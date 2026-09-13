@@ -35,7 +35,8 @@ namespace Client.Main.Objects
 
         private void Animation(GameTime gameTime)
         {
-            if (LinkParentAnimation || Model?.Actions == null || Model.Actions.Length == 0) return;
+            if (LinkParentAnimation || Model?.Actions == null || Model.Actions.Length == 0)
+                return;
 
             int currentActionIndex = Math.Clamp(CurrentAction, 0, Model.Actions.Length - 1);
             var action = Model.Actions[currentActionIndex];
