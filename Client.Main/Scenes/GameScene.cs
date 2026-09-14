@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
 using Client.Main.Objects;
+using Client.Main.Controls.UI.Game.Mobile;
 using Client.Main.Core.Utilities;
 using Client.Main.Networking.PacketHandling.Handlers; // For CharacterClassNumber
 using Microsoft.Extensions.Logging;
@@ -67,6 +68,7 @@ namespace Client.Main.Scenes
         private GameSceneChatController _chatController;
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
+        private MobileAttackButton _mobileAttackButton;
 
         // Performance optimization fields - track object IDs for O(1) lookups
         // ───────────────────────── Properties ─────────────────────────
@@ -189,7 +191,42 @@ namespace Client.Main.Scenes
             Controls.Add(_skillQuickSlot);
             _skillQuickSlot.BringToFront();
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
+            // Botón Ataque
+            _mobileAttackButton = new MobileAttackButton();
+            Controls.Add(_mobileAttackButton);
+            _mobileAttackButton.BringToFront();
 
+            _mobileAttackButton.AttackClicked += (s, e) =>
+            {
+                // Evita que el clic del botón llegue al mapa
+                // y sea interpretado como una orden de movimiento.
+                SetMouseInputConsumed();
+
+                var target = (World as WalkableWorldControl)?.FindNearestAttackableMonster();
+
+                if (target != null)
+                {
+                    _notificationManager?.AddNotification(
+                        $"ATACANDO: {target.GetType().Name}",
+                        Color.Yellow);
+
+                    Hero.Attack(target);
+
+                    _logger.LogInformation(
+                        "Mobile attack executed against {MonsterType} at {Location}",
+                        target.GetType().Name,
+                        target.Location);
+                }
+                else
+                {
+                    _notificationManager?.AddNotification(
+                        "SIN OBJETIVO",
+                        Color.Red);
+
+                    _logger.LogInformation(
+                        "Mobile attack: no attackable monster found.");
+                }
+            };
             // Experience bar
             var experienceBar = new ExperienceBarControl(MuGame.Network.GetCharacterState());
             Controls.Add(experienceBar);

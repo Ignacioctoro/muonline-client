@@ -302,5 +302,45 @@ namespace Client.Main.Controls
             }
             return null;
         }
+        /// <summary>
+        /// Finds the nearest living monster within the player's attack range.
+        /// Intended for mobile/touch attack controls.
+        /// </summary>
+        public MonsterObject FindNearestAttackableMonster()
+        {
+            if (Walker is not PlayerObject player || !player.IsAlive())
+                return null;
+
+            float attackRange = player.GetAttackRangeTiles();
+            float attackRangeSquared = attackRange * attackRange;
+
+            MonsterObject nearestMonster = null;
+            float nearestDistanceSquared = float.MaxValue;
+
+            var monsters = Monsters;
+
+            for (int i = 0; i < monsters.Count; i++)
+            {
+                var monster = monsters[i];
+
+                if (monster == null || monster.IsDead)
+                    continue;
+
+                float distanceSquared = Vector2.DistanceSquared(
+                    player.Location,
+                    monster.Location);
+
+                if (distanceSquared > attackRangeSquared)
+                    continue;
+
+                if (distanceSquared < nearestDistanceSquared)
+                {
+                    nearestDistanceSquared = distanceSquared;
+                    nearestMonster = monster;
+                }
+            }
+
+            return nearestMonster;
+        }
     }
 }
