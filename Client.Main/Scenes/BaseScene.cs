@@ -290,6 +290,47 @@ namespace Client.Main.Scenes
         {
             IsMouseInputConsumedThisFrame = true;
         }
+        /// <summary>
+        /// Returns true when the current mouse/touch position is over an
+        /// interactive UI control other than the World.
+        /// This performs a fresh hit-test instead of relying on IsMouseOver,
+        /// which may still contain the previous frame's value.
+        /// </summary>
+        public bool IsInteractiveUIUnderMouse()
+        {
+            Point mousePosition = MuGame.Instance.UiMouseState.Position;
+
+            return IsInteractiveUIUnderMouse(Controls, mousePosition);
+        }
+
+        private bool IsInteractiveUIUnderMouse(
+            IEnumerable<GameControl> controls,
+            Point mousePosition)
+        {
+            foreach (var control in controls)
+            {
+                if (control == null ||
+                    !control.Visible ||
+                    control == World)
+                {
+                    continue;
+                }
+
+                if (control.Interactive &&
+                    control.DisplayRectangle.Contains(mousePosition))
+                {
+                    return true;
+                }
+
+                if (control.Controls != null &&
+                    IsInteractiveUIUnderMouse(control.Controls, mousePosition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         public void ConsumeKeyboardEnter()
         {

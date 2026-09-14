@@ -179,8 +179,16 @@ namespace Client.Main.Controls
                         IsMousePressed = true; // for UI styling, indicate it's being pressed
                         if (prevMouse.LeftButton == ButtonState.Released)
                         {
-                            _isCurrentlyPressedByMouse = true; // this control initiated the press sequence
-                            Scene?.FocusControlIfInteractive(this); // attempt to set focus
+                            _isCurrentlyPressedByMouse = true;
+                            Scene?.FocusControlIfInteractive(this);
+
+                            // Si un control UI recibió el mouse down,
+                            // impedir que el World interprete el mismo clic
+                            // como movimiento o ataque.
+                            if (Scene is BaseScene baseScene && this != baseScene.World)
+                            {
+                                baseScene.SetMouseInputConsumed();
+                            }
                         }
                     }
                     else if (mouse.LeftButton == ButtonState.Released)
@@ -259,8 +267,8 @@ namespace Client.Main.Controls
             }
 
             if (Align != ControlAlign.None)
-                AlignControl();
-        }
+                    AlignControl();
+            }
 
         public virtual bool ProcessMouseScroll(int scrollDelta)
         {

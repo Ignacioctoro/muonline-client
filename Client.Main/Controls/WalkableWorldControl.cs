@@ -87,12 +87,11 @@ namespace Client.Main.Controls
 
             HeroTile = World.Terrain.GetHeroTile(Walker.Position.X, Walker.Position.Y);
 
-            // some UI overlay has the mouse, skip click-to-move this frame.
-            if (Scene != null && Scene.MouseHoverControl != null && Scene.MouseHoverControl != Scene.World)
+            // Any interactive UI control has priority over the world.
+            // Do a fresh hit-test because MouseHoverControl/IsMouseOver
+            // may still represent the previous frame.
+            if (Scene != null && Scene.IsInteractiveUIUnderMouse())
             {
-                // a UI element has focus or mouse over, and it's not the world itself,
-                // then the game world shouldn't process its specific click or scroll.
-                // The IsMouseInputConsumedThisFrame flag further reinforces this for other inputs.
                 base.Update(time);
                 return;
             }

@@ -765,5 +765,11 @@ namespace Client.Main.Controls
                 _objectsToInitialize.Enqueue(worldObject);
             }
         }
+
+        internal object FindNearestAttackableMonster()
+        {
+            throw new NotImplementedException();
+        }
+
     }
 }
