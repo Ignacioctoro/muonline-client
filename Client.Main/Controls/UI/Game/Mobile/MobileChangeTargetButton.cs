@@ -15,12 +15,12 @@ namespace Client.Main.Controls.UI.Game.Mobile
         {
             AutoViewSize = false;
 
-            ControlSize = new Point(110, 110);
+            ControlSize = new Point(110, 55);
             ViewSize = ControlSize;
 
             // Arriba de ATTACK PvP
             X = UiScaler.VirtualSize.X - 130;
-            Y = UiScaler.VirtualSize.Y - 380;
+            Y = UiScaler.VirtualSize.Y - 330;
 
             BackgroundColor = Color.Transparent;
 
@@ -30,8 +30,8 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 X = 0,
                 Y = 0,
 
-                ControlSize = new Point(110, 110),
-                ViewSize = new Point(110, 110),
+                ControlSize = new Point(110, 55),
+                ViewSize = new Point(110, 55),
                 AutoViewSize = false,
 
                 BackgroundColor = new Color(70, 100, 70, 220),

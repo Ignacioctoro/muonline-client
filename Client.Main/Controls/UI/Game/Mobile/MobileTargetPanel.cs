@@ -14,14 +14,14 @@ namespace Client.Main.Controls.UI.Game.Mobile
             AutoViewSize = false;
 
             // Panel ancho y relativamente bajo.
-            ControlSize = new Point(160, 72);
+            ControlSize = new Point(110, 65);
             ViewSize = ControlSize;
 
             // Misma columna derecha de los botones.
-            X = UiScaler.VirtualSize.X - 180;
+            X = UiScaler.VirtualSize.X - 130;
 
             // Arriba del botón TARGET.
-            Y = UiScaler.VirtualSize.Y - 500;
+            Y = UiScaler.VirtualSize.Y - 400;
 
             BackgroundColor = new Color(20, 25, 30, 210);
 
@@ -58,7 +58,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
             // Evita nombres absurdamente largos rompiendo el HUD.
             string displayName = name.Trim();
 
-            if (displayName.Length > 17)
+            if (displayName.Length > 11)
             {
                 displayName = displayName.Substring(0, 17) + "...";
             }
