@@ -86,7 +86,11 @@ public class VehicleObject : ModelObject
             return;
         }
         VehicleDefinition riderDefinition = VehicleDatabase.GetVehicleDefinition(itemIndex);
-        if (riderDefinition == null) return;
+
+        Console.WriteLine($"[VEHICLE MODEL] Index={itemIndex}");
+
+        if (riderDefinition == null)
+            return;
 
         // Store configuration from definition
         RiderHeightOffset = riderDefinition.RiderHeightOffset;

@@ -2265,7 +2265,7 @@ namespace Client.Main.Objects.Player
             // Horn of Fenrir variations - check for different colors
             if (itemNameLower.Contains("horn of"))
             {
-                if (itemNameLower.Contains("black") || itemNameLower.Contains("fenrir"))
+                if (itemNameLower.Contains("black"))
                     return 11; // Fenrir Black
                 if (itemNameLower.Contains("blue"))
                     return 12; // Fenrir Blue
@@ -2336,7 +2336,9 @@ namespace Client.Main.Objects.Player
             }
 
             bool hasRideablePet = vehicleIndex >= 0;
+
             bool shouldRide = hasRideablePet && !isInSafeZone;
+
 
             if (shouldRide != _isRiding || (shouldRide && vehicleIndex != _currentVehicleIndex))
             {

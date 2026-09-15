@@ -197,7 +197,7 @@ namespace Client.Main.Models
             short number = (short)(b1 | ((b0 & 0x0F) << 8));
             short itemNumber = (short)(number & (MaxItemIndex - 1));
             byte group = (byte)((b0 >> 4) & 0x0F);
-            byte variant = (byte)((b0 & 0x0E) >> 1);
+            byte variant = (byte)(b0 & 0x06);
             return (itemNumber, group, variant);
         }
 
@@ -292,7 +292,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Left hand at offset 3-5
-                    var slot = ParseExtendedSlot(RawData, 3);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 0 : 2);
                     return slot.Index < 0 ? (byte)0xFF : unchecked((byte)slot.Index);
                 }
                 // 18-byte: Byte 1
@@ -309,7 +311,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    return ParseExtendedSlot(RawData, 3).Index;
+                    return ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 0 : 2).Index;
                 }
 
                 return RawData.Length > 1 ? RawData[1] : (short)0xFF;
@@ -326,7 +330,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Right hand at offset 0-2
-                    var slot = ParseExtendedSlot(RawData, 0);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 3 : 5);
                     return slot.Index < 0 ? (byte)0xFF : unchecked((byte)slot.Index);
                 }
                 // 18-byte: Byte 2
@@ -343,7 +349,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    return ParseExtendedSlot(RawData, 0).Index;
+                    return ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 3 : 5).Index;
                 }
 
                 return RawData.Length > 2 ? RawData[2] : (short)0xFF;
@@ -359,7 +367,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 3);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 0 : 2);
                     return slot.Group;
                 }
                 // 18-byte: Byte 12, bits 5-7
@@ -376,7 +386,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 0);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 3 : 5);
                     return slot.Group;
                 }
                 // 18-byte: Byte 13, bits 5-7
@@ -398,8 +410,10 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Helm at offset 6-8
-                    var slot = ParseExtendedSlot(RawData, 6);
-                    return slot.Index;
+                    var slot = ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 6 : 8);
+                                        return slot.Index;
                 }
                 // 18-byte format
                 if (RawData.Length < 14) return 0xFF;
@@ -420,7 +434,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Armor at offset 9-11
-                    var slot = ParseExtendedSlot(RawData, 9);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 9 : 11);
                     return slot.Index;
                 }
                 // 18-byte format
@@ -442,7 +458,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Pants at offset 12-14
-                    var slot = ParseExtendedSlot(RawData, 12);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 12 : 14);
                     return slot.Index;
                 }
                 // 18-byte format
@@ -464,7 +482,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Gloves at offset 15-17
-                    var slot = ParseExtendedSlot(RawData, 15);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 15 : 17);
                     return slot.Index;
                 }
                 // 18-byte format
@@ -486,7 +506,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Boots at offset 18-20
-                    var slot = ParseExtendedSlot(RawData, 18);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 18 : 20);
                     return slot.Index;
                 }
                 // 18-byte format
@@ -508,7 +530,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 3);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 0 : 2);
                     return slot.Level;
                 }
                 return GetItemLevel18(0);
@@ -521,7 +545,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 0);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 3 : 5);
                     return slot.Level;
                 }
                 return GetItemLevel18(1);
@@ -534,7 +560,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 6);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 6 : 8);
                     return slot.Level;
                 }
                 return GetItemLevel18(2);
@@ -547,7 +575,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 9);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 9 : 11);
                     return slot.Level;
                 }
                 return GetItemLevel18(3);
@@ -560,7 +590,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 12);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 12 : 14);
                     return slot.Level;
                 }
                 return GetItemLevel18(4);
@@ -573,7 +605,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 15);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 15 : 17);
                     return slot.Level;
                 }
                 return GetItemLevel18(5);
@@ -586,7 +620,9 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var slot = ParseExtendedSlot(RawData, 18);
+                    var slot = ParseExtendedSlot(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 18 : 20);
                     return slot.Level;
                 }
                 return GetItemLevel18(6);
@@ -601,7 +637,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 6).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 6 : 8).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 7) & 0x1) == 1;
             }
         }
@@ -610,7 +651,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 9).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 9 : 11).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 6) & 0x1) == 1;
             }
         }
@@ -619,7 +665,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 12).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 12 : 14).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 5) & 0x1) == 1;
             }
         }
@@ -628,7 +679,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 15).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 15 : 17).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 4) & 0x1) == 1;
             }
         }
@@ -637,7 +693,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 18).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 18 : 20).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 3) & 0x1) == 1;
             }
         }
@@ -646,7 +707,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 3).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 0 : 2).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 2) & 0x1) == 1;
             }
         }
@@ -655,7 +721,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 0).Excellent;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 3 : 5).Excellent;
+                }
                 return RawData.Length > 10 && ((RawData[10] >> 1) & 0x1) == 1;
             }
         }
@@ -668,7 +739,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 6).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 6 : 8).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 7) & 0x1) == 1;
             }
         }
@@ -677,7 +753,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 9).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 9 : 11).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 6) & 0x1) == 1;
             }
         }
@@ -686,7 +767,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 12).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 12 : 14).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 5) & 0x1) == 1;
             }
         }
@@ -695,7 +781,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 15).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 15 : 17).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 4) & 0x1) == 1;
             }
         }
@@ -704,7 +795,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 18).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 18 : 20).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 3) & 0x1) == 1;
             }
         }
@@ -713,7 +809,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 3).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 0 : 2).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 2) & 0x1) == 1;
             }
         }
@@ -722,7 +823,12 @@ namespace Client.Main.Models
         {
             get
             {
-                if (IsExtendedFormat) return ParseExtendedSlot(RawData, 0).Ancient;
+                if (IsExtendedFormat)
+                {
+                    return ParseExtendedSlot(
+                        RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 3 : 5).Ancient;
+                }
                 return RawData.Length > 11 && ((RawData[11] >> 1) & 0x1) == 1;
             }
         }
@@ -743,7 +849,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Wings at offset 21-22
-                    var wing = ParseExtendedWings(RawData, 21);
+                    var wing = ParseExtendedWings(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 21 : 23);
                     if (wing.Index < 0)
                         return new WingAppearance(0, 0);
 
@@ -776,7 +884,9 @@ namespace Client.Main.Models
                 if (IsExtendedFormat)
                 {
                     // Extended: Helper at offset 23-24
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(
+                    RawData,
+                    Format == AppearanceFormat.Extended25Byte ? 23 : 25);
                     return helper.ItemNumber < 0 ? (byte)0 : unchecked((byte)helper.ItemNumber);
                 }
                 // 18-byte: Byte 16, bits 2-7
@@ -792,7 +902,7 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(RawData, 25);
                     return helper.Group == HelperItemGroup && helper.ItemNumber == HelperDinorantNumber;
                 }
                 return RawData.Length > 10 && (RawData[10] & 0x1) == 1;
@@ -805,7 +915,7 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(RawData, 25);
                     return helper.Group == HelperItemGroup && helper.ItemNumber == HelperFenrirNumber;
                 }
                 return RawData.Length > 12 && ((RawData[12] >> 2) & 0x1) == 1;
@@ -818,7 +928,7 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(RawData, 25);
                     return helper.Group == HelperItemGroup && helper.ItemNumber == HelperDarkHorseNumber;
                 }
                 return RawData.Length > 12 && (RawData[12] & 0x1) == 1;
@@ -831,10 +941,10 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(RawData, 25);
                     return helper.Group == HelperItemGroup
                         && helper.ItemNumber == HelperFenrirNumber
-                        && helper.Variant == 2;
+                        && helper.Variant == 0x04;
                 }
 
                 return RawData.Length > 16 && ((RawData[16] >> 1) & 0x1) == 1;
@@ -847,10 +957,11 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(RawData, 25);
+
                     return helper.Group == HelperItemGroup
                         && helper.ItemNumber == HelperFenrirNumber
-                        && helper.Variant == 1;
+                        && helper.Variant == 0x02;
                 }
 
                 return RawData.Length > 16 && (RawData[16] & 0x1) == 1;
@@ -863,10 +974,10 @@ namespace Client.Main.Models
             {
                 if (IsExtendedFormat)
                 {
-                    var helper = ParseExtendedHelper(RawData, 23);
+                    var helper = ParseExtendedHelper(RawData, 25);
                     return helper.Group == HelperItemGroup
                         && helper.ItemNumber == HelperFenrirNumber
-                        && helper.Variant == 3;
+                        && helper.Variant == 0x06;
                 }
 
                 return RawData.Length > 17 && (RawData[17] & 0x1) == 1;
@@ -874,3 +985,5 @@ namespace Client.Main.Models
         }
     }
 }
+
+

@@ -69,6 +69,49 @@ namespace Client.Main.Scenes
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
         private MobileAttackButton _mobileAttackButton;
+        private ushort? _mobilePvpTargetId;
+        private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
+            {
+                if (World is not WalkableWorldControl world || Hero == null || Hero.IsDead)
+                    return null;
+
+                PlayerObject nearest = null;
+                float nearestDistanceSquared = float.MaxValue;
+
+                var players = world.Players;
+
+                for (int i = 0; i < players.Count; i++)
+                {
+                    var player = players[i];
+
+                    if (player == null ||
+                        player == Hero ||
+                        player.IsDead ||
+                        player.World != World)
+                    {
+                        continue;
+                    }
+
+                    if (excludeCurrentTarget &&
+                        _mobilePvpTargetId.HasValue &&
+                        player.NetworkId == _mobilePvpTargetId.Value)
+                    {
+                        continue;
+                    }
+
+                    float distanceSquared = Vector2.DistanceSquared(
+                        Hero.Location,
+                        player.Location);
+
+                    if (distanceSquared < nearestDistanceSquared)
+                    {
+                        nearestDistanceSquared = distanceSquared;
+                        nearest = player;
+                    }
+                }
+
+                return nearest;
+            }
 
         // Performance optimization fields - track object IDs for O(1) lookups
         // ───────────────────────── Properties ─────────────────────────
@@ -226,6 +269,67 @@ namespace Client.Main.Scenes
                     _logger.LogInformation(
                         "Mobile attack: no attackable monster found.");
                 }
+            };
+                // Botón Ataque PvP
+                var mobilePvpAttackButton = new MobilePvpAttackButton();
+                    Controls.Add(mobilePvpAttackButton);
+                    mobilePvpAttackButton.BringToFront();
+
+                    mobilePvpAttackButton.PvpAttackClicked += (s, e) =>
+                    {
+                        // Si no tenemos objetivo, buscar uno cercano y fijarlo.
+                        if (!_mobilePvpTargetId.HasValue)
+                        {
+                            var target = FindMobilePvpTarget(false);
+
+                            if (target != null)
+                            {
+                                _mobilePvpTargetId = target.NetworkId;
+
+                                _notificationManager?.AddNotification(
+                                    $"ATACANDO A: {target.Name}",
+                                    Color.Yellow);
+
+                                _logger.LogInformation(
+                                    "Mobile PvP target selected: {PlayerName} ({NetworkId})",
+                                    target.Name,
+                                    target.NetworkId);
+
+                                Hero.Attack(target);
+                            }
+                            else
+                            {
+                                _notificationManager?.AddNotification(
+                                    "SIN OBJETIVO PvP",
+                                    Color.Red);
+
+                                _logger.LogInformation(
+                                    "Mobile PvP attack: no target found.");
+                            }
+
+                            return;
+                        }
+
+                        // Ya tenemos un objetivo fijado: buscarlo por NetworkId.
+                        var currentTarget = (World as WalkableWorldControl)?
+                            .FindPlayerById(_mobilePvpTargetId.Value);
+
+                        if (currentTarget != null &&
+                            !currentTarget.IsDead &&
+                            currentTarget.World == World)
+                        {
+                            Hero.Attack(currentTarget);
+                        }
+                        else
+                        {
+                            _notificationManager?.AddNotification(
+                                "OBJETIVO NO DISPONIBLE",
+                                Color.Red);
+
+                            _logger.LogInformation(
+                                "Mobile PvP target {NetworkId} is no longer available.",
+                                _mobilePvpTargetId.Value);
+                        }
             };
             // Experience bar
             var experienceBar = new ExperienceBarControl(MuGame.Network.GetCharacterState());

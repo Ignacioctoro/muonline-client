@@ -305,7 +305,7 @@ namespace Client.Main.Controls
         /// Finds the nearest living monster within the player's attack range.
         /// Intended for mobile/touch attack controls.
         /// </summary>
-        public MonsterObject FindNearestAttackableMonster()
+        public new MonsterObject FindNearestAttackableMonster()
         {
             if (Walker is not PlayerObject player || !player.IsAlive())
                 return null;

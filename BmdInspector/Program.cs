@@ -5,7 +5,7 @@ var path = args.Length > 0
     : throw new ArgumentException("Falta la ruta al BMD.");
 
 if (!File.Exists(path))
-    throw new FileNotFoundException("No se encontró el BMD.", path);
+    throw new FileNotFoundException("No se encontrï¿½ el BMD.", path);
 
 var buffer = File.ReadAllBytes(path);
 
@@ -23,6 +23,15 @@ Console.WriteLine($"Name    : {bmd.Name}");
 Console.WriteLine($"Meshes  : {bmd.Meshes.Length}");
 Console.WriteLine($"Bones   : {bmd.Bones.Length}");
 Console.WriteLine($"Actions : {bmd.Actions.Length}");
+Console.WriteLine();
+Console.WriteLine("=== TEXTURAS ===");
+
+for (int i = 0; i < bmd.Meshes.Length; i++)
+{
+    Console.WriteLine(
+        $"Mesh {i}: Texture={bmd.Meshes[i].Texture}, " +
+        $"TexturePath='{bmd.Meshes[i].TexturePath}'");
+}
 
 Console.WriteLine();
 Console.WriteLine("=== ACCIONES IMPORTANTES ===");

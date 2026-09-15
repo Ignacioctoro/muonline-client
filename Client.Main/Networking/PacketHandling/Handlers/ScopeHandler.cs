@@ -170,6 +170,14 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         [PacketHandler(0x12, PacketRouter.NoSubCode)] // AddCharacterToScope
         public Task HandleAddCharacterToScopeAsync(Memory<byte> packet)
         {
+            _logger.LogInformation(
+                "[SCOPE TEST] AddCharacterToScope 0x12 recibido. Length={Length}",
+                packet.Length);
+
+            _logger.LogInformation(
+            "[SCOPE RAW] {Bytes}",
+            Convert.ToHexString(packet.Span));
+
             try
             {
                 ParseAndAddCharactersToScope(packet);
@@ -181,65 +189,210 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-        private void ParseAndAddCharactersToScope(Memory<byte> packet)
-        {
-            var scope = new AddCharactersToScopeRef(packet.Span);
-
-            for (int i = 0; i < scope.CharacterCount; i++)
+            private void ParseAndAddCharactersToScope(Memory<byte> packet)
             {
-                var c = scope[i];
-                ushort raw = c.Id;
-                ushort masked = (ushort)(raw & 0x7FFF);
-                var cls = ClassFromAppearance(c.Appearance);
-
-                // Capture any active effects from the packet
-                if (c.EffectCount > 0)
+                // 2.04d / Extended format
+                if (_useExtendedWalkFormat)
                 {
-                    for (int e = 0; e < c.EffectCount; e++)
+                    var extended = new AddCharacterToScopeExtendedRef(packet.Span);
+
+                    ushort raw = extended.Id;
+                    ushort masked = (ushort)(raw & 0x7FFF);
+
+                    byte x = extended.CurrentPositionX;
+                    byte y = extended.CurrentPositionY;
+                    string name = extended.Name;
+
+                    var appearanceAndEffects = extended.AppearanceAndEffects;
+
+                    // 27 bytes de appearance + 1 byte de cantidad de efectos
+                    if (appearanceAndEffects.Length < 28)
                     {
-                        byte effectId = c[e].Id;
+                        _logger.LogWarning(
+                            "[SCOPE EXTENDED] Packet too short. Length={Length}",
+                            appearanceAndEffects.Length);
+                        return;
+                    }
+
+                    var appearance = appearanceAndEffects.Slice(0, 27);
+                    _logger.LogInformation(
+                    "[SCOPE APPEARANCE] {Bytes}",
+                    Convert.ToHexString(appearance));
+                    byte effectCount = appearanceAndEffects[27];
+
+                    _logger.LogInformation(
+                        "[SCOPE EXTENDED] Id={Id:X4}, X={X}, Y={Y}, Name={Name}, EffectCount={EffectCount}",
+                        raw,
+                        x,
+                        y,
+                        name,
+                        effectCount);
+
+                    var cls = ClassFromAppearance(appearance);
+
+                    int availableEffects = Math.Min(
+                        effectCount,
+                        appearanceAndEffects.Length - 28);
+
+                    for (int e = 0; e < availableEffects; e++)
+                    {
+                        byte effectId = appearanceAndEffects[28 + e];
+
                         _characterState.ActivateBuff(effectId, raw);
                         ElfBuffEffectManager.Instance?.HandleBuff(effectId, raw, true);
                     }
-                }
 
-                // Always update the manager, even for the local player
-                _scopeManager.AddOrUpdatePlayerInScope(masked, raw, c.CurrentPositionX, c.CurrentPositionY, c.Name);
+                    _scopeManager.AddOrUpdatePlayerInScope(
+                        masked,
+                        raw,
+                        x,
+                        y,
+                        name);
 
-                // Spawn remote players immediately if the world is ready,
-                // otherwise buffer for later
-                if (MuGame.Instance.ActiveScene?.World is WalkableWorldControl w
-                    && w.Status == GameControlStatus.Ready)
-                {
-                    if (masked != _characterState.Id) // Don't spawn self as a remote player
+                    // No crear nuestro propio personaje como jugador remoto
+                    if (masked == _characterState.Id)
+                        return;
+
+                    if (MuGame.Instance.ActiveScene?.World is WalkableWorldControl w
+                        && w.Status == GameControlStatus.Ready)
                     {
-                        SpawnRemotePlayerIntoWorld(w, masked, raw, c.CurrentPositionX, c.CurrentPositionY, c.Name, cls, c.Appearance.ToArray());
+                        SpawnRemotePlayerIntoWorld(
+                            w,
+                            masked,
+                            raw,
+                            x,
+                            y,
+                            name,
+                            cls,
+                            appearance.ToArray());
                     }
-                }
-                else if (masked != _characterState.Id)
-                {
-                    lock (_pendingPlayers)
+                    else
                     {
-                        if (!_pendingPlayers.Any(p => p.Id == masked))
+                        lock (_pendingPlayers)
                         {
-                            _pendingPlayers.Add(new PlayerScopeObject(masked, raw, c.CurrentPositionX, c.CurrentPositionY, c.Name, cls, c.Appearance.ToArray()));
+                            if (!_pendingPlayers.Any(p => p.Id == masked))
+                            {
+                                _pendingPlayers.Add(
+                                    new PlayerScopeObject(
+                                        masked,
+                                        raw,
+                                        x,
+                                        y,
+                                        name,
+                                        cls,
+                                        appearance.ToArray()));
+                            }
+                        }
+                    }
+
+                    return;
+                }
+
+                // 1.04d / Classic format
+                var scope = new AddCharactersToScopeRef(packet.Span);
+
+                for (int i = 0; i < scope.CharacterCount; i++)
+                {
+                    var c = scope[i];
+
+                    _logger.LogInformation(
+                        "[SCOPE DEBUG] Character {Index}: Id={Id:X4}, X={X}, Y={Y}, Name={Name}, EffectCount={EffectCount}",
+                        i,
+                        c.Id,
+                        c.CurrentPositionX,
+                        c.CurrentPositionY,
+                        c.Name,
+                        c.EffectCount);
+
+                    ushort raw = c.Id;
+                    ushort masked = (ushort)(raw & 0x7FFF);
+                    var cls = ClassFromAppearance(c.Appearance);
+
+                    if (c.EffectCount > 0)
+                    {
+                        for (int e = 0; e < c.EffectCount; e++)
+                        {
+                            byte effectId = c[e].Id;
+
+                            _characterState.ActivateBuff(effectId, raw);
+                            ElfBuffEffectManager.Instance?.HandleBuff(effectId, raw, true);
+                        }
+                    }
+
+                    _scopeManager.AddOrUpdatePlayerInScope(
+                        masked,
+                        raw,
+                        c.CurrentPositionX,
+                        c.CurrentPositionY,
+                        c.Name);
+
+                    if (MuGame.Instance.ActiveScene?.World is WalkableWorldControl w
+                        && w.Status == GameControlStatus.Ready)
+                    {
+                        if (masked != _characterState.Id)
+                        {
+                            SpawnRemotePlayerIntoWorld(
+                                w,
+                                masked,
+                                raw,
+                                c.CurrentPositionX,
+                                c.CurrentPositionY,
+                                c.Name,
+                                cls,
+                                c.Appearance.ToArray());
+                        }
+                    }
+                    else if (masked != _characterState.Id)
+                    {
+                        lock (_pendingPlayers)
+                        {
+                            if (!_pendingPlayers.Any(p => p.Id == masked))
+                            {
+                                _pendingPlayers.Add(
+                                    new PlayerScopeObject(
+                                        masked,
+                                        raw,
+                                        c.CurrentPositionX,
+                                        c.CurrentPositionY,
+                                        c.Name,
+                                        cls,
+                                        c.Appearance.ToArray()));
+                            }
                         }
                     }
                 }
             }
-        }
 
-        private static CharacterClassNumber ClassFromAppearance(ReadOnlySpan<byte> app)
-        {
-            if (app.Length == 0) return CharacterClassNumber.DarkWizard;
-            int raw = (app[0] >> 3) & 0b1_1111;
-            return raw switch
+            private static CharacterClassNumber ClassFromAppearance(ReadOnlySpan<byte> app)
             {
-                0 or 2 or 3 or 4 or 6 or 7 or 8 or 10 or 11 or 12 or 13 or
-                16 or 17 or 20 or 22 or 23 or 24 or 25 => (CharacterClassNumber)raw,
-                _ => CharacterClassNumber.DarkWizard
-            };
-        }
+                if (app.Length == 0)
+                    return CharacterClassNumber.DarkWizard;
+
+                int rawClass = app[0];
+
+                return rawClass switch
+                {
+                    0  => CharacterClassNumber.DarkWizard,
+                    2  => CharacterClassNumber.SoulMaster,
+                    3  => CharacterClassNumber.GrandMaster,
+                    4  => CharacterClassNumber.DarkKnight,
+                    6  => CharacterClassNumber.BladeKnight,
+                    7  => CharacterClassNumber.BladeMaster,
+                    8  => CharacterClassNumber.FairyElf,
+                    10 => CharacterClassNumber.MuseElf,
+                    11 => CharacterClassNumber.HighElf,
+                    12 => CharacterClassNumber.MagicGladiator,
+                    13 => CharacterClassNumber.DuelMaster,
+                    16 => CharacterClassNumber.DarkLord,
+                    17 => CharacterClassNumber.LordEmperor,
+                    20 => CharacterClassNumber.Summoner,
+                    22 => CharacterClassNumber.BloodySummoner,
+                    23 => CharacterClassNumber.DimensionMaster,
+                    24 => CharacterClassNumber.RageFighter,
+                    25 => CharacterClassNumber.FistMaster,
+                    _ => CharacterClassNumber.DarkWizard
+                };
+            }
 
         private void SpawnRemotePlayerIntoWorld(
                 WalkableWorldControl world,
