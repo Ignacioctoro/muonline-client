@@ -80,6 +80,9 @@ namespace Client.Main.Objects.Player
         private bool _isRiding;
         private short _currentVehicleIndex = -1;
         private float _currentRiderHeightOffset = 0f;
+        // Remote players can receive pet changes after their initial AppearanceData.
+        // When set, this overrides the vehicle encoded in the initial appearance.
+        private short? _remoteVehicleOverrideIndex;
 
         private int _lastEquipmentAnimationStride = -1;
         private float _lastWingAnimationSpeed = -1f;
@@ -2221,65 +2224,92 @@ namespace Client.Main.Objects.Player
         /// <summary>
         /// Checks if the player has a rideable pet equipped (Horn of Fenrir, Dark Horse, etc.)
         /// </summary>
-        private bool HasRideablePetEquipped(out short vehicleIndex)
-        {
-            vehicleIndex = -1;
-
-            if (_networkManager == null)
-                return false;
-
-            var charState = _networkManager.GetCharacterState();
-            var inventory = charState.GetInventoryItems();
-
-            // Check pet slot (slot 8)
-            if (!inventory.TryGetValue(InventoryConstants.PetSlot, out var petData))
-                return false;
-
-            var itemDef = ItemDatabase.GetItemDefinition(petData);
-            if (itemDef == null)
-                return false;
-
-            string itemName = itemDef.Name?.ToLowerInvariant() ?? string.Empty;
-
-            // Map pet items to vehicle indices
-            vehicleIndex = MapPetToVehicleIndex(itemName, itemDef.Id);
-            return vehicleIndex >= 0;
-        }
-
-        /// <summary>
-        /// Maps pet item name/id to the corresponding VehicleDatabase index.
-        /// </summary>
-        private static short MapPetToVehicleIndex(string itemNameLower, int itemId)
-        {
-            // Dark Horse variations
-            if (itemNameLower.Contains("dark horse"))
-                return 0; // Dark Horse
-
-            // Dinorant
-            if (itemNameLower.Contains("uniria"))
-                return 7; // Rider 01
-
-            if (itemNameLower.Contains("dinorant"))
-                return 8; // Rider 02
-
-            // Horn of Fenrir variations - check for different colors
-            if (itemNameLower.Contains("horn of"))
+            private bool HasRideablePetEquipped(out short vehicleIndex)
             {
-                if (itemNameLower.Contains("black"))
-                    return 11; // Fenrir Black
-                if (itemNameLower.Contains("blue"))
-                    return 12; // Fenrir Blue
-                if (itemNameLower.Contains("gold"))
-                    return 13; // Fenrir Gold
-                if (itemNameLower.Contains("red"))
-                    return 14; // Fenrir Red
+                vehicleIndex = -1;
 
-                // Default Fenrir
-                return 14; // Fenrir Red as default
+                if (_networkManager == null)
+                    return false;
+
+                var charState = _networkManager.GetCharacterState();
+                var inventory = charState.GetInventoryItems();
+
+                // Pet slot = 8
+                if (!inventory.TryGetValue(InventoryConstants.PetSlot, out var petData))
+                    return false;
+
+                // Get real item group / number from raw item data.
+                if (!ItemDatabase.TryGetItemGroupAndNumber(
+                        petData,
+                        out byte itemGroup,
+                        out short itemNumber))
+                {
+                    return false;
+                }
+
+                // Group 13 = pets/helpers.
+                if (itemGroup != 13)
+                    return false;
+
+                // Dark Horse
+                // Keep existing identification through the item definition
+                // because it is a different item, not a Fenrir variant.
+                var itemDef = ItemDatabase.GetItemDefinition(itemGroup, itemNumber);
+                if (itemDef == null)
+                    return false;
+
+                string itemName = itemDef.Name?.ToLowerInvariant() ?? string.Empty;
+
+                if (itemName.Contains("dark horse"))
+                {
+                    vehicleIndex = 0;
+                    return true;
+                }
+
+                if (itemName.Contains("uniria"))
+                {
+                    vehicleIndex = 7;
+                    return true;
+                }
+
+                if (itemName.Contains("dinorant"))
+                {
+                    vehicleIndex = 8;
+                    return true;
+                }
+
+                // Fenrir is Group 13, Number 37.
+                if (itemNumber == 37)
+                {
+                    var details = ItemDatabase.ParseItemDetails(petData);
+                    byte fenrirFlags = details.ExcellentFlags;
+
+                    // OpenMU Fenrir flags:
+                    // 0x01 = Black
+                    // 0x02 = Blue
+                    // 0x04 = Gold
+                    if ((fenrirFlags & 0x01) != 0)
+                    {
+                        vehicleIndex = 11; // Fenrir Black
+                    }
+                    else if ((fenrirFlags & 0x02) != 0)
+                    {
+                        vehicleIndex = 12; // Fenrir Blue
+                    }
+                    else if ((fenrirFlags & 0x04) != 0)
+                    {
+                        vehicleIndex = 13; // Fenrir Gold
+                    }
+                    else
+                    {
+                        vehicleIndex = 14; // Fenrir Red
+                    }
+
+                    return true;
+                }
+
+                return false;
             }
-
-            return -1; // Not a rideable pet
-        }
 
         /// <summary>
         /// Updates the vehicle visibility and animations based on current zone (for local player).
@@ -2313,34 +2343,41 @@ namespace Client.Main.Objects.Player
         /// </summary>
         private void UpdateVehicleStateFromAppearance(bool isInSafeZone)
         {
-            if (Appearance.RawData.IsEmpty)
-                return;
-
-            // Check appearance flags for rideable pets
             short vehicleIndex = -1;
 
-            if (Appearance.HasDarkHorse)
+            // AppearanceChanged packets override the initial appearance data.
+            // -1 means the remote player explicitly has no rideable pet.
+            if (_remoteVehicleOverrideIndex.HasValue)
             {
-                vehicleIndex = 0; // Dark Horse
+                vehicleIndex = _remoteVehicleOverrideIndex.Value;
             }
-            else if (Appearance.HasFenrir)
+            else
             {
-                if (Appearance.HasBlackFenrir)
-                    vehicleIndex = 11; // Fenrir Black
-                else if (Appearance.HasBlueFenrir)
-                    vehicleIndex = 12; // Fenrir Blue
-                else if (Appearance.HasGoldFenrir)
-                    vehicleIndex = 13; // Fenrir Gold
-                else
-                    vehicleIndex = 14; // Default Fenrir (red)
+                if (Appearance.RawData.IsEmpty)
+                    return;
+
+                if (Appearance.HasDarkHorse)
+                {
+                    vehicleIndex = 0; // Dark Horse
+                }
+                else if (Appearance.HasFenrir)
+                {
+                    if (Appearance.HasBlackFenrir)
+                        vehicleIndex = 11; // Fenrir Black
+                    else if (Appearance.HasBlueFenrir)
+                        vehicleIndex = 12; // Fenrir Blue
+                    else if (Appearance.HasGoldFenrir)
+                        vehicleIndex = 13; // Fenrir Gold
+                    else
+                        vehicleIndex = 14; // Fenrir Red
+                }
             }
 
             bool hasRideablePet = vehicleIndex >= 0;
-
             bool shouldRide = hasRideablePet && !isInSafeZone;
 
-
-            if (shouldRide != _isRiding || (shouldRide && vehicleIndex != _currentVehicleIndex))
+            if (shouldRide != _isRiding ||
+                (shouldRide && vehicleIndex != _currentVehicleIndex))
             {
                 _isRiding = shouldRide;
                 _currentVehicleIndex = shouldRide ? vehicleIndex : (short)-1;
@@ -2348,14 +2385,18 @@ namespace Client.Main.Objects.Player
                 if (Vehicle != null)
                 {
                     Vehicle.Hidden = !shouldRide;
+
                     if (shouldRide)
                     {
                         Vehicle.ItemIndex = vehicleIndex;
                     }
+                    else
+                    {
+                        Vehicle.ItemIndex = -1;
+                    }
                 }
             }
 
-            // Apply rider height offset when riding
             ApplyRiderHeightOffset();
         }
 
@@ -3908,9 +3949,71 @@ namespace Client.Main.Objects.Player
                         await UpdateArmorSlotAsync(Armor, equipmentData, equipmentData.ItemGroup, equipmentData.ItemNumber);
                         break;
 
-                    case InventoryConstants.PantsSlot: // 4 - Pants
-                        await UpdateArmorSlotAsync(Pants, equipmentData, equipmentData.ItemGroup, equipmentData.ItemNumber);
+                    case InventoryConstants.PetSlot: // 8 - Pet
+                    {
+                        short vehicleIndex = -1;
+
+                        if (equipmentData.ItemGroup == 13)
+                        {
+                            // Fenrir = Group 13, Number 37
+                            if (equipmentData.ItemNumber == 37)
+                            {
+                                byte fenrirFlags = equipmentData.ExcellentFlags;
+
+                                // OpenMU Fenrir flags:
+                                // 0x01 = Black
+                                // 0x02 = Blue
+                                // 0x04 = Gold
+                                // 0x00 = Red
+                                if ((fenrirFlags & 0x01) != 0)
+                                {
+                                    vehicleIndex = 11; // Fenrir Black
+                                }
+                                else if ((fenrirFlags & 0x02) != 0)
+                                {
+                                    vehicleIndex = 12; // Fenrir Blue
+                                }
+                                else if ((fenrirFlags & 0x04) != 0)
+                                {
+                                    vehicleIndex = 13; // Fenrir Gold
+                                }
+                                else
+                                {
+                                    vehicleIndex = 14; // Fenrir Red
+                                }
+                            }
+                            else
+                            {
+                                // Other rideable pets/helpers.
+                                var petDef = ItemDatabase.GetItemDefinition(
+                                    equipmentData.ItemGroup,
+                                    (short)equipmentData.ItemNumber);
+
+                                string petName = petDef?.Name?.ToLowerInvariant() ?? string.Empty;
+
+                                if (petName.Contains("dark horse"))
+                                {
+                                    vehicleIndex = 0;
+                                }
+                                else if (petName.Contains("uniria"))
+                                {
+                                    vehicleIndex = 7;
+                                }
+                                else if (petName.Contains("dinorant"))
+                                {
+                                    vehicleIndex = 8;
+                                }
+                            }
+                        }
+
+                        // From now on, use this new pet state instead of the initial AppearanceData.
+                        _remoteVehicleOverrideIndex = vehicleIndex;
+
+                        // Force the mount state to be recalculated on the next update.
+                        _currentVehicleIndex = -1;
+
                         break;
+                    }
 
                     case InventoryConstants.GlovesSlot: // 5 - Gloves
                         _logger?.LogDebug($"[PlayerObject] UpdateEquipmentSlotAsync: Processing gloves slot, calling UpdateArmorSlotAsync");
@@ -3925,10 +4028,6 @@ namespace Client.Main.Objects.Player
                         await UpdateWingsSlotAsync(equipmentData);
                         break;
 
-                    case InventoryConstants.PetSlot: // 8 - Pet
-                        // Pet handling would go here
-                        _logger?.LogDebug("Pet slot update not implemented yet for slot {Slot}", itemSlot);
-                        break;
 
                     default:
                         _logger?.LogWarning("Unknown equipment slot {Slot} in appearance change", itemSlot);
@@ -3990,6 +4089,23 @@ namespace Client.Main.Objects.Player
                     EquippedWings.Hidden = true;
                     EquippedWings.Type = 0;
                     EquippedWings.ItemIndex = -1;
+                    break;
+                    case InventoryConstants.PetSlot:
+                    // Explicitly override the initial AppearanceData:
+                    // this remote player no longer has a rideable pet.
+                    _remoteVehicleOverrideIndex = -1;
+
+                    _isRiding = false;
+                    _currentVehicleIndex = -1;
+                    _currentRiderHeightOffset = 0f;
+
+                    if (Vehicle != null)
+                    {
+                        Vehicle.Hidden = true;
+                        Vehicle.ItemIndex = -1;
+                    }
+
+                    ApplyRiderHeightOffset();
                     break;
 
                 default:

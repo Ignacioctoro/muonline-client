@@ -2,6 +2,7 @@ using Client.Main.Content;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System.Threading;
 
 namespace Client.Main.Objects.Vehicle;
 
@@ -26,15 +27,34 @@ public class VehicleObject : ModelObject
     };
 
     private short itemIndex = -1;
+    private int _itemIndexChangeVersion;
+
     public short ItemIndex
     {
         get => itemIndex;
         set
         {
-            if (itemIndex == value) return;
+            if (itemIndex == value)
+                return;
+
             itemIndex = value;
-            _ = OnChangeIndex();
+
+            // Cada cambio de ItemIndex obtiene una nueva versión.
+            // Una carga anterior no podrá sobrescribir una más reciente.
+            int version = Interlocked.Increment(ref _itemIndexChangeVersion);
+
+            _ = OnChangeIndexAsync(value, version);
         }
+    }
+
+    /// <summary>
+    /// Checks whether an asynchronous vehicle load still corresponds
+    /// to the currently requested ItemIndex.
+    /// </summary>
+    private bool IsCurrentItemIndex(short requestedIndex, int version)
+    {
+        return requestedIndex == itemIndex
+            && version == Volatile.Read(ref _itemIndexChangeVersion);
     }
 
     /// <summary>
@@ -48,12 +68,15 @@ public class VehicleObject : ModelObject
     /// Retrieved from VehicleDefinition when the vehicle is loaded.
     /// </summary>
     public float AnimationSpeedMultiplier { get; private set; } = 1.0f;
+
     private float idleAnimationSpeedMultiplier = 1.0f;
     private float runAnimationSpeedMultiplier = 1.0f;
     private float skillAnimationSpeedMultiplier = 1.0f;
+
     private int idleActionIndex = DefaultAnimationIdle;
     private int runActionIndex = DefaultAnimationRun;
     private int skillActionIndex = DefaultAnimationSkill;
+
     private Dictionary<int, float> actionPlaySpeedOverrides;
 
     public VehicleObject()
@@ -69,64 +92,113 @@ public class VehicleObject : ModelObject
         AnimationSpeed = 25f;
     }
 
-    private async Task OnChangeIndex()
+    /// <summary>
+    /// Loads the vehicle corresponding to a specific ItemIndex.
+    ///
+    /// requestedIndex and version are captured when ItemIndex changes.
+    /// If ItemIndex changes again while the model is loading,
+    /// this operation is discarded and cannot overwrite the newer vehicle.
+    /// </summary>
+    private async Task OnChangeIndexAsync(short requestedIndex, int version)
     {
-        if (ItemIndex < 0)
+        // This request may already have been replaced before execution starts.
+        if (!IsCurrentItemIndex(requestedIndex, version))
+            return;
+
+        // No vehicle.
+        if (requestedIndex < 0)
         {
             Model = null;
+
             RiderHeightOffset = 0f;
+
             AnimationSpeedMultiplier = 1.0f;
             idleAnimationSpeedMultiplier = 1.0f;
             runAnimationSpeedMultiplier = 1.0f;
             skillAnimationSpeedMultiplier = 1.0f;
+
             idleActionIndex = DefaultAnimationIdle;
             runActionIndex = DefaultAnimationRun;
             skillActionIndex = DefaultAnimationSkill;
+
             actionPlaySpeedOverrides = null;
+
             return;
         }
-        VehicleDefinition riderDefinition = VehicleDatabase.GetVehicleDefinition(itemIndex);
 
-        Console.WriteLine($"[VEHICLE MODEL] Index={itemIndex}");
+        // IMPORTANT:
+        // Use requestedIndex instead of the mutable itemIndex field.
+        VehicleDefinition riderDefinition =
+            VehicleDatabase.GetVehicleDefinition(requestedIndex);
 
         if (riderDefinition == null)
             return;
 
-        // Store configuration from definition
-        RiderHeightOffset = riderDefinition.RiderHeightOffset;
-        AnimationSpeedMultiplier = riderDefinition.AnimationSpeedMultiplier;
-        AnimationSpeed = riderDefinition.AnimationSpeed;
-        idleAnimationSpeedMultiplier = riderDefinition.IdleAnimationSpeedMultiplier;
-        runAnimationSpeedMultiplier = riderDefinition.RunAnimationSpeedMultiplier;
-        skillAnimationSpeedMultiplier = riderDefinition.SkillAnimationSpeedMultiplier;
-        idleActionIndex = riderDefinition.IdleActionIndex;
-        runActionIndex = riderDefinition.RunActionIndex;
-        skillActionIndex = riderDefinition.SkillActionIndex;
-        actionPlaySpeedOverrides = riderDefinition.ActionPlaySpeedOverrides;
-
         string modelPath = riderDefinition.TexturePath;
 
-        Model = await BMDLoader.Instance.Prepare(Path.Combine("Skill", modelPath));
+        // Load into a local variable first.
+        // Do not modify Model until we know this request is still current.
+        var newModel = await BMDLoader.Instance.Prepare(
+            Path.Combine("Skill", modelPath));
+
+        // ItemIndex could have changed while BMDLoader was awaiting.
+        // If so, this model is obsolete and must not be applied.
+        if (!IsCurrentItemIndex(requestedIndex, version))
+            return;
+
+        // From this point onward this request is still the current vehicle.
+        RiderHeightOffset = riderDefinition.RiderHeightOffset;
+
+        AnimationSpeedMultiplier =
+            riderDefinition.AnimationSpeedMultiplier;
+
+        AnimationSpeed =
+            riderDefinition.AnimationSpeed;
+
+        idleAnimationSpeedMultiplier =
+            riderDefinition.IdleAnimationSpeedMultiplier;
+
+        runAnimationSpeedMultiplier =
+            riderDefinition.RunAnimationSpeedMultiplier;
+
+        skillAnimationSpeedMultiplier =
+            riderDefinition.SkillAnimationSpeedMultiplier;
+
+        idleActionIndex =
+            riderDefinition.IdleActionIndex;
+
+        runActionIndex =
+            riderDefinition.RunActionIndex;
+
+        skillActionIndex =
+            riderDefinition.SkillActionIndex;
+
+        actionPlaySpeedOverrides =
+            riderDefinition.ActionPlaySpeedOverrides;
+
+        // Only the most recent ItemIndex request is allowed
+        // to replace the current model.
+        Model = newModel;
 
         if (Model == null)
         {
             Status = GameControlStatus.Error;
+            return;
         }
-        else
+
+        if (Status == GameControlStatus.Error)
         {
-            if (Status == GameControlStatus.Error)
-            {
-                Status = GameControlStatus.Ready;
-            }
+            Status = GameControlStatus.Ready;
+        }
 
-            // Apply animation speed multiplier to all actions
-            ApplyAnimationSpeedMultiplier();
+        // Apply animation speed multiplier to all actions.
+        ApplyAnimationSpeedMultiplier();
 
-            // For vehicles with root motion in their animations, lock positions to prevent drifting
-            if (VehiclesWithRootMotion.Contains(itemIndex))
-            {
-                ApplyPositionLockToAnimations();
-            }
+        // For vehicles with root motion in their animations,
+        // lock positions to prevent drifting.
+        if (VehiclesWithRootMotion.Contains(requestedIndex))
+        {
+            ApplyPositionLockToAnimations();
         }
     }
 
@@ -138,17 +210,20 @@ public class VehicleObject : ModelObject
         if (Model?.Actions == null)
             return;
 
-        if (actionPlaySpeedOverrides != null && actionPlaySpeedOverrides.Count > 0)
+        if (actionPlaySpeedOverrides != null &&
+            actionPlaySpeedOverrides.Count > 0)
         {
             foreach (var kvp in actionPlaySpeedOverrides)
             {
                 int index = kvp.Key;
+
                 if (index < 0 || index >= Model.Actions.Length)
                 {
                     continue;
                 }
 
                 var action = Model.Actions[index];
+
                 if (action == null)
                 {
                     continue;
@@ -156,25 +231,30 @@ public class VehicleObject : ModelObject
 
                 action.PlaySpeed = kvp.Value;
             }
+
             return;
         }
 
-        bool hasCustomMultiplier = AnimationSpeedMultiplier != 1.0f
+        bool hasCustomMultiplier =
+            AnimationSpeedMultiplier != 1.0f
             || idleAnimationSpeedMultiplier != 1.0f
             || runAnimationSpeedMultiplier != 1.0f
             || skillAnimationSpeedMultiplier != 1.0f;
+
         if (!hasCustomMultiplier)
             return;
 
         for (int i = 0; i < Model.Actions.Length; i++)
         {
             var action = Model.Actions[i];
+
             if (action == null)
             {
                 continue;
             }
 
             float multiplier = AnimationSpeedMultiplier;
+
             if (i == idleActionIndex)
             {
                 multiplier *= idleAnimationSpeedMultiplier;
@@ -226,33 +306,43 @@ public class VehicleObject : ModelObject
     /// <summary>
     /// Sets the vehicle animation based on rider state.
     /// </summary>
-    public void SetRiderAnimation(bool isMoving, bool isUsingSkill = false)
+    public void SetRiderAnimation(
+        bool isMoving,
+        bool isUsingSkill = false)
     {
         if (Model == null || Hidden)
             return;
 
         int targetAnim;
+
         if (isUsingSkill)
         {
             targetAnim = skillActionIndex;
-            // Skill animation should play once and hold on last frame
+
+            // Skill animation should play once
+            // and hold on last frame.
             HoldOnLastFrame = true;
         }
         else
         {
             if (isMoving)
+            {
                 targetAnim = runActionIndex;
+            }
             else
+            {
                 targetAnim = idleActionIndex;
+            }
 
-            // Normal animations should loop
+            // Normal animations should loop.
             HoldOnLastFrame = false;
         }
 
         if (CurrentAction != targetAnim)
         {
             CurrentAction = targetAnim;
-            // Reset animation time when changing actions
+
+            // Reset animation time when changing actions.
             _animTime = 0.0;
         }
     }
@@ -260,6 +350,7 @@ public class VehicleObject : ModelObject
     public override void Draw(GameTime gameTime)
     {
         base.Draw(gameTime);
+
         foreach (var child in Children)
         {
             child.Draw(gameTime);
@@ -269,6 +360,7 @@ public class VehicleObject : ModelObject
     public override void DrawAfter(GameTime gameTime)
     {
         base.DrawAfter(gameTime);
+
         foreach (var child in Children)
         {
             child.DrawAfter(gameTime);

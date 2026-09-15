@@ -1,4 +1,4 @@
-// GameScene.cs
+// File: GameScene.cs
 using Client.Main.Controls;
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Game;
@@ -30,6 +30,7 @@ using Client.Main.Controls.UI.Game.Hud;
 using MUnique.OpenMU.Network.Packets;
 using Client.Main.Controllers;
 using Client.Main.Helpers;
+using Client.Data.ATT;
 
 namespace Client.Main.Scenes
 {
@@ -69,7 +70,10 @@ namespace Client.Main.Scenes
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
         private MobileAttackButton _mobileAttackButton;
+        private MobilePvpAttackButton _mobilePvpAttackButton;
         private ushort? _mobilePvpTargetId;
+        private MobileChangeTargetButton _mobileChangeTargetButton;
+        private MobileTargetPanel _mobileTargetPanel;
         private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
             {
                 if (World is not WalkableWorldControl world || Hero == null || Hero.IsDead)
@@ -234,103 +238,256 @@ namespace Client.Main.Scenes
             Controls.Add(_skillQuickSlot);
             _skillQuickSlot.BringToFront();
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
-            // Botón Ataque
+
+            // Panel de objetivo móvil
+            _mobileTargetPanel = new MobileTargetPanel();
+            Controls.Add(_mobileTargetPanel);
+            _mobileTargetPanel.BringToFront();
+
+            // ─────────────────────────────────────────────
+            // Botón Ataque Monstruos
+            // ─────────────────────────────────────────────
             _mobileAttackButton = new MobileAttackButton();
             Controls.Add(_mobileAttackButton);
             _mobileAttackButton.BringToFront();
 
-            _mobileAttackButton.AttackClicked += (s, e) =>
+
+            // ─────────────────────────────────────────────
+            // ATAQUE BÁSICO / ARMA
+            // Equivalente al click izquierdo
+            // ─────────────────────────────────────────────
+            _mobileAttackButton.BasicAttackClicked += (s, e) =>
             {
-                // Evita que el clic del botón llegue al mapa
-                // y sea interpretado como una orden de movimiento.
                 SetMouseInputConsumed();
 
-                var target = (World as WalkableWorldControl)?.FindNearestAttackableMonster();
+                var target = (World as WalkableWorldControl)?
+                    .FindNearestAttackableMonster();
 
+                if (target == null)
+                {
+                    _mobileTargetPanel?.ClearTarget();
+                    return;
+                }
+
+                _mobileTargetPanel?.SetTarget(
+                    target.GetType().Name,
+                    isPlayer: false);
+
+                Hero.Attack(target);
+            };
+
+
+            // ─────────────────────────────────────────────
+            // SKILL
+            // Equivalente al click derecho
+            // ─────────────────────────────────────────────
+            _mobileAttackButton.SkillAttackClicked += (s, e) =>
+            {
+                SetMouseInputConsumed();
+
+                var target = (World as WalkableWorldControl)?
+                    .FindNearestAttackableMonster();
+
+                // IMPORTANTE:
+                // aunque target sea null, llamamos igualmente al controlador.
+                //
+                // Esto permite que skills que no requieren objetivo,
+                // como Twisting Slash, HellFire, Inferno o Evil Spirit,
+                // se ejecuten igualmente.
                 if (target != null)
                 {
-                    _notificationManager?.AddNotification(
-                        $"ATACANDO: {target.GetType().Name}",
-                        Color.Yellow);
-
-                    Hero.Attack(target);
-
-                    _logger.LogInformation(
-                        "Mobile attack executed against {MonsterType} at {Location}",
+                    _mobileTargetPanel?.SetTarget(
                         target.GetType().Name,
-                        target.Location);
+                        isPlayer: false);
                 }
-                else
-                {
-                    _notificationManager?.AddNotification(
-                        "SIN OBJETIVO",
-                        Color.Red);
 
-                    _logger.LogInformation(
-                        "Mobile attack: no attackable monster found.");
-                }
+                _skillController.UseSelectedSkillOnMonster(target);
             };
                 // Botón Ataque PvP
-                var mobilePvpAttackButton = new MobilePvpAttackButton();
-                    Controls.Add(mobilePvpAttackButton);
-                    mobilePvpAttackButton.BringToFront();
+                _mobilePvpAttackButton = new MobilePvpAttackButton();
+                Controls.Add(_mobilePvpAttackButton);
+                _mobilePvpAttackButton.BringToFront();
+                _mobilePvpAttackButton.BasicAttackClicked += (s, e) =>
+            {
+                SetMouseInputConsumed();
 
-                    mobilePvpAttackButton.PvpAttackClicked += (s, e) =>
+                if (World is not WalkableWorldControl walkableWorld)
+                    return;
+
+                // No permitir PvP desde zona segura.
+                var flags = walkableWorld.Terrain.RequestTerrainFlag(
+                    (int)Hero.Location.X,
+                    (int)Hero.Location.Y);
+
+                if (flags.HasFlag(TWFlags.SafeZone))
+                {
+                    _chatLog?.AddMessage(
+                    "System",
+                    "NO PUEDES ATACAR EN ZONA SEGURA",
+                    MessageType.Error);
+
+                    return;
+                }
+
+                PlayerObject target = null;
+
+                // Si ya tenemos objetivo fijado, intentar usarlo.
+                if (_mobilePvpTargetId.HasValue)
+                {
+                    target = walkableWorld.FindPlayerById(
+                        _mobilePvpTargetId.Value);
+
+                    if (target != null &&
+                        (target.IsDead || target.World != World))
                     {
-                        // Si no tenemos objetivo, buscar uno cercano y fijarlo.
-                        if (!_mobilePvpTargetId.HasValue)
+                        target = null;
+                    }
+                }
+
+                // Si no hay objetivo válido, seleccionar uno.
+                if (target == null)
+                {
+                    target = FindMobilePvpTarget(false);
+
+                    if (target != null)
+                    {
+                        _mobilePvpTargetId = target.NetworkId;
+
+                    }
+                }
+
+                if (target == null)
+                {
+                    _mobileTargetPanel?.ClearTarget();
+                    return;
+
+                }
+                _mobileTargetPanel?.SetTarget(
+                    target.Name,
+                    isPlayer: true);
+
+                // Equivalente al ataque básico / click izquierdo.
+                Hero.Attack(target);
+            };
+            _mobilePvpAttackButton.SkillAttackClicked += (s, e) =>
+            {
+                SetMouseInputConsumed();
+
+                if (World is not WalkableWorldControl walkableWorld)
+                    return;
+
+                // No permitir skills PvP desde zona segura.
+                var flags = walkableWorld.Terrain.RequestTerrainFlag(
+                    (int)Hero.Location.X,
+                    (int)Hero.Location.Y);
+
+                if (flags.HasFlag(TWFlags.SafeZone))
+                {
+                    _chatLog?.AddMessage(
+                    "System",
+                    "NO PUEDES ATACAR EN ZONA SEGURA",
+                    MessageType.Error);
+
+                    return;
+                }
+
+                PlayerObject target = null;
+
+                // Primero usamos el objetivo PvP fijado.
+                if (_mobilePvpTargetId.HasValue)
+                {
+                    target = walkableWorld.FindPlayerById(
+                        _mobilePvpTargetId.Value);
+
+                    if (target != null &&
+                        (target.IsDead || target.World != World))
+                    {
+                        target = null;
+                    }
+                }
+
+                // Si todavía no existe target, buscar uno automáticamente.
+                if (target == null)
+                {
+                    target = FindMobilePvpTarget(false);
+
+                    if (target != null)
+                    {
+                        _mobilePvpTargetId = target.NetworkId;
+
+                    }
+                }
+
+                if (target == null)
+                {
+                    _mobilePvpTargetId = null;
+                    _mobileTargetPanel?.ClearTarget();
+
+                    return;
+                }
+
+                // Equivalente móvil al click derecho:
+                // utiliza exactamente el skill actualmente seleccionado.
+                _mobileTargetPanel?.SetTarget(
+                    target.Name,
+                    isPlayer: true);
+
+                _skillController.UseSelectedSkillOnPlayer(
+                    target,
+                    allowNonDuelTarget: true);
+            };
+
+
+                    // Botón cambiar objetivo PvP
+                    _mobileChangeTargetButton = new MobileChangeTargetButton();
+                    Controls.Add(_mobileChangeTargetButton);
+                    _mobileChangeTargetButton.BringToFront();
+
+                    _mobileChangeTargetButton.ChangeTargetClicked += (s, e) =>
+                    {
+                        SetMouseInputConsumed();
+
+                        if (World is not WalkableWorldControl)
+                            return;
+
+                        // Busca otro jugador distinto del objetivo actual.
+                        var newTarget = FindMobilePvpTarget(true);
+
+                        if (newTarget != null)
                         {
-                            var target = FindMobilePvpTarget(false);
+                            _mobilePvpTargetId = newTarget.NetworkId;
 
-                            if (target != null)
-                            {
-                                _mobilePvpTargetId = target.NetworkId;
-
-                                _notificationManager?.AddNotification(
-                                    $"ATACANDO A: {target.Name}",
-                                    Color.Yellow);
-
-                                _logger.LogInformation(
-                                    "Mobile PvP target selected: {PlayerName} ({NetworkId})",
-                                    target.Name,
-                                    target.NetworkId);
-
-                                Hero.Attack(target);
-                            }
-                            else
-                            {
-                                _notificationManager?.AddNotification(
-                                    "SIN OBJETIVO PvP",
-                                    Color.Red);
-
-                                _logger.LogInformation(
-                                    "Mobile PvP attack: no target found.");
-                            }
+                            // Actualiza el panel en vez de mostrar notificación.
+                            _mobileTargetPanel?.SetTarget(
+                                newTarget.Name,
+                                isPlayer: true);
 
                             return;
                         }
 
-                        // Ya tenemos un objetivo fijado: buscarlo por NetworkId.
-                        var currentTarget = (World as WalkableWorldControl)?
-                            .FindPlayerById(_mobilePvpTargetId.Value);
-
-                        if (currentTarget != null &&
-                            !currentTarget.IsDead &&
-                            currentTarget.World == World)
+                        // Si no hay otro jugador disponible,
+                        // mantenemos el actual si sigue siendo válido.
+                        if (_mobilePvpTargetId.HasValue)
                         {
-                            Hero.Attack(currentTarget);
-                        }
-                        else
-                        {
-                            _notificationManager?.AddNotification(
-                                "OBJETIVO NO DISPONIBLE",
-                                Color.Red);
+                            var currentTarget = (World as WalkableWorldControl)?
+                                .FindPlayerById(_mobilePvpTargetId.Value);
 
-                            _logger.LogInformation(
-                                "Mobile PvP target {NetworkId} is no longer available.",
-                                _mobilePvpTargetId.Value);
+                            if (currentTarget != null &&
+                                !currentTarget.IsDead &&
+                                currentTarget.World == World)
+                            {
+                                _mobileTargetPanel?.SetTarget(
+                                    currentTarget.Name,
+                                    isPlayer: true);
+
+                                return;
+                            }
                         }
-            };
+
+                        // No queda ningún objetivo válido.
+                        _mobilePvpTargetId = null;
+                        _mobileTargetPanel?.ClearTarget();
+                    };
             // Experience bar
             var experienceBar = new ExperienceBarControl(MuGame.Network.GetCharacterState());
             Controls.Add(experienceBar);
@@ -646,10 +803,30 @@ namespace Client.Main.Scenes
         // ─────────────────────────── Update Loop ───────────────────────────
         public override void Update(GameTime gameTime)
         {
+           bool inventoryOpen = _inventoryControl?.Visible == true;
+
+            if (_mobileAttackButton != null)
+            {
+                _mobileAttackButton.Visible = !inventoryOpen;
+            }
+
+            if (_mobilePvpAttackButton != null)
+            {
+                _mobilePvpAttackButton.Visible = !inventoryOpen;
+            }
+
+            if (_mobileChangeTargetButton != null)
+            {
+                _mobileChangeTargetButton.Visible = !inventoryOpen;
+            }
             if (_mapController?.IsChangingWorld == true)
             {
                 _mapController.UpdateLoading(gameTime);
                 return;
+            }
+            if (_mobileTargetPanel != null)
+            {
+                _mobileTargetPanel.Visible = !inventoryOpen;
             }
 
             var currentKeyboardState = MuGame.Instance.Keyboard;
