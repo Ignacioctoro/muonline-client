@@ -4,46 +4,40 @@ using Microsoft.Xna.Framework;
 
 namespace Client.Main.Controls.UI.Game.Mobile
 {
-    public class MobileTargetPanel : UIControl
+    public class MobileTargetPanel : SpriteControl
     {
-        private readonly LabelControl _titleLabel;
         private readonly LabelControl _targetLabel;
 
         public MobileTargetPanel()
         {
             AutoViewSize = false;
 
-            // Panel ancho y relativamente bajo.
-            ControlSize = new Point(110, 65);
+            // Tamaño visual más grande.
+            ControlSize = new Point(150, 90);
             ViewSize = ControlSize;
 
-            // Misma columna derecha de los botones.
-            X = UiScaler.VirtualSize.X - 130;
+            // Más a la izquierda para alinearlo con los botones.
+            X = UiScaler.VirtualSize.X - 175;
 
-            // Arriba del botón TARGET.
-            Y = UiScaler.VirtualSize.Y - 400;
+            // Más cerca del botón Cambiar Objetivo.
+            Y = UiScaler.VirtualSize.Y - 395;
 
-            BackgroundColor = new Color(20, 25, 30, 210);
+            BackgroundColor = Color.Transparent;
 
-            _titleLabel = new LabelControl
-            {
-                Text = "OBJETIVO",
-                X = 10,
-                Y = 8,
-                FontSize = 12f,
-                TextColor = new Color(220, 200, 120)
-            };
+            TexturePath = "Mobile/TargetPanel.png";
 
             _targetLabel = new LabelControl
             {
                 Text = "Sin objetivo",
-                X = 10,
-                Y = 34,
-                FontSize = 14f,
-                TextColor = Color.White
+
+                // Posición ajustada al panel más grande.
+                X = 50,
+                Y = 43,
+
+                FontSize = 12f,
+                TextColor = new Color(180, 180, 180)
             };
 
-            Controls.Add(_titleLabel);
             Controls.Add(_targetLabel);
         }
 
@@ -55,10 +49,9 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 return;
             }
 
-            // Evita nombres absurdamente largos rompiendo el HUD.
             string displayName = name.Trim();
 
-            if (displayName.Length > 11)
+            if (displayName.Length > 17)
             {
                 displayName = displayName.Substring(0, 17) + "...";
             }

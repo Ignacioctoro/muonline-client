@@ -419,13 +419,22 @@ namespace Client.Main.Scenes
                 }
                 else if (hoveredTarget is PlayerObject targetPlayer)
                 {
+                    var keyboard = Keyboard.GetState();
+
+                    bool ctrlPressed =
+                        keyboard.IsKeyDown(Keys.LeftControl) ||
+                        keyboard.IsKeyDown(Keys.RightControl);
+
+                    bool allowNonDuelTarget = ctrlPressed;
+
                     if (IsInSkillRange(
                         targetPlayer.Location,
                         allowedRange))
                     {
                         UseSkillOnPlayerTarget(
                             skill,
-                            targetPlayer);
+                            targetPlayer,
+                            allowNonDuelTarget);
                     }
                     else
                     {
@@ -433,7 +442,8 @@ namespace Client.Main.Scenes
                             skill,
                             targetPlayer,
                             allowedRange,
-                            isAreaSkill: false);
+                            isAreaSkill: false,
+                            allowNonDuelPlayer: allowNonDuelTarget);
                     }
                 }
             }
@@ -456,10 +466,23 @@ namespace Client.Main.Scenes
 
             if (_scene.MouseHoverObject is PlayerObject player)
             {
-                if (player != _scene.Hero &&
-                    !player.IsDead &&
-                    player.World == _scene.World &&
-                    _isDuelAttackTarget(player))
+                if (player == _scene.Hero ||
+                    player.IsDead ||
+                    player.World != _scene.World)
+                {
+                    return null;
+                }
+
+                var keyboard = Keyboard.GetState();
+
+                bool ctrlPressed =
+                    keyboard.IsKeyDown(Keys.LeftControl) ||
+                    keyboard.IsKeyDown(Keys.RightControl);
+
+                // Jugador válido si:
+                // 1. Es nuestro oponente de duelo.
+                // 2. Estamos manteniendo CTRL para PvP clásico.
+                if (_isDuelAttackTarget(player) || ctrlPressed)
                 {
                     return player;
                 }

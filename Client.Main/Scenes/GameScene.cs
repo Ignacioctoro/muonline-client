@@ -872,15 +872,25 @@ namespace Client.Main.Scenes
                 }
             }
 
-            // Handle attack clicks on duel opponent players (treat as monster during duel)
+            // Handle attack clicks on players.
+            // Permite ataque si:
+            // 1. Es el oponente actual de duelo.
+            // 2. CTRL está presionado (PvP clásico de Windows).
             if (!IsMouseInputConsumedThisFrame &&
                 MouseHoverObject is PlayerObject targetPlayer &&
                 targetPlayer != _hero &&
-                (_duelController?.IsDuelAttackTarget(targetPlayer) == true) &&
                 MuGame.Instance.Mouse.LeftButton == ButtonState.Pressed &&
                 MuGame.Instance.PrevMouseState.LeftButton == ButtonState.Released) // Fresh press
             {
-                if (Hero != null &&
+                bool ctrlPressed =
+                    currentKeyboardState.IsKeyDown(Keys.LeftControl) ||
+                    currentKeyboardState.IsKeyDown(Keys.RightControl);
+
+                bool isDuelTarget =
+                    _duelController?.IsDuelAttackTarget(targetPlayer) == true;
+
+                if ((ctrlPressed || isDuelTarget) &&
+                    Hero != null &&
                     !Hero.IsDead &&
                     !targetPlayer.IsDead &&
                     targetPlayer.World == World)

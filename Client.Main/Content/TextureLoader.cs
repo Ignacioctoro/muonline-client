@@ -128,8 +128,19 @@ namespace Client.Main.Content
             // Determine expected extension based on reader type logic (legacy MU logic)
             string expectedExtension = reader.GetType().Name.ToLowerInvariant().Replace("reader", "");
 
-            // 1. Try path with correct extension
-            string expectedFilePath = Path.ChangeExtension(fullPath, expectedExtension);
+            // PNG files should be loaded directly.
+            // Legacy MU formats still use the extension derived from their reader.
+            string expectedFilePath;
+
+            if (ext.Equals(".png", StringComparison.OrdinalIgnoreCase))
+            {
+                expectedFilePath = fullPath;
+            }
+            else
+            {
+                expectedFilePath = Path.ChangeExtension(fullPath, expectedExtension);
+            }
+
             string actualPath = ResolveCaseInsensitivePath(expectedFilePath);
 
             if (actualPath != null)

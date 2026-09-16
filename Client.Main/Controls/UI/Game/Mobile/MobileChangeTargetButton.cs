@@ -7,6 +7,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
 {
     public class MobileChangeTargetButton : UIControl
     {
+        private readonly MobileButtonVisual _visual;
         private readonly ButtonControl _button;
 
         public event EventHandler ChangeTargetClicked;
@@ -18,35 +19,62 @@ namespace Client.Main.Controls.UI.Game.Mobile
             ControlSize = new Point(110, 55);
             ViewSize = ControlSize;
 
-            // Arriba de ATTACK PvP
-            X = UiScaler.VirtualSize.X - 130;
-            Y = UiScaler.VirtualSize.Y - 330;
+            // Más a la izquierda.
+            X = UiScaler.VirtualSize.X - 150;
+
+            // Un poco más cerca del grupo PvP.
+            Y = UiScaler.VirtualSize.Y - 320;
 
             BackgroundColor = Color.Transparent;
 
+            _visual = new MobileButtonVisual
+            {
+                TexturePath = "Mobile/Target.png",
+
+                // Imagen más grande, centrada sobre el hitbox.
+                X = -15,
+                Y = -7,
+
+                ControlSize = new Point(140, 70),
+                ViewSize = new Point(140, 70),
+                AutoViewSize = false,
+
+                Interactive = false,
+                BackgroundColor = Color.Transparent,
+
+                PressedTint = new Color(170, 170, 170)
+            };
+
             _button = new ButtonControl
             {
-                Text = "TARGET",
+                Text = string.Empty,
+
                 X = 0,
                 Y = 0,
 
+                // Hitbox original.
                 ControlSize = new Point(110, 55),
                 ViewSize = new Point(110, 55),
                 AutoViewSize = false,
 
-                BackgroundColor = new Color(70, 100, 70, 220),
-                HoverBackgroundColor = new Color(90, 140, 90, 240),
-                PressedBackgroundColor = new Color(50, 70, 50, 240),
+                Interactive = true,
 
-                TextColor = Color.White,
-                HoverTextColor = Color.White,
-
-                FontSize = 14f
+                BackgroundColor = Color.Transparent,
+                HoverBackgroundColor = Color.Transparent,
+                PressedBackgroundColor = Color.Transparent
             };
 
             _button.Click += OnChangeTargetClicked;
 
+            Controls.Add(_visual);
             Controls.Add(_button);
+        }
+
+        public override void Update(GameTime gameTime)
+        {
+            base.Update(gameTime);
+
+            _visual.Pressed = _button.IsMousePressed;
         }
 
         private void OnChangeTargetClicked(object sender, EventArgs e)

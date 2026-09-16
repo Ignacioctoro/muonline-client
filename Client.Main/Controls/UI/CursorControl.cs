@@ -86,21 +86,41 @@ public class CursorControl : SpriteControl
         }
     }
 
-    private static bool IsDuelAttackTarget(object hoveredObject)
+    private static bool IsPlayerAttackTarget(object hoveredObject)
     {
         if (hoveredObject is not PlayerObject player || player.IsDead)
         {
             return false;
         }
 
-        var state = MuGame.Network?.GetCharacterState();
-        if (state == null || !state.IsDuelActive)
+        var scene = MuGame.Instance.ActiveScene as Client.Main.Scenes.GameScene;
+
+        if (scene == null || player == scene.Hero)
         {
             return false;
         }
 
-        ushort enemyId = state.GetDuelPlayerId(Client.Main.Core.Client.CharacterState.DuelPlayerType.Enemy);
-        return enemyId != 0 && player.NetworkId == enemyId;
+        var keyboard = MuGame.Instance.Keyboard;
+
+        bool ctrlPressed =
+            keyboard.IsKeyDown(Keys.LeftControl) ||
+            keyboard.IsKeyDown(Keys.RightControl);
+
+        var state = MuGame.Network?.GetCharacterState();
+
+        bool isDuelTarget = false;
+
+        if (state != null && state.IsDuelActive)
+        {
+            ushort enemyId = state.GetDuelPlayerId(
+                Client.Main.Core.Client.CharacterState.DuelPlayerType.Enemy);
+
+            isDuelTarget =
+                enemyId != 0 &&
+                player.NetworkId == enemyId;
+        }
+
+        return ctrlPressed || isDuelTarget;
     }
 
     public override void Update(GameTime gameTime)
@@ -160,7 +180,7 @@ public class CursorControl : SpriteControl
             {
                 SetCursorState("Interface/CursorPush.ozt", DefaultAnimation);
             }
-            else if ((hoveredObject is MonsterObject monster && !monster.IsDead) || IsDuelAttackTarget(hoveredObject))
+            else if ((hoveredObject is MonsterObject monster && !monster.IsDead) || IsPlayerAttackTarget(hoveredObject))
             {
                 SetCursorState("Interface/CursorAttack.ozt", DefaultAnimation);
             }
@@ -220,7 +240,7 @@ public class CursorControl : SpriteControl
                     npc.OnClick();
                 }
             }
-            else if ((hoveredObject is MonsterObject monster && !monster.IsDead) || IsDuelAttackTarget(hoveredObject))
+            else if ((hoveredObject is MonsterObject monster && !monster.IsDead) || IsPlayerAttackTarget(hoveredObject))
             {
                 SetCursorState("Interface/CursorAttack.ozt", DefaultAnimation);
             }
