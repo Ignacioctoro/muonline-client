@@ -20,30 +20,23 @@ namespace Client.Main.Controls.UI.Game.Mobile
         {
             AutoViewSize = false;
 
-            ControlSize = new Point(110, 106);
+            ControlSize = new Point(120, 150);
             ViewSize = ControlSize;
 
-            // Más a la izquierda.
-            X = UiScaler.VirtualSize.X - 150;
-
-            // Más cerca del bloque PvP.
-            Y = UiScaler.VirtualSize.Y - 125;
+            X = UiScaler.VirtualSize.X - 280;
+            Y = UiScaler.VirtualSize.Y - 245;
 
             BackgroundColor = Color.Transparent;
-
-            // =====================================================
-            // VISUAL: ATTACK MONSTER
-            // =====================================================
 
             _basicAttackVisual = new MobileButtonVisual
             {
                 TexturePath = "Mobile/AttackMonster.png",
 
-                X = -15,
-                Y = -7,
+                X = 38,
+                Y = 68,
 
-                ControlSize = new Point(140, 69),
-                ViewSize = new Point(140, 69),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = false,
@@ -51,20 +44,16 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
                 PressedTint = new Color(170, 170, 170)
             };
-
-            // =====================================================
-            // VISUAL: SKILL MONSTER
-            // =====================================================
 
             _skillAttackVisual = new MobileButtonVisual
             {
                 TexturePath = "Mobile/SkillMonster.png",
 
-                X = -15,
-                Y = 45,
+                X = 0,
+                Y = 0,
 
-                ControlSize = new Point(140, 69),
-                ViewSize = new Point(140, 69),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = false,
@@ -73,19 +62,15 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 PressedTint = new Color(170, 170, 170)
             };
 
-            // =====================================================
-            // HITBOX: ATTACK MONSTER
-            // =====================================================
-
             _basicAttackButton = new ButtonControl
             {
                 Text = string.Empty,
 
-                X = 0,
-                Y = 0,
+                X = 38,
+                Y = 68,
 
-                ControlSize = new Point(110, 54),
-                ViewSize = new Point(110, 54),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = true,
@@ -95,19 +80,15 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 PressedBackgroundColor = Color.Transparent
             };
 
-            // =====================================================
-            // HITBOX: SKILL MONSTER
-            // =====================================================
-
             _skillAttackButton = new ButtonControl
             {
                 Text = string.Empty,
 
                 X = 0,
-                Y = 52,
+                Y = 0,
 
-                ControlSize = new Point(110, 54),
-                ViewSize = new Point(110, 54),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = true,
@@ -125,6 +106,14 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
             Controls.Add(_basicAttackButton);
             Controls.Add(_skillAttackButton);
+        }
+
+        public void SetOpacity(float opacity)
+        {
+            opacity = MathHelper.Clamp(opacity, 0f, 1f);
+
+            _basicAttackVisual.Alpha = opacity;
+            _skillAttackVisual.Alpha = opacity;
         }
 
         public override void Update(GameTime gameTime)

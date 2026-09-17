@@ -74,6 +74,44 @@ namespace Client.Main.Scenes
         private ushort? _mobilePvpTargetId;
         private MobileChangeTargetButton _mobileChangeTargetButton;
         private MobileTargetPanel _mobileTargetPanel;
+        public void ApplyMobileControlsSettings()
+        {
+            var settings = MuGame.AppSettings?.MobileControls;
+
+            bool enabled = settings?.Enabled ?? true;
+            float opacityPercent = settings?.Opacity ?? 80f;
+
+            // Convertimos 80 -> 0.80
+            float opacity = MathHelper.Clamp(
+                opacityPercent / 100f,
+                0f,
+                1f
+            );
+
+            // Mantener Constants sincronizado.
+            Constants.SHOW_MOBILE_CONTROLS = enabled;
+            Constants.MOBILE_CONTROLS_OPACITY = opacity;
+
+            // Mostrar / ocultar todos los controles móviles.
+            if (_mobileTargetPanel != null)
+                _mobileTargetPanel.Visible = enabled;
+
+            if (_mobileAttackButton != null)
+                _mobileAttackButton.Visible = enabled;
+
+            if (_mobilePvpAttackButton != null)
+                _mobilePvpAttackButton.Visible = enabled;
+
+            if (_mobileChangeTargetButton != null)
+                _mobileChangeTargetButton.Visible = enabled;
+
+            // Aplicar opacidad
+            _mobileTargetPanel?.SetOpacity(opacity);
+            _mobileAttackButton?.SetOpacity(opacity);
+            _mobilePvpAttackButton?.SetOpacity(opacity);
+            _mobileChangeTargetButton?.SetOpacity(opacity);
+        }
+
         private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
             {
                 if (World is not WalkableWorldControl world || Hero == null || Hero.IsDead)
@@ -442,6 +480,7 @@ namespace Client.Main.Scenes
                     _mobileChangeTargetButton = new MobileChangeTargetButton();
                     Controls.Add(_mobileChangeTargetButton);
                     _mobileChangeTargetButton.BringToFront();
+                    ApplyMobileControlsSettings();
 
                     _mobileChangeTargetButton.ChangeTargetClicked += (s, e) =>
                     {
@@ -803,30 +842,39 @@ namespace Client.Main.Scenes
         // ─────────────────────────── Update Loop ───────────────────────────
         public override void Update(GameTime gameTime)
         {
-           bool inventoryOpen = _inventoryControl?.Visible == true;
+            bool inventoryOpen = _inventoryControl?.Visible == true;
+
+            // Los controles móviles solo se muestran si:
+            // 1) están habilitados en Options, y
+            // 2) el inventario está cerrado.
+            bool showMobileControls =
+                Constants.SHOW_MOBILE_CONTROLS &&
+                !inventoryOpen;
 
             if (_mobileAttackButton != null)
             {
-                _mobileAttackButton.Visible = !inventoryOpen;
+                _mobileAttackButton.Visible = showMobileControls;
             }
 
             if (_mobilePvpAttackButton != null)
             {
-                _mobilePvpAttackButton.Visible = !inventoryOpen;
+                _mobilePvpAttackButton.Visible = showMobileControls;
             }
 
             if (_mobileChangeTargetButton != null)
             {
-                _mobileChangeTargetButton.Visible = !inventoryOpen;
+                _mobileChangeTargetButton.Visible = showMobileControls;
             }
+
+            if (_mobileTargetPanel != null)
+            {
+                _mobileTargetPanel.Visible = showMobileControls;
+            }
+
             if (_mapController?.IsChangingWorld == true)
             {
                 _mapController.UpdateLoading(gameTime);
                 return;
-            }
-            if (_mobileTargetPanel != null)
-            {
-                _mobileTargetPanel.Visible = !inventoryOpen;
             }
 
             var currentKeyboardState = MuGame.Instance.Keyboard;

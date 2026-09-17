@@ -588,7 +588,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
             private readonly PauseMenuControl _owner;
             private readonly List<IOptionRow> _options = new();
             private readonly List<GameControl> _dynamicControls = new();
-            private const int ContentStartY = 175;
+            private const int ContentStartY = 215;
             private const int OptionRowHeight = 26;
             private readonly ButtonControl _closeButton;
             private readonly int _panelWidth;
@@ -643,6 +643,8 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                     ref categoryX, categoryWidth, categoryHeight, categorySpacing, categoriesPerRow, ref categoryIndex);
                 AddCategoryButton("Performance", () => BuildPerformanceCategory(), categoryStartY,
                     ref categoryX, categoryWidth, categoryHeight, categorySpacing, categoriesPerRow, ref categoryIndex);
+                AddCategoryButton("Mobile Controls", () => BuildMobileControlsCategory(), categoryStartY,
+                    ref categoryX, categoryWidth, categoryHeight, categorySpacing, categoriesPerRow, ref categoryIndex);    
 
                 _closeButton = new ButtonControl
                 {
@@ -662,6 +664,58 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 Controls.Add(_closeButton);
 
                 BuildAudioCategory(); // default category
+                
+            }
+            private void BuildMobileControlsCategory()
+            {
+                BuildCategory("Mobile Controls", (ref int currentY) =>
+                {
+                    AddOption(
+                        "Show Mobile Controls",
+                        () => MuGame.AppSettings?.MobileControls?.Enabled ?? true,
+                        value =>
+                        {
+                            if (MuGame.AppSettings?.MobileControls == null)
+                                return;
+
+                            MuGame.AppSettings.MobileControls.Enabled = value;
+
+                            Constants.SHOW_MOBILE_CONTROLS = value;
+
+                            if (MuGame.Instance?.ActiveScene is GameScene gameScene)
+                            {
+                                gameScene.ApplyMobileControlsSettings();
+                            }
+                        },
+                        ref currentY,
+                        OptionRowHeight
+                    );
+
+                    AddVolumeControl(
+                        "Controls Opacity",
+                        () => MuGame.AppSettings?.MobileControls?.Opacity ?? 80f,
+                        value =>
+                        {
+                            if (MuGame.AppSettings?.MobileControls == null)
+                                return;
+
+                            MuGame.AppSettings.MobileControls.Opacity = value;
+
+                            Constants.MOBILE_CONTROLS_OPACITY =
+                                MathHelper.Clamp(value / 100f, 0f, 1f);
+
+                            if (MuGame.Instance?.ActiveScene is GameScene gameScene)
+                            {
+                                gameScene.ApplyMobileControlsSettings();
+                            }
+                        },
+                        ref currentY,
+                        OptionRowHeight,
+                        minValue: 40f,
+                        maxValue: 100f,
+                        step: 5f
+                    );
+                });
             }
 
             private delegate void CategoryBuilder(ref int currentY);

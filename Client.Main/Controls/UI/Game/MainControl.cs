@@ -25,6 +25,7 @@ namespace Client.Main.Controls.UI.Game
         // UI components
         private readonly MainHPControl _hp;
         private readonly MainMPControl _mp;
+        private readonly ItemHotkeyHudControl _itemHotkeys;
         private int _hoveredHudElements;
 
         private readonly List<DrawEntry> _drawEntries = new();
@@ -68,7 +69,13 @@ namespace Client.Main.Controls.UI.Game
             {
                 extMp.RenderOrder = lmp.Z;
             }
-
+            _itemHotkeys = new ItemHotkeyHudControl
+            {
+                Name = "ItemHotkeys",
+                X = 435,
+                Y = 665,
+                RenderOrder = 7
+            };
             // Initial values from CharacterState (if available)
             _hp.SetValues((int)state.CurrentHp, (int)state.MaxHp);
             _mp.SetValues((int)state.CurrentMana, (int)state.MaxMp);
@@ -80,7 +87,7 @@ namespace Client.Main.Controls.UI.Game
             Controls.Clear();
             Controls.Add(_mp);
             Controls.Add(_hp);
-
+            Controls.Add(_itemHotkeys);
             ControlFactories["InventoryButton"] = CreateHudButton;
             ControlFactories["SettingsButton"] = CreateHudButton;
 

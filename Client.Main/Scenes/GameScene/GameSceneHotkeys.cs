@@ -174,11 +174,118 @@ namespace Client.Main.Scenes
 
             hotkeys.OnKeyPressed(Keys.PageUp, ScrollChatLogPageUp, when: WhenChatLogFrameVisible);
             hotkeys.OnKeyPressed(Keys.PageDown, ScrollChatLogPageDown, when: WhenChatLogFrameVisible);
+            // Item hotkeys clásicos de MU.
+            // CTRL + Q/W/E/R sobre un consumible del inventario
+            // asigna ese ítem al hotkey correspondiente.
+            hotkeys.OnKeyPressed(
+                Keys.Q,
+                HotkeyModifiers.Control,
+                context => AssignItemHotkey(Keys.Q),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.W,
+                HotkeyModifiers.Control,
+                context => AssignItemHotkey(Keys.W),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.E,
+                HotkeyModifiers.Control,
+                context => AssignItemHotkey(Keys.E),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.R,
+                HotkeyModifiers.Control,
+                context => AssignItemHotkey(Keys.R),
+                exactModifiers: true);
 
             // Space bar to pick up nearest item in range
             hotkeys.OnKeyPressed(Keys.Space, PickupNearestItem, when: WhenNotUiInput);
-        }
+            // Uso de item hotkey.
+            // Q / W / E / R sin modificadores consume el objeto asignado.
+            hotkeys.OnKeyPressed(
+                Keys.Q,
+                HotkeyModifiers.None,
+                context => UseItemHotkey(Keys.Q),
+                when: WhenNotUiInput,
+                exactModifiers: true);
 
+            hotkeys.OnKeyPressed(
+                Keys.W,
+                HotkeyModifiers.None,
+                context => UseItemHotkey(Keys.W),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.E,
+                HotkeyModifiers.None,
+                context => UseItemHotkey(Keys.E),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.R,
+                HotkeyModifiers.None,
+                context => UseItemHotkey(Keys.R),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+        }
+        private void AssignItemHotkey(Keys key)
+        {
+            if (_inventoryControl == null ||
+                !_inventoryControl.Visible)
+            {
+                return;
+            }
+
+            if (_inventoryControl.TryAssignItemHotkey(
+                key,
+                out string message))
+            {
+                _chatLog?.AddMessage(
+                    "System",
+                    message,
+                    MessageType.System);
+
+                SoundController.Instance.PlayBuffer(
+                    "Sound/iButton.wav");
+
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _chatLog?.AddMessage(
+                    "System",
+                    message,
+                    MessageType.Error);
+            }
+        }
+        private void UseItemHotkey(Keys key)
+        {
+            if (_inventoryControl == null)
+            {
+                return;
+            }
+
+            if (_inventoryControl.TryUseItemHotkey(
+                key,
+                out string message))
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _chatLog?.AddMessage(
+                    "System",
+                    message,
+                    MessageType.Error);
+            }
+        }
         private void TogglePauseMenu(HotkeyContext context)
         {
             if (_playerMenuController?.IsMenuVisible == true)

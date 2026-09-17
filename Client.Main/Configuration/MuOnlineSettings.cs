@@ -21,6 +21,14 @@ namespace Client.Main.Configuration
         public string QualityPreset { get; set; } = "Auto";
     }
 
+    public class MobileControlsSettings
+    {
+        public bool Enabled { get; set; } = true;
+
+        // Guardado como porcentaje: 80 = 80%
+        public float Opacity { get; set; } = 80f;
+    }
+
     public abstract class LeafEffectSettingsBase
     {
         public bool Enabled { get; set; } = true;
@@ -124,12 +132,18 @@ namespace Client.Main.Configuration
         public int ConnectServerPort { get; set; } = 44405;
 
         // Client/Protocol Settings
-        public string ProtocolVersion { get; set; } = nameof(TargetProtocolVersion.Season6); // Use nameof for safety
-        public string ClientVersion { get; set; } = "2.04d"; // Matches SourceMain5.2 default
-        public string ClientSerial { get; set; } = "k1Pk2jcET48mxL3b"; // Matches SourceMain5.2 default
-        public Dictionary<byte, byte> DirectionMap { get; set; } = new(); // Direction mapping for walk packets
+        public string ProtocolVersion { get; set; } = nameof(TargetProtocolVersion.Season6);
+        public string ClientVersion { get; set; } = "2.04d";
+        public string ClientSerial { get; set; } = "k1Pk2jcET48mxL3b";
+
+        public Dictionary<byte, byte> DirectionMap { get; set; } = new();
+
         public PacketLoggingSettings PacketLogging { get; set; } = new();
         public GraphicsSettings Graphics { get; set; } = new();
+
+        // Configuración de los controles móviles
+        public MobileControlsSettings MobileControls { get; set; } = new();
+
         public EnvironmentSettings Environment { get; set; } = new();
     }
 }

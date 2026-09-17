@@ -28,9 +28,12 @@ namespace Client.Main.Controls.Terrain
             _terrainData = new TerrainData();
         }
 
-        public void SetTextureMapping(Dictionary<int, string> textureMapping, bool replaceDefaults)
+        public void SetTextureMapping(
+            Dictionary<int, string> textureMapping,
+            bool replaceDefaults)
         {
             _replaceTextureMapping = replaceDefaults;
+
             if (textureMapping == null)
                 return;
 
@@ -39,7 +42,6 @@ namespace Client.Main.Controls.Terrain
                 _terrainData.TextureMappingFiles.Clear();
             }
 
-            // Apply overrides (or replace defaults when requested)
             foreach (var kvp in textureMapping)
             {
                 _terrainData.TextureMappingFiles[kvp.Key] = kvp.Value;
@@ -53,70 +55,172 @@ namespace Client.Main.Controls.Terrain
             var mappingReader = new MapReader();
 
             var tasks = new List<Task>();
-            var worldFolder = $"World{_worldIndex}";
-            var fullPathWorldFolder = Path.Combine(Constants.DataPath, worldFolder);
 
-            if (string.IsNullOrEmpty(fullPathWorldFolder) || !Directory.Exists(fullPathWorldFolder))
+            var worldFolder = $"World{_worldIndex}";
+            var fullPathWorldFolder =
+                Path.Combine(Constants.DataPath, worldFolder);
+
+            if (string.IsNullOrEmpty(fullPathWorldFolder) ||
+                !Directory.Exists(fullPathWorldFolder))
+            {
                 return null;
+            }
 
             // Load terrain .att
-            string attPath = GetActualPath(Path.Combine(fullPathWorldFolder, $"EncTerrain{_worldIndex}.att"));
+            string attPath = GetActualPath(
+                Path.Combine(
+                    fullPathWorldFolder,
+                    $"EncTerrain{_worldIndex}.att"));
+
             if (!string.IsNullOrEmpty(attPath))
-                tasks.Add(terrainReader.Load(attPath).ContinueWith(t => _terrainData.Attributes = t.Result));
+            {
+                tasks.Add(
+                    terrainReader
+                        .Load(attPath)
+                        .ContinueWith(
+                            t => _terrainData.Attributes = t.Result));
+            }
 
             // Load base terrain height map
-            string heightPath = GetActualPath(Path.Combine(fullPathWorldFolder, "TerrainHeight.OZB"));
+            string heightPath = GetActualPath(
+                Path.Combine(
+                    fullPathWorldFolder,
+                    "TerrainHeight.OZB"));
+
             if (!string.IsNullOrEmpty(heightPath))
-                tasks.Add(ozbReader.Load(heightPath)
-                    .ContinueWith(t => _terrainData.HeightMap = t.Result.Data.Select(x => new Color(x.R, x.G, x.B)).ToArray()));
+            {
+                tasks.Add(
+                    ozbReader
+                        .Load(heightPath)
+                        .ContinueWith(
+                            t =>
+                                _terrainData.HeightMap =
+                                    t.Result.Data
+                                        .Select(
+                                            x => new Color(
+                                                x.R,
+                                                x.G,
+                                                x.B))
+                                        .ToArray()));
+            }
 
             // Load terrain mapping (.map)
-            string mapPath = GetActualPath(Path.Combine(fullPathWorldFolder, $"EncTerrain{_worldIndex}.map"));
+            string mapPath = GetActualPath(
+                Path.Combine(
+                    fullPathWorldFolder,
+                    $"EncTerrain{_worldIndex}.map"));
+
             if (!string.IsNullOrEmpty(mapPath))
-                tasks.Add(mappingReader.Load(mapPath).ContinueWith(t => _terrainData.Mapping = t.Result));
+            {
+                tasks.Add(
+                    mappingReader
+                        .Load(mapPath)
+                        .ContinueWith(
+                            t => _terrainData.Mapping = t.Result));
+            }
 
             // Prepare texture file list
             var textureMapFiles = new string[256];
+
             foreach (var kvp in _terrainData.TextureMappingFiles)
             {
-                textureMapFiles[kvp.Key] = GetActualPath(Path.Combine(fullPathWorldFolder, kvp.Value));
+                textureMapFiles[kvp.Key] =
+                    GetActualPath(
+                        Path.Combine(
+                            fullPathWorldFolder,
+                            kvp.Value));
             }
+
             if (!_replaceTextureMapping)
             {
                 for (int i = 1; i <= 16; i++)
                 {
-                    var extTilePath = GetActualPath(Path.Combine(fullPathWorldFolder, $"ExtTile{i:00}.ozj"));
+                    var extTilePath =
+                        GetActualPath(
+                            Path.Combine(
+                                fullPathWorldFolder,
+                                $"ExtTile{i:00}.ozj"));
+
                     textureMapFiles[13 + i] = extTilePath;
                 }
             }
 
-            _terrainData.Textures = new Microsoft.Xna.Framework.Graphics.Texture2D[textureMapFiles.Length];
+            _terrainData.Textures =
+                new Microsoft.Xna.Framework.Graphics.Texture2D[
+                    textureMapFiles.Length];
+
             for (int t = 0; t < textureMapFiles.Length; t++)
             {
                 var path = textureMapFiles[t];
-                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+
+                if (string.IsNullOrEmpty(path) ||
+                    !File.Exists(path))
+                {
                     continue;
+                }
 
                 int textureIndex = t;
-                tasks.Add(TextureLoader.Instance.Prepare(path)
-                    .ContinueWith(_ => _terrainData.Textures[textureIndex] = TextureLoader.Instance.GetTexture2D(path)));
+
+                tasks.Add(
+                    TextureLoader.Instance
+                        .Prepare(path)
+                        .ContinueWith(
+                            _ =>
+                                _terrainData.Textures[textureIndex] =
+                                    TextureLoader.Instance
+                                        .GetTexture2D(path)));
             }
 
             // Load lightmap or default to white
-            string textureLightPath = GetActualPath(Path.Combine(fullPathWorldFolder, "TerrainLight.OZB"));
-            if (!string.IsNullOrEmpty(textureLightPath) && File.Exists(textureLightPath))
+            string textureLightPath =
+                GetActualPath(
+                    Path.Combine(
+                        fullPathWorldFolder,
+                        "TerrainLight.OZB"));
+
+            if (!string.IsNullOrEmpty(textureLightPath) &&
+                File.Exists(textureLightPath))
             {
-                tasks.Add(ozbReader.Load(textureLightPath)
-                    .ContinueWith(ozb => _terrainData.LightData = ozb.Result.Data.Select(x => new Color(x.R, x.G, x.B)).ToArray()));
+                tasks.Add(
+                    ozbReader
+                        .Load(textureLightPath)
+                        .ContinueWith(
+                            ozb =>
+                                _terrainData.LightData =
+                                    ozb.Result.Data
+                                        .Select(
+                                            x => new Color(
+                                                x.R,
+                                                x.G,
+                                                x.B))
+                                        .ToArray()));
             }
             else
             {
-                _terrainData.LightData = Enumerable.Repeat(Microsoft.Xna.Framework.Color.White, Constants.TERRAIN_SIZE * Constants.TERRAIN_SIZE).ToArray();
+                _terrainData.LightData =
+                    Enumerable.Repeat(
+                            Microsoft.Xna.Framework.Color.White,
+                            Constants.TERRAIN_SIZE *
+                            Constants.TERRAIN_SIZE)
+                        .ToArray();
             }
 
-            await Task.WhenAll(tasks);
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"[TerrainLoader] Failed to load World{_worldIndex}:");
+                Console.WriteLine(ex.ToString());
+                throw;
+            }
 
-            _terrainData.GrassWind = new float[Constants.TERRAIN_SIZE * Constants.TERRAIN_SIZE];
+            _terrainData.GrassWind =
+                new float[
+                    Constants.TERRAIN_SIZE *
+                    Constants.TERRAIN_SIZE];
 
             return _terrainData;
         }

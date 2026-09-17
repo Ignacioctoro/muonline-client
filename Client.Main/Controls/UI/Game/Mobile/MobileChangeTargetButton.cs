@@ -16,14 +16,11 @@ namespace Client.Main.Controls.UI.Game.Mobile
         {
             AutoViewSize = false;
 
-            ControlSize = new Point(110, 55);
+            ControlSize = new Point(82, 82);
             ViewSize = ControlSize;
 
-            // Más a la izquierda.
-            X = UiScaler.VirtualSize.X - 150;
-
-            // Un poco más cerca del grupo PvP.
-            Y = UiScaler.VirtualSize.Y - 320;
+            X = UiScaler.VirtualSize.X - 200;
+            Y = UiScaler.VirtualSize.Y - 470;
 
             BackgroundColor = Color.Transparent;
 
@@ -31,12 +28,11 @@ namespace Client.Main.Controls.UI.Game.Mobile
             {
                 TexturePath = "Mobile/Target.png",
 
-                // Imagen más grande, centrada sobre el hitbox.
-                X = -15,
-                Y = -7,
+                X = 0,
+                Y = 0,
 
-                ControlSize = new Point(140, 70),
-                ViewSize = new Point(140, 70),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = false,
@@ -52,9 +48,8 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 X = 0,
                 Y = 0,
 
-                // Hitbox original.
-                ControlSize = new Point(110, 55),
-                ViewSize = new Point(110, 55),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = true,
@@ -68,6 +63,13 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
             Controls.Add(_visual);
             Controls.Add(_button);
+        }
+
+        public void SetOpacity(float opacity)
+        {
+            opacity = MathHelper.Clamp(opacity, 0f, 1f);
+
+            _visual.Alpha = opacity;
         }
 
         public override void Update(GameTime gameTime)

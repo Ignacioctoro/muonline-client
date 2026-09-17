@@ -20,32 +20,23 @@ namespace Client.Main.Controls.UI.Game.Mobile
         {
             AutoViewSize = false;
 
-            // Reducimos ligeramente el alto lógico porque
-            // ahora los botones están más juntos.
-            ControlSize = new Point(110, 106);
+            ControlSize = new Point(110, 154);
             ViewSize = ControlSize;
 
-            // Más a la izquierda.
-            X = UiScaler.VirtualSize.X - 150;
-
-            // Más cerca de Cambiar Objetivo.
-            Y = UiScaler.VirtualSize.Y - 245;
+            X = UiScaler.VirtualSize.X - 295;
+            Y = UiScaler.VirtualSize.Y - 410;
 
             BackgroundColor = Color.Transparent;
-
-            // =====================================================
-            // VISUAL: PVP ATTACK
-            // =====================================================
 
             _basicAttackVisual = new MobileButtonVisual
             {
                 TexturePath = "Mobile/PvpAttack.png",
 
-                X = -15,
-                Y = -7,
+                X = 0,
+                Y = 72,
 
-                ControlSize = new Point(140, 69),
-                ViewSize = new Point(140, 69),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = false,
@@ -53,22 +44,16 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
                 PressedTint = new Color(170, 170, 170)
             };
-
-            // =====================================================
-            // VISUAL: PVP SKILL
-            // =====================================================
 
             _skillAttackVisual = new MobileButtonVisual
             {
                 TexturePath = "Mobile/PvpSkill.png",
 
-                X = -15,
+                X = 28,
+                Y = 0,
 
-                // Más cerca del botón superior.
-                Y = 45,
-
-                ControlSize = new Point(140, 69),
-                ViewSize = new Point(140, 69),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = false,
@@ -76,20 +61,16 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
                 PressedTint = new Color(170, 170, 170)
             };
-
-            // =====================================================
-            // HITBOX: PVP ATTACK
-            // =====================================================
 
             _basicAttackButton = new ButtonControl
             {
                 Text = string.Empty,
 
                 X = 0,
-                Y = 0,
+                Y = 72,
 
-                ControlSize = new Point(110, 54),
-                ViewSize = new Point(110, 54),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = true,
@@ -99,22 +80,15 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 PressedBackgroundColor = Color.Transparent
             };
 
-            // =====================================================
-            // HITBOX: PVP SKILL
-            // =====================================================
-
             _skillAttackButton = new ButtonControl
             {
                 Text = string.Empty,
 
-                X = 0,
+                X = 28,
+                Y = 0,
 
-                // Antes 56.
-                // Ahora más junto.
-                Y = 52,
-
-                ControlSize = new Point(110, 54),
-                ViewSize = new Point(110, 54),
+                ControlSize = new Point(82, 82),
+                ViewSize = new Point(82, 82),
                 AutoViewSize = false,
 
                 Interactive = true,
@@ -132,6 +106,14 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
             Controls.Add(_basicAttackButton);
             Controls.Add(_skillAttackButton);
+        }
+
+        public void SetOpacity(float opacity)
+        {
+            opacity = MathHelper.Clamp(opacity, 0f, 1f);
+
+            _basicAttackVisual.Alpha = opacity;
+            _skillAttackVisual.Alpha = opacity;
         }
 
         public override void Update(GameTime gameTime)

@@ -56,6 +56,9 @@ namespace Client.Main
         public static bool DRAW_BOUNDING_BOXES_INTERACTIVES;
         public static bool ENABLE_LOW_QUALITY_SWITCH;
         public static bool ENABLE_LOW_QUALITY_IN_LOGIN_SCENE;
+        // Mobile controls
+        public static bool SHOW_MOBILE_CONTROLS;
+        public static float MOBILE_CONTROLS_OPACITY;
 
         // World visuals
         public static bool DRAW_GRASS;
@@ -207,6 +210,9 @@ namespace Client.Main
             DRAW_GRASS = true;
             ENABLE_LOW_QUALITY_SWITCH = true;
             ENABLE_LOW_QUALITY_IN_LOGIN_SCENE = false;
+            // Mobile controls
+            SHOW_MOBILE_CONTROLS = true;
+            MOBILE_CONTROLS_OPACITY = 0.80f;
 
             MSAA_ENABLED = false;
             ENABLE_DYNAMIC_LIGHTS = true;

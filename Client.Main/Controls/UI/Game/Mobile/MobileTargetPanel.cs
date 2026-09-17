@@ -12,15 +12,11 @@ namespace Client.Main.Controls.UI.Game.Mobile
         {
             AutoViewSize = false;
 
-            // Tamaño visual más grande.
-            ControlSize = new Point(150, 90);
+            ControlSize = new Point(168, 168);
             ViewSize = ControlSize;
 
-            // Más a la izquierda para alinearlo con los botones.
-            X = UiScaler.VirtualSize.X - 175;
-
-            // Más cerca del botón Cambiar Objetivo.
-            Y = UiScaler.VirtualSize.Y - 395;
+            X = UiScaler.VirtualSize.X - 180;
+            Y = UiScaler.VirtualSize.Y - 345;
 
             BackgroundColor = Color.Transparent;
 
@@ -30,15 +26,24 @@ namespace Client.Main.Controls.UI.Game.Mobile
             {
                 Text = "Sin objetivo",
 
-                // Posición ajustada al panel más grande.
                 X = 50,
-                Y = 43,
+                Y = 116,
 
                 FontSize = 12f,
                 TextColor = new Color(180, 180, 180)
             };
 
             Controls.Add(_targetLabel);
+        }
+
+        public void SetOpacity(float opacity)
+        {
+            opacity = MathHelper.Clamp(opacity, 0f, 1f);
+
+            Alpha = opacity;
+
+            // También bajamos la opacidad del texto dinámico.
+            _targetLabel.Alpha = opacity;
         }
 
         public void SetTarget(string name)

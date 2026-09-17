@@ -209,52 +209,106 @@ namespace Client.Main.Controls
             await base.Load();
 
             CreateMapTileObjects();
-            Camera.Instance.AspectRatio = GraphicsDevice.Viewport.AspectRatio;
+
+            Camera.Instance.AspectRatio =
+                GraphicsDevice.Viewport.AspectRatio;
 
             var worldFolder = $"World{WorldIndex}";
             var dataPath = Constants.DataPath;
             var tasks = new List<Task>();
 
             // Load camera settings
-            var capPath = Path.Combine(dataPath, worldFolder, "Camera_Angle_Position.bmd");
+            var capPath =
+                Path.Combine(
+                    dataPath,
+                    worldFolder,
+                    "Camera_Angle_Position.bmd");
+
             if (File.Exists(capPath))
             {
                 var capReader = new CAPReader();
                 var data = await capReader.Load(capPath);
-                Camera.Instance.FOV = data.CameraFOV * Constants.FOV_SCALE;
-                Camera.Instance.Position = data.CameraPosition;
-                Camera.Instance.Target = data.HeroPosition;
+
+                Camera.Instance.FOV =
+                    data.CameraFOV * Constants.FOV_SCALE;
+
+                Camera.Instance.Position =
+                    data.CameraPosition;
+
+                Camera.Instance.Target =
+                    data.HeroPosition;
             }
 
             // Load terrain OBJ
-            var objPath = Path.Combine(dataPath, worldFolder, $"EncTerrain{WorldIndex}.obj");
+            var objPath =
+                Path.Combine(
+                    dataPath,
+                    worldFolder,
+                    $"EncTerrain{WorldIndex}.obj");
+
             if (File.Exists(objPath))
             {
-                var reader = new OBJReader();
-                OBJ obj = await reader.Load(objPath);
-                foreach (var mapObj in obj.Objects)
+                try
                 {
-                    var instance = WorldObjectFactory.CreateMapTileObject(this, mapObj);
-                    if (instance != null) tasks.Add(instance.Load());
+                    var reader = new OBJReader();
+                    OBJ obj = await reader.Load(objPath);
+
+                    foreach (var mapObj in obj.Objects)
+                    {
+                        var instance =
+                            WorldObjectFactory.CreateMapTileObject(
+                                this,
+                                mapObj);
+
+                        if (instance != null)
+                        {
+                            tasks.Add(instance.Load());
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(
+                        $"[WorldControl] Failed to load OBJ for World{WorldIndex}:");
+                    Console.WriteLine(ex.ToString());
+                    throw;
                 }
             }
 
-            // tasks.Add(Container.Load());
-            await Task.WhenAll(tasks);
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"[WorldControl] Failed to load objects for World{WorldIndex}:");
+                Console.WriteLine(ex.ToString());
+                throw;
+            }
 
             // Play or stop background music
             if (!string.IsNullOrEmpty(BackgroundMusicPath))
-                SoundController.Instance.PlayBackgroundMusic(BackgroundMusicPath);
+            {
+                SoundController.Instance.PlayBackgroundMusic(
+                    BackgroundMusicPath);
+            }
             else
+            {
                 SoundController.Instance.StopBackgroundMusic();
+            }
 
             // Play or stop ambient sound
             if (!string.IsNullOrEmpty(AmbientSoundPath))
-                SoundController.Instance.PlayAmbientSound(AmbientSoundPath);
+            {
+                SoundController.Instance.PlayAmbientSound(
+                    AmbientSoundPath);
+            }
             else
+            {
                 SoundController.Instance.StopAmbientSound();
+            }
         }
-
         public override void AfterLoad()
         {
             base.AfterLoad();

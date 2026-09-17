@@ -226,6 +226,14 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private Rectangle _closeButtonRect;
         private Rectangle _footerLeftButtonRect;
         private Rectangle _footerRightButtonRect;
+        // Item hotkeys clásicos de MU: Q / W / E / R.
+        private readonly Dictionary<Keys, ItemHotkeyEntry> _itemHotkeys = new();
+
+        private readonly record struct ItemHotkeyEntry(
+            int Group,
+            int Id,
+            int Level,
+            string Name);
 
         private InventoryItem _hoveredItem;
         private Point _hoveredSlot = new(-1, -1);
@@ -283,6 +291,196 @@ namespace Client.Main.Controls.UI.Game.Inventory
             _pickedItemRenderer = new PickedItemRenderer();
 
             InitializeTextEntries();
+        }
+        public bool TryAssignItemHotkey(Keys key, out string message)
+        {
+            message = string.Empty;
+
+            if (key != Keys.Q &&
+                key != Keys.W &&
+                key != Keys.E &&
+                key != Keys.R)
+            {
+                return false;
+            }
+
+            if (!Visible)
+            {
+                return false;
+            }
+
+            if (_hoveredItem == null ||
+                _hoveredItem.Definition == null)
+            {
+                message = $"Pon el cursor sobre una poción antes de asignar {key}.";
+                return false;
+            }
+
+            var definition = _hoveredItem.Definition;
+
+            // Solo consumibles.
+            if (!definition.IsConsumable() ||
+                definition.IsJewel())
+            {
+                message = $"{definition.Name} no puede asignarse a {key}.";
+                return false;
+            }
+
+            _itemHotkeys[key] = new ItemHotkeyEntry(
+                definition.Group,
+                definition.Id,
+                _hoveredItem.Level,
+                definition.Name);
+
+            message = $"{key} asignada a {definition.Name}.";
+
+            return true;
+        }
+        public bool TryUseItemHotkey(Keys key, out string message)
+        {
+            message = string.Empty;
+
+            if (!_itemHotkeys.TryGetValue(key, out var hotkey))
+            {
+                message = $"No hay ningún objeto asignado a {key}.";
+                return false;
+            }
+
+            // Buscar cualquier stack compatible en todo el inventario.
+            // No dependemos de un slot concreto.
+            var item = _items
+                .Where(i =>
+                    i?.Definition != null &&
+                    i.Definition.Group == hotkey.Group &&
+                    i.Definition.Id == hotkey.Id &&
+                    i.Definition.IsConsumable() &&
+                    !i.Definition.IsJewel())
+                .OrderBy(i => i.GridPosition.Y)
+                .ThenBy(i => i.GridPosition.X)
+                .FirstOrDefault();
+
+            if (item == null)
+            {
+                message = $"No tienes {hotkey.Name} en el inventario.";
+                return false;
+            }
+
+            byte itemSlot = (byte)(
+                InventorySlotOffsetConstant +
+                (item.GridPosition.Y * Columns) +
+                item.GridPosition.X);
+
+            var state = _networkManager?.GetCharacterState();
+
+            if (state != null && item.Definition.Group == 14)
+            {
+                int itemId = item.Definition.Id;
+
+                // Apple + Healing Potions
+                if (itemId >= 0 && itemId <= 3)
+                {
+                    if (state.CurrentHealth >= state.MaximumHealth)
+                    {
+                        message = "La vida ya está al máximo.";
+                        return false;
+                    }
+                }
+
+                // Mana Potions
+                if (itemId >= 4 && itemId <= 6)
+                {
+                    if (state.CurrentMana >= state.MaximumMana)
+                    {
+                        message = "El mana ya está al máximo.";
+                        return false;
+                    }
+                }
+            }
+            var svc = _networkManager?.GetCharacterService();
+
+            if (svc == null)
+            {
+                message = "El servicio del personaje no está disponible.";
+                return false;
+            }
+
+            SoundController.Instance.PlayBuffer("Sound/pDrink.wav");
+
+            _ = Task.Run(async () =>
+            {
+                await svc.SendConsumeItemRequestAsync(itemSlot);
+
+                await Task.Delay(300);
+
+                var state = _networkManager?.GetCharacterState();
+
+                if (state != null)
+                {
+                    MuGame.ScheduleOnMainThread(
+                        () => state.RaiseInventoryChanged());
+                }
+            });
+
+            return true;
+        }
+        public bool TryGetItemHotkey(
+            Keys key,
+            out int group,
+            out int id,
+            out int level,
+            out string name)
+        {
+            group = 0;
+            id = 0;
+            level = 0;
+            name = string.Empty;
+
+            if (!_itemHotkeys.TryGetValue(key, out var hotkey))
+            {
+                return false;
+            }
+
+            group = hotkey.Group;
+            id = hotkey.Id;
+            level = hotkey.Level;
+            name = hotkey.Name;
+
+            return true;
+        }
+
+        public int GetItemHotkeyTotalCount(Keys key)
+        {
+            if (!_itemHotkeys.TryGetValue(key, out var hotkey))
+            {
+                return 0;
+            }
+
+            return _items
+                .Where(i =>
+                    i?.Definition != null &&
+                    i.Definition.Group == hotkey.Group &&
+                    i.Definition.Id == hotkey.Id)
+                .Sum(i => Math.Max(0, i.Durability));
+        }
+        public bool TryGetItemHotkeyItem(Keys key, out InventoryItem item)
+        {
+            item = null;
+
+            if (!_itemHotkeys.TryGetValue(key, out var hotkey))
+            {
+                return false;
+            }
+
+            item = _items
+                .Where(i =>
+                    i?.Definition != null &&
+                    i.Definition.Group == hotkey.Group &&
+                    i.Definition.Id == hotkey.Id)
+                .OrderBy(i => i.GridPosition.Y)
+                .ThenBy(i => i.GridPosition.X)
+                .FirstOrDefault();
+
+            return item != null;
         }
 
         public static InventoryControl Instance
