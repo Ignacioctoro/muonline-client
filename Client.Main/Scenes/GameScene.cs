@@ -55,6 +55,7 @@ namespace Client.Main.Scenes
         private int? _lastPingValue = null;
         private PauseMenuControl _pauseMenu; // ESC menu
         private GuildMenuDialog _guildMenuDialog; // Menu Guild Letra G
+        private GuildEmblemPreviewControl _guildEmblemPreview; // Guild emblem preview control
         private Controls.UI.Game.Skills.SkillQuickSlot _skillQuickSlot; // Skill quick slot
         private Controls.UI.Game.Skills.SkillSelectionPanel _skillSelectionPanel; // Skill selection panel (independent)
         private ActiveBuffsPanel _activeBuffsPanel; // Active buffs display (top-left corner)
@@ -198,6 +199,13 @@ namespace Client.Main.Scenes
 
             _main = new MainControl(MuGame.Network.GetCharacterState());
             Controls.Add(_main);
+            _guildEmblemPreview =
+                new GuildEmblemPreviewControl();
+
+            Controls.Add(
+                _guildEmblemPreview);
+
+            _guildEmblemPreview.BringToFront();
             Controls.Add(NpcShopControl.Instance);
             Controls.Add(VaultControl.Instance);
             Controls.Add(ChaosMixControl.Instance);

@@ -81,6 +81,10 @@ namespace Client.Main.Networking.PacketHandling
             _bloodCastleHandler = new BloodCastleHandler(loggerFactory, characterState, networkManager);
 
             RegisterAttributeBasedHandlers();
+            // GuildInformation 0x66
+            _packetHandlers[(0x66, NoSubCode)] =
+                _scopeHandler.HandleGuildInformationAsync;
+
             RegisterConnectServerHandlers();
         }
 
@@ -164,29 +168,73 @@ namespace Client.Main.Networking.PacketHandling
 
         // ───────────────────────── Dispatch ───────────────────────────
 
-        private Task DispatchPacketInternalAsync(Memory<byte> packet, byte code, byte subCode, byte headerType)
+        private Task DispatchPacketInternalAsync(
+            Memory<byte> packet,
+            byte code,
+            byte subCode,
+            byte headerType)
         {
-            _logger.LogTrace("Dispatching {Mode} packet: Code={C:X2}, Sub={S}, Len={L}",
-                _isConnectServerRouting ? "CS" : "GS", code, subCode == NoSubCode ? "N/A" : subCode.ToString("X2"), packet.Length);
+            _logger.LogTrace(
+                "Dispatching {Mode} packet: Code={C:X2}, Sub={S}, Len={L}",
+                _isConnectServerRouting ? "CS" : "GS",
+                code,
+                subCode == NoSubCode ? "N/A" : subCode.ToString("X2"),
+                packet.Length);
+
+            // GuildInformation (0x66)
+            // Direct routing because this packet has no subcode.
+            if (!_isConnectServerRouting &&
+                code == 0x66)
+            {
+                return ExecuteHandlerAsync(
+                    _scopeHandler.HandleGuildInformationAsync,
+                    packet,
+                    code,
+                    NoSubCode);
+            }
 
             if (ShouldSkipPacket(code))
                 return Task.CompletedTask;
 
             var key = (code, subCode);
-            if (_packetHandlers.TryGetValue(key, out var handler))
+
+            if (_packetHandlers.TryGetValue(
+                key,
+                out var handler))
             {
-                _logger.LogTrace("Executing handler for {C:X2}-{S}", code, subCode);
-                return ExecuteHandlerAsync(handler, packet, code, subCode);
+                _logger.LogTrace(
+                    "Executing handler for {C:X2}-{S}",
+                    code,
+                    subCode);
+
+                return ExecuteHandlerAsync(
+                    handler,
+                    packet,
+                    code,
+                    subCode);
             }
 
             // Fallback to main-code-only handler
-            if (subCode != NoSubCode && _packetHandlers.TryGetValue((code, NoSubCode), out handler))
+            if (subCode != NoSubCode &&
+                _packetHandlers.TryGetValue(
+                    (code, NoSubCode),
+                    out handler))
             {
-                _logger.LogTrace("Executing main-code handler for {C:X2}-FF", code);
-                return ExecuteHandlerAsync(handler, packet, code, NoSubCode);
+                _logger.LogTrace(
+                    "Executing main-code handler for {C:X2}-FF",
+                    code);
+
+                return ExecuteHandlerAsync(
+                    handler,
+                    packet,
+                    code,
+                    NoSubCode);
             }
 
-            LogUnhandled(code, subCode);
+            LogUnhandled(
+                code,
+                subCode);
+
             return Task.CompletedTask;
         }
 

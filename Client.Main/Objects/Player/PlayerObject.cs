@@ -2679,6 +2679,79 @@ namespace Client.Main.Objects.Player
 
         public bool TryGetHandWorldMatrix(bool isLeftHand, out Matrix worldMatrix) =>
             TryGetBoneWorldMatrix(isLeftHand ? LeftHandBoneIndex : RightHandBoneIndex, out worldMatrix);
+        public bool TryGetLeftUpperArmWorldMatrix(out Matrix worldMatrix)
+        {
+            var modelBones = Model?.Bones;
+
+            if (modelBones == null ||
+                LeftHandBoneIndex < 0 ||
+                LeftHandBoneIndex >= modelBones.Length)
+            {
+                worldMatrix = Matrix.Identity;
+                return false;
+            }
+
+            // Mano izquierda.
+            int boneIndex = LeftHandBoneIndex;
+
+            // Subimos dos niveles:
+            // Hand -> Forearm -> UpperArm
+            for (int i = 0; i < 2; i++)
+            {
+                int parentIndex = modelBones[boneIndex].Parent;
+
+                if (parentIndex < 0 ||
+                    parentIndex >= modelBones.Length)
+                {
+                    break;
+                }
+
+                boneIndex = parentIndex;
+            }
+
+            return TryGetBoneWorldMatrix(
+                boneIndex,
+                out worldMatrix);
+        }  
+        public bool TryGetLeftShoulderWorldMatrix(
+            out Matrix worldMatrix)
+        {
+            var modelBones =
+                Model?.Bones;
+
+            if (modelBones == null ||
+                LeftHandBoneIndex < 0 ||
+                LeftHandBoneIndex >= modelBones.Length)
+            {
+                worldMatrix =
+                    Matrix.Identity;
+
+                return false;
+            }
+
+            int boneIndex =
+                LeftHandBoneIndex;
+
+            // Hand -> Forearm -> UpperArm -> Shoulder/Clavicle
+            for (int i = 0; i < 3; i++)
+            {
+                int parentIndex =
+                    modelBones[boneIndex].Parent;
+
+                if (parentIndex < 0 ||
+                    parentIndex >= modelBones.Length)
+                {
+                    break;
+                }
+
+                boneIndex =
+                    parentIndex;
+            }
+
+            return TryGetBoneWorldMatrix(
+                boneIndex,
+                out worldMatrix);
+        }  
 
         private MovementMode GetModeFromCurrentAction() =>
             CurrentAction switch

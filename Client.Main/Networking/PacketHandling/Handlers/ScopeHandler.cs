@@ -19,6 +19,8 @@ using Client.Main.Scenes;
 using Client.Main.Controllers;
 using System.Threading;
 using Client.Data.ATT;
+using System.Buffers.Binary;
+using System.Text;
 
 namespace Client.Main.Networking.PacketHandling.Handlers
 {
@@ -1943,29 +1945,158 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-
-        [PacketHandler(0x65, PacketRouter.NoSubCode)] // AssignCharacterToGuild
-        public Task HandleAssignCharacterToGuildAsync(Memory<byte> packet)
+        // Paquete 0x65
+        [PacketHandler(0x65, PacketRouter.NoSubCode)]
+        public Task HandleAssignCharacterToGuildAsync(
+            Memory<byte> packet)
         {
             try
             {
-                var assign = new AssignCharacterToGuild(packet);
-                _logger.LogInformation("🛡️ AssignCharacterToGuild: {Count} players.", assign.PlayerCount);
-                for (int i = 0; i < assign.PlayerCount; i++)
+                ReadOnlySpan<byte> data = packet.Span;
+
+                // C2:
+                // 0      = C2
+                // 1..2   = length
+                // 3      = 0x65
+                // 4      = player count
+                // 5...   = GuildMemberRelation[12]
+                if (data.Length < 5)
+                    return Task.CompletedTask;
+
+                int playerCount = data[4];
+
+                const int relationSize = 12;
+                const int startOffset = 5;
+
+                for (int i = 0; i < playerCount; i++)
                 {
-                    var rel = assign[i];
-                    ushort rawId = rel.PlayerId;
-                    ushort maskedId = (ushort)(rawId & 0x7FFF);
-                    _logger.LogDebug(
-                        "Player {Player:X4} (Raw: {Raw:X4}) in Guild {GuildId}, Role {Role}",
-                        maskedId, rawId, rel.GuildId, rel.Role);
-                    // TODO: update guild info in _scopeManager
+                    int offset =
+                        startOffset +
+                        (i * relationSize);
+
+                    if (offset + relationSize > data.Length)
+                        break;
+
+                    uint guildId =
+                        BinaryPrimitives.ReadUInt32LittleEndian(
+                            data.Slice(offset, 4));
+
+                    byte role = data[offset + 4];
+
+                    ushort rawPlayerId =
+                        BinaryPrimitives.ReadUInt16BigEndian(
+                            data.Slice(offset + 7, 2));
+
+                    // El bit superior puede contener
+                    // IsPlayerAppearingNew.
+                    ushort playerId =
+                        (ushort)(rawPlayerId & 0x7FFF);
+
+                    // Undefined significa que dejó de pertenecer
+                    // a una guild.
+                    if (role == 0xFF || guildId == 0)
+                    {
+                        GuildInfoCache.RemovePlayerFromGuild(
+                            playerId);
+
+                        continue;
+                    }
+
+                    GuildInfoCache.AssignPlayerToGuild(
+                        playerId,
+                        guildId);
+
+                    // Si todavía no conocemos esta guild,
+                    // pedimos la información pública.
+                    if (GuildInfoCache
+                        .TryMarkGuildRequestPending(guildId))
+                    {
+                        _ = _networkManager
+                            .GetCharacterService()
+                            .SendGuildInfoRequestAsync(guildId);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error parsing AssignCharacterToGuild (0x65).");
+                _logger.LogError(
+                    ex,
+                    "Error parsing AssignCharacterToGuild (0x65).");
             }
+
+            return Task.CompletedTask;
+        }
+        // Paquete 0x66
+        [PacketHandler(0x66, PacketRouter.NoSubCode)]
+        // helper para los strings
+        private static string ReadGuildString(
+            ReadOnlySpan<byte> data)
+        {
+            int length = data.IndexOf((byte)0);
+
+            if (length < 0)
+                length = data.Length;
+
+            return Encoding.ASCII
+                .GetString(data[..length])
+                .Trim();
+        }
+        public Task HandleGuildInformationAsync(
+            Memory<byte> packet)
+        {
+            try
+            {
+                ReadOnlySpan<byte> data = packet.Span;
+
+                // GuildInformation tiene 60 bytes.
+                if (data.Length < 60)
+                {
+                    _logger.LogWarning(
+                        "GuildInformation packet too short: {Length}",
+                        data.Length);
+
+                    return Task.CompletedTask;
+                }
+
+                uint guildId =
+                    BinaryPrimitives.ReadUInt32LittleEndian(
+                        data.Slice(4, 4));
+
+                byte guildType = data[8];
+
+                string allianceGuildName =
+                    ReadGuildString(
+                        data.Slice(9, 8));
+
+                string guildName =
+                    ReadGuildString(
+                        data.Slice(17, 8));
+
+                byte[] logo =
+                    data.Slice(25, 32).ToArray();
+
+                GuildInfoCache.StoreGuild(
+                    new GuildInfoData
+                    {
+                        GuildId = guildId,
+                        GuildType = guildType,
+                        AllianceGuildName = allianceGuildName,
+                        GuildName = guildName,
+                        Logo = logo
+                    });
+
+                _logger.LogInformation(
+                    "Guild info received: {GuildName} ({GuildId}).",
+                    guildName,
+                    guildId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error parsing GuildInformation (0x66).");
+            }
+
             return Task.CompletedTask;
         }
 

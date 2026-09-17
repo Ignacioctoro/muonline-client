@@ -532,6 +532,42 @@ namespace Client.Main.Networking.Services
                 playerName);
         }
     }
+        public async Task SendGuildInfoRequestAsync(
+            uint guildId)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot request guild info.");
+                return;
+            }
+
+            if (guildId == 0)
+                return;
+
+            try
+            {
+                _logger.LogInformation(
+                    "Requesting guild info for GuildId {GuildId}.",
+                    guildId);
+
+                await _connectionManager.Connection
+                    .SendGuildInfoRequestAsync(guildId);
+
+                _logger.LogInformation(
+                    "Guild info request sent for GuildId {GuildId}.",
+                    guildId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error requesting guild info for GuildId {GuildId}.",
+                    guildId);
+
+                GuildInfoCache.CancelPendingRequest(guildId);
+            }
+        }
         /// <summary>
         /// Requests the item list of another player's personal store.
         /// </summary>
