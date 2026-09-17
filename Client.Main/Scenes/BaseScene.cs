@@ -220,7 +220,7 @@ namespace Client.Main.Scenes
             }
 
             // Update cursor after world objects have been updated
-            Cursor.Update(gameTime);
+            //Cursor.Update(gameTime);
 
             // focus management (driven by GameControl.OnClick via FocusControlIfInteractive)
             if (FocusControl != currentFocusControl)
@@ -265,18 +265,14 @@ namespace Client.Main.Scenes
                 }
             }
 
-            // handle 3D world object clicks if UI didn't consume input
+            // Handle 3D world object clicks if UI didn't consume input.
             if (!IsMouseInputConsumedThisFrame && MouseHoverObject != null &&
                 MuGame.Instance.PrevMouseState.LeftButton == ButtonState.Pressed &&
                 MuGame.Instance.UiMouseState.LeftButton == ButtonState.Released)
             {
                 MouseHoverObject.OnClick();
             }
-
-            DebugPanel.BringToFront();
-            Cursor.BringToFront();
         }
-
         public void FocusControlIfInteractive(GameControl control)
         {
             if (control != null && control.Interactive && FocusControl != control)

@@ -54,6 +54,7 @@ namespace Client.Main.Scenes
         private double _pingTimer = 0;
         private int? _lastPingValue = null;
         private PauseMenuControl _pauseMenu; // ESC menu
+        private GuildMenuDialog _guildMenuDialog; // Menu Guild Letra G
         private Controls.UI.Game.Skills.SkillQuickSlot _skillQuickSlot; // Skill quick slot
         private Controls.UI.Game.Skills.SkillSelectionPanel _skillSelectionPanel; // Skill selection panel (independent)
         private ActiveBuffsPanel _activeBuffsPanel; // Active buffs display (top-left corner)
@@ -851,6 +852,12 @@ namespace Client.Main.Scenes
                 Constants.SHOW_MOBILE_CONTROLS &&
                 !inventoryOpen;
 
+            if (MuGame.Instance.Keyboard.IsKeyDown(Keys.G) &&
+                MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.G))
+            {
+                OpenGuildMenu();
+            }
+
             if (_mobileAttackButton != null)
             {
                 _mobileAttackButton.Visible = showMobileControls;
@@ -959,6 +966,44 @@ namespace Client.Main.Scenes
                 _pingTimer = 0;
                 _ = UpdatePingAsync();
             }
+        }
+        private void OpenGuildMenu()
+        {
+            if (_guildMenuDialog != null)
+            {
+                _guildMenuDialog.Close();
+                _guildMenuDialog = null;
+                return;
+            }
+
+            _guildMenuDialog = new GuildMenuDialog();
+
+            _guildMenuDialog.Closed += (sender, args) =>
+            {
+                _guildMenuDialog = null;
+            };
+
+            _guildMenuDialog.DisbandRequested += (sender, args) =>
+            {
+                RequestDialog.Show(
+                    "Are you sure you want to disband your guild?",
+                    onAccept: () =>
+                    {
+                        _guildMenuDialog?.Close();
+                        _guildMenuDialog = null;
+
+                        _ = MuGame.Network
+                            .GetCharacterService()
+                            .SendLeaveGuildAsync(
+                                _characterInfo.Name);
+                    },
+                    onReject: () =>
+                    {
+                    });
+            };
+
+            _guildMenuDialog.ShowDialog();
+            _guildMenuDialog.BringToFront();
         }
 
         // ─────────────────────────── Draw Loop ───────────────────────────

@@ -394,7 +394,144 @@ namespace Client.Main.Networking.Services
                 _logger.LogError(ex, "Error sending guild join request to player ID {PlayerId}", guildMasterPlayerId);
             }
         }
+        public async Task SendGuildMasterAnswerAsync(bool showCreationDialog)
+{
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError("Not connected - cannot send GuildMasterAnswer.");
+                return;
+            }
 
+            _logger.LogInformation(
+                "Sending GuildMasterAnswer: ShowCreationDialog={ShowCreationDialog}...",
+                showCreationDialog);
+
+
+            try
+            {
+                await _connectionManager.Connection
+                    .SendGuildMasterAnswerAsync(showCreationDialog);
+
+                _logger.LogInformation(
+                    "GuildMasterAnswer sent: ShowCreationDialog={ShowCreationDialog}.",
+                    showCreationDialog);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error sending GuildMasterAnswer.");
+            }
+        }
+        public async Task SendCancelGuildCreationAsync()
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot cancel guild creation.");
+                return;
+            }
+
+            _logger.LogInformation(
+                "Sending CancelGuildCreation...");
+
+            try
+            {
+                await _connectionManager.Connection
+                    .SendCancelGuildCreationAsync();
+
+                _logger.LogInformation(
+                    "CancelGuildCreation sent.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error sending CancelGuildCreation.");
+            }
+        }
+        public async Task SendGuildCreateRequestAsync(
+        string guildName,
+        byte[] guildEmblem)
+    {
+        if (!_connectionManager.IsConnected)
+        {
+            _logger.LogError(
+                "Not connected - cannot create guild.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(guildName))
+        {
+            _logger.LogWarning(
+                "Cannot create guild with an empty name.");
+            return;
+        }
+
+        if (guildName.Length > 8)
+        {
+            _logger.LogWarning(
+                "Guild name cannot exceed 8 characters.");
+            return;
+        }
+
+        if (guildEmblem == null || guildEmblem.Length != 32)
+        {
+            _logger.LogWarning(
+                "Guild emblem must contain exactly 32 bytes.");
+            return;
+        }
+
+        try
+        {
+            await _connectionManager.Connection
+                .SendGuildCreateRequestAsync(
+                    guildName,
+                    guildEmblem);
+
+            _logger.LogInformation(
+                "Guild creation request sent for {GuildName}.",
+                guildName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error sending guild creation request for {GuildName}.",
+                guildName);
+        }
+    }
+    // Leave Guild
+        public async Task SendLeaveGuildAsync(
+        string playerName,
+        string securityCode = "")
+    {
+        if (!_connectionManager.IsConnected)
+        {
+            _logger.LogError(
+                "Not connected - cannot leave guild.");
+            return;
+        }
+
+        try
+        {
+            await _connectionManager.Connection
+                .SendGuildKickPlayerRequestAsync(
+                    playerName,
+                    securityCode);
+
+            _logger.LogInformation(
+                "Guild leave/disband request sent for {PlayerName}.",
+                playerName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error leaving or disbanding guild for {PlayerName}.",
+                playerName);
+        }
+    }
         /// <summary>
         /// Requests the item list of another player's personal store.
         /// </summary>

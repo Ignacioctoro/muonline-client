@@ -47,6 +47,36 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
         // ─────────────────────── Packet Handlers ────────────────────────
 
+        [PacketHandler(0x54, PacketRouter.NoSubCode)] // ShowGuildMasterDialog (S2C)
+        public Task HandleShowGuildMasterDialogAsync(Memory<byte> packet)
+        {
+            _logger.LogInformation(
+                "ShowGuildMasterDialog (0x54) received.");
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                RequestDialog.Show(
+                    "Do you want to create a guild?",
+                    onAccept: () =>
+                    {
+                        _logger.LogInformation(
+                            "Guild Master dialog accepted.");
+
+                        _ = _characterService.SendGuildMasterAnswerAsync(true);
+                    },
+                    onReject: () =>
+                    {
+                        _logger.LogInformation(
+                            "Guild Master dialog cancelled.");
+
+                        _ = _characterService.SendGuildMasterAnswerAsync(false);
+                    }
+                );
+            });
+
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0x50, PacketRouter.NoSubCode)] // GuildJoinRequest (S2C)
         public Task HandleGuildJoinRequestAsync(Memory<byte> packet)
         {
@@ -81,6 +111,80 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 _logger.LogError(ex, "Error parsing GuildJoinRequest packet.");
             }
+            return Task.CompletedTask;
+        }
+        [PacketHandler(0x55, PacketRouter.NoSubCode)]
+        public Task HandleShowGuildCreationDialogAsync(Memory<byte> packet)
+        {
+            _logger.LogInformation(
+                "ShowGuildCreationDialog (0x55) received.");
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                var dialog = new GuildCreationDialog();
+
+                dialog.CreateRequested += (sender, args) =>
+                {
+                    string guildName = dialog.GuildName;
+
+                    byte[] emblem = dialog.GuildEmblem;
+
+                    dialog.Close();
+
+                    _ = _characterService.SendGuildCreateRequestAsync(
+                        guildName,
+                        emblem);
+                };
+
+                dialog.CancelRequested += (sender, args) =>
+                {
+                    dialog.Close();
+
+                    _ = _characterService.SendCancelGuildCreationAsync();
+                };
+
+                dialog.ShowDialog();
+                dialog.BringToFront();
+                dialog.FocusGuildName();
+            });
+
+            return Task.CompletedTask;
+        }
+        // 0x56 GuildCreationResult
+        [PacketHandler(0x56, PacketRouter.NoSubCode)]
+        public Task HandleGuildCreationResultAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 5)
+            {
+                _logger.LogWarning(
+                    "GuildCreationResult packet too short: {Length}",
+                    packet.Length);
+
+                return Task.CompletedTask;
+            }
+
+            bool success = packet.Span[3] != 0;
+            byte error = packet.Span[4];
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                if (success)
+                {
+                    RequestDialog.ShowInfo(
+                        "Guild created successfully.");
+                }
+                else
+                {
+                    string message = error switch
+                    {
+                        179 => "That guild name is already in use.",
+                        _ => $"Guild creation failed. Error: {error}"
+                    };
+
+                    RequestDialog.ShowInfo(message);
+                }
+            });
+
             return Task.CompletedTask;
         }
 
