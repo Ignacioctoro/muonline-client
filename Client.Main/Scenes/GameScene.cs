@@ -859,13 +859,7 @@ namespace Client.Main.Scenes
             bool showMobileControls =
                 Constants.SHOW_MOBILE_CONTROLS &&
                 !inventoryOpen;
-
-            if (MuGame.Instance.Keyboard.IsKeyDown(Keys.G) &&
-                MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.G))
-            {
-                OpenGuildMenu();
-            }
-
+                
             if (_mobileAttackButton != null)
             {
                 _mobileAttackButton.Visible = showMobileControls;
@@ -975,7 +969,7 @@ namespace Client.Main.Scenes
                 _ = UpdatePingAsync();
             }
         }
-        private void OpenGuildMenu()
+        internal void OpenGuildMenu()
         {
             if (_guildMenuDialog != null)
             {
@@ -983,8 +977,26 @@ namespace Client.Main.Scenes
                 _guildMenuDialog = null;
                 return;
             }
+            if (Hero == null ||
+                !GuildInfoCache.PlayerHasGuild(
+                    Hero.NetworkId))
+            {
+                RequestDialog.ShowInfo(
+                    "You are not in a guild.");
 
-            _guildMenuDialog = new GuildMenuDialog();
+                return;
+            }
+
+            _guildMenuDialog =
+            new GuildMenuDialog(
+                _characterInfo.Name,
+                Hero.NetworkId);
+
+            GuildInfoCache.ClearRoster();
+
+            _ = MuGame.Network
+                .GetCharacterService()
+                .SendGuildListRequestAsync();
 
             _guildMenuDialog.Closed += (sender, args) =>
             {
@@ -1009,7 +1021,95 @@ namespace Client.Main.Scenes
                     {
                     });
             };
+            //Kikear miembro
+            _guildMenuDialog.KickMemberRequested +=
+                (sender, args) =>
+                {
+                    // Segunda protección:
+                    // no confiamos solamente en que el botón
+                    // esté oculto.
+                    if (!GuildInfoCache
+                        .IsLocalPlayerGuildMaster(
+                            _characterInfo.Name))
+                    {
+                        return;
+                    }
 
+                    if (string.IsNullOrWhiteSpace(
+                            args.PlayerName))
+                    {
+                        return;
+                    }
+
+                    if (string.Equals(
+                            args.PlayerName,
+                            _characterInfo.Name,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return;
+                    }
+
+                    RequestDialog.Show(
+                        $"Kick {args.PlayerName} from the guild?",
+                        onAccept: () =>
+                        {
+                            _ = MuGame.Network
+                                .GetCharacterService()
+                                .SendGuildKickPlayerAsync(
+                                    args.PlayerName);
+                        },
+                        onReject: () =>
+                        {
+                        });
+                };
+            //Cambiar Rango
+            _guildMenuDialog.ChangeRoleRequested +=
+            (sender, args) =>
+            {
+                if (!GuildInfoCache
+                    .IsLocalPlayerGuildMaster(
+                        _characterInfo.Name))
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(
+                        args.PlayerName))
+                {
+                    return;
+                }
+
+                if (string.Equals(
+                        args.PlayerName,
+                        _characterInfo.Name,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                string roleName =
+                    ((byte)args.Role) switch
+                    {
+                        0x00 => "Member",
+                        0x20 => "Battle Master",
+                        0x40 => "Assistant Master",
+                        _ => "Member"
+                    };
+
+                RequestDialog.Show(
+                    $"Change {args.PlayerName} to {roleName}?",
+                    onAccept: () =>
+                    {
+                        _ = MuGame.Network
+                            .GetCharacterService()
+                            .SendGuildRoleAssignRequestAsync(
+                                args.PlayerName,
+                                args.Role);
+                    },
+                    onReject: () =>
+                    {
+                    });
+            };
             _guildMenuDialog.ShowDialog();
             _guildMenuDialog.BringToFront();
         }

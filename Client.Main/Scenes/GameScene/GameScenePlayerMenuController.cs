@@ -5,6 +5,7 @@ using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Game;
 using Client.Main.Models;
 using Client.Main.Objects.Player;
+using Client.Main.Networking;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
@@ -130,6 +131,26 @@ namespace Client.Main.Scenes
 
             _playerContextMenu.SetTarget(targetPlayer.NetworkId, targetPlayer.Name);
             _playerContextMenu.SetDuelButtonEnabled(true);
+            bool localHasGuild =
+                GuildInfoCache.PlayerHasGuild(
+                    _scene.Hero.NetworkId);
+
+            bool targetHasGuild =
+                GuildInfoCache.PlayerHasGuild(
+                    targetPlayer.NetworkId);
+
+            bool targetIsGuildMaster =
+                GuildInfoCache.IsPlayerGuildMaster(
+                    targetPlayer.NetworkId);
+
+            bool canRequestGuild =
+                !localHasGuild &&
+                targetHasGuild &&
+                targetIsGuildMaster;
+
+            _playerContextMenu
+                .SetGuildRequestVisible(
+                    canRequestGuild);
             _playerContextMenu.ShowAt(mousePos.X, mousePos.Y);
             _playerContextMenu.BringToFront();
             _playerMenuHintCooldown = PlayerMenuHintCooldownSeconds;

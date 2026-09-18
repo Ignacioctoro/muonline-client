@@ -282,6 +282,7 @@ namespace Client.Main.Networking.Services
             }
         }
 
+
         /// <summary>
         /// Sends a response to a trade request.
         /// </summary>
@@ -392,6 +393,90 @@ namespace Client.Main.Networking.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending guild join request to player ID {PlayerId}", guildMasterPlayerId);
+            }
+        }
+        public async Task SendGuildListRequestAsync()
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot request guild list.");
+
+                return;
+            }
+
+            try
+            {
+                await _connectionManager.Connection
+                    .SendGuildListRequestAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error requesting guild member list.");
+            }
+        }
+
+        public async Task SendGuildKickPlayerAsync(
+            string playerName,
+            string securityCode = "")
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot kick guild member.");
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(playerName))
+                return;
+
+            try
+            {
+                await _connectionManager.Connection
+                    .SendGuildKickPlayerRequestAsync(
+                        playerName,
+                        securityCode);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error kicking guild member {PlayerName}.",
+                    playerName);
+            }
+        }
+
+        public async Task SendGuildRoleAssignRequestAsync(
+            string playerName,
+            MUnique.OpenMU.Network.Packets.ServerToClient.GuildMemberRole role)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot change guild member role.");
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(playerName))
+                return;
+
+            try
+            {
+                await _connectionManager.Connection
+                    .SendGuildRoleAssignRequestAsync(
+                        role,
+                        playerName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error changing guild role for {PlayerName}.",
+                    playerName);
             }
         }
         public async Task SendGuildMasterAnswerAsync(bool showCreationDialog)

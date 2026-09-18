@@ -1944,8 +1944,148 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
             return Task.CompletedTask;
         }
+        
+        //Paquete 0x52 GuildList
+        [PacketHandler(0x52, PacketRouter.NoSubCode)]
+        public Task HandleGuildListAsync(
+            Memory<byte> packet)
+        {
+            try
+            {
+                ReadOnlySpan<byte> data =
+                    packet.Span;
 
-        // Paquete 0x65
+                if (data.Length < 24)
+                {
+                    _logger.LogWarning(
+                        "GuildList packet too short: {Length}.",
+                        data.Length);
+
+                    return Task.CompletedTask;
+                }
+
+                bool isInGuild =
+                    data[4] != 0;
+
+                byte memberCount =
+                    data[5];
+
+                uint totalScore =
+                    BinaryPrimitives.ReadUInt32LittleEndian(
+                        data.Slice(
+                            8,
+                            4));
+
+                byte currentScore =
+                    data[12];
+
+                string rivalGuildName =
+                    ReadGuildString(
+                        data.Slice(
+                            13,
+                            8));
+
+                if (!isInGuild)
+                {
+                    GuildInfoCache.StoreRoster(
+                        new GuildRosterData
+                        {
+                            IsInGuild = false
+                        });
+
+                    return Task.CompletedTask;
+                }
+
+                const int memberStart =
+                    24;
+
+                const int memberSize =
+                    13;
+
+                var members =
+                    new List<GuildMemberData>(
+                        memberCount);
+
+                for (int i = 0;
+                    i < memberCount;
+                    i++)
+                {
+                    int offset =
+                        memberStart +
+                        i * memberSize;
+
+                    if (offset + memberSize >
+                        data.Length)
+                    {
+                        break;
+                    }
+
+                    string name =
+                        ReadGuildString(
+                            data.Slice(
+                                offset,
+                                10));
+
+                    byte serverId =
+                        data[offset + 10];
+
+                    byte serverId2 =
+                        data[offset + 11];
+
+                    byte role =
+                        data[offset + 12];
+
+                    members.Add(
+                        new GuildMemberData
+                        {
+                            Name =
+                                name,
+
+                            ServerId =
+                                serverId,
+
+                            ServerId2 =
+                                serverId2,
+
+                            Role =
+                                role
+                        });
+                }
+
+                GuildInfoCache.StoreRoster(
+                    new GuildRosterData
+                    {
+                        IsInGuild =
+                            true,
+
+                        Score =
+                            totalScore,
+
+                        CurrentScore =
+                            currentScore,
+
+                        RivalGuildName =
+                            rivalGuildName,
+
+                        Members =
+                            members.ToArray()
+                    });
+
+                _logger.LogInformation(
+                    "Guild list received: {MemberCount} members, Score={Score}.",
+                    members.Count,
+                    totalScore);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error parsing GuildList (0x52).");
+            }
+
+            return Task.CompletedTask;
+        }
+        // Paquete 0x65 GuildMemberRelation
         [PacketHandler(0x65, PacketRouter.NoSubCode)]
         public Task HandleAssignCharacterToGuildAsync(
             Memory<byte> packet)
@@ -2004,7 +2144,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                     GuildInfoCache.AssignPlayerToGuild(
                         playerId,
-                        guildId);
+                        guildId,
+                        role);
 
                     // Si todavía no conocemos esta guild,
                     // pedimos la información pública.
@@ -2101,28 +2242,67 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         }
 
         [PacketHandler(0x5D, PacketRouter.NoSubCode)] // GuildMemberLeftGuild
-        public Task HandleGuildMemberLeftGuildAsync(Memory<byte> packet)
+        public Task HandleGuildMemberLeftGuildAsync(
+            Memory<byte> packet)
         {
             try
             {
-                if (packet.Length < GuildMemberLeftGuild.Length)
+                ReadOnlySpan<byte> data =
+                    packet.Span;
+
+                if (data.Length < 5)
                 {
-                    _logger.LogWarning("GuildMemberLeftGuild packet too short: {Length}", packet.Length);
+                    _logger.LogWarning(
+                        "GuildMemberLeftGuild packet too short: {Length}.",
+                        data.Length);
+
                     return Task.CompletedTask;
                 }
-                var left = new GuildMemberLeftGuild(packet);
-                ushort rawId = left.PlayerId;
-                ushort maskedId = (ushort)(rawId & 0x7FFF);
+
+                ushort rawPlayerId =
+                    BinaryPrimitives.ReadUInt16BigEndian(
+                        data.Slice(3, 2));
+
+                ushort playerId =
+                    (ushort)(
+                        rawPlayerId &
+                        0x7FFF);
+
+                bool wasGuildMaster =
+                    (rawPlayerId &
+                    0x8000) != 0;
+
                 _logger.LogInformation(
-                    "🚶 Player {Id:X4} left guild (GM: {IsGM}).",
-                    maskedId, left.IsGuildMaster
-                );
-                // TODO: clear guild info in _scopeManager
+                    "Guild member left: PlayerId={PlayerId}, WasGuildMaster={WasGuildMaster}.",
+                    playerId,
+                    wasGuildMaster);
+
+                // Limpiar GuildId + Role del jugador.
+                GuildInfoCache.RemovePlayerFromGuild(
+                    playerId);
+
+                // Si somos nosotros quienes fuimos expulsados
+                // o salimos de la guild, limpiar también el roster.
+                if (playerId ==
+                    _characterState.Id)
+                {
+                    GuildInfoCache.StoreRoster(
+                        new GuildRosterData
+                        {
+                            IsInGuild = false
+                        });
+
+                    _logger.LogInformation(
+                        "Local player's guild state cleared.");
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error parsing GuildMemberLeftGuild (0x5D).");
+                _logger.LogError(
+                    ex,
+                    "Error processing GuildMemberLeftGuild (0x5D).");
             }
+
             return Task.CompletedTask;
         }
 

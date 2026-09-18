@@ -3592,6 +3592,378 @@ namespace Client.Main.Objects.Player
         public void OnPlayerMoved() => PlayerMoved?.Invoke(this, EventArgs.Empty);
         public void OnPlayerTookDamage() => PlayerTookDamage?.Invoke(this, EventArgs.Empty);
 
+        public override void DrawHoverName()
+        {
+            // Mantener el comportamiento normal:
+            // solamente mostrar nombre cuando corresponde.
+            if (!Constants.SHOW_NAMES_ON_HOVER ||
+                !IsMouseHover)
+            {
+                return;
+            }
+
+            var font =
+                GraphicsManager.Instance.Font;
+
+            if (font == null)
+                return;
+
+            string playerName =
+                DisplayName;
+            string playerNameText =
+                $"{playerName}:";
+
+            if (string.IsNullOrEmpty(
+                    playerName))
+            {
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // BUSCAR GUILD DEL JUGADOR
+            // ---------------------------------------------------------
+
+            if (!GuildInfoCache.TryGetPlayerGuildId(
+                    NetworkId,
+                    out uint guildId) ||
+                guildId == 0)
+            {
+                base.DrawHoverName();
+                return;
+            }
+
+            if (!GuildInfoCache.TryGetGuild(
+                    guildId,
+                    out GuildInfoData guild))
+            {
+                base.DrawHoverName();
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // RANGO
+            // ---------------------------------------------------------
+
+            string roleName =
+                string.Empty;
+
+            if (GuildInfoCache.TryGetPlayerGuildRole(
+                    NetworkId,
+                    out byte role))
+            {
+                roleName =
+                    role switch
+                    {
+                        0x80 => "Guild Master",
+                        0x40 => "Assistant Master",
+                        0x20 => "Battle Master",
+                        0x00 => "Member",
+                        _ => string.Empty
+                    };
+            }
+
+            string guildText =
+            string.IsNullOrEmpty(roleName)
+                ? $"Guild: {guild.GuildName}"
+                : $"Guild: {guild.GuildName} | {roleName}";
+
+            // ---------------------------------------------------------
+            // RELACIÓN CON NUESTRA GUILD
+            // ---------------------------------------------------------
+
+            uint localGuildId =
+                0;
+
+            if (MuGame.Instance.ActiveScene
+                    is GameScene gameScene &&
+                gameScene.Hero != null)
+            {
+                GuildInfoCache.TryGetPlayerGuildId(
+                    gameScene.Hero.NetworkId,
+                    out localGuildId);
+            }
+
+            bool sameGuild =
+                localGuildId != 0 &&
+                localGuildId ==
+                guildId;
+
+            // Esto permite ya detectar el rival si
+            // el roster 0x52 fue cargado durante la sesión.
+            // Cuando implementemos oficialmente alianzas/
+            // hostilidades, esta comprobación se sustituirá
+            // por el RelationshipCache.
+            bool hostileGuild =
+                false;
+
+            GuildRosterData roster =
+                GuildInfoCache.CurrentRoster;
+
+            if (localGuildId != 0 &&
+                roster != null &&
+                roster.IsInGuild &&
+                !string.IsNullOrWhiteSpace(
+                    roster.RivalGuildName) &&
+                string.Equals(
+                    roster.RivalGuildName,
+                    guild.GuildName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                hostileGuild =
+                    true;
+            }
+
+            Color guildColor =
+            Color.White;
+
+            // ---------------------------------------------------------
+            // PROYECCIÓN 3D -> PANTALLA
+            // ---------------------------------------------------------
+
+            Vector3 anchor =
+                new Vector3(
+                    (BoundingBoxWorld.Min.X +
+                    BoundingBoxWorld.Max.X) *
+                    0.5f,
+
+                    (BoundingBoxWorld.Min.Y +
+                    BoundingBoxWorld.Max.Y) *
+                    0.5f,
+
+                    BoundingBoxWorld.Max.Z +
+                    20f);
+
+            Vector3 screen =
+                GraphicsDevice.Viewport.Project(
+                    anchor,
+                    Camera.Instance.Projection,
+                    Camera.Instance.View,
+                    Matrix.Identity);
+
+            if (screen.Z < 0f ||
+                screen.Z > 1f)
+            {
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // TAMAÑOS
+            // ---------------------------------------------------------
+
+            const float baseScale =
+                0.4f;
+
+            float scale =
+                baseScale *
+                Constants.RENDER_SCALE;
+
+            Vector2 nameSize =
+                font.MeasureString(
+                    playerNameText) *
+                scale;
+
+            Vector2 guildSize =
+                font.MeasureString(
+                    guildText) *
+                scale;
+
+            const float horizontalPadding =
+                4f;
+
+            const float verticalPadding =
+                2f;
+
+            float lineGap =
+                MathF.Max(
+                    1f,
+                    1f *
+                    Constants.RENDER_SCALE);
+
+            float contentWidth =
+                MathF.Max(
+                    nameSize.X,
+                    guildSize.X);
+
+            float contentHeight =
+                nameSize.Y +
+                lineGap +
+                guildSize.Y;
+
+            float boxWidth =
+                contentWidth +
+                horizontalPadding * 2f;
+
+            float boxHeight =
+                contentHeight +
+                verticalPadding * 2f;
+
+            float boxX =
+                screen.X -
+                boxWidth * 0.5f;
+
+            float boxY =
+                screen.Y -
+                boxHeight;
+
+            Rectangle backgroundRect =
+                new Rectangle(
+                    (int)MathF.Round(
+                        boxX),
+
+                    (int)MathF.Round(
+                        boxY),
+
+                    Math.Max(
+                        1,
+                        (int)MathF.Round(
+                            boxWidth)),
+
+                    Math.Max(
+                        1,
+                        (int)MathF.Round(
+                            boxHeight)));
+
+            // Nombre centrado
+            Vector2 namePosition =
+                new Vector2(
+                    screen.X -
+                    nameSize.X *
+                    0.5f,
+
+                    boxY +
+                    verticalPadding);
+
+            // Guild centrada
+            Vector2 guildPosition =
+                new Vector2(
+                    screen.X -
+                    guildSize.X *
+                    0.5f,
+
+                    namePosition.Y +
+                    nameSize.Y +
+                    lineGap);
+
+            var sprite =
+                GraphicsManager.Instance.Sprite;
+
+            var pixel =
+                GraphicsManager.Instance.Pixel;
+
+            if (pixel == null)
+                return;
+            Color backgroundColor;
+
+            if (hostileGuild)
+            {
+                // Rojo, pero bastante transparente
+                backgroundColor =
+                    new Color(
+                        110,
+                        25,
+                        25,
+                        65);
+            }
+            else if (sameGuild)
+            {
+                // Amarillo/verde, pero bastante transparente
+                backgroundColor =
+                    new Color(
+                        105,
+                        115,
+                        25,
+                        65);
+            }
+            else
+            {
+                // Neutral oscuro y transparente
+                backgroundColor =
+                    new Color(
+                        20,
+                        30,
+                        40,
+                        65);
+            }
+
+            // ---------------------------------------------------------
+            // DRAW
+            // ---------------------------------------------------------
+
+            using (new SpriteBatchScope(
+                sprite,
+                SpriteSortMode.Deferred,
+                BlendState.NonPremultiplied,
+                SamplerState.LinearClamp,
+                DepthStencilState.None,
+                RasterizerState.CullNone))
+            {
+                // Fondo semitransparente
+                sprite.Draw(
+                    pixel,
+                    backgroundRect,
+                    backgroundColor);
+
+                // Sombra nombre
+                sprite.DrawString(
+                    font,
+                    playerNameText,
+                    namePosition +
+                    new Vector2(
+                        1f,
+                        1f),
+                    Color.Black *
+                    0.8f,
+                    0f,
+                    Vector2.Zero,
+                    scale,
+                    SpriteEffects.None,
+                    0f);
+
+                // Nombre personaje
+                sprite.DrawString(
+                    font,
+                    playerNameText,
+                    namePosition,
+                    new Color(
+                        220,
+                        235,
+                        240),
+                    0f,
+                    Vector2.Zero,
+                    scale,
+                    SpriteEffects.None,
+                    0f);
+
+                // Sombra Guild
+                sprite.DrawString(
+                    font,
+                    guildText,
+                    guildPosition +
+                    new Vector2(
+                        1f,
+                        1f),
+                    Color.Black *
+                    0.8f,
+                    0f,
+                    Vector2.Zero,
+                    scale,
+                    SpriteEffects.None,
+                    0f);
+
+                // Guild + rango
+                sprite.DrawString(
+                    font,
+                    guildText,
+                    guildPosition,
+                    guildColor,
+                    0f,
+                    Vector2.Zero,
+                    scale,
+                    SpriteEffects.None,
+                    0f);
+            }
+        }
+
         public override void DrawAfter(GameTime gameTime)
         {
             base.DrawAfter(gameTime);

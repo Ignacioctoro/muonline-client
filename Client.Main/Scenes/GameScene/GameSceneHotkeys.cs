@@ -150,7 +150,11 @@ namespace Client.Main.Scenes
             hotkeys.OnKeyPressed(Keys.C, ToggleCharacterInfo, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.M, ToggleMoveCommand, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.Enter, OpenChatInput, when: WhenNotUiInput);
-        }
+            hotkeys.OnKeyPressed(
+                Keys.G,
+                context => _scene.OpenGuildMenu(),
+                when: WhenNotUiInput);
+                    }
 
         private void RegisterInWorldHotkeys(HotkeySet hotkeys)
         {
