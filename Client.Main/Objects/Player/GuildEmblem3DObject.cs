@@ -10,14 +10,12 @@ namespace Client.Main.Objects.Player
     /// <summary>
     /// Emblema 3D de Guild anclado al hombro/brazo izquierdo.
     ///
-    /// La posición se controla con valores intuitivos:
+    /// IMPORTANTE:
+    /// La posición del emblema se calcula durante Draw(),
+    /// no durante Update().
     ///
-    /// DownFromShoulder = hombro -> codo
-    /// OutwardOffset    = pegado -> afuera de la armadura
-    /// TricepOffset     = bíceps <-> tríceps
-    ///
-    /// La orientación vertical se calcula automáticamente
-    /// siguiendo la dirección real del brazo.
+    /// Esto evita que el emblema quede un frame atrás
+    /// cuando el PlayerObject está caminando.
     /// </summary>
     public sealed class GuildEmblem3DObject : WorldObject
     {
@@ -32,48 +30,48 @@ namespace Client.Main.Objects.Player
 
 
         // =========================================================
-        // GEOMETRÍA DEL BRAZALETE
+        // MALLA DEL BRAZALETE
         // =========================================================
 
         private const int Segments = 6;
 
-        private const float Height = 17.0f;
-        private const float Radius = 13.0f;
-        private const float ArcDegrees = 75.0f;
+        private const float Height = 12.0f;
+        private const float Radius = 9.0f;
+        private const float ArcDegrees = 65.0f;
 
 
         // =========================================================
-        // AJUSTES DE POSICIÓN
+        // AJUSTES VISUALES
         //
-        // ESTOS SON LOS VALORES QUE DEBES MODIFICAR.
+        // ESTOS SON LOS 3 VALORES QUE PUEDES AJUSTAR.
         // =========================================================
 
         /// <summary>
-        /// Distancia desde el hombro hacia el codo.
+        /// Baja desde el hombro hacia el codo.
         ///
-        /// 0  = hombro
-        /// 3  = parte alta del brazo
-        /// 8  = mitad del brazo
-        /// 15 = cerca del codo
+        /// 0 = prácticamente en el hombro.
+        /// Más alto = más abajo por el brazo.
         /// </summary>
-        private const float DownFromShoulder = 3.0f;
+        private const float DownFromShoulder = 2.0f;
+
 
         /// <summary>
-        /// Separación respecto al cuerpo/armadura.
+        /// Separa el emblema de la armadura.
         ///
         /// Más alto = más afuera.
         /// Más bajo = más pegado.
         /// </summary>
-        private const float OutwardOffset = 2.5f;
+        private const float OutwardOffset = 5.2f;
+
 
         /// <summary>
-        /// Mueve el emblema alrededor del brazo.
+        /// Desplaza alrededor del brazo.
         ///
-        /// Un signo será tríceps y el otro bíceps.
-        /// Si -3 queda en el lado incorrecto,
-        /// simplemente usa +3.
+        /// Un signo apunta hacia tríceps,
+        /// el otro hacia bíceps.
         /// </summary>
         private const float TricepOffset = -3.0f;
+        private const float ShoulderTiltDegrees = 22.0f;
 
 
         // =========================================================
@@ -89,16 +87,13 @@ namespace Client.Main.Objects.Player
         private uint _currentGuildId;
 
 
-        // =========================================================
-        // DEBUG / REFERENCIA
-        // =========================================================
-
+        // Solo como referencia/debug.
         public Matrix ArmWorldMatrix { get; private set; } =
             Matrix.Identity;
 
 
         // =========================================================
-        // PALETA GUILD MU
+        // PALETA DE COLORES MU
         // =========================================================
 
         private readonly Color[] _palette =
@@ -141,8 +136,8 @@ namespace Client.Main.Objects.Player
         {
             CreateMesh();
 
-            // BasicEffect exclusivo del emblema.
-            // No usamos efectos compartidos del renderer.
+            // Efecto exclusivo para este objeto.
+            // No modificamos efectos compartidos del cliente.
             _effect =
                 new BasicEffect(GraphicsDevice)
                 {
@@ -156,7 +151,7 @@ namespace Client.Main.Objects.Player
 
 
         // =========================================================
-        // CREAR MALLA CURVA
+        // MALLA CURVA
         // =========================================================
 
         private void CreateMesh()
@@ -190,11 +185,7 @@ namespace Client.Main.Objects.Player
                         u);
 
 
-                // Curvatura cilíndrica.
-                //
-                // X = profundidad / salida del parche
-                // Y = recorrido alrededor del brazo
-                // Z = altura del emblema
+                // Superficie cilíndrica pequeña.
                 float x =
                     Radius -
                     MathF.Cos(angle) *
@@ -208,7 +199,7 @@ namespace Client.Main.Objects.Player
                     i * 2;
 
 
-                // Parte inferior
+                // Parte inferior.
                 _vertices[vertex] =
                     new VertexPositionTexture(
                         new Vector3(
@@ -216,11 +207,11 @@ namespace Client.Main.Objects.Player
                             y,
                             -halfHeight),
                         new Vector2(
-                            1f - u,
+                            u,
                             1f));
 
 
-                // Parte superior
+                // Parte superior.
                 _vertices[vertex + 1] =
                     new VertexPositionTexture(
                         new Vector3(
@@ -228,7 +219,7 @@ namespace Client.Main.Objects.Player
                             y,
                             halfHeight),
                         new Vector2(
-                            1f - u,
+                            u,
                             0f));
             }
 
@@ -301,7 +292,7 @@ namespace Client.Main.Objects.Player
             }
 
 
-            // Por ahora solamente el personaje local.
+            // Por ahora solo nuestro propio personaje.
             if (!player.IsMainWalker)
             {
                 Hidden = true;
@@ -309,10 +300,14 @@ namespace Client.Main.Objects.Player
             }
 
 
-            // -----------------------------------------------------
-            // ACTUALIZAR INFORMACIÓN DE GUILD
-            // -----------------------------------------------------
-
+            // En Update solamente actualizamos
+            // los datos de Guild/textura.
+            //
+            // NO calculamos aquí la posición del hombro.
+            //
+            // WalkerObject mueve al personaje después
+            // de actualizar sus hijos, por lo que hacerlo aquí
+            // dejaba el emblema un frame atrás al caminar.
             UpdateGuildInformation(
                 player);
 
@@ -324,33 +319,48 @@ namespace Client.Main.Objects.Player
             }
 
 
+            Hidden = false;
+        }
+
+
+        // =========================================================
+        // CALCULAR MATRIZ DEL BRAZALETE
+        //
+        // Se llama durante Draw(), cuando el PlayerObject
+        // ya terminó de moverse en este frame.
+        // =========================================================
+
+        private bool TryBuildAttachmentMatrix(
+            PlayerObject player,
+            out Matrix finalMatrix)
+        {
+            finalMatrix =
+                Matrix.Identity;
+
+
             // -----------------------------------------------------
-            // MATRIZ DEL HOMBRO
-            //
-            // Este será nuestro punto de anclaje principal.
+            // HOMBRO
             // -----------------------------------------------------
 
             if (!player.TryGetLeftShoulderWorldMatrix(
                     out Matrix shoulderWorld))
             {
-                Hidden = true;
-                return;
+                return false;
             }
 
 
             // -----------------------------------------------------
-            // MATRIZ DE LA MANO
+            // MANO
             //
-            // Solo la usamos para descubrir hacia dónde
-            // apunta realmente el brazo.
+            // La usamos para saber hacia dónde apunta
+            // actualmente el brazo.
             // -----------------------------------------------------
 
             if (!player.TryGetHandWorldMatrix(
                     true,
                     out Matrix handWorld))
             {
-                Hidden = true;
-                return;
+                return false;
             }
 
 
@@ -362,7 +372,7 @@ namespace Client.Main.Objects.Player
 
 
             // =====================================================
-            // DIRECCIÓN HOMBRO -> MANO
+            // EJE HOMBRO -> MANO
             // =====================================================
 
             Vector3 armDown =
@@ -373,25 +383,22 @@ namespace Client.Main.Objects.Player
             if (armDown.LengthSquared() <
                 0.001f)
             {
-                Hidden = true;
-                return;
+                return false;
             }
 
 
             armDown.Normalize();
 
 
-            // Dirección contraria:
+            // Dirección mano -> hombro.
             //
-            // mano -> hombro
-            //
-            // Será nuestro eje vertical.
+            // Esta será la vertical del emblema.
             Vector3 armUp =
                 -armDown;
 
 
             // =====================================================
-            // DIRECCIÓN HACIA AFUERA DEL CUERPO
+            // HACIA AFUERA DEL CUERPO
             // =====================================================
 
             Vector3 bodyPosition =
@@ -403,10 +410,8 @@ namespace Client.Main.Objects.Player
                 bodyPosition;
 
 
-            // Eliminamos cualquier componente que esté
-            // apuntando a lo largo del brazo.
-            //
-            // Queremos solamente "salir" del brazo/cuerpo.
+            // Eliminamos la parte del vector
+            // que va a lo largo del brazo.
             outward -=
                 armDown *
                 Vector3.Dot(
@@ -427,7 +432,7 @@ namespace Client.Main.Objects.Player
 
 
             // =====================================================
-            // DIRECCIÓN ALREDEDOR DEL BRAZO
+            // ALREDEDOR DEL BRAZO
             // =====================================================
 
             Vector3 around =
@@ -449,85 +454,78 @@ namespace Client.Main.Objects.Player
 
 
             // =====================================================
-            // POSICIÓN FINAL
+            // POSICIÓN
             // =====================================================
 
             Vector3 targetPosition =
                 shoulderPosition
 
-                // Hombro -> codo
+                // Hombro -> codo.
                 + armDown *
                   DownFromShoulder
 
-                // Separación respecto a la armadura
+                // Sale de la armadura.
                 + outward *
                   OutwardOffset
 
-                // Bíceps <-> tríceps
+                // Bíceps <-> tríceps.
                 + around *
                   TricepOffset;
 
 
             // =====================================================
-            // ORIENTACIÓN FINAL
+            // ORIENTACIÓN
             //
-            // Ya no usamos:
-            //
-            // RotationX(105)
-            // RotationZ(-48)
-            //
-            // Construimos una orientación directamente
-            // a partir del brazo.
-            //
-            // Local X = hacia afuera
+            // Local X = hacia afuera del personaje
             // Local Y = alrededor del brazo
-            // Local Z = hacia el hombro
+            // Local Z = mano -> hombro
             //
-            // Como la malla tiene su altura en Z,
-            // esto hace que la T quede vertical
-            // siguiendo el brazo.
+            // Nuestra malla tiene la altura en Z,
+            // por eso sigue verticalmente el brazo.
             // =====================================================
 
-            Matrix finalMatrix =
-            new Matrix(
-                // Local X
-                outward.X,
-                outward.Y,
-                outward.Z,
-                0f,
+            finalMatrix =
+                new Matrix(
+                    // Local X
+                    -outward.X,
+                    -outward.Y,
+                    -outward.Z,
+                    0f,
 
-                // Local Y
-                around.X,
-                around.Y,
-                around.Z,
-                0f,
+                    // Local Y
+                    -around.X,
+                    -around.Y,
+                    -around.Z,
+                    0f,
 
-                // Local Z
-                armUp.X,
-                armUp.Y,
-                armUp.Z,
-                0f,
+                    // Local Z
+                    armUp.X,
+                    armUp.Y,
+                    armUp.Z,
+                    0f,
 
-                // Posición
-                targetPosition.X,
-                targetPosition.Y,
-                targetPosition.Z,
-                1f);
-
+                    // Posición mundial
+                    targetPosition.X,
+                    targetPosition.Y,
+                    targetPosition.Z,
+                    1f);
+            // Ligera inclinación vertical siguiendo el hombro.
+            finalMatrix =
+                Matrix.CreateRotationY(
+                    MathHelper.ToRadians(ShoulderTiltDegrees))
+                *
+                finalMatrix;        
 
             ArmWorldMatrix =
                 shoulderWorld;
 
-            WorldPosition =
-                finalMatrix;
 
-
-            Hidden = false;
+            return true;
         }
 
 
         // =========================================================
-        // INFORMACIÓN DE GUILD
+        // GUILD INFO
         // =========================================================
 
         private void UpdateGuildInformation(
@@ -581,7 +579,7 @@ namespace Client.Main.Objects.Player
 
 
         // =========================================================
-        // CREAR TEXTURA DEL EMBLEMA
+        // CREAR TEXTURA
         // =========================================================
 
         private void CreateEmblemTexture(
@@ -621,17 +619,12 @@ namespace Client.Main.Objects.Player
                     int colorIndex;
 
 
-                    // Pixel par:
-                    // nibble alto.
                     if ((x & 1) == 0)
                     {
                         colorIndex =
                             (packed >> 4) &
                             0x0F;
                     }
-
-                    // Pixel impar:
-                    // nibble bajo.
                     else
                     {
                         colorIndex =
@@ -712,12 +705,36 @@ namespace Client.Main.Objects.Player
             }
 
 
+            if (Parent is not PlayerObject player)
+            {
+                return;
+            }
+
+
+            // =====================================================
+            // MUY IMPORTANTE:
+            //
+            // Calculamos la posición AHORA.
+            //
+            // A esta altura del frame el PlayerObject
+            // ya terminó de ejecutar UpdatePosition().
+            //
+            // Así evitamos que el brazalete se quede atrás
+            // cuando el personaje camina.
+            // =====================================================
+
+            if (!TryBuildAttachmentMatrix(
+                    player,
+                    out Matrix attachmentMatrix))
+            {
+                return;
+            }
+
+
             GraphicsDevice gd =
                 GraphicsDevice;
 
 
-            // Guardamos solamente los estados
-            // que vamos a modificar.
             DepthStencilState previousDepth =
                 gd.DepthStencilState;
 
@@ -738,37 +755,47 @@ namespace Client.Main.Objects.Player
                     DepthStencilState.Default;
 
 
-                // Necesario porque el color 0
-                // de la Guild es transparente.
+                // Transparencia de la Guild.
                 gd.BlendState =
                     BlendState.AlphaBlend;
 
 
-                // Durante la calibración queremos
-                // ver ambas caras del parche.
+                // Seguimos mostrando ambas caras
+                // durante calibración.
                 gd.RasterizerState =
                     RasterizerState.CullNone;
 
 
-                // Pixel-art sin suavizado.
+                // Pixel art sin filtrado.
                 gd.SamplerStates[0] =
                     SamplerState.PointClamp;
 
 
+                // IMPORTANTE:
+                //
+                // Ya no usamos WorldPosition aquí.
+                //
+                // Usamos la matriz recién calculada
+                // con la posición actual del personaje.
                 _effect.World =
-                    WorldPosition;
+                    attachmentMatrix;
+
 
                 _effect.View =
                     Camera.Instance.View;
 
+
                 _effect.Projection =
                     Camera.Instance.Projection;
+
 
                 _effect.Texture =
                     _emblemTexture;
 
+
                 _effect.DiffuseColor =
                     Vector3.One;
+
 
                 _effect.Alpha =
                     1.0f;
@@ -794,7 +821,6 @@ namespace Client.Main.Objects.Player
             }
             finally
             {
-                // Restauramos estados.
                 gd.DepthStencilState =
                     previousDepth;
 
