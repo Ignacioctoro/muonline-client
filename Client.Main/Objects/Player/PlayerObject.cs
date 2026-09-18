@@ -50,6 +50,7 @@ namespace Client.Main.Objects.Player
         public PlayerBootObject Boots { get; private set; }
         public WeaponObject Weapon1 { get; private set; }
         public WeaponObject Weapon2 { get; private set; }
+        public GuildEmblem3DObject GuildEmblem3D { get; private set; }
         public WingObject EquippedWings { get; private set; }
 
         public VehicleObject Vehicle { get; private set; }
@@ -209,6 +210,7 @@ namespace Client.Main.Objects.Player
             Children.Add(Weapon1);
             Children.Add(Weapon2);
             Children.Add(EquippedWings);
+            Children.Add(GuildEmblem3D = new GuildEmblem3DObject());
             Children.Add(Vehicle);
 
             // Enable mouse hover interactions so the name is shown
