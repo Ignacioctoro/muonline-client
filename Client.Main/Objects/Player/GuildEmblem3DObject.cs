@@ -61,7 +61,7 @@ namespace Client.Main.Objects.Player
         /// Más alto = más afuera.
         /// Más bajo = más pegado.
         /// </summary>
-        private const float OutwardOffset = 5.2f;
+        private const float OutwardOffset = 5.8f;
 
 
         /// <summary>
@@ -85,6 +85,11 @@ namespace Client.Main.Objects.Player
         private Texture2D _emblemTexture;
 
         private uint _currentGuildId;
+        // Slot de armadura en el inventario del jugador local.
+        private const byte ArmorInventorySlot = 3;
+
+        // Separación adicional cuando el jugador tiene armadura equipada.
+        private const float ArmorExtraOutwardOffset = 6.0f;
 
 
         // Solo como referencia/debug.
@@ -298,6 +303,7 @@ namespace Client.Main.Objects.Player
                 Hidden = true;
                 return;
             }
+            
 
 
             // En Update solamente actualizamos
@@ -308,6 +314,7 @@ namespace Client.Main.Objects.Player
             // WalkerObject mueve al personaje después
             // de actualizar sus hijos, por lo que hacerlo aquí
             // dejaba el emblema un frame atrás al caminar.
+        
             UpdateGuildInformation(
                 player);
 
@@ -452,25 +459,26 @@ namespace Client.Main.Objects.Player
                 around.Normalize();
             }
 
+            // =========================================================
+            // COMPENSACIÓN POR ARMADURA
+            // =========================================================
 
-            // =====================================================
-            // POSICIÓN
-            // =====================================================
+            float armorExtraOffset =
+                HasArmorEquipped(player)
+                    ? ArmorExtraOutwardOffset
+                    : 0f;
+
+
+            // =========================================================
+            // POSICIÓN FINAL
+            // =========================================================
 
             Vector3 targetPosition =
                 shoulderPosition
-
-                // Hombro -> codo.
-                + armDown *
-                  DownFromShoulder
-
-                // Sale de la armadura.
+                + armDown * DownFromShoulder
                 + outward *
-                  OutwardOffset
-
-                // Bíceps <-> tríceps.
-                + around *
-                  TricepOffset;
+                (OutwardOffset + armorExtraOffset)
+                + around * TricepOffset;
 
 
             // =====================================================
@@ -523,7 +531,46 @@ namespace Client.Main.Objects.Player
             return true;
         }
 
+        private static bool HasArmorEquipped(
+            PlayerObject player)
+        {
+            if (player == null)
+                return false;
 
+            // =========================================================
+            // JUGADOR LOCAL
+            // =========================================================
+
+            if (player.IsMainWalker)
+            {
+                var characterState =
+                    MuGame.Network?.GetCharacterState();
+
+                var inventory =
+                    characterState?.GetInventoryItems();
+
+                return inventory != null &&
+                    inventory.ContainsKey(
+                        ArmorInventorySlot);
+            }
+
+
+            // =========================================================
+            // JUGADOR REMOTO
+            //
+            // Los jugadores remotos no tienen acceso al inventario
+            // completo del cliente local.
+            //
+            // Su equipamiento viene codificado en Appearance.
+            // =========================================================
+
+            short armorIndex =
+                player.Appearance.ArmorItemIndex;
+
+            return armorIndex >= 0 &&
+                armorIndex != 0xFF &&
+                armorIndex != 0x1FF;
+        }
         // =========================================================
         // GUILD INFO
         // =========================================================
