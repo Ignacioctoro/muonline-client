@@ -611,6 +611,7 @@ namespace Client.Main.Networking
         {
             _logger.LogInformation(">>> ProcessLogoutResponse: Received logout response type {Type}", type);
             _characterState.IsInGame = false;
+            GuildInfoCache.Clear();
 
             switch (type)
             {
