@@ -736,7 +736,7 @@ namespace Client.Main.Controls.UI
             byte chatAlpha = (byte)(frameVisible ? 100 : 150);
             switch (type)
             {
-                case MessageType.Whisper: return new Color(255, 200, 50, 150);
+                case MessageType.Whisper: return new Color(255, 200, 50, 110);
                 case MessageType.System: return new Color(0, 0, 0, 150);
                 case MessageType.Error: return new Color(0, 0, 0, 150);
                 case MessageType.Chat: return new Color(0, 0, 0, (int)chatAlpha);

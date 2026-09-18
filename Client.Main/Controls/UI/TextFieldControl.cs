@@ -102,29 +102,53 @@ namespace Client.Main.Controls.UI
         public override void OnFocus()
         {
             if (IsFocused) return;
+
             base.OnFocus();
             IsFocused = true;
             _showCursor = true;
             _cursorBlinkTimer = 0;
-            if (Scene != null) Scene.FocusControl = this;
 
-            _logger?.LogDebug("TextFieldControl: OnFocus called. Subscribing to TextInput.");
+            if (Scene != null)
+                Scene.FocusControl = this;
+
+            _logger?.LogDebug("TextFieldControl: OnFocus called.");
+
+        #if !(ANDROID || IOS)
+            // Desktop:
+            // Let the operating system resolve the actual character according
+            // to the user's active keyboard layout.
+            if (MuGame.Instance?.GameWindow != null)
+            {
+                // Defensive unsubscribe avoids accidental duplicate subscriptions.
+                MuGame.Instance.GameWindow.TextInput -= OnDesktopTextInput;
+                MuGame.Instance.GameWindow.TextInput += OnDesktopTextInput;
+            }
+        #endif
         }
 
         public override void OnBlur()
         {
             if (!IsFocused) return;
+
+        #if !(ANDROID || IOS)
+            if (MuGame.Instance?.GameWindow != null)
+            {
+                MuGame.Instance.GameWindow.TextInput -= OnDesktopTextInput;
+            }
+        #endif
+
             base.OnBlur();
+
             IsFocused = false;
             _showCursor = false;
             _cursorBlinkTimer = 0;
 
-            _logger?.LogDebug("TextFieldControl: OnBlur called. Unsubscribing from TextInput.");
+            _logger?.LogDebug("TextFieldControl: OnBlur called.");
 
-#if ANDROID
+        #if ANDROID
             AndroidKeyboard.TextInput -= OnTextInput;
             AndroidKeyboard.Hide();
-#endif
+        #endif
         }
 
         public new void Focus() => OnFocus();
@@ -202,31 +226,82 @@ namespace Client.Main.Controls.UI
         }
 #endif
 
+        #if !(ANDROID || IOS)
+        private void OnDesktopTextInput(object sender, Microsoft.Xna.Framework.TextInputEventArgs e)
+        {
+            if (!IsFocused || !Visible)
+                return;
+
+            char character = e.Character;
+
+            // Control characters are still handled through KeyboardState.
+            // Here we only want actual printable text resolved by the OS.
+            if (character == '\0' || char.IsControl(character))
+                return;
+
+            _inputText.Append(character);
+
+            UpdateScrollOffset();
+            MoveCursorToEnd();
+            OnValueChanged();
+        }
+        #endif
         public override void Update(GameTime gameTime)
         {
             base.Update(gameTime);
 
             if (!IsFocused || !Visible) return;
 
-#if !ANDROID
-            // On non-Android platforms (Windows, Linux, Mac), use keyboard polling
-            var keysPressed = MuGame.Instance.Keyboard.GetPressedKeys();
-            bool shift = MuGame.Instance.Keyboard.IsKeyDown(Keys.LeftShift) || MuGame.Instance.Keyboard.IsKeyDown(Keys.RightShift);
-            bool capsLock = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows) ? Console.CapsLock : false;
+#if !(ANDROID || IOS)
+            // Desktop platforms:
+            //
+            // Printable text is received through GameWindow.TextInput,
+            // so Windows/Linux/macOS can use their real keyboard layout.
+            //
+            // KeyboardState remains responsible only for control keys.
 
-            bool textModifiedByKey = false;
+            var keyboard = MuGame.Instance.Keyboard;
+            var previousKeyboard = MuGame.Instance.PrevKeyboard;
+
+            if (keyboard.IsKeyDown(Keys.Back) &&
+                previousKeyboard.IsKeyUp(Keys.Back))
+            {
+                if (_inputText.Length > 0)
+                {
+                    _inputText.Remove(_inputText.Length - 1, 1);
+                    UpdateScrollOffset();
+                    MoveCursorToEnd();
+                    OnValueChanged();
+                }
+            }
+
+            if (keyboard.IsKeyDown(Keys.Enter) &&
+                previousKeyboard.IsKeyUp(Keys.Enter))
+            {
+                OnEnterKeyPressed();
+                OnValueChanged();
+            }
+
+#elif IOS
+            // Keep the previous keyboard polling fallback on iOS.
+            //
+            // GameWindow.TextInput is a desktop API in MonoGame,
+            // so until native iOS text input is implemented we retain
+            // the existing behavior instead of breaking the platform.
+
+            var keysPressed = MuGame.Instance.Keyboard.GetPressedKeys();
+            bool shift =
+                MuGame.Instance.Keyboard.IsKeyDown(Keys.LeftShift) ||
+                MuGame.Instance.Keyboard.IsKeyDown(Keys.RightShift);
+
+            bool capsLock = false;
+
             foreach (var key in keysPressed)
             {
                 if (MuGame.Instance.PrevKeyboard.IsKeyUp(key))
                 {
                     ProcessKey(key, shift, capsLock);
-                    textModifiedByKey = true;
                 }
-            }
-
-            if (textModifiedByKey || (IsFocused && !MuGame.Instance.PrevKeyboard.GetPressedKeys().Any()))
-            {
-                UpdateScrollOffset();
             }
 #endif
 
@@ -238,7 +313,7 @@ namespace Client.Main.Controls.UI
             }
         }
 
-#if !ANDROID
+#if IOS
         // Keyboard input processing for Windows/Desktop platforms
         private void ProcessKey(Keys key, bool shift, bool capsLock)
         {

@@ -52,7 +52,7 @@ namespace Client.Main.Objects.Player
         /// 0 = prácticamente en el hombro.
         /// Más alto = más abajo por el brazo.
         /// </summary>
-        private const float DownFromShoulder = 2.0f;
+        private const float DownFromShoulder = 1.9f;
 
 
         /// <summary>
@@ -71,7 +71,7 @@ namespace Client.Main.Objects.Player
         /// el otro hacia bíceps.
         /// </summary>
         private const float TricepOffset = -3.0f;
-        private const float ShoulderTiltDegrees = 22.0f;
+        private const float ShoulderTiltDegrees = 26.0f;
 
 
         // =========================================================
@@ -89,7 +89,7 @@ namespace Client.Main.Objects.Player
         private const byte ArmorInventorySlot = 3;
 
         // Separación adicional cuando el jugador tiene armadura equipada.
-        private const float ArmorExtraOutwardOffset = 6.0f;
+        private const float ArmorExtraOutwardOffset = 5.5f;
 
 
         // Solo como referencia/debug.
@@ -294,17 +294,7 @@ namespace Client.Main.Objects.Player
             {
                 Hidden = true;
                 return;
-            }
-
-
-            // Por ahora solo nuestro propio personaje.
-            if (!player.IsMainWalker)
-            {
-                Hidden = true;
-                return;
-            }
-            
-
+            }            
 
             // En Update solamente actualizamos
             // los datos de Guild/textura.
