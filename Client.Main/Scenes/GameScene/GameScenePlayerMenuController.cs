@@ -148,9 +148,100 @@ namespace Client.Main.Scenes
                 targetHasGuild &&
                 targetIsGuildMaster;
 
+            bool localIsGuildMaster =
+                GuildInfoCache.IsPlayerGuildMaster(
+                    _scene.Hero.NetworkId);
+
+            bool differentGuilds =
+                false;
+
+            bool sameAlliance =
+                false;
+
+            if (GuildInfoCache.TryGetPlayerGuildId(
+                    _scene.Hero.NetworkId,
+                    out uint localGuildId) &&
+                GuildInfoCache.TryGetPlayerGuildId(
+                    targetPlayer.NetworkId,
+                    out uint targetGuildId))
+            {
+                differentGuilds =
+                    localGuildId != 0 &&
+                    targetGuildId != 0 &&
+                    localGuildId != targetGuildId;
+
+                if (differentGuilds &&
+                    GuildInfoCache.TryGetGuildForPlayer(
+                        _scene.Hero.NetworkId,
+                        out GuildInfoData localGuild) &&
+                    GuildInfoCache.TryGetGuildForPlayer(
+                        targetPlayer.NetworkId,
+                        out GuildInfoData targetGuild) &&
+                    GuildInfoCache.CurrentAllianceList is
+                        { Guilds: { } allianceGuilds })
+                {
+                    bool localInAlliance =
+                        false;
+
+                    bool targetInAlliance =
+                        false;
+
+                    foreach (AllianceGuildData allianceGuild
+                        in allianceGuilds)
+                    {
+                        if (string.Equals(
+                                allianceGuild.GuildName,
+                                localGuild.GuildName,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            localInAlliance =
+                                true;
+                        }
+
+                        if (string.Equals(
+                                allianceGuild.GuildName,
+                                targetGuild.GuildName,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            targetInAlliance =
+                                true;
+                        }
+                    }
+
+                    sameAlliance =
+                        localInAlliance &&
+                        targetInAlliance;
+                }
+            }
+
+            bool canRequestAlliance =
+                localHasGuild &&
+                targetHasGuild &&
+                localIsGuildMaster &&
+                targetIsGuildMaster &&
+                differentGuilds &&
+                !sameAlliance;
+
+            bool canRequestHostility =
+                localHasGuild &&
+                targetHasGuild &&
+                localIsGuildMaster &&
+                targetIsGuildMaster &&
+                differentGuilds &&
+                !sameAlliance;
+
             _playerContextMenu
                 .SetGuildRequestVisible(
                     canRequestGuild);
+
+            _playerContextMenu
+                .SetAllianceRequestVisible(
+                    canRequestAlliance);
+
+            _playerContextMenu
+                .SetHostilityRequestVisible(
+                    canRequestHostility);
+                    
             _playerContextMenu.ShowAt(mousePos.X, mousePos.Y);
             _playerContextMenu.BringToFront();
             _playerMenuHintCooldown = PlayerMenuHintCooldownSeconds;

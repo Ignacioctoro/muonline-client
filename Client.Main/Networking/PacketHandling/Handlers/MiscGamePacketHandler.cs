@@ -56,7 +56,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             MuGame.ScheduleOnMainThread(() =>
             {
                 RequestDialog.Show(
-                    "Do you want to create a guild?",
+                    "Quieres crear una guild?",
                     onAccept: () =>
                     {
                         _logger.LogInformation(
@@ -88,21 +88,21 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 {
                     requesterName = $"Player (ID: {requesterId & 0x7FFF})";
                 }
-                _logger.LogInformation("Received guild join request from {Name} ({Id}).", requesterName, requesterId);
+                _logger.LogInformation("recibió una solicitud para unirse a una Guild de parte de {Name} ({Id}).", requesterName, requesterId);
 
                 MuGame.ScheduleOnMainThread(() =>
                 {
                     RequestDialog.Show(
-                        $"{requesterName} quiere unirse a tu guild. ¿Aceptas?.",
+                        $"{requesterName} Quiere unirse a tu guild. ¿Aceptas?.",
                         onAccept: () =>
                         {
                             _ = _characterService.SendGuildJoinResponseAsync(true, requesterId);
-                            _logger.LogInformation("Accepted guild join request from {Name} ({Id}).", requesterName, requesterId);
+                            _logger.LogInformation("Se aceptó la solicitud de unión a la Guild de {Name} ({Id}).", requesterName, requesterId);
                         },
                         onReject: () =>
                         {
                             _ = _characterService.SendGuildJoinResponseAsync(false, requesterId);
-                            _logger.LogInformation("Rejected guild join request from {Name} ({Id}).", requesterName, requesterId);
+                            _logger.LogInformation("Se rechazó la solicitud de unirse a la Guild de {Name} ({Id}).", requesterName, requesterId);
                         }
                     );
                 });
@@ -113,6 +113,369 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             }
             return Task.CompletedTask;
         }
+
+        [PacketHandler(0xE5, PacketRouter.NoSubCode)]
+        public Task HandleGuildRelationshipRequestAsync(
+            Memory<byte> packet)
+        {
+            try
+            {
+                ReadOnlySpan<byte> data =
+                    packet.Span;
+
+                if (data.Length < 7)
+                {
+                    _logger.LogWarning(
+                        "GuildRelationshipRequest packet too short: {Length}.",
+                        data.Length);
+
+                    return Task.CompletedTask;
+                }
+
+                byte relationshipType =
+                    data[3];
+
+                byte requestType =
+                    data[4];
+
+                ushort requesterId =
+                    System.Buffers.Binary.BinaryPrimitives
+                        .ReadUInt16BigEndian(
+                            data.Slice(
+                                5,
+                                2));
+
+                requesterId =
+                    (ushort)(
+                        requesterId &
+                        0x7FFF);
+
+                _logger.LogInformation(
+                    "Guild relationship request received: Relationship={Relationship}, Request={Request}, Sender={SenderId}.",
+                    relationshipType,
+                    requestType,
+                    requesterId);
+
+                // Alliance  = 1
+                // Hostility = 2
+                // Join      = 1
+                if ((relationshipType != 1 &&
+                    relationshipType != 2) ||
+                    requestType != 1)
+                {
+                    _logger.LogInformation(
+                        "Unsupported Guild relationship request. Relationship={Relationship}, Request={Request}.",
+                        relationshipType,
+                        requestType);
+
+                    return Task.CompletedTask;
+                }
+
+                string requesterName;
+
+                if (!_scopeManager.TryGetScopeObjectName(
+                        requesterId,
+                        out requesterName))
+                {
+                    requesterName =
+                        $"Player (ID: {requesterId})";
+                }
+
+                string requesterGuildName =
+                    string.Empty;
+
+                if (GuildInfoCache.TryGetGuildForPlayer(
+                        requesterId,
+                        out GuildInfoData requesterGuild))
+                {
+                    requesterGuildName =
+                        requesterGuild.GuildName;
+                }
+
+                MuGame.ScheduleOnMainThread(
+                    () =>
+                    {
+                        string message;
+
+                        if (relationshipType == 1)
+                        {
+                            message =
+                                string.IsNullOrWhiteSpace(
+                                    requesterGuildName)
+                                    ? $"{requesterName} quiere formar una alianza de gremios. ¿Aceptas?"
+                                    : $"{requesterName} quiere formar una alianza con Guild {requesterGuildName}. ¿Aceptas?";
+                        }
+                        else
+                        {
+                            message =
+                                string.IsNullOrWhiteSpace(
+                                    requesterGuildName)
+                                    ? $"{requesterName} Quiere establecer hostilidad entre Guilds. ¿Aceptas?"
+                                    : $"Guild {requesterGuildName} quiere establecer hostilidad con tu Guild. ¿Aceptas?";
+                        }
+
+                        RequestDialog.Show(
+                            message,
+                            onAccept: () =>
+                            {
+                                if (relationshipType == 1)
+                                {
+                                    _ = _characterService
+                                        .SendAllianceResponseAsync(
+                                            true,
+                                            requesterId);
+                                }
+                                else
+                                {
+                                    _ = _characterService
+                                        .SendHostilityResponseAsync(
+                                            true,
+                                            requesterId);
+                                }
+                            },
+                            onReject: () =>
+                            {
+                                if (relationshipType == 1)
+                                {
+                                    _ = _characterService
+                                        .SendAllianceResponseAsync(
+                                            false,
+                                            requesterId);
+                                }
+                                else
+                                {
+                                    _ = _characterService
+                                        .SendHostilityResponseAsync(
+                                            false,
+                                            requesterId);
+                                }
+                            });
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error parsing GuildRelationshipRequest (0xE5).");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xE6, PacketRouter.NoSubCode)]
+        public Task HandleGuildRelationshipChangeResultAsync(
+            Memory<byte> packet)
+        {
+            try
+            {
+                ReadOnlySpan<byte> data =
+                    packet.Span;
+
+                if (data.Length < 8)
+                {
+                    _logger.LogWarning(
+                        "GuildRelationshipChangeResult packet too short: {Length}.",
+                        data.Length);
+
+                    return Task.CompletedTask;
+                }
+
+                byte relationshipType =
+                    data[3];
+
+                byte requestType =
+                    data[4];
+
+                byte result =
+                    data[5];
+
+                ushort guildMasterId =
+                    System.Buffers.Binary.BinaryPrimitives
+                        .ReadUInt16BigEndian(
+                            data.Slice(
+                                6,
+                                2));
+
+                guildMasterId =
+                    (ushort)(
+                        guildMasterId &
+                        0x7FFF);
+
+                _logger.LogInformation(
+                    "Guild relationship result: Relationship={Relationship}, Request={Request}, Result={Result}, GuildMaster={GuildMasterId}.",
+                    relationshipType,
+                    requestType,
+                    result,
+                    guildMasterId);
+
+                // Relationship:
+                // 1 = Alliance
+                // 2 = Hostility
+                //
+                // Request:
+                // 1 = Join / crear
+                // 2 = Leave / finalizar
+                if ((relationshipType != 1 &&
+                    relationshipType != 2) ||
+                    (requestType != 1 &&
+                    requestType != 2))
+                {
+                    return Task.CompletedTask;
+                }
+
+                MuGame.ScheduleOnMainThread(
+                    () =>
+                    {
+                        // ----------------------------------------------------
+                        // ÉXITO
+                        // ----------------------------------------------------
+                        if (result == 1)
+                        {
+                            // FINALIZAR RELACIÓN
+                            if (requestType == 2)
+                            {
+                                if (relationshipType == 1)
+                                {
+                                    RequestDialog.ShowInfo(
+                                        "La alianza ha finalizado.");
+
+                                    GuildInfoCache
+                                        .ClearAllianceList();
+
+                                    _ = _characterService
+                                        .SendAllianceListRequestAsync();
+
+                                    _ = _characterService
+                                        .SendGuildListRequestAsync();
+                                }
+                                else
+                                {
+                                    RequestDialog.ShowInfo(
+                                        "La hostilidad ha finalizado.");
+
+                                    _ = _characterService
+                                        .SendGuildListRequestAsync();
+                                }
+
+                                return;
+                            }
+
+                            // CREAR RELACIÓN
+                            if (relationshipType == 1)
+                            {
+                                RequestDialog.ShowInfo(
+                                    "Alianza creada correctamente.");
+
+                                GuildInfoCache
+                                    .ClearAllianceList();
+
+                                _ = _characterService
+                                    .SendAllianceListRequestAsync();
+
+                                _ = _characterService
+                                    .SendGuildListRequestAsync();
+                            }
+                            else
+                            {
+                                RequestDialog.ShowInfo(
+                                    "Hostilidad establecida correctamente.");
+
+                                _ = _characterService
+                                    .SendGuildListRequestAsync();
+                            }
+
+                            return;
+                        }
+
+                        // ----------------------------------------------------
+                        // ERROR
+                        // ----------------------------------------------------
+
+                        string relationshipName =
+                            relationshipType == 1
+                                ? "alianza"
+                                : "hostilidad";
+
+                        string actionName =
+                            requestType == 1
+                                ? "crear"
+                                : "finalizar";
+
+                        string message =
+                            result switch
+                            {
+                                0 =>
+                                    $"No se pudo {actionName} la {relationshipName}.",
+
+                                2 =>
+                                    "No se encontró el gremio objetivo.",
+
+                                3 =>
+                                    "No se pueden modificar relaciones durante Castle Siege.",
+
+                                4 =>
+                                    "No tienes autorización para realizar esta acción.",
+
+                                5 =>
+                                    "Ese gremio ya pertenece a una alianza.",
+
+                                6 =>
+                                    "Ya existe una relación de hostilidad.",
+
+                                7 =>
+                                    "La alianza ya existe.",
+
+                                8 =>
+                                    "La relación de hostilidad ya existe.",
+
+                                9 =>
+                                    "La alianza no existe.",
+
+                                10 =>
+                                    "La relación de hostilidad no existe.",
+
+                                11 =>
+                                    "No eres el maestro de esta alianza.",
+
+                                12 =>
+                                    "Ese gremio no es un gremio rival.",
+
+                                13 =>
+                                    "No se cumplen los requisitos para crear la alianza.",
+
+                                14 =>
+                                    "La alianza alcanzó el máximo de gremios permitido.",
+
+                                15 =>
+                                    "La solicitud fue rechazada o cancelada.",
+
+                                16 =>
+                                    "El maestro de la alianza no pertenece a una facción Gens.",
+
+                                17 =>
+                                    "El Guild Master no pertenece a una facción Gens.",
+
+                                0xA3 =>
+                                    "Los gremios pertenecen a facciones Gens diferentes.",
+
+                                _ =>
+                                    $"No se pudo {actionName} la {relationshipName}. Código: {result}"
+                            };
+
+                        RequestDialog.ShowInfo(
+                            message);
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error parsing GuildRelationshipChangeResult (0xE6).");
+            }
+
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0x55, PacketRouter.NoSubCode)]
         public Task HandleShowGuildCreationDialogAsync(Memory<byte> packet)
         {
@@ -177,13 +540,79 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 {
                     string message = error switch
                     {
-                        179 => "That guild name is already in use.",
+                        179 => "Este nombre se encuentra en uso.",
                         _ => $"Guild creation failed. Error: {error}"
                     };
 
                     RequestDialog.ShowInfo(message);
                 }
             });
+
+            return Task.CompletedTask;
+        }
+        [PacketHandler(0xEB, 0x01)]
+        public Task HandleRemoveAllianceGuildResultAsync(
+            Memory<byte> packet)
+        {
+            try
+            {
+                ReadOnlySpan<byte> data =
+                    packet.Span;
+
+                if (data.Length < 7)
+                {
+                    _logger.LogWarning(
+                        "RemoveAllianceGuildResult packet too short: {Length}.",
+                        data.Length);
+
+                    return Task.CompletedTask;
+                }
+
+                bool success =
+                    data[4] != 0;
+
+                byte requestType =
+                    data[5];
+
+                byte relationshipType =
+                    data[6];
+
+                _logger.LogInformation(
+                    "Alliance remove result: Success={Success}, Request={Request}, Relationship={Relationship}.",
+                    success,
+                    requestType,
+                    relationshipType);
+
+                MuGame.ScheduleOnMainThread(
+                    () =>
+                    {
+                        if (success)
+                        {
+                            RequestDialog.ShowInfo(
+                                "Alianza finalizada correctamente.");
+
+                            GuildInfoCache
+                                .ClearAllianceList();
+
+                            _ = _characterService
+                                .SendAllianceListRequestAsync();
+
+                            _ = _characterService
+                                .SendGuildListRequestAsync();
+                        }
+                        else
+                        {
+                            RequestDialog.ShowInfo(
+                                "No se pudo finalizar la alianza.");
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error parsing RemoveAllianceGuildResult (0xEB/0x01).");
+            }
 
             return Task.CompletedTask;
         }
@@ -200,7 +629,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 MuGame.ScheduleOnMainThread(() =>
                 {
                     RequestDialog.Show(
-                        $"{requesterName} has requested a trade.",
+                        $"{requesterName} has solicitado un trade.",
                         onAccept: () =>
                         {
                             _ = _characterService.SendTradeResponseAsync(true);
@@ -236,16 +665,16 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 MuGame.ScheduleOnMainThread(() =>
                 {
                     RequestDialog.Show(
-                        $"{requesterName} has challenged you to a duel.",
+                        $"{requesterName} te ha retado a un duelo.",
                         onAccept: () =>
                         {
                             _ = _characterService.SendDuelResponseAsync(true, requesterId, requesterName);
-                            _logger.LogInformation("Accepted duel challenge from {Name} ({Id}).", requesterName, requesterId);
+                            _logger.LogInformation("Aceptada la solicitud de duelo de: {Name} ({Id}).", requesterName, requesterId);
                         },
                         onReject: () =>
                         {
                             _ = _characterService.SendDuelResponseAsync(false, requesterId, requesterName);
-                            _logger.LogInformation("Rejected duel challenge from {Name} ({Id}).", requesterName, requesterId);
+                            _logger.LogInformation("Rechazada la solicitud de duelo de: {Name} ({Id}).", requesterName, requesterId);
                         }
                     );
                 });
@@ -275,7 +704,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     _characterState.SetHeroAsDuelPlayer(CharacterState.DuelPlayerType.Hero);
                     _characterState.SetDuelPlayer(CharacterState.DuelPlayerType.Enemy, opponentId, opponentName);
 
-                    ShowSystemMessage($"Duel started with {opponentName}.", MessageType.System);
+                    ShowSystemMessage($"El duelo comenzó con {opponentName}.", MessageType.System);
                 }
                 else
                 {

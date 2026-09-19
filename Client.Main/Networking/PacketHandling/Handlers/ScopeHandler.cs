@@ -2085,6 +2085,145 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
             return Task.CompletedTask;
         }
+        // Paquete 0xE9 AllianceList
+        [PacketHandler(0xE9, PacketRouter.NoSubCode)]
+        public Task HandleAllianceListAsync(
+            Memory<byte> packet)
+        {
+            try
+            {
+                ReadOnlySpan<byte> data =
+                    packet.Span;
+
+                // C2:
+                // 0      = C2
+                // 1..2   = Length
+                // 3      = E9
+                // 4      = GuildCount
+                // 5      = Success
+                // 6      = RivalCount
+                // 7      = UnionCount
+                // 8...   = AllianceGuildEntry[41]
+                if (data.Length < 8)
+                {
+                    _logger.LogWarning(
+                        "AllianceList packet too short: {Length}.",
+                        data.Length);
+
+                    return Task.CompletedTask;
+                }
+
+                byte guildCount =
+                    data[4];
+
+                bool success =
+                    data[5] != 0;
+
+                byte rivalCount =
+                    data[6];
+
+                byte unionCount =
+                    data[7];
+
+                const int entryStart =
+                    8;
+
+                const int entrySize =
+                    41;
+
+                var guilds =
+                    new List<AllianceGuildData>(
+                        guildCount);
+
+                for (int i = 0;
+                    i < guildCount;
+                    i++)
+                {
+                    int offset =
+                        entryStart +
+                        i * entrySize;
+
+                    if (offset + entrySize >
+                        data.Length)
+                    {
+                        _logger.LogWarning(
+                            "AllianceList ended early. Expected {ExpectedCount} guilds, parsed {ParsedCount}.",
+                            guildCount,
+                            guilds.Count);
+
+                        break;
+                    }
+
+                    byte memberCount =
+                        data[offset];
+
+                    byte[] logo =
+                        data.Slice(
+                                offset + 1,
+                                32)
+                            .ToArray();
+
+                    string guildName =
+                        ReadGuildString(
+                            data.Slice(
+                                offset + 33,
+                                8));
+
+                    guilds.Add(
+                        new AllianceGuildData
+                        {
+                            GuildName =
+                                guildName,
+
+                            MemberCount =
+                                memberCount,
+
+                            Logo =
+                                logo
+                        });
+                }
+
+                GuildInfoCache.StoreAllianceList(
+                    new AllianceListData
+                    {
+                        Success =
+                            success,
+
+                        RivalCount =
+                            rivalCount,
+
+                        UnionCount =
+                            unionCount,
+
+                        Guilds =
+                            guilds.ToArray()
+                    });
+
+                _logger.LogInformation(
+                    "Alliance list received: Success={Success}, Guilds={GuildCount}, UnionCount={UnionCount}, RivalCount={RivalCount}.",
+                    success,
+                    guilds.Count,
+                    unionCount,
+                    rivalCount);
+
+                foreach (AllianceGuildData guild
+                        in guilds)
+                {
+                    _logger.LogInformation(
+                        "Alliance guild: {GuildName}, Members={MemberCount}.",
+                        guild.GuildName,
+                        guild.MemberCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error parsing AllianceList (0xE9).");
+            }
+
+            return Task.CompletedTask;
+        }
         // Paquete 0x65 GuildMemberRelation
         [PacketHandler(0x65, PacketRouter.NoSubCode)]
         public Task HandleAssignCharacterToGuildAsync(

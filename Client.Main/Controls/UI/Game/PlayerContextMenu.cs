@@ -21,6 +21,8 @@ namespace Client.Main.Controls.UI.Game
         private readonly ButtonControl _tradeButton;
         private readonly ButtonControl _duelButton;
         private readonly ButtonControl _guildRequestButton;
+        private readonly ButtonControl _allianceRequestButton;
+        private readonly ButtonControl _hostilityRequestButton;
         private readonly ButtonControl _storeButton;
         private readonly ButtonControl _whisperButton;
 
@@ -75,6 +77,12 @@ namespace Client.Main.Controls.UI.Game
             _guildRequestButton =
                 buttons.guildRequest;
 
+            _allianceRequestButton =
+                buttons.allianceRequest;
+
+            _hostilityRequestButton =
+                buttons.hostilityRequest;
+
             _storeButton =
                 buttons.store;
 
@@ -92,6 +100,11 @@ namespace Client.Main.Controls.UI.Game
 
             _guildRequestButton.Click +=
                 OnGuildRequestClicked;
+            _allianceRequestButton.Click +=
+                OnAllianceRequestClicked;
+
+            _hostilityRequestButton.Click +=
+                OnHostilityRequestClicked;
 
             _storeButton.Click +=
                 OnStoreRequestClicked;
@@ -112,6 +125,12 @@ namespace Client.Main.Controls.UI.Game
                 _guildRequestButton);
 
             Controls.Add(
+                _allianceRequestButton);
+
+            Controls.Add(
+                _hostilityRequestButton);
+
+            Controls.Add(
                 _storeButton);
 
             Controls.Add(
@@ -119,6 +138,14 @@ namespace Client.Main.Controls.UI.Game
 
             // Por defecto no aparece.
             _guildRequestButton.Visible =
+                false;
+            _guildRequestButton.Visible =
+                false;
+
+            _allianceRequestButton.Visible =
+                false;
+
+            _hostilityRequestButton.Visible =
                 false;
 
             RefreshButtonLayout();
@@ -153,6 +180,22 @@ namespace Client.Main.Controls.UI.Game
             bool visible)
         {
             _guildRequestButton.Visible =
+                visible;
+
+            RefreshButtonLayout();
+        }
+        public void SetAllianceRequestVisible(
+            bool visible)
+        {
+            _allianceRequestButton.Visible =
+                visible;
+
+            RefreshButtonLayout();
+        }
+        public void SetHostilityRequestVisible(
+            bool visible)
+        {
+            _hostilityRequestButton.Visible =
                 visible;
 
             RefreshButtonLayout();
@@ -277,6 +320,52 @@ namespace Client.Main.Controls.UI.Game
             Visible =
                 false;
         }
+        private async void OnAllianceRequestClicked(
+            object sender,
+            EventArgs e)
+        {
+            _logger?.LogInformation(
+                "Alliance request sent to Guild Master {Name} (ID: {Id})",
+                _targetPlayerName,
+                _targetPlayerId);
+
+            var characterService =
+                MuGame.Network?
+                    .GetCharacterService();
+
+            if (characterService != null)
+            {
+                await characterService
+                    .SendAllianceRequestAsync(
+                        _targetPlayerId);
+            }
+
+            Visible =
+                false;
+        }
+        private async void OnHostilityRequestClicked(
+            object sender,
+            EventArgs e)
+        {
+            _logger?.LogInformation(
+                "Hostility request sent to Guild Master {Name} (ID: {Id})",
+                _targetPlayerName,
+                _targetPlayerId);
+
+            var characterService =
+                MuGame.Network?
+                    .GetCharacterService();
+
+            if (characterService != null)
+            {
+                await characterService
+                    .SendHostilityRequestAsync(
+                        _targetPlayerId);
+            }
+
+            Visible =
+                false;
+        }
 
         private async void OnStoreRequestClicked(
             object sender,
@@ -383,6 +472,12 @@ namespace Client.Main.Controls.UI.Game
                 _storeButton);
 
             PositionButton(
+                _allianceRequestButton);
+
+            PositionButton(
+                _hostilityRequestButton);
+
+            PositionButton(
                 _whisperButton);
 
             int totalHeight =
@@ -402,6 +497,8 @@ namespace Client.Main.Controls.UI.Game
             ButtonControl trade,
             ButtonControl duel,
             ButtonControl guildRequest,
+            ButtonControl allianceRequest,
+            ButtonControl hostilityRequest,
             ButtonControl store,
             ButtonControl whisper)
             CreateButtons()
@@ -478,6 +575,15 @@ namespace Client.Main.Controls.UI.Game
                 Make(
                     "Request Guild");
 
+            var allianceRequest =
+                Make(
+                    "Request Alliance");
+                    
+            var hostilityRequest =
+                Make(
+                    "Declare Hostility");
+                        
+
             var store =
                 Make(
                     "View Store");
@@ -491,6 +597,8 @@ namespace Client.Main.Controls.UI.Game
                 trade,
                 duel,
                 guildRequest,
+                allianceRequest,
+                hostilityRequest,
                 store,
                 whisper);
         }

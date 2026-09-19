@@ -11,6 +11,7 @@ namespace Client.Main.Controls.UI
     public class GuildMenuDialog : PopupFieldDialog
     {
         private const int MembersPerPage = 8;
+        private const int AllianceRowsCount = 5;
 
         private readonly string _localPlayerName;
         private readonly ushort _localPlayerId;
@@ -22,20 +23,40 @@ namespace Client.Main.Controls.UI
 
         private readonly GuildEmblemDisplayControl _emblemControl;
 
+        private readonly LabelButtonSmall _membersTabButton;
+        private readonly LabelButtonSmall _relationsTabButton;
+
+        private readonly LabelControl _memberHeaderLabel;
+        private readonly LabelControl _rankHeaderLabel;
+        private readonly LabelControl _statusHeaderLabel;
+
         private readonly MemberRow[] _memberRows =
             new MemberRow[MembersPerPage];
 
         private readonly LabelButtonSmall _previousButton;
         private readonly LabelButtonSmall _nextButton;
-
         private readonly LabelButton _disbandButton;
+
+        private readonly LabelControl _allianceHeaderLabel;
+        private readonly LabelControl _allianceEmptyLabel;
+        private readonly AllianceRow[] _allianceRows =
+            new AllianceRow[AllianceRowsCount];
+        private readonly LabelButton _endAllianceButton;
+
+        private readonly LabelControl _hostilityHeaderLabel;
+        private readonly LabelControl _rivalGuildLabel;
+        private readonly LabelButton _endHostilityButton;
+
         private readonly LabelButtonSmall _closeButton;
 
         private GuildRosterData _roster;
-
+        private AllianceListData _allianceList;
+        private GuildMenuTab _activeTab = GuildMenuTab.Members;
         private int _currentPage;
 
         public event EventHandler DisbandRequested;
+        public event EventHandler EndAllianceRequested;
+        public event EventHandler EndHostilityRequested;
 
         public event EventHandler<GuildMemberActionEventArgs>
             KickMemberRequested;
@@ -58,7 +79,7 @@ namespace Client.Main.Controls.UI
             ControlSize =
                 new Point(
                     460,
-                    410);
+                    500);
 
             // --------------------------------------------------------
             // TÍTULO
@@ -67,7 +88,7 @@ namespace Client.Main.Controls.UI
             Controls.Add(
                 new LabelControl
                 {
-                    Text = "Guild",
+                    Text = "Gremio",
                     Align =
                         ControlAlign.HorizontalCenter,
                     Y = 18,
@@ -76,7 +97,7 @@ namespace Client.Main.Controls.UI
                 });
 
             // --------------------------------------------------------
-            // EMBLEMA
+            // EMBLEMA + INFORMACIÓN GENERAL
             // --------------------------------------------------------
 
             _emblemControl =
@@ -89,16 +110,12 @@ namespace Client.Main.Controls.UI
             Controls.Add(
                 _emblemControl);
 
-            // --------------------------------------------------------
-            // NOMBRE
-            // --------------------------------------------------------
-
             _guildNameLabel =
                 new LabelControl
                 {
                     X = 120,
                     Y = 55,
-                    Text = "Guild: Loading...",
+                    Text = "Gremio: Cargando...",
                     FontSize = 13,
                     IsBold = true,
                     TextColor =
@@ -111,32 +128,24 @@ namespace Client.Main.Controls.UI
             Controls.Add(
                 _guildNameLabel);
 
-            // --------------------------------------------------------
-            // SCORE
-            // --------------------------------------------------------
-
             _scoreLabel =
                 new LabelControl
                 {
                     X = 120,
                     Y = 80,
-                    Text = "Score: --",
+                    Text = "Puntaje: --",
                     FontSize = 11
                 };
 
             Controls.Add(
                 _scoreLabel);
 
-            // --------------------------------------------------------
-            // MEMBER COUNT
-            // --------------------------------------------------------
-
             _memberCountLabel =
                 new LabelControl
                 {
                     X = 120,
                     Y = 102,
-                    Text = "Members: --",
+                    Text = "Miembros: --",
                     FontSize = 11,
                     TextColor =
                         new Color(
@@ -149,15 +158,71 @@ namespace Client.Main.Controls.UI
                 _memberCountLabel);
 
             // --------------------------------------------------------
-            // HEADERS
+            // PESTAÑAS
             // --------------------------------------------------------
 
+            _membersTabButton =
+                new LabelButtonSmall
+                {
+                    X = 125,
+                    Y = 128,
+                    Label =
+                        new LabelControl
+                        {
+                            Text = "Miembros",
+                            Align =
+                                ControlAlign.HorizontalCenter |
+                                ControlAlign.VerticalCenter,
+                            FontSize = 9
+                        }
+                };
+
+            _membersTabButton.Click +=
+                (sender, args) =>
+                {
+                    SetActiveTab(
+                        GuildMenuTab.Members);
+                };
+
             Controls.Add(
+                _membersTabButton);
+
+            _relationsTabButton =
+                new LabelButtonSmall
+                {
+                    X = 235,
+                    Y = 128,
+                    Label =
+                        new LabelControl
+                        {
+                            Text = "Relaciones",
+                            Align =
+                                ControlAlign.HorizontalCenter |
+                                ControlAlign.VerticalCenter,
+                            FontSize = 9
+                        }
+                };
+
+            _relationsTabButton.Click +=
+                (sender, args) =>
+                {
+                    SetActiveTab(
+                        GuildMenuTab.Relations);
+                };
+
+            Controls.Add(
+                _relationsTabButton);
+
+            // --------------------------------------------------------
+            // PESTAÑA MIEMBROS - HEADERS
+            // --------------------------------------------------------
+
+            _memberHeaderLabel =
                 new LabelControl
                 {
                     X = 35,
-                    Y = 140,
-                    Text = "Member",
+                    Y = 165,
+                    Text = "Miembro",
                     FontSize = 10,
                     IsBold = true,
                     TextColor =
@@ -165,14 +230,17 @@ namespace Client.Main.Controls.UI
                             220,
                             220,
                             220)
-                });
+                };
 
             Controls.Add(
+                _memberHeaderLabel);
+
+            _rankHeaderLabel =
                 new LabelControl
                 {
                     X = 155,
-                    Y = 140,
-                    Text = "Rank",
+                    Y = 165,
+                    Text = "Rango",
                     FontSize = 10,
                     IsBold = true,
                     TextColor =
@@ -180,14 +248,17 @@ namespace Client.Main.Controls.UI
                             220,
                             220,
                             220)
-                });
+                };
 
             Controls.Add(
+                _rankHeaderLabel);
+
+            _statusHeaderLabel =
                 new LabelControl
                 {
                     X = 260,
-                    Y = 140,
-                    Text = "Status",
+                    Y = 165,
+                    Text = "Estado",
                     FontSize = 10,
                     IsBold = true,
                     TextColor =
@@ -195,14 +266,13 @@ namespace Client.Main.Controls.UI
                             220,
                             220,
                             220)
-                });
+                };
 
-            // --------------------------------------------------------
-            // FILAS
-            // --------------------------------------------------------
+            Controls.Add(
+                _statusHeaderLabel);
 
             const int firstRowY =
-                164;
+                188;
 
             const int rowHeight =
                 25;
@@ -255,16 +325,41 @@ namespace Client.Main.Controls.UI
                     };
             }
 
-            // --------------------------------------------------------
-            // PAGINACIÓN
-            // --------------------------------------------------------
+            _disbandButton =
+                new LabelButton
+                {
+                    X = 35,
+                    Y = 402,
+                    Label =
+                        new LabelControl
+                        {
+                            Text = "Disolver gremio",
+                            Align =
+                                ControlAlign.HorizontalCenter |
+                                ControlAlign.VerticalCenter,
+                            FontSize = 10
+                        }
+                };
+
+            _disbandButton.Click +=
+                (sender, args) =>
+                {
+                    if (!IsLocalPlayerGuildMaster())
+                        return;
+
+                    DisbandRequested?.Invoke(
+                        this,
+                        EventArgs.Empty);
+                };
+
+            Controls.Add(
+                _disbandButton);
 
             _previousButton =
                 new LabelButtonSmall
                 {
                     X = 135,
-                    Y = 365,
-
+                    Y = 447,
                     Label =
                         new LabelControl
                         {
@@ -283,7 +378,6 @@ namespace Client.Main.Controls.UI
                         return;
 
                     _currentPage--;
-
                     RefreshMemberRows();
                 };
 
@@ -294,7 +388,7 @@ namespace Client.Main.Controls.UI
                 new LabelControl
                 {
                     X = 213,
-                    Y = 372,
+                    Y = 454,
                     Text = "1 / 1",
                     FontSize = 10
                 };
@@ -306,8 +400,7 @@ namespace Client.Main.Controls.UI
                 new LabelButtonSmall
                 {
                     X = 260,
-                    Y = 365,
-
+                    Y = 447,
                     Label =
                         new LabelControl
                         {
@@ -332,7 +425,6 @@ namespace Client.Main.Controls.UI
                     }
 
                     _currentPage++;
-
                     RefreshMemberRows();
                 };
 
@@ -340,62 +432,178 @@ namespace Client.Main.Controls.UI
                 _nextButton);
 
             // --------------------------------------------------------
-            // DISBAND
+            // PESTAÑA RELACIONES
             // --------------------------------------------------------
 
-            _disbandButton =
+            _allianceHeaderLabel =
+                new LabelControl
+                {
+                    X = 35,
+                    Y = 170,
+                    Text = "Alianza",
+                    FontSize = 11,
+                    IsBold = true,
+                    TextColor =
+                        new Color(
+                            255,
+                            220,
+                            120),
+                    Visible = false
+                };
+
+            Controls.Add(
+                _allianceHeaderLabel);
+
+            _allianceEmptyLabel =
+                new LabelControl
+                {
+                    X = 45,
+                    Y = 195,
+                    Text = "Sin alianza activa.",
+                    FontSize = 10,
+                    TextColor =
+                        new Color(
+                            160,
+                            160,
+                            160),
+                    Visible = false
+                };
+
+            Controls.Add(
+                _allianceEmptyLabel);
+
+            for (int i = 0;
+                 i < AllianceRowsCount;
+                 i++)
+            {
+                int rowY =
+                    195 +
+                    i * 25;
+
+                var row =
+                    new AllianceRow(
+                        rowY);
+
+                _allianceRows[i] =
+                    row;
+
+                Controls.Add(
+                    row.NameLabel);
+
+                Controls.Add(
+                    row.MemberCountLabel);
+            }
+
+            _endAllianceButton =
                 new LabelButton
                 {
                     X = 35,
-                    Y = 330,
-
+                    Y = 327,
                     Label =
                         new LabelControl
                         {
-                            Text =
-                                "Disband Guild",
-
+                            Text = "Finalizar alianza",
                             Align =
                                 ControlAlign.HorizontalCenter |
                                 ControlAlign.VerticalCenter,
-
                             FontSize = 10
-                        }
+                        },
+                    Visible = false
                 };
 
-            _disbandButton.Click +=
+            _endAllianceButton.Click +=
                 (sender, args) =>
                 {
                     if (!IsLocalPlayerGuildMaster())
                         return;
 
-                    DisbandRequested?.Invoke(
+                    EndAllianceRequested?.Invoke(
                         this,
                         EventArgs.Empty);
                 };
 
             Controls.Add(
-                _disbandButton);
+                _endAllianceButton);
+
+            _hostilityHeaderLabel =
+                new LabelControl
+                {
+                    X = 35,
+                    Y = 370,
+                    Text = "Hostilidad",
+                    FontSize = 11,
+                    IsBold = true,
+                    TextColor =
+                        new Color(
+                            255,
+                            120,
+                            120),
+                    Visible = false
+                };
+
+            Controls.Add(
+                _hostilityHeaderLabel);
+
+            _rivalGuildLabel =
+                new LabelControl
+                {
+                    X = 45,
+                    Y = 395,
+                    Text = "Sin hostilidad activa.",
+                    FontSize = 10,
+                    Visible = false
+                };
+
+            Controls.Add(
+                _rivalGuildLabel);
+
+            _endHostilityButton =
+                new LabelButton
+                {
+                    X = 250,
+                    Y = 402,
+                    Label =
+                        new LabelControl
+                        {
+                            Text = "Finalizar hostilidad",
+                            Align =
+                                ControlAlign.HorizontalCenter |
+                                ControlAlign.VerticalCenter,
+                            FontSize = 9
+                        },
+                    Visible = false
+                };
+
+            _endHostilityButton.Click +=
+                (sender, args) =>
+                {
+                    if (!IsLocalPlayerGuildMaster())
+                        return;
+
+                    EndHostilityRequested?.Invoke(
+                        this,
+                        EventArgs.Empty);
+                };
+
+            Controls.Add(
+                _endHostilityButton);
 
             // --------------------------------------------------------
-            // CLOSE
+            // CERRAR
             // --------------------------------------------------------
 
             _closeButton =
                 new LabelButtonSmall
                 {
                     X = 360,
-                    Y = 365,
-
+                    Y = 447,
                     Label =
                         new LabelControl
                         {
-                            Text = "Close",
-
+                            Text = "Cerrar",
                             Align =
                                 ControlAlign.HorizontalCenter |
                                 ControlAlign.VerticalCenter,
-
                             FontSize = 10
                         }
                 };
@@ -409,16 +617,16 @@ namespace Client.Main.Controls.UI
             Controls.Add(
                 _closeButton);
 
-            // --------------------------------------------------------
-            // ESCUCHAR ACTUALIZACIONES DEL ROSTER
-            // --------------------------------------------------------
-
             GuildInfoCache.GuildRosterUpdated +=
                 OnGuildRosterUpdated;
 
-            LoadCachedGuildInfo();
+            GuildInfoCache.AllianceListUpdated +=
+                OnAllianceListUpdated;
 
+            LoadCachedGuildInfo();
             SetLoadingState();
+            SetActiveTab(
+                GuildMenuTab.Members);
         }
 
         private void LoadCachedGuildInfo()
@@ -429,13 +637,13 @@ namespace Client.Main.Controls.UI
                     out GuildInfoData guild))
             {
                 _guildNameLabel.Text =
-                    "Guild: --";
+                    "Gremio: --";
 
                 return;
             }
 
             _guildNameLabel.Text =
-                $"Guild: {guild.GuildName}";
+                $"Gremio: {guild.GuildName}";
 
             _emblemControl.SetEmblem(
                 guild.Logo);
@@ -444,38 +652,45 @@ namespace Client.Main.Controls.UI
         private void SetLoadingState()
         {
             _scoreLabel.Text =
-                "Score: Loading...";
+                "Puntaje: Cargando...";
 
             _memberCountLabel.Text =
-                "Members: Loading...";
+                "Miembros: Cargando...";
 
             _currentPage = 0;
+            _roster = null;
+            _allianceList = null;
 
             HideRows();
+            HideAllianceRows();
 
-            _previousButton.Visible =
-                false;
-
-            _nextButton.Visible =
-                false;
-
-            _pageLabel.Visible =
-                false;
-
-            _disbandButton.Visible =
-                false;
+            _previousButton.Visible = false;
+            _nextButton.Visible = false;
+            _pageLabel.Visible = false;
+            _disbandButton.Visible = false;
+            _endAllianceButton.Visible = false;
+            _endHostilityButton.Visible = false;
         }
 
         private void OnGuildRosterUpdated(
             GuildRosterData roster)
         {
-            // La respuesta de red puede llegar fuera
-            // del thread principal.
             MuGame.ScheduleOnMainThread(
                 () =>
                 {
                     ApplyRoster(
                         roster);
+                });
+        }
+
+        private void OnAllianceListUpdated(
+            AllianceListData allianceList)
+        {
+            MuGame.ScheduleOnMainThread(
+                () =>
+                {
+                    ApplyAllianceList(
+                        allianceList);
                 });
         }
 
@@ -494,31 +709,98 @@ namespace Client.Main.Controls.UI
                 !_roster.IsInGuild)
             {
                 _scoreLabel.Text =
-                    "Score: --";
+                    "Puntaje: --";
 
                 _memberCountLabel.Text =
-                    "Not in a Guild";
+                    "No perteneces a un gremio";
 
                 HideRows();
+                _disbandButton.Visible = false;
 
-                _disbandButton.Visible =
-                    false;
+                if (_activeTab ==
+                    GuildMenuTab.Relations)
+                {
+                    RefreshRelationsView();
+                }
 
                 return;
             }
 
             _scoreLabel.Text =
-                $"Score: {_roster.Score}";
+                $"Puntaje: {_roster.Score}";
 
             _memberCountLabel.Text =
-                $"Members: {_roster.Members.Length}";
+                $"Miembros: {_roster.Members.Length}";
 
-            RefreshMemberRows();
+            if (_activeTab ==
+                GuildMenuTab.Members)
+            {
+                RefreshMemberRows();
+            }
+            else
+            {
+                RefreshRelationsView();
+            }
+        }
+
+        private void ApplyAllianceList(
+            AllianceListData allianceList)
+        {
+            _allianceList =
+                allianceList;
+
+            if (_activeTab ==
+                GuildMenuTab.Relations)
+            {
+                RefreshRelationsView();
+            }
+        }
+
+        private void SetActiveTab(
+            GuildMenuTab tab)
+        {
+            _activeTab =
+                tab;
+
+            bool showMembers =
+                tab == GuildMenuTab.Members;
+
+            _memberHeaderLabel.Visible =
+                showMembers;
+
+            _rankHeaderLabel.Visible =
+                showMembers;
+
+            _statusHeaderLabel.Visible =
+                showMembers;
+
+            _allianceHeaderLabel.Visible =
+                !showMembers;
+
+            _hostilityHeaderLabel.Visible =
+                !showMembers;
+
+            if (showMembers)
+            {
+                HideRelationsControls();
+                RefreshMemberRows();
+            }
+            else
+            {
+                HideMemberControls();
+                RefreshRelationsView();
+            }
         }
 
         private void RefreshMemberRows()
         {
             HideRows();
+
+            if (_activeTab !=
+                GuildMenuTab.Members)
+            {
+                return;
+            }
 
             if (_roster == null ||
                 _roster.Members == null)
@@ -565,12 +847,13 @@ namespace Client.Main.Controls.UI
                     member.Name;
 
                 row.RoleLabel.Text =
-                    member.RoleName;
+                    GetRoleNameSpanish(
+                        member.Role);
 
                 row.StatusLabel.Text =
                     member.IsOnline
-                        ? "Online"
-                        : "Offline";
+                        ? "En línea"
+                        : "Desconectado";
 
                 row.StatusLabel.TextColor =
                     member.IsOnline
@@ -583,14 +866,9 @@ namespace Client.Main.Controls.UI
                             160,
                             160);
 
-                row.NameLabel.Visible =
-                    true;
-
-                row.RoleLabel.Visible =
-                    true;
-
-                row.StatusLabel.Visible =
-                    true;
+                row.NameLabel.Visible = true;
+                row.RoleLabel.Visible = true;
+                row.StatusLabel.Visible = true;
 
                 bool isLocalPlayer =
                     string.Equals(
@@ -598,8 +876,6 @@ namespace Client.Main.Controls.UI
                         _localPlayerName,
                         StringComparison.OrdinalIgnoreCase);
 
-                // Solo el Guild Master puede
-                // administrar a OTROS miembros.
                 bool canManage =
                     localIsMaster &&
                     !isLocalPlayer;
@@ -633,28 +909,153 @@ namespace Client.Main.Controls.UI
                 localIsMaster;
         }
 
+        private void RefreshRelationsView()
+        {
+            HideAllianceRows();
+
+            if (_activeTab !=
+                GuildMenuTab.Relations)
+            {
+                return;
+            }
+
+            bool localIsMaster =
+                IsLocalPlayerGuildMaster();
+
+            AllianceGuildData[] guilds =
+                _allianceList?.Guilds ??
+                Array.Empty<AllianceGuildData>();
+
+            bool hasAlliance =
+                guilds.Length > 1;
+
+            _allianceEmptyLabel.Visible =
+                !hasAlliance;
+
+            if (hasAlliance)
+            {
+                int visibleCount =
+                    Math.Min(
+                        guilds.Length,
+                        AllianceRowsCount);
+
+                string localGuildName =
+                    string.Empty;
+
+                if (GuildInfoCache
+                    .TryGetGuildForPlayer(
+                        _localPlayerId,
+                        out GuildInfoData localGuild))
+                {
+                    localGuildName =
+                        localGuild.GuildName;
+                }
+
+                for (int i = 0;
+                     i < visibleCount;
+                     i++)
+                {
+                    AllianceGuildData guild =
+                        guilds[i];
+
+                    AllianceRow row =
+                        _allianceRows[i];
+
+                    bool isLocalGuild =
+                        string.Equals(
+                            guild.GuildName,
+                            localGuildName,
+                            StringComparison.OrdinalIgnoreCase);
+
+                    row.NameLabel.Text =
+                        isLocalGuild
+                            ? $"{guild.GuildName} (tu gremio)"
+                            : guild.GuildName;
+
+                    row.MemberCountLabel.Text =
+                        $"{guild.MemberCount} miembros";
+
+                    row.NameLabel.Visible = true;
+                    row.MemberCountLabel.Visible = true;
+                }
+            }
+
+            _endAllianceButton.Visible =
+                localIsMaster &&
+                hasAlliance;
+
+            string rivalGuildName =
+                _roster?.RivalGuildName ??
+                string.Empty;
+
+            bool hasHostility =
+                !string.IsNullOrWhiteSpace(
+                    rivalGuildName);
+
+            _rivalGuildLabel.Text =
+                hasHostility
+                    ? $"Gremio rival: {rivalGuildName}"
+                    : "Sin hostilidad activa.";
+
+            _rivalGuildLabel.TextColor =
+                hasHostility
+                    ? new Color(
+                        255,
+                        150,
+                        150)
+                    : new Color(
+                        160,
+                        160,
+                        160);
+
+            _rivalGuildLabel.Visible =
+                true;
+
+            _endHostilityButton.Visible =
+                localIsMaster &&
+                hasHostility;
+        }
+
+        private void HideMemberControls()
+        {
+            HideRows();
+
+            _previousButton.Visible = false;
+            _nextButton.Visible = false;
+            _pageLabel.Visible = false;
+            _disbandButton.Visible = false;
+        }
+
+        private void HideRelationsControls()
+        {
+            HideAllianceRows();
+            _allianceEmptyLabel.Visible = false;
+            _rivalGuildLabel.Visible = false;
+            _endAllianceButton.Visible = false;
+            _endHostilityButton.Visible = false;
+        }
+
         private void HideRows()
         {
             foreach (MemberRow row
                      in _memberRows)
             {
-                row.Member =
-                    null;
+                row.Member = null;
+                row.NameLabel.Visible = false;
+                row.RoleLabel.Visible = false;
+                row.StatusLabel.Visible = false;
+                row.RoleButton.Visible = false;
+                row.KickButton.Visible = false;
+            }
+        }
 
-                row.NameLabel.Visible =
-                    false;
-
-                row.RoleLabel.Visible =
-                    false;
-
-                row.StatusLabel.Visible =
-                    false;
-
-                row.RoleButton.Visible =
-                    false;
-
-                row.KickButton.Visible =
-                    false;
+        private void HideAllianceRows()
+        {
+            foreach (AllianceRow row
+                     in _allianceRows)
+            {
+                row.NameLabel.Visible = false;
+                row.MemberCountLabel.Visible = false;
             }
         }
 
@@ -736,24 +1137,25 @@ namespace Client.Main.Controls.UI
         private static byte GetNextRole(
             byte currentRole)
         {
-            // Ciclo administrativo:
-            //
-            // Member
-            // -> Battle Master
-            // -> Assistant Master
-            // -> Member
-            //
-            // NO asignamos Guild Master desde aquí.
             return currentRole switch
             {
                 0x00 => 0x20,
                 0x20 => 0x40,
                 0x40 => 0x00,
-
-                // GuildMaster o valor desconocido:
-                // vuelve a Member únicamente si
-                // alguna situación extraña lo dispara.
                 _ => 0x00
+            };
+        }
+
+        private static string GetRoleNameSpanish(
+            byte role)
+        {
+            return role switch
+            {
+                0x80 => "Maestro de gremio",
+                0x40 => "Maestro asistente",
+                0x20 => "Maestro de batalla",
+                0x00 => "Miembro",
+                _ => "Desconocido"
             };
         }
 
@@ -785,7 +1187,16 @@ namespace Client.Main.Controls.UI
             GuildInfoCache.GuildRosterUpdated -=
                 OnGuildRosterUpdated;
 
+            GuildInfoCache.AllianceListUpdated -=
+                OnAllianceListUpdated;
+
             base.Dispose();
+        }
+
+        private enum GuildMenuTab
+        {
+            Members,
+            Relations
         }
 
         private sealed class MemberRow
@@ -793,13 +1204,9 @@ namespace Client.Main.Controls.UI
             public GuildMemberData Member;
 
             public LabelControl NameLabel { get; }
-
             public LabelControl RoleLabel { get; }
-
             public LabelControl StatusLabel { get; }
-
             public LabelButtonVerySmall RoleButton { get; }
-
             public LabelButtonVerySmall KickButton { get; }
 
             public MemberRow(
@@ -837,21 +1244,16 @@ namespace Client.Main.Controls.UI
                     {
                         X = 320,
                         Y = y,
-
                         Label =
                             new LabelControl
                             {
-                                Text = "Rank",
-
+                                Text = "Rango",
                                 Align =
                                     ControlAlign.HorizontalCenter |
                                     ControlAlign.VerticalCenter,
-
                                 FontSize = 8
                             },
-
-                        Visible =
-                            false
+                        Visible = false
                     };
 
                 KickButton =
@@ -859,21 +1261,51 @@ namespace Client.Main.Controls.UI
                     {
                         X = 380,
                         Y = y,
-
                         Label =
                             new LabelControl
                             {
-                                Text = "Kick",
-
+                                Text = "Expulsar",
                                 Align =
                                     ControlAlign.HorizontalCenter |
                                     ControlAlign.VerticalCenter,
-
-                                FontSize = 8
+                                FontSize = 7
                             },
+                        Visible = false
+                    };
+            }
+        }
 
-                        Visible =
-                            false
+        private sealed class AllianceRow
+        {
+            public LabelControl NameLabel { get; }
+            public LabelControl MemberCountLabel { get; }
+
+            public AllianceRow(
+                int y)
+            {
+                NameLabel =
+                    new LabelControl
+                    {
+                        X = 45,
+                        Y = y,
+                        Text = string.Empty,
+                        FontSize = 9,
+                        Visible = false
+                    };
+
+                MemberCountLabel =
+                    new LabelControl
+                    {
+                        X = 280,
+                        Y = y,
+                        Text = string.Empty,
+                        FontSize = 9,
+                        TextColor =
+                            new Color(
+                                180,
+                                180,
+                                180),
+                        Visible = false
                     };
             }
         }
@@ -896,7 +1328,6 @@ namespace Client.Main.Controls.UI
         : EventArgs
     {
         public string PlayerName { get; }
-
         public GuildMemberRole Role { get; }
 
         public GuildMemberRoleActionEventArgs(

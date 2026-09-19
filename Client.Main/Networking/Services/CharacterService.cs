@@ -395,6 +395,347 @@ namespace Client.Main.Networking.Services
                 _logger.LogError(ex, "Error sending guild join request to player ID {PlayerId}", guildMasterPlayerId);
             }
         }
+        public async Task SendAllianceRequestAsync(
+            ushort targetGuildMasterId)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot request guild alliance.");
+                return;
+            }
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    const int length = 7;
+
+                    Span<byte> packet =
+                        _connectionManager.Connection.Output
+                            .GetSpan(length)
+                            .Slice(0, length);
+
+                    packet[0] = 0xC1;
+                    packet[1] = 0x07;
+                    packet[2] = 0xE5;
+
+                    // Alliance
+                    packet[3] = 0x01;
+
+                    // Join
+                    packet[4] = 0x01;
+
+                    // TargetPlayerId - BIG ENDIAN
+                    packet[5] = (byte)(targetGuildMasterId >> 8);
+                    packet[6] = (byte)(targetGuildMasterId & 0xFF);
+
+                    _logger.LogWarning(
+                        "[Alliance E5 OUT] Target={Target}, Packet={Packet}",
+                        targetGuildMasterId,
+                        Convert.ToHexString(packet));
+
+                    return length;
+                });
+
+                _logger.LogInformation(
+                    "Alliance request sent to Guild Master ID {PlayerId}.",
+                    targetGuildMasterId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error sending alliance request to Guild Master ID {PlayerId}.",
+                    targetGuildMasterId);
+            }
+        }
+
+        public async Task SendAllianceResponseAsync(
+            bool accepted,
+            ushort requesterId)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot answer guild alliance request.");
+
+                return;
+            }
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    const int length = 8;
+
+                    Span<byte> packet =
+                        _connectionManager.Connection.Output
+                            .GetSpan(length)
+                            .Slice(0, length);
+
+                    packet[0] = 0xC1;
+                    packet[1] = 0x08;
+                    packet[2] = 0xE6;
+
+                    // Alliance
+                    packet[3] = 0x01;
+
+                    // Join
+                    packet[4] = 0x01;
+
+                    // Accept / Reject
+                    packet[5] =
+                        accepted
+                            ? (byte)0x01
+                            : (byte)0x00;
+
+                    // RequesterId - BIG ENDIAN
+                    packet[6] =
+                        (byte)(requesterId >> 8);
+
+                    packet[7] =
+                        (byte)(requesterId & 0xFF);
+
+                    _logger.LogWarning(
+                        "[Alliance E6 OUT] Requester={Requester}, Packet={Packet}",
+                        requesterId,
+                        Convert.ToHexString(packet));
+
+                    return length;
+                });
+
+                _logger.LogInformation(
+                    "Alliance response sent. Accepted={Accepted}, Requester={RequesterId}.",
+                    accepted,
+                    requesterId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error answering alliance request from {RequesterId}.",
+                    requesterId);
+            }
+        }
+        public async Task SendHostilityRequestAsync(
+    ushort targetGuildMasterId)
+{
+    if (!_connectionManager.IsConnected)
+    {
+        _logger.LogError(
+            "Not connected - cannot request guild hostility.");
+
+        return;
+    }
+
+    try
+    {
+        await _connectionManager.Connection.SendAsync(() =>
+        {
+            const int length = 7;
+
+            Span<byte> packet =
+                _connectionManager.Connection.Output
+                    .GetSpan(length)
+                    .Slice(0, length);
+
+            packet[0] = 0xC1;
+            packet[1] = 0x07;
+            packet[2] = 0xE5;
+
+            // Hostility
+            packet[3] = 0x02;
+
+            // Join / Create relationship
+            packet[4] = 0x01;
+
+            // TargetPlayerId - BIG ENDIAN
+            packet[5] =
+                (byte)(targetGuildMasterId >> 8);
+
+            packet[6] =
+                (byte)(targetGuildMasterId & 0xFF);
+
+            return length;
+        });
+
+        _logger.LogInformation(
+            "Hostility request sent to Guild Master ID {PlayerId}.",
+            targetGuildMasterId);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(
+            ex,
+            "Error sending hostility request to Guild Master ID {PlayerId}.",
+            targetGuildMasterId);
+    }
+}
+
+        public async Task SendHostilityResponseAsync(
+            bool accepted,
+            ushort requesterId)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot answer guild hostility request.");
+
+                return;
+            }
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    const int length = 8;
+
+                    Span<byte> packet =
+                        _connectionManager.Connection.Output
+                            .GetSpan(length)
+                            .Slice(0, length);
+
+                    packet[0] = 0xC1;
+                    packet[1] = 0x08;
+                    packet[2] = 0xE6;
+
+                    // Hostility
+                    packet[3] = 0x02;
+
+                    // Join / Create relationship
+                    packet[4] = 0x01;
+
+                    // Accept / Reject
+                    packet[5] =
+                        accepted
+                            ? (byte)0x01
+                            : (byte)0x00;
+
+                    // RequesterId - BIG ENDIAN
+                    packet[6] =
+                        (byte)(requesterId >> 8);
+
+                    packet[7] =
+                        (byte)(requesterId & 0xFF);
+
+                    return length;
+                });
+
+                _logger.LogInformation(
+                    "Hostility response sent. Accepted={Accepted}, Requester={RequesterId}.",
+                    accepted,
+                    requesterId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error answering hostility request from {RequesterId}.",
+                    requesterId);
+            }
+        }
+        public Task SendEndAllianceRequestAsync(
+            ushort localPlayerId)
+        {
+            return SendGuildRelationshipLeaveRequestAsync(
+                relationshipType: 0x01,
+                localPlayerId,
+                "alliance");
+        }
+
+        public Task SendEndHostilityRequestAsync(
+            ushort localPlayerId)
+        {
+            return SendGuildRelationshipLeaveRequestAsync(
+                relationshipType: 0x02,
+                localPlayerId,
+                "hostility");
+        }
+
+        private async Task SendGuildRelationshipLeaveRequestAsync(
+            byte relationshipType,
+            ushort localPlayerId,
+            string relationshipName)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot end guild {Relationship}.",
+                    relationshipName);
+
+                return;
+            }
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    const int length = 7;
+
+                    Span<byte> packet =
+                        _connectionManager.Connection.Output
+                            .GetSpan(length)
+                            .Slice(0, length);
+
+                    packet[0] = 0xC1;
+                    packet[1] = 0x07;
+                    packet[2] = 0xE5;
+
+                    // 1 = Alliance, 2 = Hostility
+                    packet[3] = relationshipType;
+
+                    // 2 = Leave / End relationship
+                    packet[4] = 0x02;
+
+                    // Usamos nuestro propio ID para indicar que
+                    // la acción se ejecuta desde el menú de gremio.
+                    // Big Endian, igual que E5 Join.
+                    packet[5] =
+                        (byte)(localPlayerId >> 8);
+
+                    packet[6] =
+                        (byte)(localPlayerId & 0xFF);
+
+                    return length;
+                });
+
+                _logger.LogInformation(
+                    "Guild {Relationship} leave request sent. LocalPlayerId={PlayerId}.",
+                    relationshipName,
+                    localPlayerId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error ending guild {Relationship}.",
+                    relationshipName);
+            }
+        }
+
+        public async Task SendAllianceListRequestAsync()
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError(
+                    "Not connected - cannot request alliance list.");
+
+                return;
+            }
+
+            try
+            {
+                await _connectionManager.Connection
+                    .SendRequestAllianceListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error requesting alliance guild list.");
+            }
+        }
         public async Task SendGuildListRequestAsync()
         {
             if (!_connectionManager.IsConnected)

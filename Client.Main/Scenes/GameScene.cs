@@ -977,26 +977,34 @@ namespace Client.Main.Scenes
                 _guildMenuDialog = null;
                 return;
             }
+
             if (Hero == null ||
                 !GuildInfoCache.PlayerHasGuild(
                     Hero.NetworkId))
             {
                 RequestDialog.ShowInfo(
-                    "You are not in a guild.");
+                    "No perteneces a un gremio.");
 
                 return;
             }
 
-            _guildMenuDialog =
-            new GuildMenuDialog(
-                _characterInfo.Name,
-                Hero.NetworkId);
-
+            // Limpiamos primero para que el diálogo no alcance
+            // a mostrar información antigua mientras llegan los paquetes.
             GuildInfoCache.ClearRoster();
+            GuildInfoCache.ClearAllianceList();
+
+            _guildMenuDialog =
+                new GuildMenuDialog(
+                    _characterInfo.Name,
+                    Hero.NetworkId);
 
             _ = MuGame.Network
                 .GetCharacterService()
                 .SendGuildListRequestAsync();
+
+            _ = MuGame.Network
+                .GetCharacterService()
+                .SendAllianceListRequestAsync();
 
             _guildMenuDialog.Closed += (sender, args) =>
             {
@@ -1006,7 +1014,7 @@ namespace Client.Main.Scenes
             _guildMenuDialog.DisbandRequested += (sender, args) =>
             {
                 RequestDialog.Show(
-                    "Are you sure you want to disband your guild?",
+                    "¿Seguro que quieres disolver tu gremio?",
                     onAccept: () =>
                     {
                         _guildMenuDialog?.Close();
@@ -1021,13 +1029,10 @@ namespace Client.Main.Scenes
                     {
                     });
             };
-            //Kikear miembro
+
             _guildMenuDialog.KickMemberRequested +=
                 (sender, args) =>
                 {
-                    // Segunda protección:
-                    // no confiamos solamente en que el botón
-                    // esté oculto.
                     if (!GuildInfoCache
                         .IsLocalPlayerGuildMaster(
                             _characterInfo.Name))
@@ -1050,7 +1055,7 @@ namespace Client.Main.Scenes
                     }
 
                     RequestDialog.Show(
-                        $"Kick {args.PlayerName} from the guild?",
+                        $"¿Expulsar a {args.PlayerName} del gremio?",
                         onAccept: () =>
                         {
                             _ = MuGame.Network
@@ -1062,54 +1067,114 @@ namespace Client.Main.Scenes
                         {
                         });
                 };
-            //Cambiar Rango
+
             _guildMenuDialog.ChangeRoleRequested +=
-            (sender, args) =>
-            {
-                if (!GuildInfoCache
-                    .IsLocalPlayerGuildMaster(
-                        _characterInfo.Name))
+                (sender, args) =>
                 {
-                    return;
-                }
+                    if (!GuildInfoCache
+                        .IsLocalPlayerGuildMaster(
+                            _characterInfo.Name))
+                    {
+                        return;
+                    }
 
-                if (string.IsNullOrWhiteSpace(
-                        args.PlayerName))
+                    if (string.IsNullOrWhiteSpace(
+                            args.PlayerName))
+                    {
+                        return;
+                    }
+
+                    if (string.Equals(
+                            args.PlayerName,
+                            _characterInfo.Name,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return;
+                    }
+
+                    string roleName =
+                        ((byte)args.Role) switch
+                        {
+                            0x00 => "Miembro",
+                            0x20 => "Maestro de batalla",
+                            0x40 => "Maestro asistente",
+                            _ => "Miembro"
+                        };
+
+                    RequestDialog.Show(
+                        $"¿Cambiar el rango de {args.PlayerName} a {roleName}?",
+                        onAccept: () =>
+                        {
+                            _ = MuGame.Network
+                                .GetCharacterService()
+                                .SendGuildRoleAssignRequestAsync(
+                                    args.PlayerName,
+                                    args.Role);
+                        },
+                        onReject: () =>
+                        {
+                        });
+                };
+
+            _guildMenuDialog.EndAllianceRequested +=
+                (sender, args) =>
                 {
-                    return;
-                }
+                    if (!GuildInfoCache
+                        .IsLocalPlayerGuildMaster(
+                            _characterInfo.Name))
+                    {
+                        return;
+                    }
 
-                if (string.Equals(
-                        args.PlayerName,
-                        _characterInfo.Name,
-                        StringComparison.OrdinalIgnoreCase))
+                    RequestDialog.Show(
+                        "¿Seguro que quieres finalizar la alianza? Si tu gremio es el maestro, se disolverá la alianza completa.",
+                        onAccept: () =>
+                        {
+                            _ = MuGame.Network
+                                .GetCharacterService()
+                                .SendEndAllianceRequestAsync(
+                                    Hero.NetworkId);
+                        },
+                        onReject: () =>
+                        {
+                        });
+                };
+
+            _guildMenuDialog.EndHostilityRequested +=
+                (sender, args) =>
                 {
-                    return;
-                }
+                    if (!GuildInfoCache
+                        .IsLocalPlayerGuildMaster(
+                            _characterInfo.Name))
+                    {
+                        return;
+                    }
 
-                string roleName =
-                    ((byte)args.Role) switch
-                    {
-                        0x00 => "Member",
-                        0x20 => "Battle Master",
-                        0x40 => "Assistant Master",
-                        _ => "Member"
-                    };
+                    string rivalGuildName =
+                        GuildInfoCache.CurrentRoster?
+                            .RivalGuildName ??
+                        string.Empty;
 
-                RequestDialog.Show(
-                    $"Change {args.PlayerName} to {roleName}?",
-                    onAccept: () =>
-                    {
-                        _ = MuGame.Network
-                            .GetCharacterService()
-                            .SendGuildRoleAssignRequestAsync(
-                                args.PlayerName,
-                                args.Role);
-                    },
-                    onReject: () =>
-                    {
-                    });
-            };
+                    string message =
+                        string.IsNullOrWhiteSpace(
+                            rivalGuildName)
+                            ? "¿Seguro que quieres finalizar la hostilidad?"
+                            : $"¿Seguro que quieres finalizar la hostilidad con {rivalGuildName}?";
+
+                    RequestDialog.Show(
+                        message,
+                        onAccept: () =>
+                        {
+                            _ = MuGame.Network
+                                .GetCharacterService()
+                                .SendEndHostilityRequestAsync(
+                                    Hero.NetworkId);
+                        },
+                        onReject: () =>
+                        {
+                        });
+                };
+
             _guildMenuDialog.ShowDialog();
             _guildMenuDialog.BringToFront();
         }

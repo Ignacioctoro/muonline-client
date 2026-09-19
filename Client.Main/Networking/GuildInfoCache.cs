@@ -76,7 +76,28 @@ namespace Client.Main.Networking
                         StringComparison.OrdinalIgnoreCase));
         }
     }
+    public sealed class AllianceGuildData
+{
+    public string GuildName { get; init; } =
+        string.Empty;
 
+    public byte MemberCount { get; init; }
+
+    public byte[] Logo { get; init; } =
+                new byte[32];
+        }
+
+        public sealed class AllianceListData
+        {
+            public bool Success { get; init; }
+
+            public byte RivalCount { get; init; }
+
+            public byte UnionCount { get; init; }
+
+            public AllianceGuildData[] Guilds { get; init; } =
+                Array.Empty<AllianceGuildData>();
+        }
     public static class GuildInfoCache
     {
         private static readonly ConcurrentDictionary<uint, GuildInfoData>
@@ -92,11 +113,17 @@ namespace Client.Main.Networking
 
         private static GuildRosterData _currentRoster;
 
+        private static AllianceListData _currentAllianceList;
+
         public static event Action<GuildRosterData>
             GuildRosterUpdated;
+        public static event Action<AllianceListData>
+            AllianceListUpdated;
 
         public static GuildRosterData CurrentRoster =>
             _currentRoster;
+        public static AllianceListData CurrentAllianceList =>
+            _currentAllianceList;
 
         public static void AssignPlayerToGuild(
             ushort playerId,
@@ -237,6 +264,20 @@ namespace Client.Main.Networking
             GuildRosterUpdated?.Invoke(
                 roster);
         }
+        public static void StoreAllianceList(
+            AllianceListData allianceList)
+        {
+            _currentAllianceList =
+                allianceList;
+
+            AllianceListUpdated?.Invoke(
+                allianceList);
+        }
+        public static void ClearAllianceList()
+        {
+            _currentAllianceList =
+                null;
+        }
 
         public static GuildMemberData GetLocalMember(
             string playerName)
@@ -288,6 +329,9 @@ namespace Client.Main.Networking
             _playerGuildRoles.Clear();
 
             _currentRoster =
+                null;
+
+            _currentAllianceList =
                 null;
         }
     }
