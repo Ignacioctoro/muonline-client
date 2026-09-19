@@ -142,6 +142,7 @@ namespace Client.Main.Controls.UI
 
             // 2. Text Input Fields
             _chatInput = TextFieldControl.Create();
+            _chatInput.MaxLength = 59;
             _chatInput.X = 72;
             _chatInput.Y = 30;
             _chatInput.ViewSize = new Point(176, 14);
