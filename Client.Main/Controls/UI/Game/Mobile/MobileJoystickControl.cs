@@ -66,6 +66,17 @@ namespace Client.Main.Controls.UI.Game.Mobile
             return delta.LengthSquared() <=
                 CaptureRadius * CaptureRadius;
         }
+        public Rectangle GetCaptureRectangle()
+        {
+            Vector2 center =
+                GetCenterVirtual();
+
+            return new Rectangle(
+                (int)(center.X - CaptureRadius),
+                (int)(center.Y - CaptureRadius),
+                (int)(CaptureRadius * 2),
+                (int)(CaptureRadius * 2));
+        }
 
         public MobileJoystickControl()
         {
@@ -125,18 +136,13 @@ namespace Client.Main.Controls.UI.Game.Mobile
         {
             bool coveredByWindow =
                 Scene is GameScene gameScene &&
-                gameScene.IsMobileControlCovered(this);
+                gameScene.IsMobileJoystickCovered(
+                    GetCaptureRectangle());
 
             if (coveredByWindow)
             {
                 _mouseCaptured = false;
                 ResetJoystick();
-
-                TouchInputRouter.ConfigureJoystick(
-                    GetCenterVirtual(),
-                    CaptureRadius,
-                    false);
-
                 return;
             }
 
@@ -146,11 +152,6 @@ namespace Client.Main.Controls.UI.Game.Mobile
             RegisterTouchRegion();
 
             if (!_touchEnabled || !Visible)
-            {
-                _mouseCaptured = false;
-                ResetJoystick();
-                return;
-            }
             {
                 _mouseCaptured = false;
                 ResetJoystick();
@@ -201,8 +202,8 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         mouse.X,
                         mouse.Y);
 
-                // El mouse solo captura el joystick si el click
-                // COMENZÓ dentro de su círculo.
+                // El mouse solo captura el joystick si
+                // el click COMENZÓ dentro de su círculo.
                 if (!_mouseCaptured &&
                     mouse.LeftButton == ButtonState.Pressed &&
                     previousMouse.LeftButton == ButtonState.Released)

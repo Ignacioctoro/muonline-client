@@ -305,6 +305,85 @@ namespace Client.Main.Scenes
 
                 return false;
             }
+            public bool IsMobileJoystickCovered(
+                Rectangle joystickRectangle)
+            {
+                bool IsWindowCovering(
+                    GameControl control)
+                {
+                    if (control == null ||
+                        !control.Visible ||
+                        !control.Interactive)
+                    {
+                        return false;
+                    }
+
+                    Rectangle rect =
+                        control.DisplayRectangle;
+
+                    if (rect.Width <= 0 ||
+                        rect.Height <= 0)
+                    {
+                        return false;
+                    }
+
+                    return joystickRectangle
+                        .Intersects(rect);
+                }
+
+
+                // Ventanas principales del juego.
+                if (IsWindowCovering(_inventoryControl))
+                    return true;
+
+                if (IsWindowCovering(_characterInfoWindow))
+                    return true;
+
+                if (IsWindowCovering(_moveCommandWindow))
+                    return true;
+
+                if (IsWindowCovering(NpcShopControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(VaultControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(ChaosMixControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(TradeControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(QuestDialogControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(DevilSquareEnterControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(BloodCastleEnterControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(BloodCastleTimeControl.Instance))
+                    return true;
+
+                if (IsWindowCovering(BloodCastleResultControl.Instance))
+                    return true;
+
+
+                // Popup de asignación de potas.
+                // Mientras esté abierto, también debe bloquear
+                // el joystick si físicamente está encima.
+                if (IsWindowCovering(_mobilePotionAssignPopup))
+                    return true;
+
+
+                // Guild.
+                if (IsWindowCovering(_guildMenuDialog))
+                    return true;
+
+
+                return false;
+            }
 
             // Performance optimization fields - track object IDs for O(1) lookups
             // ───────────────────────── Properties ─────────────────────────
