@@ -1,4 +1,5 @@
 using System;
+using Client.Main.Scenes;
 using Client.Main.Controls.UI.Common;
 using Client.Main.Controllers;
 using Microsoft.Xna.Framework;
@@ -118,6 +119,22 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
         public override void Update(GameTime gameTime)
         {
+            bool coveredByWindow =
+                Scene is GameScene gameScene &&
+                gameScene.IsMobileControlCovered(this);
+
+            _basicAttackButton.Interactive =
+                !coveredByWindow;
+
+            _skillAttackButton.Interactive =
+                !coveredByWindow;
+
+            if (coveredByWindow)
+            {
+                _basicAttackButton.IsMousePressed = false;
+                _skillAttackButton.IsMousePressed = false;
+            }
+
             base.Update(gameTime);
 
             _basicAttackVisual.Pressed =

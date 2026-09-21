@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Client.Main.Scenes;
 using Client.Main.Controllers;
 using Client.Main.Core.Input;
 using Client.Main.Helpers;
@@ -122,12 +123,34 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
         public override void Update(GameTime gameTime)
         {
+            bool coveredByWindow =
+                Scene is GameScene gameScene &&
+                gameScene.IsMobileControlCovered(this);
+
+            if (coveredByWindow)
+            {
+                _mouseCaptured = false;
+                ResetJoystick();
+
+                TouchInputRouter.ConfigureJoystick(
+                    GetCenterVirtual(),
+                    CaptureRadius,
+                    false);
+
+                return;
+            }
+
             base.Update(gameTime);
 
             // Mantener actualizada la región táctil.
             RegisterTouchRegion();
 
             if (!_touchEnabled || !Visible)
+            {
+                _mouseCaptured = false;
+                ResetJoystick();
+                return;
+            }
             {
                 _mouseCaptured = false;
                 ResetJoystick();

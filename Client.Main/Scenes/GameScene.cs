@@ -73,12 +73,19 @@ namespace Client.Main.Scenes
         private GameSceneChatController _chatController;
         private GameSceneUiPreloadController _uiPreloadController;
         private GameSceneWindowCloseController _windowCloseController;
+        
         private MobileAttackButton _mobileAttackButton;
         private MobilePvpAttackButton _mobilePvpAttackButton;
         private ushort? _mobilePvpTargetId;
         private MobileChangeTargetButton _mobileChangeTargetButton;
         private MobileTargetPanel _mobileTargetPanel;
         private MobileJoystickControl _mobileJoystick;
+        private MobilePotionButton _mobilePotionQ;
+        private MobilePotionButton _mobilePotionW;
+        private MobilePotionButton _mobilePotionE;
+        private MobilePotionButton _mobilePotionR;
+        private MobilePotionAssignPopup _mobilePotionAssignPopup;
+
         public void ApplyMobileControlsSettings()
         {
             var settings = MuGame.AppSettings?.MobileControls;
@@ -109,11 +116,24 @@ namespace Client.Main.Scenes
 
             if (_mobileChangeTargetButton != null)
                 _mobileChangeTargetButton.Visible = enabled;
+
             if (_mobileJoystick != null)
             {
                 _mobileJoystick.Visible = enabled;
                 _mobileJoystick.SetTouchEnabled(enabled);
             }
+
+            if (_mobilePotionQ != null)
+                _mobilePotionQ.Visible = enabled;
+
+            if (_mobilePotionW != null)
+                _mobilePotionW.Visible = enabled;
+
+            if (_mobilePotionE != null)
+                _mobilePotionE.Visible = enabled;
+
+            if (_mobilePotionR != null)
+                _mobilePotionR.Visible = enabled;
 
             // Aplicar opacidad
             _mobileTargetPanel?.SetOpacity(opacity);
@@ -121,6 +141,10 @@ namespace Client.Main.Scenes
             _mobilePvpAttackButton?.SetOpacity(opacity);
             _mobileChangeTargetButton?.SetOpacity(opacity);
             _mobileJoystick?.SetOpacity(opacity);
+            _mobilePotionQ?.SetOpacity(opacity);
+            _mobilePotionW?.SetOpacity(opacity);
+            _mobilePotionE?.SetOpacity(opacity);
+            _mobilePotionR?.SetOpacity(opacity);
         }
 
         private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
@@ -165,47 +189,163 @@ namespace Client.Main.Scenes
 
                 return nearest;
             }
-
-        // Performance optimization fields - track object IDs for O(1) lookups
-        // ───────────────────────── Properties ─────────────────────────
-        public HeroObject Hero => _hero;
-        public bool IsMobileJoystickCapturingMouse
-        {
-            get
+            private void UseMobilePotion(
+                Keys key)
             {
-                if (_mobileJoystick == null ||
-                    !_mobileJoystick.Visible)
+                SetMouseInputConsumed();
+
+                if (_inventoryControl == null)
+                {
+                    return;
+                }
+
+                if (_inventoryControl.TryUseItemHotkey(
+                        key,
+                        out string message))
+                {
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
+                        message))
+                {
+                    _chatLog?.AddMessage(
+                        "System",
+                        message,
+                        MessageType.Error);
+                }
+            }
+
+            private void RequestMobilePotionAssignment(
+                Keys key)
+            {
+                SetMouseInputConsumed();
+
+                MobilePotionButton anchor =
+                    key switch
+                    {
+                        Keys.Q => _mobilePotionQ,
+                        Keys.W => _mobilePotionW,
+                        Keys.E => _mobilePotionE,
+                        Keys.R => _mobilePotionR,
+                        _ => null
+                    };
+
+                if (anchor == null ||
+                    _mobilePotionAssignPopup == null)
+                {
+                    return;
+                }
+
+                _mobilePotionAssignPopup.ShowFor(
+                    key,
+                    anchor.DisplayRectangle);
+            }
+            public bool IsMobileControlCovered(GameControl mobileControl)
+            {
+                if (mobileControl == null ||
+                    !mobileControl.Visible)
                 {
                     return false;
                 }
 
-                // Si ya comenzó el drag desde el joystick,
-                // el joystick conserva el mouse aunque el cursor
-                // salga visualmente de su círculo.
-                if (_mobileJoystick.IsMouseCaptured)
+                int mobileIndex =
+                    Controls.IndexOf(mobileControl);
+
+                if (mobileIndex < 0)
                 {
-                    return true;
+                    return false;
                 }
 
-                // Primer frame del click:
-                // el World se actualiza antes que algunos controles UI,
-                // así que detectamos directamente si el click comenzó
-                // dentro del joystick.
-                var mouse =
-                    MuGame.Instance.UiMouseState;
+                Rectangle mobileRect =
+                    mobileControl.DisplayRectangle;
 
-                var previousMouse =
-                    MuGame.Instance.PrevUiMouseState;
+                for (int i = mobileIndex + 1;
+                    i < Controls.Count;
+                    i++)
+                {
+                    GameControl control =
+                        Controls[i];
 
-                bool newPress =
-                    mouse.LeftButton == ButtonState.Pressed &&
-                    previousMouse.LeftButton == ButtonState.Released;
+                    if (control == null ||
+                        !control.Visible ||
+                        !control.Interactive ||
+                        control == World ||
+                        control == Cursor ||
+                        control == DebugPanel)
+                    {
+                        continue;
+                    }
 
-                return newPress &&
-                    _mobileJoystick.IsMouseInsideCaptureArea(
-                        mouse.Position);
+                    // El HUD móvil no se bloquea entre sí.
+                    if (control is MobilePotionButton ||
+                        control is MobileAttackButton ||
+                        control is MobilePvpAttackButton ||
+                        control is MobileChangeTargetButton ||
+                        control is MobileTargetPanel ||
+                        control is MobileJoystickControl)
+                    {
+                        continue;
+                    }
+
+                    Rectangle otherRect =
+                        control.DisplayRectangle;
+
+                    if (otherRect.Width <= 0 ||
+                        otherRect.Height <= 0)
+                    {
+                        continue;
+                    }
+
+                    if (mobileRect.Intersects(otherRect))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
-        }
+
+            // Performance optimization fields - track object IDs for O(1) lookups
+            // ───────────────────────── Properties ─────────────────────────
+            public HeroObject Hero => _hero;
+            public bool IsMobileJoystickCapturingMouse
+            {
+                get
+                {
+                    if (_mobileJoystick == null ||
+                        !_mobileJoystick.Visible)
+                    {
+                        return false;
+                    }
+
+                    // Si ya comenzó el drag desde el joystick,
+                    // el joystick conserva el mouse aunque el cursor
+                    // salga visualmente de su círculo.
+                    if (_mobileJoystick.IsMouseCaptured)
+                    {
+                        return true;
+                    }
+
+                    // Primer frame del click:
+                    // el World se actualiza antes que algunos controles UI,
+                    // así que detectamos directamente si el click comenzó
+                    // dentro del joystick.
+                    var mouse =
+                        MuGame.Instance.UiMouseState;
+
+                    var previousMouse =
+                        MuGame.Instance.PrevUiMouseState;
+
+                    bool newPress =
+                        mouse.LeftButton == ButtonState.Pressed &&
+                        previousMouse.LeftButton == ButtonState.Released;
+
+                    return newPress &&
+                        _mobileJoystick.IsMouseInsideCaptureArea(
+                            mouse.Position);
+                }
+            }
         public ChatLogWindow ChatLog => _chatLog;
         public InventoryControl InventoryControl => _inventoryControl;
         public TradeControl TradeControl => TradeControl.Instance;
@@ -553,7 +693,95 @@ namespace Client.Main.Scenes
 
                     _mobileJoystick
                         .BringToFront();
+                    
+                    // ─────────────────────────────────────────────
+                    // BOTONES DE POTAS MÓVILES
+                    // ─────────────────────────────────────────────
 
+                    _mobilePotionQ =
+                        new MobilePotionButton(Keys.Q);
+
+                    _mobilePotionW =
+                        new MobilePotionButton(
+                            Keys.W,
+                            visualSize: 52,
+                            touchSize: 68);
+
+                    _mobilePotionE =
+                        new MobilePotionButton(
+                            Keys.E,
+                            visualSize: 52,
+                            touchSize: 68);
+
+                    _mobilePotionR =
+                        new MobilePotionButton(Keys.R);
+
+
+                    // Posiciones iniciales.
+                    //
+                    // Todavía son provisionales.
+                    // Después las ajustamos mirando el HUD real.
+
+                    // Q - al lado derecho del joystick.
+                    _mobilePotionQ.X = 245;
+                    _mobilePotionQ.Y = 380;
+
+                    // W - pequeño sobre zona HP.
+                    _mobilePotionW.X = 330;
+                    _mobilePotionW.Y = 535;
+
+                    // E - pequeño sobre zona Mana.
+                    _mobilePotionE.X = 885;
+                    _mobilePotionE.Y = 535;
+
+                    // R - a la izquierda de botones de ataque.
+                    _mobilePotionR.X = 915;
+                    _mobilePotionR.Y = 440;
+
+
+                    Controls.Add(_mobilePotionQ);
+                    Controls.Add(_mobilePotionW);
+                    Controls.Add(_mobilePotionE);
+                    Controls.Add(_mobilePotionR);
+
+                    _mobilePotionQ.BringToFront();
+                    _mobilePotionW.BringToFront();
+                    _mobilePotionE.BringToFront();
+                    _mobilePotionR.BringToFront();
+                    _mobilePotionAssignPopup =
+                        new MobilePotionAssignPopup(
+                            _inventoryControl);
+
+                    Controls.Add(
+                        _mobilePotionAssignPopup);
+
+                    _mobilePotionAssignPopup
+                        .BringToFront();
+
+                    _mobilePotionQ.PotionPressed +=
+                        UseMobilePotion;
+
+                    _mobilePotionW.PotionPressed +=
+                        UseMobilePotion;
+
+                    _mobilePotionE.PotionPressed +=
+                        UseMobilePotion;
+
+                    _mobilePotionR.PotionPressed +=
+                        UseMobilePotion;
+
+
+                    _mobilePotionQ.AssignmentRequested +=
+                        RequestMobilePotionAssignment;
+
+                    _mobilePotionW.AssignmentRequested +=
+                        RequestMobilePotionAssignment;
+
+                    _mobilePotionE.AssignmentRequested +=
+                        RequestMobilePotionAssignment;
+
+                    _mobilePotionR.AssignmentRequested +=
+                        RequestMobilePotionAssignment;
 
                     // Aplicar visibilidad/opacidad
                     // a todos los controles móviles.
@@ -1089,9 +1317,6 @@ namespace Client.Main.Scenes
         // ─────────────────────────── Update Loop ───────────────────────────
         public override void Update(GameTime gameTime)
         {
-            bool inventoryOpen =
-                _inventoryControl?.Visible == true;
-
             bool pauseOpen =
                 _pauseMenu?.Visible == true;
 
@@ -1101,28 +1326,94 @@ namespace Client.Main.Scenes
             // 3) menú ESC cerrado.
             bool showMobileControls =
                 Constants.SHOW_MOBILE_CONTROLS &&
-                !inventoryOpen &&
                 !pauseOpen;
-                
+            if (!showMobileControls)
+                {
+                    _mobilePotionAssignPopup?.Hide();
+                }
+
+            // ─────────────────────────────────────────────
+            // POTAS MÓVILES
+            // ─────────────────────────────────────────────
+
+            if (_mobilePotionQ != null)
+            {
+                _mobilePotionQ.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobilePotionQ.CancelPress();
+                }
+            }
+
+            if (_mobilePotionW != null)
+            {
+                _mobilePotionW.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobilePotionW.CancelPress();
+                }
+            }
+
+            if (_mobilePotionE != null)
+            {
+                _mobilePotionE.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobilePotionE.CancelPress();
+                }
+            }
+
+            if (_mobilePotionR != null)
+            {
+                _mobilePotionR.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobilePotionR.CancelPress();
+                }
+            }
+
+
+            // ─────────────────────────────────────────────
+            // BOTONES DE ATAQUE / OBJETIVO
+            // ─────────────────────────────────────────────
+
             if (_mobileAttackButton != null)
             {
-                _mobileAttackButton.Visible = showMobileControls;
+                _mobileAttackButton.Visible =
+                    showMobileControls;
             }
 
             if (_mobilePvpAttackButton != null)
             {
-                _mobilePvpAttackButton.Visible = showMobileControls;
+                _mobilePvpAttackButton.Visible =
+                    showMobileControls;
             }
 
             if (_mobileChangeTargetButton != null)
             {
-                _mobileChangeTargetButton.Visible = showMobileControls;
+                _mobileChangeTargetButton.Visible =
+                    showMobileControls;
             }
 
             if (_mobileTargetPanel != null)
             {
-                _mobileTargetPanel.Visible = showMobileControls;
+                _mobileTargetPanel.Visible =
+                    showMobileControls;
             }
+
+
+            // ─────────────────────────────────────────────
+            // JOYSTICK
+            // ─────────────────────────────────────────────
+
             if (_mobileJoystick != null)
             {
                 _mobileJoystick.Visible =
@@ -1131,6 +1422,11 @@ namespace Client.Main.Scenes
                 _mobileJoystick.SetTouchEnabled(
                     showMobileControls);
             }
+
+
+            // ─────────────────────────────────────────────
+            // CAMBIO DE MAPA
+            // ─────────────────────────────────────────────
 
             if (_mapController?.IsChangingWorld == true)
             {

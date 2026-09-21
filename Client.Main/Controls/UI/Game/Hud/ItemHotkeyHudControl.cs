@@ -87,7 +87,8 @@ namespace Client.Main.Controls.UI.Game.Hud
                 }
                 else
                 {
-                    _countLabels[i].Text = "0";
+                    // Sin asignación = no mostrar contador.
+                    _countLabels[i].Text = string.Empty;
                 }
             }
         }

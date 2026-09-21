@@ -234,6 +234,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
             int Id,
             int Level,
             string Name);
+        public readonly record struct ItemHotkeyOption(
+            int Group,
+            int Id,
+            int Level,
+            string Name,
+            int TotalCount,
+            InventoryItem RepresentativeItem);
 
         private InventoryItem _hoveredItem;
         private Point _hoveredSlot = new(-1, -1);
@@ -481,6 +488,94 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 .FirstOrDefault();
 
             return item != null;
+        }
+        public IReadOnlyList<ItemHotkeyOption> GetAssignableItemHotkeyOptions()
+        {
+            return _items
+                .Where(item =>
+                    item?.Definition != null &&
+                    item.Definition.IsConsumable() &&
+                    !item.Definition.IsJewel())
+                .GroupBy(item => new
+                {
+                    item.Definition.Group,
+                    item.Definition.Id
+                })
+                .Select(group =>
+                {
+                    InventoryItem representative = group.First();
+
+                    int totalCount = group.Sum(item =>
+                        Math.Max(0, item.Durability));
+
+                    return new ItemHotkeyOption(
+                        representative.Definition.Group,
+                        representative.Definition.Id,
+                        representative.Level,
+                        representative.Definition.Name,
+                        totalCount,
+                        representative);
+                })
+                .OrderBy(option => option.Group)
+                .ThenBy(option => option.Id)
+                .ToList();
+        }
+        public bool TryAssignItemHotkey(
+            Keys key,
+            ItemHotkeyOption option,
+            out string message)
+        {
+            message = string.Empty;
+
+            if (key != Keys.Q &&
+                key != Keys.W &&
+                key != Keys.E &&
+                key != Keys.R)
+            {
+                return false;
+            }
+
+            if (option.RepresentativeItem?.Definition == null)
+            {
+                message = "El objeto seleccionado no es válido.";
+                return false;
+            }
+
+            var definition =
+                option.RepresentativeItem.Definition;
+
+            if (!definition.IsConsumable() ||
+                definition.IsJewel())
+            {
+                message =
+                    $"{definition.Name} no puede asignarse a {key}.";
+
+                return false;
+            }
+
+            _itemHotkeys[key] =
+                new ItemHotkeyEntry(
+                    option.Group,
+                    option.Id,
+                    option.Level,
+                    option.Name);
+
+            message =
+                $"{key} asignada a {option.Name}.";
+
+            return true;
+        }
+        public bool ClearItemHotkey(Keys key)
+        {
+            if (key != Keys.Q &&
+                key != Keys.W &&
+                key != Keys.E &&
+                key != Keys.R)
+            {
+                return false;
+            }
+
+            return _itemHotkeys.Remove(key);
         }
 
         public static InventoryControl Instance

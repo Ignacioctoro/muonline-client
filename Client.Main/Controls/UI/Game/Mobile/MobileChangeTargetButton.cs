@@ -1,4 +1,5 @@
 using System;
+using Client.Main.Scenes;
 using Client.Main.Controls.UI.Common;
 using Client.Main.Controllers;
 using Microsoft.Xna.Framework;
@@ -74,9 +75,22 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
         public override void Update(GameTime gameTime)
         {
+            bool coveredByWindow =
+                Scene is GameScene gameScene &&
+                gameScene.IsMobileControlCovered(this);
+
+            _button.Interactive =
+                !coveredByWindow;
+
+            if (coveredByWindow)
+            {
+                _button.IsMousePressed = false;
+            }
+
             base.Update(gameTime);
 
-            _visual.Pressed = _button.IsMousePressed;
+            _visual.Pressed =
+                _button.IsMousePressed;
         }
 
         private void OnChangeTargetClicked(object sender, EventArgs e)
