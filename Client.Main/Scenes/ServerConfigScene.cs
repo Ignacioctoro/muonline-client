@@ -59,6 +59,8 @@ namespace Client.Main.Scenes
             var previousFocus = FocusControl;
             base.Update(gameTime);
 
+            // ServerConfigScene has no World, so it needs to dispatch
+            // the focus transition itself after BaseScene updates controls.
             if (World == null && Status == GameControlStatus.Ready)
             {
                 if (FocusControl != previousFocus)
@@ -93,10 +95,15 @@ namespace Client.Main.Scenes
                 return;
             }
 
-            if (_submitted) return; // prevent double-submit
+            if (_submitted)
+                return;
+
             _submitted = true;
 
-            _logger?.LogInformation("ServerConfigScene: host={Host}, port={Port}", host, port);
+            _logger?.LogInformation(
+                "ServerConfigScene: host={Host}, port={Port}",
+                host,
+                port);
 
             MuGame.AppSettings.ConnectServerHost = host;
             MuGame.AppSettings.ConnectServerPort = port;
@@ -106,11 +113,14 @@ namespace Client.Main.Scenes
             if (network != null)
             {
                 network.UpdateConnectServerSettings(host, port);
+
                 _ = network.ForceReconnectToConnectServerAsync().ContinueWith(t =>
                 {
                     if (t.Exception != null)
                     {
-                        _logger?.LogWarning(t.Exception, "Failed to reconnect with updated server settings; continuing to LoginScene.");
+                        _logger?.LogWarning(
+                            t.Exception,
+                            "Failed to reconnect with updated server settings; continuing to LoginScene.");
                     }
                 });
             }
@@ -124,6 +134,7 @@ namespace Client.Main.Scenes
             {
                 _dialog.SubmitRequested -= OnSubmit;
             }
+
             base.Dispose();
         }
 
@@ -143,13 +154,17 @@ namespace Client.Main.Scenes
             {
                 if (_backgroundTexture != null)
                 {
-                    GraphicsManager.Instance.Sprite.Draw(_backgroundTexture,
-                        new Rectangle(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y), Color.White);
+                    GraphicsManager.Instance.Sprite.Draw(
+                        _backgroundTexture,
+                        new Rectangle(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y),
+                        Color.White);
                 }
                 else
                 {
-                    GraphicsManager.Instance.Sprite.Draw(GraphicsManager.Instance.Pixel,
-                        new Rectangle(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y), BackgroundColor);
+                    GraphicsManager.Instance.Sprite.Draw(
+                        GraphicsManager.Instance.Pixel,
+                        new Rectangle(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y),
+                        BackgroundColor);
                 }
             }
 
@@ -164,7 +179,8 @@ namespace Client.Main.Scenes
                        null,
                        UiScaler.SpriteTransform))
             {
-                GraphicsManager.Instance.Sprite.Draw(GraphicsManager.Instance.Pixel,
+                GraphicsManager.Instance.Sprite.Draw(
+                    GraphicsManager.Instance.Pixel,
                     new Rectangle(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y),
                     new Color(0, 0, 0, 160));
             }
@@ -180,13 +196,13 @@ namespace Client.Main.Scenes
                        UiScaler.SpriteTransform))
             {
                 var controls = Controls.GetSnapshot();
+
                 for (int i = 0; i < controls.Count; i++)
                 {
                     var ctrl = controls[i];
+
                     if (ctrl == null || ctrl == World || !ctrl.Visible)
-                    {
                         continue;
-                    }
 
                     ctrl.Draw(gameTime);
                 }
@@ -258,7 +274,6 @@ namespace Client.Main.Scenes
             _hostInput.ControlSize = new Point(240, 30);
             _hostInput.FontSize = 12f;
             _hostInput.Interactive = true;
-
             Controls.Add(_hostInput);
 
             Controls.Add(new LabelControl
@@ -280,7 +295,6 @@ namespace Client.Main.Scenes
             _portInput.ControlSize = new Point(120, 30);
             _portInput.FontSize = 12f;
             _portInput.Interactive = true;
-
             Controls.Add(_portInput);
 
             _errorLabel = new LabelControl
@@ -301,14 +315,16 @@ namespace Client.Main.Scenes
                 Align = ControlAlign.HorizontalCenter,
                 Y = 170
             };
-            _okButton.Click += (_, _) => SubmitRequested?.Invoke(this, EventArgs.Empty);
+            _okButton.Click += (_, _) =>
+                SubmitRequested?.Invoke(this, EventArgs.Empty);
             Controls.Add(_okButton);
 
             _hostInput.Click += (_, _) => FocusHost();
             _portInput.Click += (_, _) => FocusPort();
 
             _hostInput.EnterKeyPressed += (_, _) => FocusPort();
-            _portInput.EnterKeyPressed += (_, _) => SubmitRequested?.Invoke(this, EventArgs.Empty);
+            _portInput.EnterKeyPressed += (_, _) =>
+                SubmitRequested?.Invoke(this, EventArgs.Empty);
         }
 
         public void SetValues(string host, string port)
@@ -323,7 +339,10 @@ namespace Client.Main.Scenes
             _errorLabel.Visible = !string.IsNullOrWhiteSpace(message);
         }
 
-        public void ClearError() => SetError(string.Empty);
+        public void ClearError()
+        {
+            SetError(string.Empty);
+        }
 
         public void FocusHost()
         {

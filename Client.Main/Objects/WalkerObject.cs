@@ -630,7 +630,14 @@ namespace Client.Main.Objects
         }
 
         protected bool _movementIntent;
+
         public bool MovementIntent => _movementIntent;
+
+        // Cantidad de tiles que todavía quedan en cola.
+        // El joystick lo usa para rellenar la ruta antes
+        // de que el personaje llegue a detenerse.
+        public int QueuedMovementSteps =>
+            _currentPath?.Count ?? 0;
 
         // protected override void Dispose(bool disposing)
         // {

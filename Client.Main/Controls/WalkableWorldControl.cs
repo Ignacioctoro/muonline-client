@@ -100,6 +100,14 @@ namespace Client.Main.Controls
             {
                 return;
             }
+            // En Windows el joystick se prueba mediante el mouse.
+            // Mientras el joystick tenga capturado el botón izquierdo,
+            // el mismo click no debe convertirse en click-to-move.
+            if (Scene is Client.Main.Scenes.GameScene gameScene &&
+                gameScene.IsMobileJoystickCapturingMouse)
+            {
+                return;
+            }
 
             CalculateMouseTilePos();
 

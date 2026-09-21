@@ -1,4 +1,4 @@
-﻿using Client.Main.Content;
+using Client.Main.Content;
 using TextCopy;
 using Client.Main.Controllers;
 using Client.Main.Helpers;
@@ -10,6 +10,7 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 
 namespace Client.Main.Controls.UI
@@ -54,6 +55,15 @@ namespace Client.Main.Controls.UI
         };
 
         private static readonly ILogger _logger = MuGame.AppLoggerFactory?.CreateLogger<TextFieldControl>();
+
+        // Desktop-only TextInput subscription is done via reflection.
+        // Client.Main is shared with Android, while the Android MonoGame
+        // GameWindow runtime does not expose the same TextInput event accessors.
+        // Keeping a direct GameWindow.TextInput += / -= reference here causes
+        // MissingMethodException on Android.
+        private EventInfo _desktopTextInputEvent;
+        private Delegate _desktopTextInputHandler;
+        private object _desktopTextInputWindow;
 
         public TextFieldSkin Skin { get; set; } = TextFieldSkin.Flat;
         public Color TextColor { get; set; } = Color.White;
@@ -136,27 +146,14 @@ namespace Client.Main.Controls.UI
 
             _logger?.LogDebug("TextFieldControl: OnFocus called.");
 
-#if !(ANDROID || IOS)
-            // Desktop: the OS resolves printable characters according to the
-            // active keyboard layout. This preserves Spanish keyboard support.
-            if (MuGame.Instance?.GameWindow != null)
-            {
-                MuGame.Instance.GameWindow.TextInput -= OnDesktopTextInput;
-                MuGame.Instance.GameWindow.TextInput += OnDesktopTextInput;
-            }
-#endif
+            SubscribeDesktopTextInput();
         }
 
         public override void OnBlur()
         {
             if (!IsFocused) return;
 
-#if !(ANDROID || IOS)
-            if (MuGame.Instance?.GameWindow != null)
-            {
-                MuGame.Instance.GameWindow.TextInput -= OnDesktopTextInput;
-            }
-#endif
+            UnsubscribeDesktopTextInput();
 
             base.OnBlur();
 
@@ -166,11 +163,77 @@ namespace Client.Main.Controls.UI
             _mouseSelecting = false;
 
             _logger?.LogDebug("TextFieldControl: OnBlur called.");
+        }
 
-#if ANDROID
-            AndroidKeyboard.TextInput -= OnTextInput;
-            AndroidKeyboard.Hide();
-#endif
+        private void SubscribeDesktopTextInput()
+        {
+            // Android/iOS use their platform-specific TextFieldControl subclass.
+            // Do not touch GameWindow.TextInput there.
+            if (OperatingSystem.IsAndroid() || OperatingSystem.IsIOS())
+                return;
+
+            var window = MuGame.Instance?.GameWindow;
+            if (window == null)
+                return;
+
+            try
+            {
+                var eventInfo = window.GetType().GetEvent(
+                    "TextInput",
+                    BindingFlags.Instance | BindingFlags.Public);
+
+                if (eventInfo == null || eventInfo.EventHandlerType == null)
+                    return;
+
+                // Clear a previous subscription first, if there is one.
+                UnsubscribeDesktopTextInput();
+
+                var handler = Delegate.CreateDelegate(
+                    eventInfo.EventHandlerType,
+                    this,
+                    nameof(OnDesktopTextInput));
+
+                eventInfo.AddEventHandler(window, handler);
+
+                _desktopTextInputEvent = eventInfo;
+                _desktopTextInputHandler = handler;
+                _desktopTextInputWindow = window;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "Could not subscribe to desktop GameWindow.TextInput.");
+            }
+        }
+
+        private void UnsubscribeDesktopTextInput()
+        {
+            if (_desktopTextInputEvent == null ||
+                _desktopTextInputHandler == null ||
+                _desktopTextInputWindow == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _desktopTextInputEvent.RemoveEventHandler(
+                    _desktopTextInputWindow,
+                    _desktopTextInputHandler);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "Could not unsubscribe from desktop GameWindow.TextInput.");
+            }
+            finally
+            {
+                _desktopTextInputEvent = null;
+                _desktopTextInputHandler = null;
+                _desktopTextInputWindow = null;
+            }
         }
 
         public new void Focus() => OnFocus();
@@ -533,9 +596,6 @@ namespace Client.Main.Controls.UI
                 previousMouse.LeftButton == ButtonState.Released &&
                 inside)
             {
-                if (!IsFocused)
-                    Focus();
-
                 int index = GetCharacterIndexFromMouseX(mouse.X);
 
                 bool shift = MuGame.Instance.Keyboard.IsKeyDown(Keys.LeftShift) ||
@@ -571,50 +631,6 @@ namespace Client.Main.Controls.UI
             }
         }
 
-        /// <summary>
-        /// Handles text input on Android (from soft keyboard or scrcpy).
-        /// </summary>
-#if ANDROID
-        private void OnTextInput(object sender, Platform.Android.TextInputEventArgs e)
-        {
-            if (!IsFocused || !Visible)
-                return;
-
-            if (e.Character == '\r' || e.Key == Keys.Enter)
-            {
-                OnEnterKeyPressed();
-                OnValueChanged();
-                return;
-            }
-
-            if (e.Character == '\b' || e.Key == Keys.Back)
-            {
-                if (DeleteSelection())
-                {
-                    UpdateScrollOffset();
-                    ResetCursorBlink();
-                    OnValueChanged();
-                }
-                else if (_cursorIndex > 0)
-                {
-                    _inputText.Remove(_cursorIndex - 1, 1);
-                    _cursorIndex--;
-                    UpdateScrollOffset();
-                    ResetCursorBlink();
-                    OnValueChanged();
-                }
-
-                return;
-            }
-
-            if (e.Character != '\0' && !char.IsControl(e.Character))
-            {
-                InsertTextAtCursor(e.Character.ToString());
-            }
-        }
-#endif
-
-#if !(ANDROID || IOS)
         private void OnDesktopTextInput(object sender, Microsoft.Xna.Framework.TextInputEventArgs e)
         {
             if (!IsFocused || !Visible)
@@ -636,7 +652,6 @@ namespace Client.Main.Controls.UI
 
             InsertTextAtCursor(character.ToString());
         }
-#endif
 
         public override void Update(GameTime gameTime)
         {

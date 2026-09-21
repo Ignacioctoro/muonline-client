@@ -3,6 +3,7 @@ using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Controls;
 using Client.Main.Core.Client;
+using Client.Main.Core.Input;
 using Client.Main.Data;
 using Client.Main.Graphics;
 using Client.Main.Networking;
@@ -628,6 +629,8 @@ namespace Client.Main
             Keyboard = Microsoft.Xna.Framework.Input.Keyboard.GetState();
             Touch = touchState;
 
+            // Separar dedo del joystick y dedo de UI/mundo.
+            TouchInputRouter.Update(Touch);
             // Get back buffer and window dimensions
             int backBufferWidth = GraphicsDevice.PresentationParameters.BackBufferWidth;
             int backBufferHeight = GraphicsDevice.PresentationParameters.BackBufferHeight;
@@ -669,93 +672,135 @@ namespace Client.Main
 
             // --- VIRTUAL MOUSE (UI) ---
 
-            if (Touch.Count > 0)
+            if (TouchInputRouter.TryGetPointerTouch(out var pointerTouch))
             {
-                // CASE 1: Touch detected (Android/Touchscreen)
-                var touch = Touch[0];
-                var touchPos = touch.Position;
+                var touchPos =
+                    pointerTouch.Position;
 
-                // Convert touch position to virtual UI coordinates
-                var virtualTouchPos = UiScaler.ToVirtual(new Microsoft.Xna.Framework.Point((int)touchPos.X, (int)touchPos.Y));
+                var virtualTouchPos =
+                    UiScaler.ToVirtual(
+                        new Microsoft.Xna.Framework.Point(
+                            (int)touchPos.X,
+                            (int)touchPos.Y));
 
-                UiTouchPosition = virtualTouchPos;
-                UiMousePosition = virtualTouchPos; // Mouse follows finger
+                UiTouchPosition =
+                    virtualTouchPos;
 
-                // Touch as left mouse button
-                var leftButtonState = (touch.State == TouchLocationState.Pressed || touch.State == TouchLocationState.Moved)
-                    ? Microsoft.Xna.Framework.Input.ButtonState.Pressed
-                    : Microsoft.Xna.Framework.Input.ButtonState.Released;
+                UiMousePosition =
+                    virtualTouchPos;
 
-                UiMouseState = new Microsoft.Xna.Framework.Input.MouseState(
-                    virtualTouchPos.X,
-                    virtualTouchPos.Y,
-                    0,
-                    leftButtonState,
-                    Microsoft.Xna.Framework.Input.ButtonState.Released, Microsoft.Xna.Framework.Input.ButtonState.Released, Microsoft.Xna.Framework.Input.ButtonState.Released, Microsoft.Xna.Framework.Input.ButtonState.Released);
+                var leftButtonState =
+                    pointerTouch.State ==
+                        TouchLocationState.Pressed ||
+                    pointerTouch.State ==
+                        TouchLocationState.Moved
+                        ? ButtonState.Pressed
+                        : ButtonState.Released;
+
+                UiMouseState =
+                    new MouseState(
+                        virtualTouchPos.X,
+                        virtualTouchPos.Y,
+                        0,
+                        leftButtonState,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released);
+
+                // También mantener la posición usada
+                // para raycasting 3D sincronizada
+                // con el dedo que realmente controla
+                // la UI/mundo.
+                float touchBackBufferX =
+                    touchPos.X * scaleX;
+
+                float touchBackBufferY =
+                    touchPos.Y * scaleY;
+
+                MouseInBackBuffer =
+                    new Vector2(
+                        touchBackBufferX,
+                        touchBackBufferY);
+
+                _lastValidMouseInBackBuffer =
+                    MouseInBackBuffer;
             }
             else
             {
-                if (OperatingSystem.IsAndroid())
+                if (OperatingSystem.IsAndroid() ||
+                    OperatingSystem.IsIOS())
                 {
-                    // Keep the cursor at the last touch position when finger is lifted.
-                    // This prevents the UI system from thinking we clicked outside the control.
-                    // The cursor will stay at this position until next touch - we DON'T move it to (-1, -1).
+                    // Puede haber un dedo sobre el joystick,
+                    // pero eso NO debe convertirse en mouse.
+                    UiMousePosition =
+                        PrevUiMouseState.Position;
 
-                    UiMousePosition = PrevUiMouseState.Position;
-                    UiTouchPosition = PrevUiMouseState.Position;
+                    UiTouchPosition =
+                        PrevUiMouseState.Position;
 
-                    UiMouseState = new Microsoft.Xna.Framework.Input.MouseState(
-                        UiMousePosition.X, UiMousePosition.Y,
-                        0,
-                        Microsoft.Xna.Framework.Input.ButtonState.Released,
-                        Microsoft.Xna.Framework.Input.ButtonState.Released, Microsoft.Xna.Framework.Input.ButtonState.Released, Microsoft.Xna.Framework.Input.ButtonState.Released, Microsoft.Xna.Framework.Input.ButtonState.Released);
+                    UiMouseState =
+                        new MouseState(
+                            UiMousePosition.X,
+                            UiMousePosition.Y,
+                            0,
+                            ButtonState.Released,
+                            ButtonState.Released,
+                            ButtonState.Released,
+                            ButtonState.Released,
+                            ButtonState.Released);
                 }
                 else
                 {
-                    // WINDOWS: Use standard mouse
-                    UiMousePosition = UiScaler.ToVirtual(Mouse.Position);
-                    UiTouchPosition = UiMousePosition;
+                    UiMousePosition =
+                        UiScaler.ToVirtual(
+                            Mouse.Position);
 
-                    UiMouseState = new Microsoft.Xna.Framework.Input.MouseState(
-                        UiMousePosition.X,
-                        UiMousePosition.Y,
-                        Mouse.ScrollWheelValue,
-                        Mouse.LeftButton,
-                        Mouse.MiddleButton,
-                        Mouse.RightButton,
-                        Mouse.XButton1,
-                        Mouse.XButton2);
+                    UiTouchPosition =
+                        UiMousePosition;
+
+                    UiMouseState =
+                        new MouseState(
+                            UiMousePosition.X,
+                            UiMousePosition.Y,
+                            Mouse.ScrollWheelValue,
+                            Mouse.LeftButton,
+                            Mouse.MiddleButton,
+                            Mouse.RightButton,
+                            Mouse.XButton1,
+                            Mouse.XButton2);
                 }
             }
 
-            // Update MouseRay when mouse position changes OR when touch position changes
-            bool shouldUpdateRay = false;
+            bool shouldUpdateRay =
+                PrevMouseState.Position !=
+                Mouse.Position;
 
-            if (PrevMouseState.Position != Mouse.Position)
-                shouldUpdateRay = true;
-
-            if (PrevTouchState.Count != Touch.Count)
-                shouldUpdateRay = true;
-
-            // Check if touch position changed (finger moved)
-            if (Touch.Count > 0 && PrevTouchState.Count > 0)
+            // Mientras exista un dedo de puntero,
+            // refrescamos el raycast.
+            // El dedo del joystick no participa.
+            if (TouchInputRouter.HasPointerTouch)
             {
-                if (Touch[0].Position != PrevTouchState[0].Position)
-                    shouldUpdateRay = true;
+                shouldUpdateRay = true;
             }
 
             if (shouldUpdateRay)
+            {
                 UpdateMouseRay();
+            }
         }
 
         private void UpdateMouseRay()
         {
             // Use touch position if available, otherwise use mouse position in back buffer space
             Vector2 inputPosition;
-            if (Touch.Count > 0)
+            if (TouchInputRouter.TryGetPointerTouch(
+                    out var pointerTouch))
             {
-                // Touch position needs same scaling as mouse in fullscreen borderless mode
-                var touchPos = Touch[0].Position;
+                // Solo el dedo destinado a UI/mundo
+                // controla el raycast.
+                var touchPos =
+                    pointerTouch.Position;
                 int backBufferWidth = GraphicsDevice.PresentationParameters.BackBufferWidth;
                 int backBufferHeight = GraphicsDevice.PresentationParameters.BackBufferHeight;
 

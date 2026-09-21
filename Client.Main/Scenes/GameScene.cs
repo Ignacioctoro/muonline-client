@@ -1,6 +1,7 @@
 // File: GameScene.cs
 using Client.Main.Controls;
 using Client.Main.Controls.UI;
+using Client.Main.Core.Input;
 using Client.Main.Controls.UI.Game;
 using Client.Main.Models;
 using Client.Main.Objects.Player;
@@ -30,6 +31,7 @@ using Client.Main.Controls.UI.Game.Hud;
 using MUnique.OpenMU.Network.Packets;
 using Client.Main.Controllers;
 using Client.Main.Helpers;
+using Client.Main.Graphics;
 using Client.Data.ATT;
 
 namespace Client.Main.Scenes
@@ -76,6 +78,7 @@ namespace Client.Main.Scenes
         private ushort? _mobilePvpTargetId;
         private MobileChangeTargetButton _mobileChangeTargetButton;
         private MobileTargetPanel _mobileTargetPanel;
+        private MobileJoystickControl _mobileJoystick;
         public void ApplyMobileControlsSettings()
         {
             var settings = MuGame.AppSettings?.MobileControls;
@@ -106,12 +109,18 @@ namespace Client.Main.Scenes
 
             if (_mobileChangeTargetButton != null)
                 _mobileChangeTargetButton.Visible = enabled;
+            if (_mobileJoystick != null)
+            {
+                _mobileJoystick.Visible = enabled;
+                _mobileJoystick.SetTouchEnabled(enabled);
+            }
 
             // Aplicar opacidad
             _mobileTargetPanel?.SetOpacity(opacity);
             _mobileAttackButton?.SetOpacity(opacity);
             _mobilePvpAttackButton?.SetOpacity(opacity);
             _mobileChangeTargetButton?.SetOpacity(opacity);
+            _mobileJoystick?.SetOpacity(opacity);
         }
 
         private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
@@ -160,6 +169,43 @@ namespace Client.Main.Scenes
         // Performance optimization fields - track object IDs for O(1) lookups
         // ───────────────────────── Properties ─────────────────────────
         public HeroObject Hero => _hero;
+        public bool IsMobileJoystickCapturingMouse
+        {
+            get
+            {
+                if (_mobileJoystick == null ||
+                    !_mobileJoystick.Visible)
+                {
+                    return false;
+                }
+
+                // Si ya comenzó el drag desde el joystick,
+                // el joystick conserva el mouse aunque el cursor
+                // salga visualmente de su círculo.
+                if (_mobileJoystick.IsMouseCaptured)
+                {
+                    return true;
+                }
+
+                // Primer frame del click:
+                // el World se actualiza antes que algunos controles UI,
+                // así que detectamos directamente si el click comenzó
+                // dentro del joystick.
+                var mouse =
+                    MuGame.Instance.UiMouseState;
+
+                var previousMouse =
+                    MuGame.Instance.PrevUiMouseState;
+
+                bool newPress =
+                    mouse.LeftButton == ButtonState.Pressed &&
+                    previousMouse.LeftButton == ButtonState.Released;
+
+                return newPress &&
+                    _mobileJoystick.IsMouseInsideCaptureArea(
+                        mouse.Position);
+            }
+        }
         public ChatLogWindow ChatLog => _chatLog;
         public InventoryControl InventoryControl => _inventoryControl;
         public TradeControl TradeControl => TradeControl.Instance;
@@ -486,9 +532,31 @@ namespace Client.Main.Scenes
 
 
                     // Botón cambiar objetivo PvP
-                    _mobileChangeTargetButton = new MobileChangeTargetButton();
-                    Controls.Add(_mobileChangeTargetButton);
-                    _mobileChangeTargetButton.BringToFront();
+                    _mobileChangeTargetButton =
+                        new MobileChangeTargetButton();
+
+                    Controls.Add(
+                        _mobileChangeTargetButton);
+
+                    _mobileChangeTargetButton
+                        .BringToFront();
+
+
+                    // ─────────────────────────────────────────────
+                    // JOYSTICK MÓVIL
+                    // ─────────────────────────────────────────────
+                    _mobileJoystick =
+                        new MobileJoystickControl();
+
+                    Controls.Add(
+                        _mobileJoystick);
+
+                    _mobileJoystick
+                        .BringToFront();
+
+
+                    // Aplicar visibilidad/opacidad
+                    // a todos los controles móviles.
                     ApplyMobileControlsSettings();
 
                     _mobileChangeTargetButton.ChangeTargetClicked += (s, e) =>
@@ -847,18 +915,194 @@ namespace Client.Main.Scenes
         {
             _notificationController?.Enqueue(messageType, message);
         }
+        private void UpdateMobileJoystickMovement()
+        {
+            if (_mobileJoystick == null ||
+                !_mobileJoystick.Visible ||
+                !_mobileJoystick.IsActive)
+            {
+                return;
+            }
 
+            if (World is not WalkableWorldControl world ||
+                Hero == null ||
+                Hero.IsDead)
+            {
+                return;
+            }
+
+            Vector2 stick =
+                _mobileJoystick.Direction;
+
+            // Todavía dentro de dead zone.
+            if (stick.LengthSquared() < 0.04f)
+            {
+                return;
+            }
+
+            // Esperar a terminar el tile actual.
+            //
+            // Esto evita bombardear al servidor
+            // con movimientos cada frame.
+           // Si todavía quedan pasos en cola, dejamos que continúe.
+            //
+            // Cuando la cola llegue a 0, el personaje normalmente
+            // todavía estará desplazándose hacia el último tile.
+            // Ese es el momento ideal para agregar el siguiente tramo,
+            // antes de que MovementIntent llegue a false.
+            if (Hero.MovementIntent &&
+                Hero.QueuedMovementSteps > 0)
+            {
+                return;
+            }
+
+            Vector3 cameraForward3D =
+                Camera.Instance.Target -
+                Camera.Instance.Position;
+
+            Vector2 cameraForward =
+                new Vector2(
+                    cameraForward3D.X,
+                    cameraForward3D.Y);
+
+            if (cameraForward.LengthSquared() <
+                0.0001f)
+            {
+                return;
+            }
+
+            cameraForward.Normalize();
+
+            // Derecha relativa a la cámara.
+            Vector2 cameraRight =
+                new Vector2(
+                    cameraForward.Y,
+                    -cameraForward.X);
+
+            // stick.Y positivo significa abajo.
+            // Por eso invertimos Y.
+            Vector2 desiredWorldDirection =
+                cameraRight * stick.X +
+                cameraForward * -stick.Y;
+
+            if (desiredWorldDirection.LengthSquared() <
+                0.0001f)
+            {
+                return;
+            }
+
+            desiredWorldDirection.Normalize();
+
+            Vector2 tileStep =
+                QuantizeJoystickDirection(
+                    desiredWorldDirection);
+
+            Vector2 currentTile =
+                new Vector2(
+                    (int)Hero.Location.X,
+                    (int)Hero.Location.Y);
+
+            // -------------------------------------------------
+            // LOOKAHEAD DEL JOYSTICK
+            // -------------------------------------------------
+            //
+            // En vez de ordenar solamente 1 tile,
+            // mantenemos una pequeña ruta por delante.
+            //
+            // Esto evita que MovementIntent caiga a false
+            // entre cada tile y mantiene continua la
+            // animación de caminar/correr.
+            //
+            const int JoystickLookAheadTiles = 2;
+
+            Vector2 targetTile = currentTile;
+
+            for (int i = 0;
+                i < JoystickLookAheadTiles;
+                i++)
+            {
+                Vector2 candidate =
+                    targetTile +
+                    tileStep;
+
+                // Límites del mapa.
+                if (candidate.X < 0 ||
+                    candidate.Y < 0 ||
+                    candidate.X >= Constants.TERRAIN_SIZE ||
+                    candidate.Y >= Constants.TERRAIN_SIZE)
+                {
+                    break;
+                }
+
+                // No atravesar paredes / NoMove.
+                if (!world.IsWalkable(candidate))
+                {
+                    break;
+                }
+
+                targetTile = candidate;
+            }
+
+            // No existe ningún tile válido en esa dirección.
+            if (targetTile == currentTile)
+            {
+                return;
+            }
+
+            // Generará una ruta directa de hasta 2 tiles.
+            // Se envía como un único paquete de movimiento.
+            Hero.MoveTo(
+                targetTile,
+                sendToServer: true,
+                usePathfinding: false);
+        }
+
+        private static Vector2 QuantizeJoystickDirection(
+            Vector2 direction)
+        {
+            double angle =
+                System.Math.Atan2(
+                    direction.Y,
+                    direction.X);
+
+            int sector =
+                (int)System.Math.Round(
+                    angle /
+                    (System.Math.PI / 4.0));
+
+            sector =
+                ((sector % 8) + 8) % 8;
+
+            return sector switch
+            {
+                0 => new Vector2(1, 0),
+                1 => new Vector2(1, 1),
+                2 => new Vector2(0, 1),
+                3 => new Vector2(-1, 1),
+                4 => new Vector2(-1, 0),
+                5 => new Vector2(-1, -1),
+                6 => new Vector2(0, -1),
+                7 => new Vector2(1, -1),
+                _ => Vector2.Zero
+            };
+        }
         // ─────────────────────────── Update Loop ───────────────────────────
         public override void Update(GameTime gameTime)
         {
-            bool inventoryOpen = _inventoryControl?.Visible == true;
+            bool inventoryOpen =
+                _inventoryControl?.Visible == true;
+
+            bool pauseOpen =
+                _pauseMenu?.Visible == true;
 
             // Los controles móviles solo se muestran si:
-            // 1) están habilitados en Options, y
-            // 2) el inventario está cerrado.
+            // 1) están habilitados,
+            // 2) inventario cerrado,
+            // 3) menú ESC cerrado.
             bool showMobileControls =
                 Constants.SHOW_MOBILE_CONTROLS &&
-                !inventoryOpen;
+                !inventoryOpen &&
+                !pauseOpen;
                 
             if (_mobileAttackButton != null)
             {
@@ -878,6 +1122,14 @@ namespace Client.Main.Scenes
             if (_mobileTargetPanel != null)
             {
                 _mobileTargetPanel.Visible = showMobileControls;
+            }
+            if (_mobileJoystick != null)
+            {
+                _mobileJoystick.Visible =
+                    showMobileControls;
+
+                _mobileJoystick.SetTouchEnabled(
+                    showMobileControls);
             }
 
             if (_mapController?.IsChangingWorld == true)
@@ -900,14 +1152,22 @@ namespace Client.Main.Scenes
                 ScopeHandler.PumpNpcSpawnQueue(walkableWorld);
             }
 
-            if (World == null || World.Status != GameControlStatus.Ready)
+            if (World == null ||
+                World.Status != GameControlStatus.Ready)
             {
-                _playerMenuController?.ResetOnWorldUnavailable();
-                _skillController?.ClearPending();
+                _playerMenuController?
+                    .ResetOnWorldUnavailable();
+
+                _skillController?
+                    .ClearPending();
+
                 return;
             }
 
-            var uiMouse = MuGame.Instance.UiMouseState;
+            UpdateMobileJoystickMovement();
+
+            var uiMouse =
+                MuGame.Instance.UiMouseState;
             var prevUiMouse = MuGame.Instance.PrevUiMouseState;
             _playerMenuController?.Update(gameTime, currentKeyboardState, uiMouse, prevUiMouse);
             _skillController?.Update();
@@ -1298,6 +1558,14 @@ namespace Client.Main.Scenes
 
         public override void Dispose()
         {
+            // Liberar cualquier touch capturado por los controles móviles.
+            if (_mobileJoystick != null)
+            {
+                _mobileJoystick.SetTouchEnabled(false);
+            }
+
+            TouchInputRouter.Reset();
+
             if (_hero != null)
             {
                 if (_windowCloseController != null)
@@ -1306,6 +1574,7 @@ namespace Client.Main.Scenes
                     _hero.PlayerTookDamage -= _windowCloseController.OnHeroTookDamage;
                 }
             }
+
             base.Dispose();
         }
     }

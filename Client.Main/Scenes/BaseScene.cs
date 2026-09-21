@@ -1,4 +1,5 @@
 ﻿using Client.Main.Controllers;
+using Client.Main.Core.Input;
 using Client.Main.Controls;
 using Client.Main.Controls.UI;
 using Client.Main.Helpers;
@@ -140,27 +141,58 @@ namespace Client.Main.Scenes
             GameControl topmostHoverForTooltip = null;
             GameControl topmostInteractiveForScroll = null;
 
-            // Simulate mouse click by touch input
-            var touchState = MuGame.Instance.Touch;
-            if (touchState.Count > 0)
+            // Simular mouse usando solamente el dedo
+            // asignado a UI / mundo.
+            //
+            // El dedo capturado por el joystick queda
+            // completamente excluido de este sistema.
+            if (TouchInputRouter.TryGetPointerTouch(
+                    out var pointerTouch))
             {
-                var touch = touchState[0];
-                int x = (int)touch.Position.X;
-                int y = (int)touch.Position.Y;
-                bool isTouchDown = touch.State == TouchLocationState.Pressed || touch.State == TouchLocationState.Moved;
+                int x =
+                    (int)pointerTouch.Position.X;
 
-                Mouse.SetPosition(x, y);
+                int y =
+                    (int)pointerTouch.Position.Y;
 
-                MuGame.Instance.Mouse = new MouseState(
-                    x,
-                    y,
-                    0,
-                    isTouchDown ? ButtonState.Pressed : ButtonState.Released,
-                    ButtonState.Released,
-                    ButtonState.Released,
-                    ButtonState.Released,
-                    ButtonState.Released
-                );
+                bool isTouchDown =
+                    pointerTouch.State ==
+                        TouchLocationState.Pressed ||
+                    pointerTouch.State ==
+                        TouchLocationState.Moved;
+
+                MuGame.Instance.Mouse =
+                    new MouseState(
+                        x,
+                        y,
+                        0,
+                        isTouchDown
+                            ? ButtonState.Pressed
+                            : ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released);
+            }
+            else if (OperatingSystem.IsAndroid() ||
+                    OperatingSystem.IsIOS())
+            {
+                // Puede haber un dedo usando el joystick.
+                // Para el mundo, en ese caso, el mouse
+                // debe permanecer RELEASED.
+                var previous =
+                    MuGame.Instance.Mouse;
+
+                MuGame.Instance.Mouse =
+                    new MouseState(
+                        previous.X,
+                        previous.Y,
+                        0,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released,
+                        ButtonState.Released);
             }
 
             for (int i = Controls.Count - 1; i >= 0; i--)
