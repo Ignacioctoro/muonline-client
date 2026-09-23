@@ -1,9 +1,10 @@
 #nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Client.Data.BMD;
+using Client.Main.Controls.UI.Common;
 using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
@@ -12,340 +13,1113 @@ using Microsoft.Xna.Framework;
 namespace Client.Main.Controls.UI.Game.Skills
 {
     /// <summary>
-    /// Popup panel displaying all available skills in a grid layout.
-    /// Allows player to select a skill for the quick slot.
+    /// Main skill management window.
+    ///
+    /// Current behavior:
+    /// - Shows learned skills only.
+    /// - Clicking a skill selects it.
+    /// - Shows skill information at the top.
+    /// - Allows assigning the selected skill to quick slots 1-5.
+    /// - Supports multiple pages for characters with many skills.
+    ///
+    /// Future:
+    /// - Connect quick slots to the actual HUD hotkeys.
+    /// - Show unlearned class skills using disabled icon atlases.
+    /// - Optional drag & drop.
     /// </summary>
     public class SkillSelectionPanel : UIControl
     {
-        private const int COLUMNS = 5;
-        private const int PADDING = 8;
-        private const int HEADER_HEIGHT = 36;
-        private const int DETAIL_WIDTH = 220;
-        private const int DETAIL_PADDING = 12;
+        private const int PANEL_WIDTH = 350;
+        private const int PANEL_HEIGHT = 365;
+
+        private const int PADDING = 12;
+
+        private const int TITLE_HEIGHT = 34;
+
+        private const int INFO_Y = 42;
+        private const int INFO_HEIGHT = 72;
+
+        private const int GRID_Y = 126;
+
+        private const int COLUMNS = 6;
+        private const int ROWS = 3;
+        private const int PAGE_SIZE = COLUMNS * ROWS;
+
+        private const int GRID_GAP_X = 10;
+        private const int GRID_GAP_Y = 8;
+
+        private const int QUICK_AREA_Y = 275;
+        private const int QUICK_SLOT_GAP = 14;
 
         private readonly List<SkillSlotControl> _skillSlots = new();
+
+        private readonly SkillSlotControl[] _quickSlots =
+            new SkillSlotControl[5];
+
+        private readonly LabelControl[] _quickSlotLabels =
+            new LabelControl[5];
+
+        private List<SkillEntryState> _allSkills =
+            new();
+
+        private SkillEntryState? _selectedSkill;
+
         private readonly LabelControl _titleLabel;
-        private readonly UIControl _detailPanel;
-        private readonly LabelControl _detailNameLabel;
-        private readonly LabelControl _detailTypeLabel;
-        private readonly LabelControl _detailStatsLabel;
-        private ushort? _selectedSkillId;
+        private readonly ButtonControl _closeButton;
 
-        private sealed class PanelControl : UIControl { }
+        private readonly UIControl _infoPanel;
+        private readonly LabelControl _skillNameLabel;
+        private readonly LabelControl _skillTypeLabel;
+        private readonly LabelControl _skillCostLabel;
+        private readonly LabelControl _skillStatsLabel;
 
-        /// <summary>
-        /// Fired when a skill is selected from the panel.
-        /// </summary>
-        public event Action<SkillEntryState>? SkillSelected;
+        private readonly ButtonControl _previousPageButton;
+        private readonly ButtonControl _nextPageButton;
+        private readonly LabelControl _pageLabel;
 
-        public SkillSelectionPanel()
+        private readonly LabelControl _quickTitleLabel;
+
+        private int _currentPage;
+        private int _pageCount = 1;
+
+        private sealed class PanelControl : UIControl
         {
-            Interactive = true;
-            BackgroundColor = new Color(20, 20, 30) * 0.95f;
-            BorderColor = Color.Gold;
-            BorderThickness = 2;
-            Visible = false;
-
-            // Center on screen
-            Align = ControlAlign.HorizontalCenter | ControlAlign.VerticalCenter;
-
-            // Title
-            _titleLabel = new LabelControl
-            {
-                Text = "Select Skill",
-                TextColor = Color.Gold,
-                X = PADDING,
-                Y = PADDING,
-                ViewSize = new Point(320, 22),
-                Align = ControlAlign.HorizontalCenter
-            };
-            Controls.Add(_titleLabel);
-
-            _detailPanel = new PanelControl
-            {
-                AutoViewSize = false,
-                ControlSize = new Point(DETAIL_WIDTH, 220),
-                ViewSize = new Point(DETAIL_WIDTH, 220),
-                BackgroundColor = new Color(12, 16, 28) * 0.95f,
-                BorderColor = new Color(70, 70, 110),
-                BorderThickness = 1,
-                Interactive = false
-            };
-            Controls.Add(_detailPanel);
-
-            _detailNameLabel = new LabelControl
-            {
-                Text = "Skill Info",
-                TextColor = Color.White,
-                FontSize = 14f,
-                X = DETAIL_PADDING,
-                Y = DETAIL_PADDING,
-                ViewSize = new Point(DETAIL_WIDTH - DETAIL_PADDING * 2, 24)
-            };
-            _detailPanel.Controls.Add(_detailNameLabel);
-
-            _detailTypeLabel = new LabelControl
-            {
-                Text = string.Empty,
-                TextColor = Color.Gold,
-                FontSize = 12f,
-                X = DETAIL_PADDING,
-                Y = DETAIL_PADDING + 24,
-                ViewSize = new Point(DETAIL_WIDTH - DETAIL_PADDING * 2, 20)
-            };
-            _detailPanel.Controls.Add(_detailTypeLabel);
-
-            _detailStatsLabel = new LabelControl
-            {
-                Text = "Hover a skill to see details.",
-                TextColor = Color.Silver,
-                X = DETAIL_PADDING,
-                Y = DETAIL_PADDING + 46,
-                ViewSize = new Point(DETAIL_WIDTH - DETAIL_PADDING * 2, 150),
-                Scale = 0.85f
-            };
-            _detailPanel.Controls.Add(_detailStatsLabel);
         }
 
         /// <summary>
-        /// Opens the panel and populates it with the character's skills.
+        /// Fired whenever a skill is selected.
+        ///
+        /// SkillQuickSlot already listens to this event,
+        /// so selecting a skill here also updates the
+        /// current active skill.
         /// </summary>
-        public void Open(CharacterState characterState)
+        public event Action<SkillEntryState>? SkillSelected;
+
+        /// <summary>
+        /// Fired whenever one of the five quick slots changes.
+        ///
+        /// Parameters:
+        /// slot index: 0-4
+        /// skill: assigned skill
+        /// </summary>
+        public event Action<int, SkillEntryState>? QuickSlotAssigned;
+
+        public SkillSelectionPanel()
+        {
+            AutoViewSize = false;
+
+            ControlSize =
+                new Point(
+                    PANEL_WIDTH,
+                    PANEL_HEIGHT);
+
+            ViewSize =
+                ControlSize;
+
+            Align =
+                ControlAlign.HorizontalCenter |
+                ControlAlign.VerticalCenter;
+
+            Interactive = true;
+
+            BackgroundColor =
+                new Color(
+                    12,
+                    12,
+                    16) * 0.97f;
+
+            BorderColor =
+                new Color(
+                    135,
+                    105,
+                    45);
+
+            BorderThickness = 2;
+
+            Visible = false;
+
+            // =========================================================
+            // TITLE
+            // =========================================================
+
+            _titleLabel =
+                new LabelControl
+                {
+                    Text = "SKILL",
+
+                    TextColor =
+                        new Color(
+                            225,
+                            205,
+                            150),
+
+                    FontSize = 16f,
+
+                    X = 0,
+                    Y = 8,
+
+                    ViewSize =
+                        new Point(
+                            PANEL_WIDTH,
+                            24),
+
+                    Align =
+                        ControlAlign.HorizontalCenter
+                };
+
+            Controls.Add(
+                _titleLabel);
+
+            _closeButton =
+                new ButtonControl
+                {
+                    Text = "X",
+
+                    FontSize = 11f,
+
+                    X =
+                        PANEL_WIDTH -
+                        34,
+
+                    Y = 6,
+
+                    AutoViewSize = false,
+
+                    ControlSize =
+                        new Point(
+                            26,
+                            24),
+
+                    ViewSize =
+                        new Point(
+                            26,
+                            24),
+
+                    BackgroundColor =
+                        new Color(
+                            40,
+                            30,
+                            25),
+
+                    HoverBackgroundColor =
+                        new Color(
+                            90,
+                            45,
+                            30),
+
+                    PressedBackgroundColor =
+                        new Color(
+                            110,
+                            50,
+                            30),
+
+                    TextColor =
+                        Color.Silver,
+
+                    HoverTextColor =
+                        Color.White
+                };
+
+            _closeButton.Click +=
+                (_, _) =>
+                {
+                    Close();
+                };
+
+            Controls.Add(
+                _closeButton);
+
+            // =========================================================
+            // SKILL INFORMATION
+            // =========================================================
+
+            _infoPanel =
+                new PanelControl
+                {
+                    AutoViewSize = false,
+
+                    X = PADDING,
+                    Y = INFO_Y,
+
+                    ControlSize =
+                        new Point(
+                            PANEL_WIDTH -
+                            PADDING * 2,
+                            INFO_HEIGHT),
+
+                    ViewSize =
+                        new Point(
+                            PANEL_WIDTH -
+                            PADDING * 2,
+                            INFO_HEIGHT),
+
+                    BackgroundColor =
+                        new Color(
+                            18,
+                            18,
+                            20) * 0.96f,
+
+                    BorderColor =
+                        new Color(
+                            95,
+                            80,
+                            50),
+
+                    BorderThickness = 1,
+
+                    Interactive = false
+                };
+
+            Controls.Add(
+                _infoPanel);
+
+            _skillNameLabel =
+                new LabelControl
+                {
+                    Text =
+                        "Selecciona una skill",
+
+                    TextColor =
+                        Color.White,
+
+                    FontSize = 13f,
+
+                    X = 10,
+                    Y = 7,
+
+                    ViewSize =
+                        new Point(
+                            300,
+                            20)
+                };
+
+            _infoPanel.Controls.Add(
+                _skillNameLabel);
+
+            _skillTypeLabel =
+                new LabelControl
+                {
+                    Text =
+                        string.Empty,
+
+                    TextColor =
+                        new Color(
+                            215,
+                            180,
+                            80),
+
+                    FontSize = 9f,
+
+                    X = 10,
+                    Y = 28,
+
+                    ViewSize =
+                        new Point(
+                            145,
+                            16)
+                };
+
+            _infoPanel.Controls.Add(
+                _skillTypeLabel);
+
+            _skillCostLabel =
+                new LabelControl
+                {
+                    Text =
+                        string.Empty,
+
+                    TextColor =
+                        Color.Silver,
+
+                    FontSize = 9f,
+
+                    X = 10,
+                    Y = 47,
+
+                    ViewSize =
+                        new Point(
+                            150,
+                            16)
+                };
+
+            _infoPanel.Controls.Add(
+                _skillCostLabel);
+
+            _skillStatsLabel =
+                new LabelControl
+                {
+                    Text =
+                        string.Empty,
+
+                    TextColor =
+                        Color.Silver,
+
+                    FontSize = 9f,
+
+                    X = 165,
+                    Y = 47,
+
+                    ViewSize =
+                        new Point(
+                            145,
+                            16)
+                };
+
+            _infoPanel.Controls.Add(
+                _skillStatsLabel);
+
+            // =========================================================
+            // PAGINATION
+            // =========================================================
+
+            _previousPageButton =
+                new ButtonControl
+                {
+                    Text = "<",
+
+                    FontSize = 11f,
+
+                    AutoViewSize = false,
+
+                    ControlSize =
+                        new Point(
+                            28,
+                            22),
+
+                    ViewSize =
+                        new Point(
+                            28,
+                            22),
+
+                    X = 105,
+                    Y = 242,
+
+                    BackgroundColor =
+                        new Color(
+                            30,
+                            28,
+                            24),
+
+                    HoverBackgroundColor =
+                        new Color(
+                            70,
+                            55,
+                            30),
+
+                    TextColor =
+                        Color.Silver,
+
+                    HoverTextColor =
+                        Color.White
+                };
+
+            _previousPageButton.Click +=
+                (_, _) =>
+                {
+                    ChangePage(
+                        _currentPage - 1);
+                };
+
+            Controls.Add(
+                _previousPageButton);
+
+            _nextPageButton =
+                new ButtonControl
+                {
+                    Text = ">",
+
+                    FontSize = 11f,
+
+                    AutoViewSize = false,
+
+                    ControlSize =
+                        new Point(
+                            28,
+                            22),
+
+                    ViewSize =
+                        new Point(
+                            28,
+                            22),
+
+                    X = 217,
+                    Y = 242,
+
+                    BackgroundColor =
+                        new Color(
+                            30,
+                            28,
+                            24),
+
+                    HoverBackgroundColor =
+                        new Color(
+                            70,
+                            55,
+                            30),
+
+                    TextColor =
+                        Color.Silver,
+
+                    HoverTextColor =
+                        Color.White
+                };
+
+            _nextPageButton.Click +=
+                (_, _) =>
+                {
+                    ChangePage(
+                        _currentPage + 1);
+                };
+
+            Controls.Add(
+                _nextPageButton);
+
+            _pageLabel =
+                new LabelControl
+                {
+                    Text = "1 / 1",
+
+                    TextColor =
+                        new Color(
+                            190,
+                            165,
+                            95),
+
+                    FontSize = 9f,
+
+                    X = 155,
+                    Y = 246,
+
+                    ViewSize =
+                        new Point(
+                            50,
+                            16),
+
+                    Align =
+                        ControlAlign.HorizontalCenter
+                };
+
+            Controls.Add(
+                _pageLabel);
+
+            // =========================================================
+            // QUICK SLOTS
+            // =========================================================
+
+            _quickTitleLabel =
+                new LabelControl
+                {
+                    Text =
+                        "ACCESOS RAPIDOS",
+
+                    TextColor =
+                        new Color(
+                            185,
+                            165,
+                            110),
+
+                    FontSize = 9f,
+
+                    X = PADDING,
+                    Y = QUICK_AREA_Y,
+
+                    ViewSize =
+                        new Point(
+                            PANEL_WIDTH -
+                            PADDING * 2,
+                            18),
+
+                    Align =
+                        ControlAlign.HorizontalCenter
+                };
+
+            Controls.Add(
+                _quickTitleLabel);
+
+            CreateQuickSlots();
+        }
+
+        // =============================================================
+        // OPEN / CLOSE
+        // =============================================================
+
+        public void Open(
+            CharacterState characterState)
         {
             if (characterState == null)
                 return;
 
-            var skills = characterState
-                .GetSkills()
-                .OrderBy(s => SkillDatabase.GetSkillName(s.SkillId))
-                .ThenBy(s => s.SkillId)
-                .ToList();
+            _allSkills =
+                characterState
+                    .GetSkills()
+                    .OrderBy(
+                        skill =>
+                            skill.SkillId)
+                    .ToList();
 
-            // Update title with skill count
-            _titleLabel.Text = $"Select Skill ({skills.Count} available)";
+            _pageCount =
+                Math.Max(
+                    1,
+                    (int)Math.Ceiling(
+                        _allSkills.Count /
+                        (float)PAGE_SIZE));
 
-            // Clear existing skill slots
-            foreach (var slot in _skillSlots)
+            _currentPage =
+                Math.Clamp(
+                    _currentPage,
+                    0,
+                    _pageCount - 1);
+
+            // If no skill has been selected yet,
+            // use the first learned skill.
+            if (_selectedSkill == null)
             {
-                slot.HoverChanged -= OnSkillSlotHover;
-                Controls.Remove(slot);
-            }
-            _skillSlots.Clear();
-
-            // Calculate panel size
-            int rows = (int)Math.Ceiling(skills.Count / (float)COLUMNS);
-            if (rows == 0) rows = 1; // At least one row even if no skills
-
-            int gridWidth = (COLUMNS * SkillSlotControl.SLOT_WIDTH) + ((COLUMNS + 1) * PADDING);
-            int gridHeight = HEADER_HEIGHT + PADDING + (rows * (SkillSlotControl.SLOT_HEIGHT + PADDING)) + PADDING;
-
-            int totalWidth = gridWidth + DETAIL_WIDTH + (PADDING * 3);
-            int totalHeight = gridHeight + PADDING;
-
-            ViewSize = new Point(totalWidth, totalHeight);
-            ControlSize = ViewSize;
-
-            _titleLabel.ViewSize = new Point(totalWidth - (PADDING * 2), 24);
-            _titleLabel.X = PADDING;
-
-            // Create skill slots in grid
-            for (int i = 0; i < skills.Count; i++)
-            {
-                int row = i / COLUMNS;
-                int col = i % COLUMNS;
-
-                var slot = new SkillSlotControl
-                {
-                    Skill = skills[i],
-                    X = PADDING + (col * (SkillSlotControl.SLOT_WIDTH + PADDING)),
-                    Y = HEADER_HEIGHT + PADDING + (row * (SkillSlotControl.SLOT_HEIGHT + PADDING)),
-                    IsTooltipEnabled = false
-                };
-
-                slot.Click += (sender, args) => OnSkillSlotClicked(slot);
-                slot.HoverChanged += OnSkillSlotHover;
-                slot.IsSelected = _selectedSkillId.HasValue && slot.Skill?.SkillId == _selectedSkillId.Value;
-                _skillSlots.Add(slot);
-                Controls.Add(slot);
-            }
-
-            // Position detail panel
-            int detailHeight = Math.Max(gridHeight - HEADER_HEIGHT - (PADDING * 2), 160);
-            _detailPanel.X = gridWidth + (PADDING * 2);
-            _detailPanel.Y = HEADER_HEIGHT;
-            _detailPanel.ControlSize = new Point(DETAIL_WIDTH, detailHeight);
-            _detailPanel.ViewSize = _detailPanel.ControlSize;
-
-            int statsHeight = Math.Max(detailHeight - (DETAIL_PADDING + 46), 40);
-            _detailStatsLabel.ViewSize = new Point(DETAIL_WIDTH - DETAIL_PADDING * 2, statsHeight);
-
-            if (_selectedSkillId.HasValue)
-            {
-                HighlightSkill(_selectedSkillId.Value);
+                _selectedSkill =
+                    _allSkills
+                        .FirstOrDefault();
             }
             else
             {
-                UpdateDetail(skills.FirstOrDefault());
+                // Refresh the reference in case
+                // the server updated the skill list.
+                _selectedSkill =
+                    _allSkills
+                        .FirstOrDefault(
+                            skill =>
+                                skill.SkillId ==
+                                _selectedSkill.SkillId)
+                    ??
+                    _allSkills.FirstOrDefault();
             }
+
+            // Open on the page containing
+            // the currently selected skill.
+            if (_selectedSkill != null)
+            {
+                int selectedIndex =
+                    _allSkills.FindIndex(
+                        skill =>
+                            skill.SkillId ==
+                            _selectedSkill.SkillId);
+
+                if (selectedIndex >= 0)
+                {
+                    _currentPage =
+                        selectedIndex /
+                        PAGE_SIZE;
+                }
+            }
+
+            RebuildSkillGrid();
+
+            UpdateSkillInfo(
+                _selectedSkill);
 
             Visible = true;
             BringToFront();
         }
 
-        /// <summary>
-        /// Closes the panel.
-        /// </summary>
         public void Close()
         {
             Visible = false;
         }
 
-        private void OnSkillSlotClicked(SkillSlotControl slot)
+        // =============================================================
+        // SKILL GRID
+        // =============================================================
+
+        private void RebuildSkillGrid()
         {
-            if (slot.Skill == null)
-                return;
+            ClearSkillGrid();
 
-            _selectedSkillId = slot.Skill.SkillId;
-            SkillSelected?.Invoke(slot.Skill);
-            Close();
-        }
+            List<SkillEntryState> pageSkills =
+                _allSkills
+                    .Skip(
+                        _currentPage *
+                        PAGE_SIZE)
+                    .Take(
+                        PAGE_SIZE)
+                    .ToList();
 
-        public void HighlightSkill(ushort skillId)
-        {
-            _selectedSkillId = skillId;
+            int gridWidth =
+                COLUMNS *
+                SkillSlotControl.SLOT_WIDTH
+                +
+                (COLUMNS - 1) *
+                GRID_GAP_X;
 
-            SkillEntryState? selected = null;
-            foreach (var slot in _skillSlots)
+            int startX =
+                (PANEL_WIDTH -
+                 gridWidth) / 2;
+
+            for (int i = 0;
+                 i < pageSkills.Count;
+                 i++)
             {
-                bool isMatch = slot.Skill?.SkillId == skillId;
-                slot.IsSelected = isMatch;
-                if (isMatch)
-                {
-                    selected = slot.Skill;
-                }
+                int row =
+                    i / COLUMNS;
+
+                int column =
+                    i % COLUMNS;
+
+                SkillEntryState skill =
+                    pageSkills[i];
+
+                var slot =
+                    new SkillSlotControl
+                    {
+                        Skill =
+                            skill,
+
+                        X =
+                            startX +
+                            column *
+                            (
+                                SkillSlotControl.SLOT_WIDTH +
+                                GRID_GAP_X
+                            ),
+
+                        Y =
+                            GRID_Y +
+                            row *
+                            (
+                                SkillSlotControl.SLOT_HEIGHT +
+                                GRID_GAP_Y
+                            ),
+
+                        IsTooltipEnabled =
+                            false,
+
+                        IsSelected =
+                            _selectedSkill != null &&
+                            _selectedSkill.SkillId ==
+                            skill.SkillId
+                    };
+
+                slot.Click +=
+                    (_, _) =>
+                    {
+                        SelectSkill(
+                            skill);
+                    };
+
+                slot.HoverChanged +=
+                    OnSkillHover;
+
+                _skillSlots.Add(
+                    slot);
+
+                Controls.Add(
+                    slot);
             }
 
-            UpdateDetail(selected);
+            bool multiplePages =
+                _pageCount > 1;
+
+            _previousPageButton.Visible =
+                multiplePages;
+
+            _nextPageButton.Visible =
+                multiplePages;
+
+            _pageLabel.Visible =
+                multiplePages;
+
+            _previousPageButton.Enabled =
+                _currentPage > 0;
+
+            _nextPageButton.Enabled =
+                _currentPage <
+                _pageCount - 1;
+
+            _pageLabel.Text =
+                $"{_currentPage + 1} / {_pageCount}";
         }
 
-        private void OnSkillSlotHover(SkillEntryState? skill)
+        private void ClearSkillGrid()
         {
-            if (!_selectedSkillId.HasValue)
+            foreach (
+                SkillSlotControl slot
+                in _skillSlots)
             {
-                UpdateDetail(skill);
-                return;
+                slot.HoverChanged -=
+                    OnSkillHover;
+
+                Controls.Remove(
+                    slot);
             }
 
+            _skillSlots.Clear();
+        }
+
+        private void SelectSkill(
+            SkillEntryState skill)
+        {
+            _selectedSkill =
+                skill;
+
+            foreach (
+                SkillSlotControl slot
+                in _skillSlots)
+            {
+                slot.IsSelected =
+                    slot.Skill?.SkillId ==
+                    skill.SkillId;
+            }
+
+            UpdateSkillInfo(
+                skill);
+
+            // Keep current active skill behavior.
+            SkillSelected?.Invoke(
+                skill);
+        }
+
+        private void OnSkillHover(
+            SkillEntryState? skill)
+        {
             if (skill != null)
             {
-                UpdateDetail(skill);
+                UpdateSkillInfo(
+                    skill);
                 return;
             }
 
-            var selectedSlot = _skillSlots.FirstOrDefault(s => s.Skill?.SkillId == _selectedSkillId);
-            UpdateDetail(selectedSlot?.Skill);
+            UpdateSkillInfo(
+                _selectedSkill);
         }
 
-        private void UpdateDetail(SkillEntryState? skill)
+        // =============================================================
+        // SKILL INFO
+        // =============================================================
+
+        private void UpdateSkillInfo(
+            SkillEntryState? skill)
         {
             if (skill == null)
             {
-                _detailNameLabel.Text = "Skill Info";
-                _detailTypeLabel.Text = string.Empty;
-                _detailStatsLabel.Text = "Hover a skill to see details.";
-                _detailStatsLabel.TextColor = Color.Silver;
+                _skillNameLabel.Text =
+                    "Sin skills";
+
+                _skillTypeLabel.Text =
+                    string.Empty;
+
+                _skillCostLabel.Text =
+                    string.Empty;
+
+                _skillStatsLabel.Text =
+                    string.Empty;
+
                 return;
             }
 
-            var definition = SkillDatabase.GetSkillDefinition(skill.SkillId);
-            var type = SkillDatabase.GetSkillType(skill.SkillId);
+            SkillBMD? definition =
+                SkillDatabase
+                    .GetSkillDefinition(
+                        skill.SkillId);
 
-            string typeText = type switch
+            SkillType type =
+                SkillDatabase
+                    .GetSkillType(
+                        skill.SkillId);
+
+            string typeText =
+                type switch
+                {
+                    SkillType.Area =>
+                        "Area",
+
+                    SkillType.Self =>
+                        "Self",
+
+                    _ =>
+                        "Target"
+                };
+
+            _skillNameLabel.Text =
+                SkillDatabase.GetSkillName(
+                    skill.SkillId);
+
+            _skillTypeLabel.Text =
+                typeText;
+
+            if (definition == null)
             {
-                SkillType.Area => "Area",
-                SkillType.Self => "Self",
-                _ => "Target"
-            };
+                _skillCostLabel.Text =
+                    string.Empty;
 
-            _detailNameLabel.Text = SkillDatabase.GetSkillName(skill.SkillId);
-            _detailTypeLabel.Text = $"Type: {typeText}  •  Level {skill.SkillLevel}";
+                _skillStatsLabel.Text =
+                    string.Empty;
 
-            var sb = new StringBuilder();
-            sb.AppendLine($"Skill ID: {skill.SkillId}");
-
-            if (definition != null)
-            {
-                if (definition.RequiredLevel > 0)
-                {
-                    sb.AppendLine($"Required Level: {definition.RequiredLevel}");
-                }
-                if (definition.RequiredStrength > 0)
-                {
-                    sb.AppendLine($"Required Strength: {definition.RequiredStrength}");
-                }
-                if (definition.RequiredDexterity > 0)
-                {
-                    sb.AppendLine($"Required Dexterity: {definition.RequiredDexterity}");
-                }
-                if (definition.RequiredEnergy > 0)
-                {
-                    sb.AppendLine($"Required Energy: {definition.RequiredEnergy}");
-                }
-                if (definition.RequiredLeadership > 0)
-                {
-                    sb.AppendLine($"Required Command: {definition.RequiredLeadership}");
-                }
-
-                if (definition.ManaCost > 0 || definition.AbilityGaugeCost > 0)
-                {
-                    sb.Append("Cost: ");
-                    if (definition.ManaCost > 0)
-                    {
-                        sb.Append($"Mana {definition.ManaCost}");
-                    }
-                    if (definition.AbilityGaugeCost > 0)
-                    {
-                        if (definition.ManaCost > 0)
-                        {
-                            sb.Append(" | ");
-                        }
-                        sb.Append($"AG {definition.AbilityGaugeCost}");
-                    }
-                    sb.AppendLine();
-                }
-
-                if (definition.Damage > 0)
-                {
-                    sb.AppendLine($"Base Damage: {definition.Damage}");
-                }
-                if (definition.Distance > 0)
-                {
-                    sb.AppendLine($"Range: {definition.Distance}");
-                }
-                if (definition.Delay > 0)
-                {
-                    sb.AppendLine($"Cooldown: {definition.Delay} ms");
-                }
+                return;
             }
 
-            if (sb.Length == 0)
+            string costText =
+                string.Empty;
+
+            if (definition.ManaCost > 0)
             {
-                sb.Append("No additional data available.");
+                costText =
+                    $"Mana: {definition.ManaCost}";
             }
 
-            _detailStatsLabel.Text = sb.ToString();
-            _detailStatsLabel.TextColor = Color.WhiteSmoke;
+            if (definition.AbilityGaugeCost > 0)
+            {
+                if (!string.IsNullOrEmpty(
+                    costText))
+                {
+                    costText +=
+                        "   ";
+                }
+
+                costText +=
+                    $"AG: {definition.AbilityGaugeCost}";
+            }
+
+            _skillCostLabel.Text =
+                costText;
+
+            string statsText =
+                string.Empty;
+
+            if (definition.Damage > 0)
+            {
+                statsText =
+                    $"Daño: {definition.Damage}";
+            }
+
+            if (definition.Distance > 0)
+            {
+                if (!string.IsNullOrEmpty(
+                    statsText))
+                {
+                    statsText +=
+                        "   ";
+                }
+
+                statsText +=
+                    $"Rango: {definition.Distance}";
+            }
+
+            _skillStatsLabel.Text =
+                statsText;
         }
 
-        public override void Update(GameTime gameTime)
-        {
-            base.Update(gameTime);
+        // =============================================================
+        // QUICK SLOTS
+        // =============================================================
 
-            // Close on click outside (optional - can be enabled if desired)
-            // if (Visible && !IsMouseOver && CurrentMouseState.LeftButton == ButtonState.Pressed)
-            // {
-            //     Close();
-            // }
+        private void CreateQuickSlots()
+        {
+            int totalWidth =
+                5 *
+                SkillSlotControl.SLOT_WIDTH
+                +
+                4 *
+                QUICK_SLOT_GAP;
+
+            int startX =
+                (PANEL_WIDTH -
+                 totalWidth) / 2;
+
+            for (int i = 0;
+                 i < 5;
+                 i++)
+            {
+                int slotIndex =
+                    i;
+
+                var quickSlot =
+                    new SkillSlotControl
+                    {
+                        X =
+                            startX +
+                            i *
+                            (
+                                SkillSlotControl.SLOT_WIDTH +
+                                QUICK_SLOT_GAP
+                            ),
+
+                        Y =
+                            QUICK_AREA_Y +
+                            24,
+
+                        Skill = null,
+
+                        IsSelected = false,
+
+                        IsTooltipEnabled = false
+                    };
+
+                quickSlot.Click +=
+                    (_, _) =>
+                    {
+                        AssignSelectedSkillToQuickSlot(
+                            slotIndex);
+                    };
+
+                _quickSlots[i] =
+                    quickSlot;
+
+                Controls.Add(
+                    quickSlot);
+
+                var numberLabel =
+                    new LabelControl
+                    {
+                        Text =
+                            (i + 1)
+                            .ToString(),
+
+                        TextColor =
+                            new Color(
+                                190,
+                                170,
+                                115),
+
+                        FontSize = 9f,
+
+                        X =
+                            quickSlot.X,
+
+                        Y =
+                            quickSlot.Y +
+                            SkillSlotControl.SLOT_HEIGHT +
+                            2,
+
+                        ViewSize =
+                            new Point(
+                                SkillSlotControl.SLOT_WIDTH,
+                                14),
+
+                        Align =
+                            ControlAlign.HorizontalCenter
+                    };
+
+                _quickSlotLabels[i] =
+                    numberLabel;
+
+                Controls.Add(
+                    numberLabel);
+            }
+        }
+
+        private void AssignSelectedSkillToQuickSlot(
+            int slotIndex)
+        {
+            if (_selectedSkill == null)
+                return;
+
+            if (slotIndex < 0 ||
+                slotIndex >=
+                _quickSlots.Length)
+            {
+                return;
+            }
+
+            _quickSlots[slotIndex].Skill =
+                _selectedSkill;
+
+            QuickSlotAssigned?.Invoke(
+                slotIndex,
+                _selectedSkill);
+        }
+
+        /// <summary>
+        /// Allows another control to initialize or refresh
+        /// one of the five quick slots later.
+        /// </summary>
+        public void SetQuickSlot(
+            int slotIndex,
+            SkillEntryState? skill)
+        {
+            if (slotIndex < 0 ||
+                slotIndex >=
+                _quickSlots.Length)
+            {
+                return;
+            }
+
+            _quickSlots[slotIndex].Skill =
+                skill;
+        }
+
+        // =============================================================
+        // PAGE MANAGEMENT
+        // =============================================================
+
+        private void ChangePage(
+            int newPage)
+        {
+            newPage =
+                Math.Clamp(
+                    newPage,
+                    0,
+                    _pageCount - 1);
+
+            if (newPage ==
+                _currentPage)
+            {
+                return;
+            }
+
+            _currentPage =
+                newPage;
+
+            RebuildSkillGrid();
+        }
+
+        // =============================================================
+        // EXISTING API
+        // =============================================================
+
+        public void HighlightSkill(
+            ushort skillId)
+        {
+            SkillEntryState? skill =
+                _allSkills
+                    .FirstOrDefault(
+                        entry =>
+                            entry.SkillId ==
+                            skillId);
+
+            if (skill == null)
+            {
+                // The panel may not have been opened yet.
+                // Keep only the visual update for existing slots.
+                foreach (
+                    SkillSlotControl slot
+                    in _skillSlots)
+                {
+                    slot.IsSelected =
+                        slot.Skill?.SkillId ==
+                        skillId;
+                }
+
+                return;
+            }
+
+            _selectedSkill =
+                skill;
+
+            foreach (
+                SkillSlotControl slot
+                in _skillSlots)
+            {
+                slot.IsSelected =
+                    slot.Skill?.SkillId ==
+                    skillId;
+            }
+
+            UpdateSkillInfo(
+                skill);
+        }
+
+        public override void Update(
+            GameTime gameTime)
+        {
+            base.Update(
+                gameTime);
         }
     }
 }

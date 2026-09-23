@@ -47,7 +47,7 @@ namespace Client.Main.Scenes
             progressCallback?.Invoke("Preparing configuration fields...", 0.5f);
 
             string defaultHost = MuGame.AppSettings?.ConnectServerHost ?? "127.0.0.1";
-            int defaultPort = MuGame.AppSettings?.ConnectServerPort ?? 44405;
+            int defaultPort = MuGame.AppSettings?.ConnectServerPort ?? 44406;
             _dialog.SetValues(defaultHost, defaultPort.ToString());
 
             progressCallback?.Invoke("UI ready", 1f);

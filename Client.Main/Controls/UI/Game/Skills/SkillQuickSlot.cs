@@ -34,15 +34,41 @@ namespace Client.Main.Controls.UI.Game.Skills
             Interactive = true;
 
             // Current skill display
+            float slotScale =
+                SLOT_SIZE /
+                (float)SkillSlotControl.SLOT_HEIGHT;
+
+            int scaledWidth =
+                (int)(
+                    SkillSlotControl.SLOT_WIDTH *
+                    slotScale);
+
+            int scaledHeight =
+                (int)(
+                    SkillSlotControl.SLOT_HEIGHT *
+                    slotScale);
+
+            // Fine tuning for the center hole of the HUD.
+            // Negative X = move left
+            // Positive Y = move down
+            const int HORIZONTAL_NUDGE = -20;
+            const int VERTICAL_NUDGE = 20;
+
             _currentSkillSlot = new SkillSlotControl
             {
-                X = 4,
-                Y = 2,
-                IsSelected = true,
-                Skill = null // Explicitly start with no skill
+                IsSelected = false,
+                Skill = null,
+                Scale = slotScale
             };
-            // Scale it up to fit our slot
-            _currentSkillSlot.Scale = SLOT_SIZE / (float)SkillSlotControl.SLOT_HEIGHT;
+
+            _currentSkillSlot.X =
+                ((ViewSize.X - scaledWidth) / 2) +
+                HORIZONTAL_NUDGE;
+
+            _currentSkillSlot.Y =
+                ((SLOT_SIZE - scaledHeight) / 2) +
+                VERTICAL_NUDGE;
+
             Controls.Add(_currentSkillSlot);
 
             // Hint label - compact
@@ -96,7 +122,7 @@ namespace Client.Main.Controls.UI.Game.Skills
             _currentSkillSlot.Skill = skill;
 
             // Force display update
-            _currentSkillSlot.IsSelected = true;
+            _currentSkillSlot.IsSelected = false;
 
             if (skill != null)
             {
@@ -110,6 +136,15 @@ namespace Client.Main.Controls.UI.Game.Skills
                 // _hintLabel.Text = "";
                 // _hintLabel.TextColor = Color.Gray;
             }
+        }
+        public void SelectSkill(
+            SkillEntryState skill)
+        {
+            if (skill == null)
+                return;
+
+            OnSkillSelectedFromPanel(
+                skill);
         }
 
         public override bool OnClick()

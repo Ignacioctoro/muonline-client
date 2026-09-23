@@ -548,6 +548,24 @@ namespace Client.Main.Scenes
             _skillQuickSlot = new Controls.UI.Game.Skills.SkillQuickSlot(MuGame.Network.GetCharacterState());
             _skillQuickSlot.SetSelectionPanel(_skillSelectionPanel); // Connect panel
             Controls.Add(_skillQuickSlot);
+            // Cuando se asigna una skill desde el menú SKILL,
+            // reflejarla en los slots 1-5 del HUD.
+            _skillSelectionPanel.QuickSlotAssigned +=
+                (slotIndex, skill) =>
+                {
+                    _main.SkillHotkeys.SetSkill(
+                        slotIndex,
+                        skill);
+                };
+
+            // Click / touch sobre un skill del HUD:
+            // convertirlo en la skill activa.
+            _main.SkillHotkeys.SkillClicked +=
+                (slotIndex, skill) =>
+                {
+                    _skillQuickSlot.SelectSkill(
+                        skill);
+                };
             _skillQuickSlot.BringToFront();
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
 
@@ -942,8 +960,10 @@ namespace Client.Main.Scenes
                 _chatInput,
                 _chatLog,
                 _objectEditorController,
+                _skillQuickSlot,
+                _main.SkillHotkeys,
+                _main,
                 _logger);
-
             try
             {
                 _backgroundTexture = MuGame.Instance.Content.Load<Texture2D>("Background");

@@ -1,5 +1,6 @@
 using Client.Main.Graphics;
 using Client.Main.Models;
+using System;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -51,7 +52,8 @@ namespace Client.Main.Controls.UI.Login
             base.Update(gameTime);
 
             Interactive = Available;
-            _status.TileWidth = 167 * Gauge;
+            _status.TileWidth =
+                Math.Max(1, 167 * Gauge / 100);
             _status.Visible = Gauge > 0;
 
             if (!Available)

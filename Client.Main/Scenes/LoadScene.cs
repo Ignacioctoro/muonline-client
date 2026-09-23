@@ -11,6 +11,7 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Client.Main.Content;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -243,6 +244,8 @@ namespace Client.Main.Scenes
                 await GateDataManager.Instance.LoadData();
                 await SkillDatabase.Initialize();
 
+                await PlayerIdlePoseProvider.EnsureLoadedAsync();
+
                 await TransitionToNextSceneAsync(ct);
             }
             catch (OperationCanceledException)
@@ -316,9 +319,33 @@ namespace Client.Main.Scenes
             });
 
             await ExtractZipWithProgressAsync(localZip, extractPath, ct);
+            TextureLoader.Instance.ClearFailedLoads();
+            ValidateExtractedData(extractPath);
 
             UpdateProgress(p => p.StatusText = "Cleaning up...");
             SafeDeleteFile(localZip);
+        }
+        private static void ValidateExtractedData(
+            string dataPath)
+        {
+            string[] requiredFiles =
+            {
+                "Gate.bmd",
+                "Player/Player.bmd"
+            };
+
+            foreach (string relativePath in requiredFiles)
+            {
+                string fullPath =
+                    Path.Combine(dataPath, relativePath);
+
+                if (!File.Exists(fullPath))
+                {
+                    throw new FileNotFoundException(
+                        $"Required game asset was not extracted: {relativePath}",
+                        fullPath);
+                }
+            }
         }
 
         private async Task TransitionToNextSceneAsync(CancellationToken ct)
@@ -736,11 +763,15 @@ namespace Client.Main.Scenes
 
                     try
                     {
-                        entry.ExtractToFile(fullPath, overwrite: true);
+                        entry.ExtractToFile(
+                            fullPath,
+                            overwrite: true);
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[Extract] Failed: {entry.Name} - {ex.Message}");
+                        throw new IOException(
+                            $"Failed to extract '{entry.FullName}' to '{fullPath}'.",
+                            ex);
                     }
 
                     processed++;

@@ -1,5 +1,7 @@
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Game;
+using Client.Main.Controls.UI.Game.Hud;
+using Client.Main.Controls.UI.Game.Skills;
 using Client.Main.Controllers;
 using Client.Main.Models;
 using Microsoft.Xna.Framework.Input;
@@ -25,6 +27,9 @@ namespace Client.Main.Scenes
         private readonly ChatInputBoxControl _chatInput;
         private readonly ChatLogWindow _chatLog;
         private readonly GameSceneObjectEditorController _objectEditorController;
+        private readonly SkillQuickSlot _skillQuickSlot;
+        private readonly SkillHotkeyHudControl _skillHotkeys;
+        private readonly MainControl _mainControl;
         private readonly ILogger _logger;
 
         private readonly HotkeySet _global;
@@ -40,6 +45,9 @@ namespace Client.Main.Scenes
             ChatInputBoxControl chatInput,
             ChatLogWindow chatLog,
             GameSceneObjectEditorController objectEditorController,
+            SkillQuickSlot skillQuickSlot,
+            SkillHotkeyHudControl skillHotkeys,
+             MainControl mainControl,
             ILogger logger = null)
         {
             _scene = scene;
@@ -51,10 +59,20 @@ namespace Client.Main.Scenes
             _chatInput = chatInput;
             _chatLog = chatLog;
             _objectEditorController = objectEditorController;
+
+            _skillQuickSlot = skillQuickSlot;
+            _skillHotkeys = skillHotkeys;
+            _mainControl = mainControl;
+
             _logger = logger ?? NullLogger.Instance;
 
-            _global = new HotkeySet(_logger, "GameScene.Global");
-            _inWorld = new HotkeySet(_logger, "GameScene.InWorld");
+            _global = new HotkeySet(
+                _logger,
+                "GameScene.Global");
+
+            _inWorld = new HotkeySet(
+                _logger,
+                "GameScene.InWorld");
 
             RegisterGlobalHotkeys(_global);
             RegisterInWorldHotkeys(_inWorld);
@@ -203,6 +221,50 @@ namespace Client.Main.Scenes
                 Keys.R,
                 HotkeyModifiers.Control,
                 context => AssignItemHotkey(Keys.R),
+                exactModifiers: true);
+            // ---------------------------------------------------------
+            // SKILL HOTKEYS 1-5
+            //
+            // MU clásico:
+            // 1-5 seleccionan el skill asignado al slot correspondiente.
+            //
+            // Usamos exactamente el mismo estado del HUD,
+            // así PC y Android comparten la misma lógica.
+            // ---------------------------------------------------------
+
+            hotkeys.OnKeyPressed(
+                Keys.D1,
+                HotkeyModifiers.None,
+                context => SelectSkillHotkey(0),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D2,
+                HotkeyModifiers.None,
+                context => SelectSkillHotkey(1),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D3,
+                HotkeyModifiers.None,
+                context => SelectSkillHotkey(2),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D4,
+                HotkeyModifiers.None,
+                context => SelectSkillHotkey(3),
+                when: WhenNotUiInput,
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D5,
+                HotkeyModifiers.None,
+                context => SelectSkillHotkey(4),
+                when: WhenNotUiInput,
                 exactModifiers: true);
 
             // Space bar to pick up nearest item in range
@@ -374,6 +436,25 @@ namespace Client.Main.Scenes
             }
 
             _chatInput.Show();
+        }
+        private void SelectSkillHotkey(int slotIndex)
+        {
+            if (_skillHotkeys == null ||
+                _skillQuickSlot == null)
+            {
+                return;
+            }
+
+            var skill =
+                _skillHotkeys.GetSkill(slotIndex);
+
+            if (skill == null)
+                return;
+
+            _skillQuickSlot.SelectSkill(skill);
+
+            _mainControl?.SetSelectedSkillHotkey(
+                slotIndex);
         }
 
         private void ActivateBlendingEditor(HotkeyContext context)

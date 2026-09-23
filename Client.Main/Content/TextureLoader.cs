@@ -385,6 +385,40 @@ namespace Client.Main.Content
                 texture.LastAccessUtc = DateTime.UtcNow;
             }
         }
+        public void ClearFailedLoads()
+        {
+            foreach (var pair in _textureTasks.ToArray())
+            {
+                var task = pair.Value;
+
+                if (!task.IsValueCreated)
+                {
+                    continue;
+                }
+
+                var completedTask = task.Value;
+
+                if (completedTask.IsCompletedSuccessfully &&
+                    completedTask.Result != null)
+                {
+                    continue;
+                }
+
+                _textureTasks.TryRemove(
+                    pair.Key,
+                    out _);
+            }
+
+            foreach (var pair in _pathResolutionCache.ToArray())
+            {
+                if (string.IsNullOrEmpty(pair.Value))
+                {
+                    _pathResolutionCache.TryRemove(
+                        pair.Key,
+                        out _);
+                }
+            }
+        }
 
         private async Task CleanupLoopAsync(CancellationToken token)
         {
