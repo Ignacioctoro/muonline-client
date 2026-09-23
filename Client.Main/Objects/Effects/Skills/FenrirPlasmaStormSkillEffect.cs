@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using Client.Main.Controllers;
 using Client.Main.Core.Utilities;
 using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
@@ -44,6 +45,27 @@ namespace Client.Main.Objects.Effects.Skills
             if (!IsFenrir(fenrirIndex))
             {
                 return null;
+            }
+            //
+            // Original MU:
+            // PlayBuffer(SOUND_FENRIR_SKILL)
+            // Data/Sound/pWskill.wav
+            //
+            // This is triggered once per Plasma Storm cast,
+            // not once per target.
+            //
+            if (context.World.Walker != null)
+            {
+                SoundController.Instance.PlayBufferWithAttenuation(
+                    "Sound/pWskill.wav",
+                    player.Position,
+                    context.World.Walker.Position,
+                    maxDistance: 1200f);
+            }
+            else
+            {
+                SoundController.Instance.PlayBuffer(
+                    "Sound/pWskill.wav");
             }
 
             ushort mainTargetId =

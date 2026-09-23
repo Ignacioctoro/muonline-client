@@ -177,7 +177,7 @@ namespace Client.Main
 
         // Paths
         public static string DataPath;
-        public static string DataPathUrl = "http://192.168.55.220/Data.zip";
+        public static string DataPathUrl = "http://100.100.149.96:5097/Data.zip";
         public static string DefaultDataPathUrl = "https://full-wkr.mu.webzen.co.kr/muweb/full/MU_Red_1_20_61_Full.zip";
         public static string SETTINGS_PATH = "appsettings.json";
 

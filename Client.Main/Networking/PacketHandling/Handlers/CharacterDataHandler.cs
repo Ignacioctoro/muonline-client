@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.Network.Packets;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
+using Client.Main.Objects.Player;
 using System;
 using System.Threading.Tasks;
+using Client.Data.ATT;
 using Client.Main.Core.Utilities;
 using Client.Main.Core.Client;
 using Client.Main.Controllers;
@@ -1252,9 +1254,109 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     }
                     else
                     {
-                        // TODO: Handle other players' skill animations when scope system supports it
-                        _logger.LogDebug("Other player {PlayerId} used targeted skill {SkillId} on {TargetId}",
-                            playerId, skillId, targetId);
+                        if (activeScene.World is not WalkableWorldControl world)
+                        {
+                            return;
+                        }
+
+                        //
+                        // Find the remote player who cast the skill.
+                        //
+                        if (!world.TryGetWalkerById(
+                                playerId,
+                                out var casterWalker) ||
+                            casterWalker is not PlayerObject remotePlayer)
+                        {
+                            _logger.LogDebug(
+                                "Remote skill caster {PlayerId} was not found in world. Skill={SkillId}",
+                                playerId,
+                                skillId);
+
+                            return;
+                        }
+
+
+                        // =====================================================
+                        // REMOTE PLAYER ANIMATION
+                        // =====================================================
+
+                        //
+                        // GetSkillAction also handles the Fenrir-specific
+                        // fallback animation when a skill has no explicit
+                        // animation configured.
+                        //
+                        var remoteAction =
+                            remotePlayer.GetSkillAction(
+                                skillId,
+                                isInSafeZone: false);
+
+                        remotePlayer.PlayAction(
+                            (ushort)remoteAction);
+
+
+                        //
+                        // This switches the remote Fenrir itself to
+                        // FENRIR_ATTACK_SKILL.
+                        //
+                        remotePlayer.TriggerVehicleSkillAnimation();
+
+
+                        // =====================================================
+                        // TARGET POSITION
+                        // =====================================================
+
+                        Vector3? targetPosition =
+                            null;
+
+                        if (targetId != 0 &&
+                            world.TryGetWalkerById(
+                                targetId,
+                                out var target))
+                        {
+                            targetPosition =
+                                target.WorldPosition.Translation;
+                        }
+
+
+                        // =====================================================
+                        // VISUAL EFFECT
+                        // =====================================================
+                        //
+                        // This now uses exactly the same registry as the
+                        // local player.
+                        //
+                        // For skill 76 this resolves to:
+                        //
+                        // FenrirPlasmaStormSkillEffect
+                        //
+                        var effectContext =
+                            new Objects.Effects.Skills.SkillEffectContext
+                            {
+                                Caster = remotePlayer,
+                                TargetId = targetId,
+                                SkillId = skillId,
+                                TargetPosition = targetPosition,
+                                World = world
+                            };
+
+
+                        if (Objects.Effects.Skills.SkillVisualEffectRegistry.TrySpawn(
+                                skillId,
+                                effectContext,
+                                out var effect))
+                        {
+                            world.Objects.Add(
+                                effect!);
+
+                            _ = effect!.Load();
+                        }
+
+
+                        _logger.LogDebug(
+                            "Remote player {PlayerId} used skill {SkillId} on target {TargetId}",
+                            playerId,
+                            skillId,
+                            targetId);
                     }
                 });
             }
@@ -1271,80 +1373,207 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         {
             try
             {
-                var areaSkill = new AreaSkillAnimation(packet);
-                ushort playerId = areaSkill.PlayerId;
-                ushort skillId = areaSkill.SkillId;
-                byte targetX = areaSkill.PointX;
-                byte targetY = areaSkill.PointY;
+                var areaSkill =
+                    new AreaSkillAnimation(packet);
 
-                _logger.LogDebug("AreaSkillAnimation: Player={PlayerId}, Skill={SkillId}, Target=({X},{Y})",
-                    playerId, skillId, targetX, targetY);
+                ushort rawPlayerId =
+                    areaSkill.PlayerId;
+
+                ushort playerId =
+                    (ushort)(rawPlayerId & 0x7FFF);
+
+                ushort skillId =
+                    areaSkill.SkillId;
+
+                byte targetX =
+                    areaSkill.PointX;
+
+                byte targetY =
+                    areaSkill.PointY;
 
                 MuGame.ScheduleOnMainThread(() =>
                 {
-                    var activeScene = MuGame.Instance?.ActiveScene as GameScene;
-                    if (activeScene?.Hero == null) return;
+                    var activeScene =
+                        MuGame.Instance?.ActiveScene
+                        as GameScene;
 
-                    // Check if this is our player
-                    if (playerId == _characterState.Id)
+                    if (activeScene?.Hero == null)
+                        return;
+
+                    if (activeScene.World
+                        is not WalkableWorldControl world)
                     {
-                        // Get animation from SkillDatabase
-                        int animationId = Core.Utilities.SkillDatabase.GetSkillAnimation(skillId);
-                        string soundPath = Client.Data.BMD.SkillDefinitions.GetSkillSound(skillId);
+                        return;
+                    }
 
-                        // Play skill sound if available
-                        if (!string.IsNullOrEmpty(soundPath))
+                    float worldX =
+                        (targetX + 0.5f) *
+                        Constants.TERRAIN_SCALE;
+
+                    float worldY =
+                        (targetY + 0.5f) *
+                        Constants.TERRAIN_SCALE;
+
+                    float worldZ =
+                        world.Terrain.RequestTerrainHeight(
+                            worldX,
+                            worldY);
+
+                    var targetPosition =
+                        new Vector3(
+                            worldX,
+                            worldY,
+                            worldZ);
+
+
+                    // =====================================================
+                    // LOCAL PLAYER
+                    // =====================================================
+
+                    if (playerId ==
+                        (_characterState.Id & 0x7FFF))
+                    {
+                        int animationId =
+                            Core.Utilities.SkillDatabase
+                                .GetSkillAnimation(
+                                    skillId);
+
+                        string soundPath =
+                            Client.Data.BMD.SkillDefinitions
+                                .GetSkillSound(
+                                    skillId);
+
+                        if (!string.IsNullOrEmpty(
+                                soundPath))
                         {
-                            SoundController.Instance.PlayBuffer(soundPath);
+                            SoundController.Instance
+                                .PlayBuffer(
+                                    soundPath);
                         }
 
-                        // Trigger vehicle skill animation if riding
-                        activeScene.Hero.TriggerVehicleSkillAnimation();
+                        activeScene.Hero
+                            .TriggerVehicleSkillAnimation();
 
                         if (animationId > 0)
                         {
-                            activeScene.Hero.PlayAction((ushort)animationId);
-                            _logger.LogInformation("Playing skill animation {AnimationId} for skill {SkillId} ({SkillName})",
-                                animationId, skillId, Core.Utilities.SkillDatabase.GetSkillName(skillId));
-                        }
-                        else
-                        {
-                            // No specific animation - skill uses generic magic/attack animation
-                            _logger.LogDebug("Skill {SkillId} ({SkillName}) uses generic animation",
-                                skillId, Core.Utilities.SkillDatabase.GetSkillName(skillId));
+                            activeScene.Hero
+                                .PlayAction(
+                                    (ushort)animationId);
                         }
 
-                        // Spawn skill visual effect via registry (area skills included)
-                        if (activeScene.World is WalkableWorldControl world)
-                        {
-                            float worldX = (targetX + 0.5f) * Constants.TERRAIN_SCALE;
-                            float worldY = (targetY + 0.5f) * Constants.TERRAIN_SCALE;
-                            float worldZ = world.Terrain.RequestTerrainHeight(worldX, worldY);
-                            var targetPosition = new Vector3(worldX, worldY, worldZ);
-
-                            var effectContext = new Objects.Effects.Skills.SkillEffectContext
+                        var effectContext =
+                            new Objects.Effects.Skills
+                                .SkillEffectContext
                             {
-                                Caster = activeScene.Hero,
-                                TargetId = 0,
-                                SkillId = skillId,
-                                TargetPosition = targetPosition,
-                                World = world
+                                Caster =
+                                    activeScene.Hero,
+
+                                TargetId =
+                                    0,
+
+                                SkillId =
+                                    skillId,
+
+                                TargetPosition =
+                                    targetPosition,
+
+                                World =
+                                    world
                             };
 
-                            if (Objects.Effects.Skills.SkillVisualEffectRegistry.TrySpawn(skillId, effectContext, out var effect))
-                                world.Objects.Add(effect!);
+                        if (Objects.Effects.Skills
+                            .SkillVisualEffectRegistry
+                            .TrySpawn(
+                                skillId,
+                                effectContext,
+                                out var effect))
+                        {
+                            world.Objects.Add(
+                                effect!);
+
+                            _ = effect!.Load();
                         }
+
+                        return;
                     }
-                    else
+
+
+                    // =====================================================
+                    // REMOTE PLAYER
+                    // =====================================================
+
+                    if (!world.TryGetWalkerById(
+                            playerId,
+                            out var casterWalker))
                     {
-                        // TODO: Handle other players' skill animations when scope system supports it
-                        _logger.LogDebug("Other player {PlayerId} used skill {SkillId}", playerId, skillId);
+                        return;
+                    }
+
+                    if (casterWalker
+                        is not PlayerObject remotePlayer)
+                    {
+                        return;
+                    }
+
+                    bool isInSafeZone =
+                        world.Terrain
+                            .RequestTerrainFlag(
+                                (int)remotePlayer.Location.X,
+                                (int)remotePlayer.Location.Y)
+                            .HasFlag(
+                                TWFlags.SafeZone);
+
+                    var remoteAction =
+                        remotePlayer.GetSkillAction(
+                            skillId,
+                            isInSafeZone);
+
+                    remotePlayer.PlayAction(
+                        (ushort)remoteAction);
+
+                    remotePlayer
+                        .TriggerVehicleSkillAnimation();
+
+
+                    var remoteEffectContext =
+                        new Objects.Effects.Skills
+                            .SkillEffectContext
+                        {
+                            Caster =
+                                remotePlayer,
+
+                            TargetId =
+                                0,
+
+                            SkillId =
+                                skillId,
+
+                            TargetPosition =
+                                targetPosition,
+
+                            World =
+                                world
+                        };
+
+                    if (Objects.Effects.Skills
+                        .SkillVisualEffectRegistry
+                        .TrySpawn(
+                            skillId,
+                            remoteEffectContext,
+                            out var remoteEffect))
+                    {
+                        world.Objects.Add(
+                            remoteEffect!);
+
+                        _ = remoteEffect!.Load();
                     }
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "💥 Error handling AreaSkillAnimation packet.");
+                _logger.LogError(
+                    ex,
+                    "Error handling AreaSkillAnimation packet.");
             }
 
             return Task.CompletedTask;

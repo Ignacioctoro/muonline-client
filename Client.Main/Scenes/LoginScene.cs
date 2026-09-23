@@ -9,6 +9,9 @@ using Client.Main.Worlds;
 using Client.Main.Graphics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xna.Framework;
+using Client.Main.Services.Auth;
+using System.Diagnostics;
+using System.Threading;
 using MUnique.OpenMU.Network.Packets; // Needed for CharacterClassNumber
 using MUnique.OpenMU.Network.Packets.ServerToClient;
 using System;
@@ -22,11 +25,16 @@ namespace Client.Main.Scenes
     {
         // Fields
         private LoginDialog _loginDialog;
+        private RegisterDialog _registerDialog;
         private ServerGroupSelector _nonEventGroup;
         private ServerGroupSelector _eventGroup;
         private ServerList _serverList;
         private LabelControl _statusLabel;
         private ClientConnectionState _previousStateHandled = ClientConnectionState.Initial;
+        private readonly BroyalAuthApiClient _authApiClient = new();
+
+        private Guid? _registerChallengeId;
+        private CancellationTokenSource _captchaPollingCts;
 
         private bool _previousDayNightEnabled;
         private Vector3 _previousSunDirection;
@@ -60,6 +68,8 @@ namespace Client.Main.Scenes
                 Align = ControlAlign.HorizontalCenter | ControlAlign.VerticalCenter
             };
             _loginDialog.LoginAttempt += LoginDialog_LoginAttempt;
+            _loginDialog.RegisterRequested +=
+                LoginDialog_RegisterRequested;
             Controls.Add(_loginDialog);
 
             // Server selection UI elements are initialized later in InitializeServerSelectionUI
@@ -369,6 +379,380 @@ namespace Client.Main.Scenes
             {
                 _logger.LogWarning("Login attempt ignored, invalid state: {State}", _networkManager.CurrentState);
                 MessageWindow.Show($"Cannot login in state: {_networkManager.CurrentState}");
+            }
+        }
+        private void LoginDialog_RegisterRequested(
+            object sender,
+            EventArgs e)
+        {
+            if (_registerDialog != null)
+            {
+                _registerDialog.Visible = true;
+                _registerDialog.BringToFront();
+                _registerDialog.FocusUsername();
+                return;
+            }
+
+            _registerDialog =
+                new RegisterDialog
+                {
+                    Align =
+                        ControlAlign.HorizontalCenter
+                        |
+                        ControlAlign.VerticalCenter
+                };
+
+            _registerDialog.BackRequested +=
+                RegisterDialog_BackRequested;
+
+            _registerDialog.VerifyCaptchaRequested +=
+                RegisterDialog_VerifyCaptchaRequested;
+            
+
+            _registerDialog.RegisterRequested +=
+                RegisterDialog_RegisterRequested;
+
+            Controls.Add(_registerDialog);
+
+            _loginDialog.Visible = false;
+
+            _registerDialog.Visible = true;
+            _registerDialog.BringToFront();
+            _registerDialog.FocusUsername();
+        }
+        private void RegisterDialog_BackRequested(
+            object sender,
+            EventArgs e)
+        {
+            _captchaPollingCts?.Cancel();
+            _captchaPollingCts?.Dispose();
+            _captchaPollingCts = null;
+
+            _registerChallengeId = null;
+
+            if (_registerDialog != null)
+            {
+                _registerDialog.ResetCaptcha();
+                _registerDialog.Visible = false;
+            }
+
+            if (_loginDialog != null)
+            {
+                _loginDialog.Visible = true;
+                _loginDialog.BringToFront();
+                _loginDialog.FocusUsername();
+            }
+        }
+
+        private async void RegisterDialog_VerifyCaptchaRequested(
+            object sender,
+            EventArgs e)
+        {
+            if (_registerDialog == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _registerDialog.SetCaptchaPending();
+
+                _captchaPollingCts?.Cancel();
+                _captchaPollingCts?.Dispose();
+
+                _captchaPollingCts =
+                    new CancellationTokenSource();
+
+                var challenge =
+                    await _authApiClient.CreateCaptchaChallengeAsync(
+                        _captchaPollingCts.Token);
+
+                if (!challenge.Success ||
+                    challenge.ChallengeId == Guid.Empty ||
+                    string.IsNullOrWhiteSpace(challenge.VerifyUrl))
+                {
+                    _registerDialog.SetCaptchaFailed();
+
+                    MessageWindow.Show(
+                        "No fue posible iniciar la verificación CAPTCHA.");
+
+                    return;
+                }
+
+                _registerChallengeId =
+                    challenge.ChallengeId;
+
+                OpenExternalUrl(
+                    challenge.VerifyUrl);
+
+                _ = PollCaptchaStatusAsync(
+                    challenge.ChallengeId,
+                    _captchaPollingCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelación normal.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error iniciando CAPTCHA.");
+
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    _registerDialog?.SetCaptchaFailed();
+
+                    MessageWindow.Show(
+                        "No fue posible conectar con el servicio de verificación.");
+                });
+            }
+        }
+        private static void OpenExternalUrl(
+            string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            try
+            {
+        #if ANDROID
+                var intent =
+                    new Android.Content.Intent(
+                        Android.Content.Intent.ActionView,
+                        Android.Net.Uri.Parse(url));
+
+                intent.AddFlags(
+                    Android.Content.ActivityFlags.NewTask);
+
+                Android.App.Application.Context.StartActivity(
+                    intent);
+        #else
+                Process.Start(
+                    new ProcessStartInfo
+                    {
+                        FileName = url,
+                        UseShellExecute = true
+                    });
+        #endif
+            }
+            catch
+            {
+                throw;
+            }
+        }
+        private async Task PollCaptchaStatusAsync(
+            Guid challengeId,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(2),
+                        cancellationToken);
+
+                    var status =
+                        await _authApiClient.GetCaptchaStatusAsync(
+                            challengeId,
+                            cancellationToken);
+
+                    if (!status.Success)
+                    {
+                        continue;
+                    }
+
+                    if (status.Verified &&
+                        !status.Used)
+                    {
+                        MuGame.ScheduleOnMainThread(() =>
+                        {
+                            if (_registerDialog != null)
+                            {
+                                _registerDialog.SetCaptchaVerified();
+                            }
+                        });
+
+                        return;
+                    }
+
+                    if (status.Used)
+                    {
+                        MuGame.ScheduleOnMainThread(() =>
+                        {
+                            _registerDialog?.ResetCaptcha();
+                        });
+
+                        return;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal al cerrar o iniciar otro CAPTCHA.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error consultando estado CAPTCHA.");
+
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    _registerDialog?.SetCaptchaFailed();
+                });
+            }
+        }
+        private async void RegisterDialog_RegisterRequested(
+            object sender,
+            EventArgs e)
+        {
+            if (_registerDialog == null)
+            {
+                return;
+            }
+
+            string username =
+                _registerDialog.Username.Trim();
+
+            string email =
+                _registerDialog.Email.Trim();
+
+            string password =
+                _registerDialog.Password;
+
+            string confirmPassword =
+                _registerDialog.ConfirmPassword;
+
+            // ─────────────────────────────────────
+            // VALIDACIONES LOCALES
+            // ─────────────────────────────────────
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                MessageWindow.Show(
+                    "Ingresa un nombre de usuario.");
+
+                return;
+            }
+
+            if (username.Length < 4 ||
+                username.Length > 10)
+            {
+                MessageWindow.Show(
+                    "El usuario debe tener entre 4 y 10 caracteres.");
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                MessageWindow.Show(
+                    "Ingresa un correo electrónico.");
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                MessageWindow.Show(
+                    "Ingresa una contraseña.");
+
+                return;
+            }
+
+            if (password.Length < 8)
+            {
+                MessageWindow.Show(
+                    "La contraseña debe tener al menos 8 caracteres.");
+
+                return;
+            }
+
+            if (password != confirmPassword)
+            {
+                MessageWindow.Show(
+                    "Las contraseñas no coinciden.");
+
+                return;
+            }
+
+            if (!_registerChallengeId.HasValue)
+            {
+                MessageWindow.Show(
+                    "Debes completar la verificación CAPTCHA.");
+
+                return;
+            }
+
+            try
+            {
+                var result =
+                    await _authApiClient.RegisterAsync(
+                        username,
+                        email,
+                        password,
+                        _registerChallengeId.Value);
+
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    if (!result.Success)
+                    {
+                        MessageWindow.Show(
+                            string.IsNullOrWhiteSpace(result.Message)
+                                ? "No fue posible crear la cuenta."
+                                : result.Message);
+
+                        return;
+                    }
+
+                    // CAPTCHA consumido correctamente.
+                    _registerChallengeId = null;
+
+                    _captchaPollingCts?.Cancel();
+                    _captchaPollingCts?.Dispose();
+                    _captchaPollingCts = null;
+
+                    MessageWindow message =
+                        MessageWindow.Show(
+                            "Cuenta creada correctamente.");
+
+                    if (message != null)
+                    {
+                        message.Closed += (s, args) =>
+                        {
+                            if (_registerDialog != null)
+                            {
+                                _registerDialog.Visible = false;
+                            }
+
+                            if (_loginDialog != null)
+                            {
+                                _loginDialog.Visible = true;
+                                _loginDialog.BringToFront();
+                                _loginDialog.FocusUsername();
+                            }
+                        };
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error creando cuenta mediante B Royal Auth API.");
+
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    MessageWindow.Show(
+                        "No fue posible conectar con el servidor de registro.");
+                });
             }
         }
 
