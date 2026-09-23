@@ -17,7 +17,7 @@ namespace Client.Main.Services.Auth
 #if ANDROID
         private const string BaseUrl = "http://100.100.149.96:5097";
 #else
-        private const string BaseUrl = "http://localhost:5097";
+        private const string BaseUrl = "http://100.100.149.96:5097";
 #endif
 
         public async Task<CaptchaChallengeResponse> CreateCaptchaChallengeAsync(
