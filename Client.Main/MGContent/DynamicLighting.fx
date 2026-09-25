@@ -14,6 +14,10 @@ float4x4 View;
 float4x4 Projection;
 float4x4 WorldViewProjection;
 
+#if !OPENGL
+float4x4 BoneMatrices[256];
+#endif
+
 // Camera position for specular highlights
 float3 EyePosition;
 
@@ -90,6 +94,16 @@ struct VertexInput
     float2 TexCoord : TEXCOORD0;
     float4 Color    : COLOR0;
 };
+#if !OPENGL
+struct VertexInputSkinned
+{
+    float3 Position    : POSITION0;
+    float3 Normal      : NORMAL0;
+    float2 TexCoord    : TEXCOORD0;
+    float4 Color       : COLOR0;
+    float2 BoneIndices : TEXCOORD1;
+};
+#endif
 
 struct PixelInput
 {
@@ -293,6 +307,50 @@ PixelInput VS_Objects(VertexInput input)
     output.DynamicLight = float3(0, 0, 0); // Not used, PS calculates per-pixel
     return output;
 }
+#if !OPENGL
+PixelInput VS_ObjectsSkinned(VertexInputSkinned input)
+{
+    PixelInput output;
+
+    int positionBoneIndex = min(max((int)input.BoneIndices.x, 0), 255);
+
+    int normalBoneIndex = min(max((int)input.BoneIndices.y, 0), 255);
+
+    float4 localPos =
+        mul(float4(input.Position, 1.0), BoneMatrices[positionBoneIndex]);
+
+    float3 localNormal =
+        mul(input.Normal,(float3x3)BoneMatrices[normalBoneIndex]);
+
+    float4 worldPos =
+        mul(localPos, World);
+
+    output.WorldPos =
+        worldPos.xyz;
+
+    output.Position =
+        mul(
+            worldPos,
+            mul(View, Projection));
+
+    output.Normal =
+        normalize(
+            mul(
+                localNormal,
+                (float3x3)World));
+
+    output.TexCoord =
+        input.TexCoord;
+
+    output.Color =
+        input.Color;
+
+    output.DynamicLight =
+        float3(0, 0, 0);
+
+    return output;
+}
+#endif
 
 float SampleShadow(float3 worldPos, float3 normal)
 {
@@ -421,6 +479,21 @@ technique DynamicLighting
         PixelShader = compile PS_SHADERMODEL PS_Objects();
     }
 }
+#if !OPENGL
+technique DynamicLighting_Skinned
+{
+    pass Pass1
+    {
+        VertexShader =
+            compile VS_SHADERMODEL
+            VS_ObjectsSkinned();
+
+        PixelShader =
+            compile PS_SHADERMODEL
+            PS_Objects();
+    }
+}
+#endif
 
 // Technique for TERRAIN (vertex color lighting + vertex dynamic lights)
 technique DynamicLighting_Terrain

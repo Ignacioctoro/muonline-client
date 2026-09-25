@@ -55,6 +55,16 @@ namespace Client.Main.Content
 
         // Track chosen index element size per mesh (true => 16-bit)
         private readonly Dictionary<MeshCacheKey, bool> _indexIs16Bit = [];
+        // Static buffers for GPU skinning path.
+        // These contain bind-pose vertices and are uploaded only once.
+        private readonly Dictionary<MeshCacheKey, VertexBuffer>
+            _gpuSkinVertexBuffers = [];
+
+        private readonly Dictionary<MeshCacheKey, IndexBuffer>
+            _gpuSkinIndexBuffers = [];
+
+        private readonly Dictionary<MeshCacheKey, int>
+            _gpuSkinBoneCounts = [];
 
         // Per-frame instrumentation (queried by DebugPanel)
         public int FrameVBUpdates { get; private set; }
@@ -155,7 +165,15 @@ namespace Client.Main.Content
 
         public void SetGraphicsDevice(GraphicsDevice graphicsDevice)
         {
-            _graphicsDevice = graphicsDevice;
+            if (!ReferenceEquals(
+                    _graphicsDevice,
+                    graphicsDevice))
+            {
+                DisposeGpuSkinnedBuffers();
+            }
+
+            _graphicsDevice =
+                graphicsDevice;
         }
 
         /// <summary>
@@ -189,6 +207,55 @@ namespace Client.Main.Content
                 p.X * m.M11 + p.Y * m.M21 + p.Z * m.M31 + m.M41,
                 p.X * m.M12 + p.Y * m.M22 + p.Z * m.M32 + m.M42,
                 p.X * m.M13 + p.Y * m.M23 + p.Z * m.M33 + m.M43);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool TryResolveNormalBoneIndex(
+            BMDTextureMesh mesh,
+            int normalIndex,
+            out int boneIndex)
+        {
+            boneIndex = 0;
+
+            if (mesh == null ||
+                mesh.Normals == null ||
+                mesh.Vertices == null ||
+                (uint)normalIndex >=
+                    (uint)mesh.Normals.Length)
+            {
+                return false;
+            }
+
+            var normal =
+                mesh.Normals[normalIndex];
+
+            if (normal.Node >= 0)
+            {
+                boneIndex =
+                    normal.Node;
+
+                return true;
+            }
+
+            int bindVertexIndex =
+                normal.BindVertex;
+
+            if ((uint)bindVertexIndex <
+                (uint)mesh.Vertices.Length)
+            {
+                short bindVertexBone =
+                    mesh.Vertices[
+                        bindVertexIndex].Node;
+
+                if (bindVertexBone >= 0)
+                {
+                    boneIndex =
+                        bindVertexBone;
+
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public Task<BMD> Prepare(string path, string textureFolder = null)
@@ -547,6 +614,306 @@ namespace Client.Main.Content
             }
             return hash;
         }
+        public bool TryGetGpuSkinnedMeshBuffers(BMD asset, int meshIndex, out VertexBuffer vertexBuffer, out IndexBuffer indexBuffer, out int boneCount)
+        {
+            vertexBuffer = null;
+            indexBuffer = null;
+            boneCount = 0;
+
+            if (asset == null || _graphicsDevice == null || asset.Meshes == null || meshIndex < 0 || meshIndex >= asset.Meshes.Length)
+            {
+                return false;
+            }
+
+            int assetId =
+                RuntimeHelpers.GetHashCode(
+                    asset);
+
+            var cacheKey =
+                new MeshCacheKey(
+                    assetId,
+                    meshIndex);
+
+            if (_gpuSkinVertexBuffers.TryGetValue(
+                    cacheKey,
+                    out var cachedVB) &&
+                _gpuSkinIndexBuffers.TryGetValue(
+                    cacheKey,
+                    out var cachedIB) &&
+                _gpuSkinBoneCounts.TryGetValue(
+                    cacheKey,
+                    out var cachedBoneCount) &&
+                cachedVB != null &&
+                !cachedVB.IsDisposed &&
+                cachedIB != null &&
+                !cachedIB.IsDisposed)
+            {
+                vertexBuffer =
+                    cachedVB;
+
+                indexBuffer =
+                    cachedIB;
+
+                boneCount =
+                    cachedBoneCount;
+
+                return true;
+            }
+
+            var mesh =
+                asset.Meshes[meshIndex];
+
+            if (mesh?.Triangles == null ||
+                mesh.Vertices == null ||
+                mesh.Normals == null ||
+                mesh.TexCoords == null)
+            {
+                return false;
+            }
+
+            int totalVertices = 0;
+
+            var triangles =
+                mesh.Triangles;
+
+            for (int i = 0;
+                i < triangles.Length;
+                i++)
+            {
+                totalVertices +=
+                    triangles[i].Polygon;
+            }
+
+            if (totalVertices <= 0)
+                return false;
+
+            bool prefer16Bit =
+                totalVertices <=
+                ushort.MaxValue;
+
+            var vertices =
+                ArrayPool<
+                    SkinnedVertexPositionColorNormalTexture>
+                .Shared
+                .Rent(totalVertices);
+
+            try
+            {
+                int maxBoneIndex = 0;
+                int v = 0;
+
+                for (int triIdx = 0;
+                    triIdx < triangles.Length;
+                    triIdx++)
+                {
+                    var tri =
+                        triangles[triIdx];
+
+                    for (int j = 0;
+                        j < tri.Polygon;
+                        j++)
+                    {
+                        int vi =
+                            tri.VertexIndex[j];
+
+                        int ni =
+                            tri.NormalIndex[j];
+
+                        int ti =
+                            tri.TexCoordIndex[j];
+
+                        var vert =
+                            mesh.Vertices[vi];
+
+                        int positionBoneIndex =
+                            vert.Node >= 0
+                                ? vert.Node
+                                : 0;
+
+                        int normalBoneIndex =
+                            positionBoneIndex;
+
+                        if (TryResolveNormalBoneIndex(
+                                mesh,
+                                ni,
+                                out int resolvedNormalBone) &&
+                            resolvedNormalBone >= 0)
+                        {
+                            normalBoneIndex =
+                                resolvedNormalBone;
+                        }
+
+                        if (positionBoneIndex >
+                            maxBoneIndex)
+                        {
+                            maxBoneIndex =
+                                positionBoneIndex;
+                        }
+
+                        if (normalBoneIndex >
+                            maxBoneIndex)
+                        {
+                            maxBoneIndex =
+                                normalBoneIndex;
+                        }
+
+                        var normal =
+                            mesh.Normals[ni].Normal;
+
+                        var uv =
+                            mesh.TexCoords[ti];
+
+                        vertices[v++] =
+                            new SkinnedVertexPositionColorNormalTexture(
+                                vert.Position,
+                                Color.White,
+                                normal,
+                                new Vector2(
+                                    uv.U,
+                                    uv.V),
+                                new Vector2(
+                                    positionBoneIndex,
+                                    normalBoneIndex));
+                    }
+                }
+
+                var newVB =
+                    new VertexBuffer(
+                        _graphicsDevice,
+                        SkinnedVertexPositionColorNormalTexture
+                            .VertexDeclaration,
+                        totalVertices,
+                        BufferUsage.WriteOnly);
+
+                newVB.SetData(
+                    vertices,
+                    0,
+                    totalVertices);
+
+                IndexBuffer newIB;
+
+                if (prefer16Bit)
+                {
+                    var indices16 =
+                        ArrayPool<ushort>
+                            .Shared
+                            .Rent(totalVertices);
+
+                    try
+                    {
+                        for (int i = 0;
+                            i < totalVertices;
+                            i++)
+                        {
+                            indices16[i] =
+                                (ushort)i;
+                        }
+
+                        newIB =
+                            new IndexBuffer(
+                                _graphicsDevice,
+                                IndexElementSize.SixteenBits,
+                                totalVertices,
+                                BufferUsage.WriteOnly);
+
+                        newIB.SetData(
+                            indices16,
+                            0,
+                            totalVertices);
+                    }
+                    finally
+                    {
+                        ArrayPool<ushort>
+                            .Shared
+                            .Return(
+                                indices16,
+                                clearArray: true);
+                    }
+                }
+                else
+                {
+                    var indices32 =
+                        ArrayPool<int>
+                            .Shared
+                            .Rent(totalVertices);
+
+                    try
+                    {
+                        for (int i = 0;
+                            i < totalVertices;
+                            i++)
+                        {
+                            indices32[i] =
+                                i;
+                        }
+
+                        newIB =
+                            new IndexBuffer(
+                                _graphicsDevice,
+                                IndexElementSize.ThirtyTwoBits,
+                                totalVertices,
+                                BufferUsage.WriteOnly);
+
+                        newIB.SetData(
+                            indices32,
+                            0,
+                            totalVertices);
+                    }
+                    finally
+                    {
+                        ArrayPool<int>
+                            .Shared
+                            .Return(
+                                indices32,
+                                clearArray: true);
+                    }
+                }
+
+                if (_gpuSkinVertexBuffers.TryGetValue(
+                        cacheKey,
+                        out var oldVB))
+                {
+                    oldVB?.Dispose();
+                }
+
+                if (_gpuSkinIndexBuffers.TryGetValue(
+                        cacheKey,
+                        out var oldIB))
+                {
+                    oldIB?.Dispose();
+                }
+
+                _gpuSkinVertexBuffers[
+                    cacheKey] =
+                    newVB;
+
+                _gpuSkinIndexBuffers[
+                    cacheKey] =
+                    newIB;
+
+                _gpuSkinBoneCounts[
+                    cacheKey] =
+                    maxBoneIndex + 1;
+
+                vertexBuffer =
+                    newVB;
+
+                indexBuffer =
+                    newIB;
+
+                boneCount =
+                    maxBoneIndex + 1;
+
+                return true;
+            }
+            finally
+            {
+                ArrayPool<
+                    SkinnedVertexPositionColorNormalTexture>
+                .Shared
+                .Return(vertices);
+            }
+        }
 
         public string GetTexturePath(BMD bmd, string texturePath)
         {
@@ -569,6 +936,26 @@ namespace Client.Main.Content
             _bufferCacheState.Clear();
             _indexInitialized.Clear();
             _indexIs16Bit.Clear();
+
+            DisposeGpuSkinnedBuffers();
+        }
+        private void DisposeGpuSkinnedBuffers()
+        {
+            foreach (var vb in
+                    _gpuSkinVertexBuffers.Values)
+            {
+                vb?.Dispose();
+            }
+
+            foreach (var ib in
+                    _gpuSkinIndexBuffers.Values)
+            {
+                ib?.Dispose();
+            }
+
+            _gpuSkinVertexBuffers.Clear();
+            _gpuSkinIndexBuffers.Clear();
+            _gpuSkinBoneCounts.Clear();
         }
     }
 

@@ -1,3 +1,4 @@
+using Client.Data.BMD;
 using Client.Data.Texture;
 using Client.Main.Content;
 using Client.Main.Graphics;
@@ -91,7 +92,13 @@ namespace Client.Main.Objects
                 }
 
                 // Ensure arrays only when needed
-                bool needArrayResize = _boneVertexBuffers?.Length != meshCount;
+                bool needArrayResize =
+                        _boneVertexBuffers?.Length != meshCount ||
+                        _boneIndexBuffers?.Length != meshCount ||
+                        _gpuSkinVertexBuffers?.Length != meshCount ||
+                        _gpuSkinIndexBuffers?.Length != meshCount ||
+                        _gpuSkinBoneCounts?.Length != meshCount ||
+                        _gpuSkinMeshEnabled?.Length != meshCount;
                 if (needArrayResize)
                 {
                     EnsureArraySize(ref _boneVertexBuffers, meshCount);
@@ -104,6 +111,10 @@ namespace Client.Main.Objects
                     EnsureArraySize(ref _meshBlendByScript, meshCount);
                     EnsureArraySize(ref _meshTexturePath, meshCount);
                     EnsureArraySize(ref _blendMeshIndicesScratch, meshCount);
+                    EnsureArraySize(ref _gpuSkinVertexBuffers,meshCount);
+                    EnsureArraySize(ref _gpuSkinIndexBuffers,meshCount);
+                    EnsureArraySize(ref _gpuSkinBoneCounts, meshCount);
+                    EnsureArraySize(ref _gpuSkinMeshEnabled,meshCount);
                 }
 
                 // Get bone transforms with caching
@@ -146,6 +157,43 @@ namespace Client.Main.Objects
                     {
                         ref var cache = ref _meshBufferCache[meshIndex];
                         var mesh = Model.Meshes[meshIndex];
+                        bool canUseGpuSkinning =
+                            SupportsGpuDynamicSkinning &&
+                            Constants.ENABLE_GPU_SKINNING &&
+                            !hasVertexDeformer &&
+                            DetermineShaderForMesh(
+                                meshIndex)
+                                .UseDynamicLighting;
+                        bool gpuSkinReady =
+                            canUseGpuSkinning &&
+                            _gpuSkinMeshEnabled != null &&
+                            (uint)meshIndex <
+                                (uint)_gpuSkinMeshEnabled.Length &&
+                            _gpuSkinMeshEnabled[meshIndex] &&
+                            _gpuSkinVertexBuffers != null &&
+                            (uint)meshIndex <
+                                (uint)_gpuSkinVertexBuffers.Length &&
+                            _gpuSkinVertexBuffers[meshIndex] != null &&
+                            _gpuSkinIndexBuffers != null &&
+                            (uint)meshIndex <
+                                (uint)_gpuSkinIndexBuffers.Length &&
+                            _gpuSkinIndexBuffers[meshIndex] != null &&
+                            _gpuSkinBoneCounts != null &&
+                            (uint)meshIndex <
+                                (uint)_gpuSkinBoneCounts.Length &&
+                            _gpuSkinBoneCounts[meshIndex] > 0;
+                        if (canUseGpuSkinning &&
+                            ((!gpuSkinReady &&
+                            TryEnableGpuSkinnedMesh(
+                                meshIndex,
+                                mesh))
+                            || gpuSkinReady))
+                        {
+                            // No generamos nuevamente el mesh animado en CPU.
+                            // Conservamos los buffers CPU existentes como fallback.
+                            cache.IsValid = false;
+                            continue;
+                        }
 
                         // Skip if mesh is hidden and we're not doing texture updates
                         if (IsHiddenMesh(meshIndex) && (_invalidatedBufferFlags & BUFFER_FLAG_TEXTURE) == 0)
@@ -225,7 +273,53 @@ namespace Client.Main.Objects
                 _logger?.LogCritical(ex, "SetDynamicBuffers FATAL");
             }
         }
+        private bool TryEnableGpuSkinnedMesh(
+            int meshIndex,
+            BMDTextureMesh mesh)
+        {
+            if (_gpuSkinMeshEnabled == null ||
+                _gpuSkinVertexBuffers == null ||
+                _gpuSkinIndexBuffers == null ||
+                _gpuSkinBoneCounts == null ||
+                Model == null ||
+                mesh == null ||
+                (uint)meshIndex >=
+                    (uint)_gpuSkinMeshEnabled.Length)
+            {
+                return false;
+            }
 
+            if (!BMDLoader.Instance
+                .TryGetGpuSkinnedMeshBuffers(
+                    Model,
+                    meshIndex,
+                    out var vertexBuffer,
+                    out var indexBuffer,
+                    out var boneCount))
+            {
+                return false;
+            }
+
+            if (boneCount <= 0 ||
+                boneCount > MaxGpuSkinBones)
+            {
+                return false;
+            }
+
+            _gpuSkinVertexBuffers[meshIndex] =
+                vertexBuffer;
+
+            _gpuSkinIndexBuffers[meshIndex] =
+                indexBuffer;
+
+            _gpuSkinBoneCounts[meshIndex] =
+                boneCount;
+
+            _gpuSkinMeshEnabled[meshIndex] =
+                true;
+
+            return true;
+        }
         private Matrix[] GetCachedBoneTransforms()
         {
             Matrix[] bones = (LinkParentAnimation && Parent is ModelObject parentModel && parentModel.BoneTransform != null)

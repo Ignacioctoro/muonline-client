@@ -73,6 +73,11 @@ namespace Client.Main.Objects
 
         private DynamicVertexBuffer[] _boneVertexBuffers;
         private DynamicIndexBuffer[] _boneIndexBuffers;
+
+        private VertexBuffer[] _gpuSkinVertexBuffers;
+        private IndexBuffer[] _gpuSkinIndexBuffers;
+        private int[] _gpuSkinBoneCounts;
+        private bool[] _gpuSkinMeshEnabled;
         private Texture2D[] _boneTextures;
         private TextureScript[] _scriptTextures;
         private TextureData[] _dataTextures;
@@ -143,6 +148,16 @@ namespace Client.Main.Objects
         private bool _boneMatrixCacheValid = false;
 
         private MeshBufferCache[] _meshBufferCache;
+        private const int MaxGpuSkinBones = 256;
+
+        #if WINDOWS_DX
+        private const bool SupportsGpuDynamicSkinning = true;
+        #else
+        private const bool SupportsGpuDynamicSkinning = false;
+        #endif
+
+        private Matrix[] _gpuSkinBoneUploadBuffer =
+            Array.Empty<Matrix>();
 
         #endregion
 
@@ -339,8 +354,14 @@ namespace Client.Main.Objects
             }
 
             int meshCount = Model.Meshes.Length;
-            _boneVertexBuffers = new DynamicVertexBuffer[meshCount];
+            _boneVertexBuffers =
+    new DynamicVertexBuffer[meshCount];
+
             _boneIndexBuffers = new DynamicIndexBuffer[meshCount];
+            _gpuSkinVertexBuffers = new VertexBuffer[meshCount];
+            _gpuSkinIndexBuffers = new IndexBuffer[meshCount];
+            _gpuSkinBoneCounts = new int[meshCount];
+            _gpuSkinMeshEnabled = new bool[meshCount];
             _boneTextures = new Texture2D[meshCount];
             _scriptTextures = new TextureScript[meshCount];
             _dataTextures = new TextureData[meshCount];
@@ -474,15 +495,34 @@ namespace Client.Main.Objects
 
             if (LinkParentAnimation && Parent is ModelObject parent)
             {
-                CurrentAction = parent.CurrentAction;
+                CurrentAction =parent.CurrentAction;
+
                 _animTime = parent._animTime;
+
                 _isBlending = parent._isBlending;
+
                 _blendElapsed = parent._blendElapsed;
 
-                if (parent._isBlending || parent.BoneTransform != null)
-                    InvalidateBuffers(BUFFER_FLAG_ANIMATION);
-            }
+                if (!ReferenceEquals(_lastLinkedParentModel,parent))
+                {
+                    _lastLinkedParentModel = parent;
 
+                    _lastLinkedParentPoseVersion = uint.MaxValue;
+                }
+
+                uint parentPoseVersion =
+                    parent.AnimationPoseVersion;
+
+                if (_lastLinkedParentPoseVersion !=
+                    parentPoseVersion)
+                {
+                    InvalidateBuffers(
+                        BUFFER_FLAG_ANIMATION);
+
+                    _lastLinkedParentPoseVersion =
+                        parentPoseVersion;
+                }
+            }
             if (ParentBoneLink >= 0 || LinkParentAnimation)
             {
                 RecalculateWorldPosition();
@@ -588,8 +628,10 @@ namespace Client.Main.Objects
             ReleaseDynamicBuffers();
 
             // Release graphics resources and mark content as unloaded
-            _boneVertexBuffers = null;
-            _boneIndexBuffers = null;
+            _gpuSkinVertexBuffers = null;
+            _gpuSkinIndexBuffers = null;
+            _gpuSkinBoneCounts = null;
+            _gpuSkinMeshEnabled = null;
             _boneTextures = null;
             _scriptTextures = null;
             _dataTextures = null;

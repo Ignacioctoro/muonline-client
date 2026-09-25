@@ -253,6 +253,7 @@ namespace Client.Main.Objects
         public override void Draw(GameTime gameTime)
         {
             if (!Visible || _boneIndexBuffers == null) return;
+            SetDrawShaderTimeSeconds((float)gameTime.TotalGameTime.TotalSeconds);
 
             var gd = GraphicsDevice;
             var prevCull = gd.RasterizerState;
@@ -711,7 +712,7 @@ namespace Client.Main.Objects
                         itemOptions |= 0x10;
 
                     effect.Parameters["ItemOptions"]?.SetValue(itemOptions);
-                    effect.Parameters["Time"]?.SetValue(GetCachedTime());
+                    effect.Parameters["Time"]?.SetValue(GetShaderTimeSeconds());
                     effect.Parameters["IsAncient"]?.SetValue(IsAncientItem);
                     effect.Parameters["IsExcellent"]?.SetValue(IsExcellentItem);
                     effect.Parameters["Alpha"]?.SetValue(TotalAlpha);
@@ -817,7 +818,7 @@ namespace Client.Main.Objects
                     effect.Parameters["GlowIntensity"]?.SetValue(GlowIntensity);
                     effect.Parameters["EnableGlow"]?.SetValue(GlowIntensity > 0.0f && !SimpleColorMode);
                     effect.Parameters["SimpleColorMode"]?.SetValue(SimpleColorMode);
-                    effect.Parameters["Time"]?.SetValue(GetCachedTime());
+                    effect.Parameters["Time"]?.SetValue(GetShaderTimeSeconds());
                     effect.Parameters["Alpha"]?.SetValue(TotalAlpha);
 
                     gd.SetVertexBuffer(vertexBuffer);
@@ -847,89 +848,207 @@ namespace Client.Main.Objects
             }
         }
 
-        public virtual void DrawMeshWithDynamicLighting(int mesh)
-        {
-            if (Model?.Meshes == null || mesh < 0 || mesh >= Model.Meshes.Length)
-                return;
-            if (_boneVertexBuffers?[mesh] == null ||
-                _boneIndexBuffers?[mesh] == null ||
-                _boneTextures?[mesh] == null ||
-                IsHiddenMesh(mesh))
-                return;
-
-            try
+        public virtual void DrawMeshWithDynamicLighting(
+                int mesh)
             {
-                var gd = GraphicsDevice;
-                var effect = GraphicsManager.Instance.DynamicLightingEffect;
-
-                if (effect == null)
+                if (Model?.Meshes == null ||
+                    mesh < 0 ||
+                    mesh >= Model.Meshes.Length)
                 {
-                    DrawMesh(mesh); // Fallback to standard rendering
                     return;
                 }
 
-                var prevDepthState = gd.DepthStencilState;
-                bool depthStateChanged = false;
+                if (_boneTextures?[mesh] == null ||
+                    IsHiddenMesh(mesh))
+                {
+                    return;
+                }
+
+                bool useGpuSkinning =
+                    Constants.ENABLE_GPU_SKINNING &&
+                    SupportsGpuDynamicSkinning &&
+                    _gpuSkinMeshEnabled != null &&
+                    (uint)mesh <
+                        (uint)_gpuSkinMeshEnabled.Length &&
+                    _gpuSkinMeshEnabled[mesh] &&
+                    _gpuSkinVertexBuffers != null &&
+                    (uint)mesh <
+                        (uint)_gpuSkinVertexBuffers.Length &&
+                    _gpuSkinVertexBuffers[mesh] != null &&
+                    _gpuSkinIndexBuffers != null &&
+                    (uint)mesh <
+                        (uint)_gpuSkinIndexBuffers.Length &&
+                    _gpuSkinIndexBuffers[mesh] != null;
+
+                VertexBuffer vertexBuffer =
+                    useGpuSkinning
+                        ? _gpuSkinVertexBuffers[mesh]
+                        : _boneVertexBuffers?[mesh];
+
+                IndexBuffer indexBuffer =
+                    useGpuSkinning
+                        ? _gpuSkinIndexBuffers[mesh]
+                        : _boneIndexBuffers?[mesh];
+
+                if (vertexBuffer == null ||
+                    indexBuffer == null)
+                {
+                    return;
+                }
 
                 try
                 {
-                    bool isBlendMesh = IsBlendMesh(mesh);
-                    var vertexBuffer = _boneVertexBuffers[mesh];
-                    var indexBuffer = _boneIndexBuffers[mesh];
-                    var texture = _boneTextures[mesh];
+                    var gd =
+                        GraphicsDevice;
 
-                    var prevCull = gd.RasterizerState;
-                    var prevBlend = gd.BlendState;
+                    var effect =
+                        GraphicsManager.Instance
+                            .DynamicLightingEffect;
 
-                    // Get mesh rendering states using helper methods
-                    bool isTwoSided = IsMeshTwoSided(mesh, isBlendMesh);
-                    BlendState blendState = GetMeshBlendState(mesh, isBlendMesh);
-
-                    gd.RasterizerState = isTwoSided ? _cullNone : _cullClockwise;
-
-                    if (isBlendMesh)
+                    if (effect == null)
                     {
-                        gd.DepthStencilState = GraphicsManager.ReadOnlyDepth;
-                        depthStateChanged = true;
+                        return;
                     }
 
-                    gd.BlendState = blendState;
+                    var prevDepthState =
+                        gd.DepthStencilState;
 
-                    if (_dynamicLightingPreparedInvocationId != _drawModelInvocationId)
+                    bool depthStateChanged =
+                        false;
+
+                    try
                     {
-                        PrepareDynamicLightingEffect(effect);
-                        _dynamicLightingPreparedInvocationId = _drawModelInvocationId;
+                        bool isBlendMesh =
+                            IsBlendMesh(mesh);
+
+                        var texture =
+                            _boneTextures[mesh];
+
+                        var prevCull =
+                            gd.RasterizerState;
+
+                        var prevBlend =
+                            gd.BlendState;
+
+                        bool isTwoSided =
+                            IsMeshTwoSided(
+                                mesh,
+                                isBlendMesh);
+
+                        BlendState blendState =
+                            GetMeshBlendState(
+                                mesh,
+                                isBlendMesh);
+
+                        gd.RasterizerState =
+                            isTwoSided
+                                ? _cullNone
+                                : _cullClockwise;
+
+                        if (isBlendMesh)
+                        {
+                            gd.DepthStencilState =
+                                GraphicsManager
+                                    .ReadOnlyDepth;
+
+                            depthStateChanged =
+                                true;
+                        }
+
+                        gd.BlendState =
+                            blendState;
+
+                        int requiredBoneCount =
+                            useGpuSkinning &&
+                            _gpuSkinBoneCounts != null &&
+                            (uint)mesh <
+                                (uint)_gpuSkinBoneCounts.Length
+                                ? _gpuSkinBoneCounts[mesh]
+                                : 0;
+
+                        PrepareDynamicLightingEffect(
+                            effect,
+                            useGpuSkinning,
+                            requiredBoneCount);
+
+                        // Si por cualquier motivo la técnica skinned
+                        // no pudo activarse, volvemos al mesh CPU.
+                        if (useGpuSkinning &&
+                            !string.Equals(
+                                effect.CurrentTechnique?.Name,
+                                "DynamicLighting_Skinned",
+                                StringComparison.Ordinal))
+                        {
+                            vertexBuffer =
+                                _boneVertexBuffers?[mesh];
+
+                            indexBuffer =
+                                _boneIndexBuffers?[mesh];
+
+                            if (vertexBuffer == null ||
+                                indexBuffer == null)
+                            {
+                                return;
+                            }
+
+                            useGpuSkinning =
+                                false;
+
+                            PrepareDynamicLightingEffect(
+                                effect,
+                                false,
+                                0);
+                        }
+
+                        effect.Parameters[
+                                "DiffuseTexture"]
+                            ?.SetValue(texture);
+
+                        gd.SetVertexBuffer(
+                            vertexBuffer);
+
+                        gd.Indices =
+                            indexBuffer;
+
+                        int primitiveCount =
+                            indexBuffer.IndexCount /
+                            3;
+
+                        foreach (
+                            EffectPass pass
+                            in effect.CurrentTechnique.Passes)
+                        {
+                            pass.Apply();
+
+                            gd.DrawIndexedPrimitives(
+                                PrimitiveType.TriangleList,
+                                0,
+                                0,
+                                primitiveCount);
+                        }
+
+                        gd.BlendState =
+                            prevBlend;
+
+                        gd.RasterizerState =
+                            prevCull;
                     }
-
-                    // Set texture
-                    effect.Parameters["DiffuseTexture"]?.SetValue(texture);
-
-                    gd.SetVertexBuffer(vertexBuffer);
-                    gd.Indices = indexBuffer;
-
-                    int primitiveCount = indexBuffer.IndexCount / 3;
-
-                    foreach (EffectPass pass in effect.CurrentTechnique.Passes)
+                    finally
                     {
-                        pass.Apply();
-                        gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
+                        if (depthStateChanged)
+                        {
+                            gd.DepthStencilState =
+                                prevDepthState;
+                        }
                     }
-
-                    gd.BlendState = prevBlend;
-                    gd.RasterizerState = prevCull;
                 }
-                finally
+                catch (Exception ex)
                 {
-                    if (depthStateChanged)
-                        gd.DepthStencilState = prevDepthState;
+                    _logger?.LogDebug(
+                        "Error in DrawMeshWithDynamicLighting: {Message}",
+                        ex.Message);
                 }
             }
-            catch (Exception ex)
-            {
-                _logger?.LogDebug("Error in DrawMeshWithDynamicLighting: {Message}", ex.Message);
-                DrawMesh(mesh); // Fallback to standard rendering
-            }
-        }
 
         public virtual void DrawMeshHighlight(int mesh, Matrix highlightMatrix, Vector3 highlightColor)
         {
@@ -993,6 +1112,7 @@ namespace Client.Main.Objects
         public override void DrawAfter(GameTime gameTime)
         {
             if (!Visible) return;
+            SetDrawShaderTimeSeconds((float)gameTime.TotalGameTime.TotalSeconds);
 
             var gd = GraphicsDevice;
             var prevCull = gd.RasterizerState;

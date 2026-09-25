@@ -81,6 +81,7 @@ namespace Client.Main
         public static bool HIGH_QUALITY_TEXTURES;
         public static bool DISABLE_VSYNC;
         public static bool UNLIMITED_FPS;
+        public static bool ENABLE_GPU_SKINNING;
 
         // Lighting
         public static bool SUN_ENABLED = true;
@@ -209,6 +210,7 @@ namespace Client.Main
 
         private static void ApplyBaseDefaults()
         {
+            ENABLE_GPU_SKINNING = true;
             ENTRY_SCENE = typeof(Scenes.LoadScene);
 
             BACKGROUND_MUSIC = true;
