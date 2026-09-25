@@ -55,13 +55,14 @@ sampler2D ShadowSampler = sampler_state
 };
 
 // Dynamic lights
+#if OPENGL
+#define MAX_LIGHTS 8
+#else
 #define MAX_LIGHTS 32
-float3 LightPositions[MAX_LIGHTS];
-float3 LightColors[MAX_LIGHTS];
-float LightRadii[MAX_LIGHTS];
-float LightIntensities[MAX_LIGHTS];
-int ActiveLightCount = 0;
-int MaxLightsToProcess = MAX_LIGHTS;
+#endif
+
+float4 LightPosInvRadius[MAX_LIGHTS];   // xyz = position, w = inverse radius
+float4 LightColorIntensity[MAX_LIGHTS]; // rgb = color, w = intensity
 // Use float for both DX and OpenGL for C# compatibility (SetValue works with float on both)
 float DebugLightingAreas = 0.0;
 float UseVertexColorLighting = 0.0;
@@ -106,96 +107,141 @@ struct PixelInput
 // on the CPU side (32).  DX vs_5_0 has no instruction limit; GL vs_3_0
 // has 512 slots, but the branchless active-mask approach keeps ALU low.
 #define TERRAIN_MAX_LIGHTS MAX_LIGHTS
+
 float3 CalculateTerrainLighting(float3 worldPos, float3 normal)
 {
     float3 dynamicLight = float3(0, 0, 0);
 
-    // Static loop bound so MojoShader (OpenGL vs_3_0) can unroll without
-    // "relative address needs replicate swizzle" errors from dynamic indexing.
-    // Inactive slots are zeroed out branchlessly via the 'active' mask.
-    float fLightCount = float(min(ActiveLightCount, MaxLightsToProcess));
-
+#if OPENGL
+    [unroll(MAX_LIGHTS)]
+#else
+    [loop]
+#endif
     for (int i = 0; i < TERRAIN_MAX_LIGHTS; i++)
     {
-        // Branchless mask: 1.0 if i < lightCount, 0.0 otherwise
-        float active = step(float(i) + 0.5, fLightCount);
+        float intensity = LightColorIntensity[i].w;
 
-        float3 lightPos = LightPositions[i];
-        float3 lightColor = LightColors[i];
-        float lightRadius = LightRadii[i];
-        float lightIntensity = LightIntensities[i];
+        if (intensity <= 0.0)
+            continue;
 
-        // Vector to light
+        float3 lightPos = LightPosInvRadius[i].xyz;
+        float3 lightColor = LightColorIntensity[i].xyz;
+
         float3 lightDir = lightPos - worldPos;
-        float distanceSquared = dot(lightDir, lightDir);
-        float radiusSquared = lightRadius * lightRadius;
+        float distSq = dot(lightDir, lightDir);
 
-        // Early skip if outside radius (branchless)
-        float inRange = step(distanceSquared, radiusSquared);
+        float invRad = max(
+            LightPosInvRadius[i].w,
+            0.0);
 
-        // Smooth quadratic falloff (faster than linear, looks good)
-        float normalizedDist = distanceSquared / radiusSquared;
-        float attenuation = saturate(1.0 - normalizedDist) * inRange;
+        float invRadSq =
+            invRad * invRad;
 
-        // Hemisphere check for terrain (light from above)
-        float vertical = saturate((lightPos.z - worldPos.z) * (1.0 / lightRadius));
+        // Quadratic attenuation
+        float attenuation =
+            saturate(
+                1.0 -
+                (distSq * invRadSq));
+
+        // Terrain receives light mainly from above
+        float vertical =
+            saturate(
+                (lightPos.z - worldPos.z)
+                * invRad);
+
         attenuation *= vertical;
 
-        // Fast normalize using rsqrt
-        float invDistance = rsqrt(distanceSquared + 0.001);
-        lightDir *= invDistance;
+        float invDist =
+            rsqrt(
+                distSq +
+                0.0001);
 
-        // Simple diffuse
-        float diffuse = saturate(dot(normal, lightDir));
+        float diffuse =
+            saturate(
+                dot(normal, lightDir)
+                * invDist);
 
-        dynamicLight += lightColor * (lightIntensity * diffuse * attenuation * active);
+        dynamicLight +=
+            lightColor *
+            (
+                intensity *
+                diffuse *
+                attenuation
+            );
     }
 
     return dynamicLight;
 }
 
-// Full quality dynamic lighting for objects (per-pixel)
-float3 CalculateDynamicLighting(float3 worldPos, float3 normal)
+
+// Full quality dynamic lighting for objects
+float3 CalculateDynamicLighting(
+    float3 worldPos,
+    float3 normal)
 {
-    float3 dynamicLight = float3(0, 0, 0);
+    float3 dynamicLight =
+        float3(0, 0, 0);
 
-    // Process all available lights for objects
-    int lightCount = min(min(ActiveLightCount, MaxLightsToProcess), MAX_LIGHTS);
-
-    for (int i = 0; i < lightCount; i++)
+#if OPENGL
+    [unroll(MAX_LIGHTS)]
+#else
+    [loop]
+#endif
+    for (int i = 0; i < MAX_LIGHTS; i++)
     {
-        float3 lightPos = LightPositions[i];
-        float3 lightColor = LightColors[i];
-        float lightRadius = LightRadii[i];
-        float lightIntensity = LightIntensities[i];
+        float intensity =
+            LightColorIntensity[i].w;
 
-        // Single vector subtraction
-        float3 lightDir = lightPos - worldPos;
-        float distanceSquared = dot(lightDir, lightDir);
+        if (intensity <= 0.0)
+            continue;
 
-        // Precompute radius squared once
-        float radiusSquared = lightRadius * lightRadius;
+        float3 lightPos =
+            LightPosInvRadius[i].xyz;
 
-        // Use rsqrt for fast inverse square root (GPU optimized)
-        float invDistance = rsqrt(distanceSquared + 0.001);
-        float distance = 1.0 / invDistance;
+        float3 lightColor =
+            LightColorIntensity[i].xyz;
 
-        // Fast attenuation using inverse distance
-        float attenuation = 1.0 - (distance * (1.0 / lightRadius));
-        attenuation = saturate(attenuation);
+        float3 lightDir =
+            lightPos -
+            worldPos;
 
-        // Skip light if outside radius using multiplication instead of branches
-        float inRange = step(distanceSquared, radiusSquared);
-        attenuation *= inRange;
+        float distSq =
+            dot(
+                lightDir,
+                lightDir);
 
-        // Normalize light direction using precomputed inverse distance
-        lightDir *= invDistance;
+        float invRad =
+            max(
+                LightPosInvRadius[i].w,
+                0.0);
 
-        // Simple diffuse with saturate (clamp to 0-1)
-        float diffuse = saturate(dot(normal, lightDir));
+        float attenuation =
+            saturate(
+                1.0 -
+                (
+                    distSq *
+                    (invRad * invRad)
+                ));
 
-        // Single multiply-add operation with all optimizations
-        dynamicLight += lightColor * (lightIntensity * diffuse * attenuation);
+        float invDist =
+            rsqrt(
+                distSq +
+                0.0001);
+
+        float diffuse =
+            saturate(
+                dot(
+                    normal,
+                    lightDir)
+                * invDist);
+
+        dynamicLight +=
+            lightColor *
+            (
+                intensity *
+                diffuse *
+                attenuation
+            );
     }
 
     return dynamicLight;
@@ -308,11 +354,11 @@ float4 PS_Terrain(PixelInput input) : SV_Target
 
     // Use pre-computed dynamic lighting from vertex shader
     float3 dynamicLight = input.DynamicLight;
-    float hasActiveLights = step(1.0, float(ActiveLightCount));
-    float3 finalLight = baseLight + dynamicLight * TerrainDynamicIntensityScale * hasActiveLights;
+
+    float3 finalLight = baseLight + dynamicLight *TerrainDynamicIntensityScale;
 
     // Debug mode
-    float isDebugPixel = DebugLightingAreas * step(0.1, length(dynamicLight)) * hasActiveLights;
+    float isDebugPixel = DebugLightingAreas * step(0.1, length(dynamicLight));
 
     // Shadows
     float shadowTerm = SampleShadow(input.WorldPos, normal);
@@ -346,12 +392,11 @@ float4 PS_Objects(PixelInput input) : SV_Target
 
     // Calculate per-pixel dynamic lighting (higher quality for objects)
     float3 dynamicLight = CalculateDynamicLighting(input.WorldPos, normal);
-    float hasActiveLights = step(1.0, float(ActiveLightCount));
-    float3 finalLight = baseLight + dynamicLight * TerrainDynamicIntensityScale * hasActiveLights;
+
+    float3 finalLight = baseLight + dynamicLight * TerrainDynamicIntensityScale;
 
     // Debug mode
-    float isDebugPixel = DebugLightingAreas * step(0.1, length(dynamicLight)) * hasActiveLights;
-
+    float isDebugPixel = DebugLightingAreas * step(0.1, length(dynamicLight));
     // Shadows
     float shadowTerm = SampleShadow(input.WorldPos, normal);
     float shadowMix = lerp(1.0 - ShadowStrength, 1.0, shadowTerm);
