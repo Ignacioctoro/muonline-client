@@ -854,13 +854,32 @@ namespace Client.Main.Controls.Terrain
             if (!HasAnyGroundInTile(xi, yi, lodInt))
                 return;
 
-            int i1 = GetTerrainIndex(xi, yi);
+            int x1 = xi;
+            int y1 = yi;
+            int x2 = xi + lodInt;
+            int y2 = yi;
+            int x3 = xi + lodInt;
+            int y3 = yi + lodInt;
+            int x4 = xi;
+            int y4 = yi + lodInt;
 
-            int i2 = GetTerrainIndex(xi + lodInt, yi);
-            int i3 = GetTerrainIndex(xi + lodInt, yi + lodInt);
-            int i4 = GetTerrainIndex(xi, yi + lodInt);
+            int i1 = GetTerrainIndexRepeat(x1, y1);
+            int i2 = GetTerrainIndexRepeat(x2, y2);
+            int i3 = GetTerrainIndexRepeat(x3, y3);
+            int i4 = GetTerrainIndexRepeat(x4, y4);
 
-            if (_useTerrainIndexBatching)
+            bool canUseIndexedTile =
+                _useTerrainIndexBatching &&
+                x1 >= 0 && x1 < Constants.TERRAIN_SIZE &&
+                y1 >= 0 && y1 < Constants.TERRAIN_SIZE &&
+                x2 >= 0 && x2 < Constants.TERRAIN_SIZE &&
+                y2 >= 0 && y2 < Constants.TERRAIN_SIZE &&
+                x3 >= 0 && x3 < Constants.TERRAIN_SIZE &&
+                y3 >= 0 && y3 < Constants.TERRAIN_SIZE &&
+                x4 >= 0 && x4 < Constants.TERRAIN_SIZE &&
+                y4 >= 0 && y4 < Constants.TERRAIN_SIZE;
+
+            if (canUseIndexedTile)
             {
                 byte a1i = i1 < _data.Mapping.Alpha.Length ? _data.Mapping.Alpha[i1] : (byte)0;
                 byte a2i = i2 < _data.Mapping.Alpha.Length ? _data.Mapping.Alpha[i2] : (byte)0;
@@ -895,7 +914,7 @@ namespace Client.Main.Controls.Terrain
                 return;
             }
 
-            PrepareTileVertices(xi, yi, i1, i2, i3, i4, lodFactor);
+            PrepareTileVertices(x1, y1, x2, y2, x3, y3, x4, y4, i1, i2, i3, i4);
             PrepareTileLights(i1, i2, i3, i4);
             bool renderSkirts = edgeMask != 0;
             if (renderSkirts)
@@ -1150,68 +1169,53 @@ namespace Client.Main.Controls.Terrain
             }
         }
 
-        private void PrepareTileVertices(int xi, int yi, int i1, int i2, int i3, int i4, float lodFactor)
+        private void PrepareTileVertices(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int i1, int i2, int i3, int i4)
         {
-            if (_cachedVertexPositions != null && _cachedVertexNormals != null)
-            {
-                int total = _cachedVertexPositions.Length;
-                if ((uint)i1 < (uint)total &&
-                    (uint)i2 < (uint)total &&
-                    (uint)i3 < (uint)total &&
-                    (uint)i4 < (uint)total)
-                {
-                    // Cached positions include height scaling and special-height offsets.
-                    _tempTerrainVertex[0] = _cachedVertexPositions[i1];
-                    _tempTerrainVertex[1] = _cachedVertexPositions[i2];
-                    _tempTerrainVertex[2] = _cachedVertexPositions[i3];
-                    _tempTerrainVertex[3] = _cachedVertexPositions[i4];
-
-                    _tempTerrainNormals[0] = _cachedVertexNormals[i1];
-                    _tempTerrainNormals[1] = _cachedVertexNormals[i2];
-                    _tempTerrainNormals[2] = _cachedVertexNormals[i3];
-                    _tempTerrainNormals[3] = _cachedVertexNormals[i4];
-                    return;
-                }
-            }
-
-            // Fallback for edge tiles that exceed cached array bounds (matches pre-cache behavior).
-            float sx = xi * Constants.TERRAIN_SCALE;
-            float sy = yi * Constants.TERRAIN_SCALE;
-            float ss = Constants.TERRAIN_SCALE * lodFactor;
-
-            SetTempVertex(0, i1, sx, sy);
-            SetTempVertex(1, i2, sx + ss, sy);
-            SetTempVertex(2, i3, sx + ss, sy + ss);
-            SetTempVertex(3, i4, sx, sy + ss);
+            SetTempVertexFromSample(0, x1, y1, i1);
+            SetTempVertexFromSample(1, x2, y2, i2);
+            SetTempVertexFromSample(2, x3, y3, i3);
+            SetTempVertexFromSample(3, x4, y4, i4);
         }
 
-        private void SetTempVertex(int slot, int index, float x, float y)
+        private void SetTempVertexFromSample(int slot, int worldTileX, int worldTileY, int sampleIndex)
         {
+            float z;
+            Vector3 normal = Vector3.UnitZ;
+
             if (_cachedVertexPositions != null &&
                 _cachedVertexNormals != null &&
-                (uint)index < (uint)_cachedVertexPositions.Length &&
-                (uint)index < (uint)_cachedVertexNormals.Length)
+                (uint)sampleIndex < (uint)_cachedVertexPositions.Length &&
+                (uint)sampleIndex < (uint)_cachedVertexNormals.Length)
             {
-                _tempTerrainVertex[slot] = _cachedVertexPositions[index];
-                _tempTerrainNormals[slot] = _cachedVertexNormals[index];
-                return;
+                z = _cachedVertexPositions[sampleIndex].Z;
+                normal = _cachedVertexNormals[sampleIndex];
             }
-
-            float z = 0f;
-            if (_data.HeightMap != null && (uint)index < (uint)_data.HeightMap.Length)
+            else
             {
-                z = _data.HeightMap[index].R * 1.5f;
-                var terrainWall = _data.Attributes?.TerrainWall;
-                if (terrainWall != null &&
-                    (uint)index < (uint)terrainWall.Length &&
-                    (terrainWall[index] & Client.Data.ATT.TWFlags.Height) != 0)
+                z = 0f;
+
+                if (_data.HeightMap != null &&
+                    (uint)sampleIndex < (uint)_data.HeightMap.Length)
                 {
-                    z += SpecialHeight;
+                    z = _data.HeightMap[sampleIndex].R * 1.5f;
+
+                    var terrainWall = _data.Attributes?.TerrainWall;
+
+                    if (terrainWall != null &&
+                        (uint)sampleIndex < (uint)terrainWall.Length &&
+                        (terrainWall[sampleIndex] & Client.Data.ATT.TWFlags.Height) != 0)
+                    {
+                        z += SpecialHeight;
+                    }
                 }
             }
 
-            _tempTerrainVertex[slot] = new Vector3(x, y, z);
-            _tempTerrainNormals[slot] = Vector3.UnitZ;
+            _tempTerrainVertex[slot] = new Vector3(
+                worldTileX * Constants.TERRAIN_SCALE,
+                worldTileY * Constants.TERRAIN_SCALE,
+                z);
+
+            _tempTerrainNormals[slot] = normal;
         }
 
         private void PrepareTileLights(int i1, int i2, int i3, int i4)
@@ -1661,6 +1665,10 @@ namespace Client.Main.Controls.Terrain
 
         private static int GetTerrainIndex(int x, int y)
             => y * Constants.TERRAIN_SIZE + x;
+
+        private static int GetTerrainIndexRepeat(int x, int y)
+            => ((y & Constants.TERRAIN_SIZE_MASK) * Constants.TERRAIN_SIZE)
+            + (x & Constants.TERRAIN_SIZE_MASK);
 
         private TerrainVertexPositionColorNormalTexture[] GetTileBatchBuffer(int texIndex, bool alphaLayer)
         {
