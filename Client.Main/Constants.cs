@@ -92,6 +92,11 @@ namespace Client.Main
         public static int SHADOW_MAP_SIZE;
         public static float SHADOW_DISTANCE;
         public static int DYNAMIC_LIGHT_UPDATE_FPS;
+        public static int ANIMATION_UPDATE_FPS;
+
+        public const int MIN_PERFORMANCE_FPS_CAP = 10;
+        public const int MAX_PERFORMANCE_FPS_CAP = 120;
+        public const int DEFAULT_ANIMATION_UPDATE_FPS = 45;
 
         // Day-Night Cycle (real-time sun movement)
         public static bool ENABLE_DAY_NIGHT_CYCLE;
@@ -174,6 +179,13 @@ namespace Client.Main
                 return ShadowQuality.High;
             return ShadowQuality.Ultra;
         }
+        public static int ClampPerformanceFps(int fps)
+        {
+            return Math.Clamp(
+                fps,
+                MIN_PERFORMANCE_FPS_CAP,
+                MAX_PERFORMANCE_FPS_CAP);
+        }
 
         // Paths
         public static string DataPath;
@@ -234,7 +246,7 @@ namespace Client.Main
             ENABLE_SHADOW_MAPPING = false;
             ENABLE_DAY_NIGHT_CYCLE = false;
             DAY_NIGHT_SPEED_MULTIPLIER = 60f;
-            DYNAMIC_LIGHT_UPDATE_FPS = 30;
+            ANIMATION_UPDATE_FPS = DEFAULT_ANIMATION_UPDATE_FPS;
             // Default to the Medium preset unless user changes it in options
             // ApplyShadowQualityPreset(ShadowQuality.Medium);
             SHADOW_NEAR_PLANE = 10f;

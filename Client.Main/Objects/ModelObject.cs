@@ -166,10 +166,15 @@ namespace Client.Main.Objects
         #endregion
 
         #region Instance Fields - Cached State
+        private float _animationStepAccumulatorSeconds = 0f;
+        private uint _animationPoseVersion = 0;
+        private uint _lastLinkedParentPoseVersion = uint.MaxValue;
+        private ModelObject _lastLinkedParentModel = null;
 
         private double _lastAnimationUpdateTime = 0;
         private double _lastFrameTimeMs = 0; // To track timing in methods without GameTime
         private double _lastStrideAnimationBufferUpdateTimeMs = double.NegativeInfinity;
+        private float _drawShaderTimeSeconds = 0f;
 
         private readonly int _animationStrideOffset;
 
@@ -291,6 +296,7 @@ namespace Client.Main.Objects
 
         public int AnimationUpdateStride { get; private set; } = 1;
         protected virtual bool RequiresPerFrameAnimation => false;
+        internal uint AnimationPoseVersion => _animationPoseVersion;
         protected virtual bool AllowAnimationUpdates => true;
         protected virtual bool AllowLightingUpdates => true;
         protected virtual bool AllowDynamicLightingShader => true;
@@ -631,6 +637,20 @@ namespace Client.Main.Objects
                 _cachedTime = currentTick * 0.001f;
             }
             return _cachedTime;
+        }
+        private void SetDrawShaderTimeSeconds(float timeSeconds)
+        {
+            if (!float.IsNaN(timeSeconds) &&
+                !float.IsInfinity(timeSeconds) &&
+                timeSeconds >= 0f)
+            {
+                _drawShaderTimeSeconds = timeSeconds;
+            }
+        }
+
+        private float GetShaderTimeSeconds()
+        {
+            return _drawShaderTimeSeconds;
         }
 
         public void SetAnimationUpdateStride(int stride)
