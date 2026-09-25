@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Client.Main.Controls.UI.Game.Inventory;
 
@@ -50,6 +51,7 @@ namespace Client.Main.Objects.Wings
         private float _capeMinAxis;
         private float _capeMaxAxis;
         private bool _capeHasExtents;
+        private int _changeVersion;
 
         private short _type;
         public new short Type
@@ -60,7 +62,13 @@ namespace Client.Main.Objects.Wings
                 if (_type != value)
                 {
                     _type = value;
-                    _ = OnChangeType();
+
+                    int changeVersion =
+                        Interlocked.Increment(ref _changeVersion);
+
+                    _ = OnChangeType(
+                        _type,
+                        changeVersion);
                 }
             }
         }
@@ -77,7 +85,13 @@ namespace Client.Main.Objects.Wings
                 }
 
                 itemIndex = value;
-                _ = OnChangeIndex();
+
+            int changeVersion =
+                Interlocked.Increment(ref _changeVersion);
+
+            _ = OnChangeIndex(
+                itemIndex,
+                changeVersion);
             }
         }
 
@@ -105,100 +119,192 @@ namespace Client.Main.Objects.Wings
             // occluded by the body depth, especially for capes (e.g., Dark Lord robe).
             return -0.000012f;
         }
-
-        private async Task OnChangeType()
+        private bool IsCurrentChangeVersion(int changeVersion)
         {
-            if (Type <= 0)
-            {
-                // Only clear the model if we don't have a valid ItemIndex
-                // (ItemIndex is the preferred source when set)
-                if (ItemIndex < 0)
-                {
-                    Model = null;
-                }
-
-                return;
-            }
-
-            string modelPath = Path.Combine("Item", $"Wing{Type:D2}.bmd");
-
-            Model = await BMDLoader.Instance.Prepare(modelPath);
-
-            if (Model == null)
-            {
-                modelPath = Path.Combine("Item", $"Wing{Type}.bmd");
-                Model = await BMDLoader.Instance.Prepare(modelPath);
-            }
-
-            Status = Model == null ? GameControlStatus.Error : GameControlStatus.Ready;
+            return Volatile.Read(ref _changeVersion) ==
+                changeVersion;
         }
 
-        private async Task OnChangeIndex()
+        private void UpdateStatusAfterAsyncResolve(
+            bool modelResolved)
         {
-            if (ItemIndex < 0)
+            if (Status is not (
+                GameControlStatus.Ready or
+                GameControlStatus.Error))
             {
-                // Only clear the model if we don't have a valid Type
-                // (Type is the fallback source when ItemIndex is not set)
-                if (Type <= 0)
+                return;
+            }
+
+            Status =
+                modelResolved
+                    ? GameControlStatus.Ready
+                    : GameControlStatus.Error;
+        }
+
+        private async Task OnChangeType(
+            short requestedType,
+            int changeVersion)
+        {
+            if (!IsCurrentChangeVersion(changeVersion))
+                return;
+
+            if (requestedType <= 0)
+            {
+                if (ItemIndex < 0)
                 {
+                    ApplyCapeState(false);
                     Model = null;
                 }
 
                 return;
             }
 
-            ItemDefinition itemDefinition = ItemDatabase.GetItemDefinition(12, itemIndex);
-            string modelPath = itemDefinition?.TexturePath;
-            bool isCape = ItemIndex == 30;
+            string modelPath =
+                Path.Combine(
+                    "Item",
+                    $"Wing{requestedType:D2}.bmd");
+
+            var resolvedModel =
+                await BMDLoader.Instance.Prepare(modelPath);
+
+            if (resolvedModel == null)
+            {
+                modelPath =
+                    Path.Combine(
+                        "Item",
+                        $"Wing{requestedType}.bmd");
+
+                resolvedModel =
+                    await BMDLoader.Instance.Prepare(modelPath);
+            }
+
+            if (!IsCurrentChangeVersion(changeVersion))
+                return;
+
+            ApplyCapeState(false);
+
+            Model = resolvedModel;
+
+            UpdateStatusAfterAsyncResolve(
+                resolvedModel != null);
+        }
+
+        private async Task OnChangeIndex(
+            short requestedItemIndex,
+            int changeVersion)
+        {
+            if (!IsCurrentChangeVersion(changeVersion))
+                return;
+
+            if (requestedItemIndex < 0)
+            {
+                if (Type <= 0)
+                {
+                    ApplyCapeState(false);
+                    Model = null;
+                }
+
+                return;
+            }
+
+            ItemDefinition itemDefinition =
+                ItemDatabase.GetItemDefinition(
+                    12,
+                    requestedItemIndex);
+
+            string modelPath =
+                itemDefinition?.TexturePath;
+
+            bool isCape =
+                requestedItemIndex == 30;
+
+            BMD resolvedModel = null;
 
             if (string.IsNullOrWhiteSpace(modelPath))
             {
-                // Only Cape of Lord needs a hardcoded fallback model.
-                if (ItemIndex == 30)
+                if (requestedItemIndex == 30)
                 {
-                    Model = await BMDLoader.Instance.Prepare("Item/DarkLordRobe.bmd")
-                        ?? await BMDLoader.Instance.Prepare("Item/DarkLordRobe02.bmd");
-                }
-                else
-                {
-                    Model = null;
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare(
+                            "Item/DarkLordRobe.bmd")
+                        ??
+                        await BMDLoader.Instance.Prepare(
+                            "Item/DarkLordRobe02.bmd");
                 }
             }
             else
             {
-                string normalized = modelPath.Replace("\\", "/");
+                string normalized =
+                    modelPath.Replace("\\", "/");
 
-                if (normalized.Contains("DarkLordRobe", StringComparison.OrdinalIgnoreCase))
+                if (normalized.Contains(
+                        "DarkLordRobe",
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     isCape = true;
                 }
 
-                if (normalized.Contains("Item/Wing/", StringComparison.OrdinalIgnoreCase))
+                if (normalized.Contains(
+                        "Item/Wing/",
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    normalized = Path.Combine("Item", Path.GetFileName(normalized)).Replace("\\", "/");
+                    normalized =
+                        Path.Combine(
+                            "Item",
+                            Path.GetFileName(normalized))
+                        .Replace("\\", "/");
                 }
 
-                if (normalized.Contains("DarkLordRobe01", StringComparison.OrdinalIgnoreCase))
+                if (normalized.Contains(
+                        "DarkLordRobe01",
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    normalized = normalized.Replace("DarkLordRobe01", "DarkLordRobe");
+                    normalized =
+                        normalized.Replace(
+                            "DarkLordRobe01",
+                            "DarkLordRobe");
                 }
 
-                Model = await BMDLoader.Instance.Prepare(normalized);
+                resolvedModel =
+                    await BMDLoader.Instance.Prepare(
+                        normalized);
 
-                if (Model == null && normalized.EndsWith("DarkLordRobe.bmd", StringComparison.OrdinalIgnoreCase))
+                if (resolvedModel == null &&
+                    normalized.EndsWith(
+                        "DarkLordRobe.bmd",
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    string robe02Path = normalized.Replace("DarkLordRobe.bmd", "DarkLordRobe02.bmd");
-                    Model = await BMDLoader.Instance.Prepare(robe02Path);
+                    string robe02Path =
+                        normalized.Replace(
+                            "DarkLordRobe.bmd",
+                            "DarkLordRobe02.bmd");
+
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare(
+                            robe02Path);
                 }
             }
 
-            if (isCape && Model != null)
+            if (!IsCurrentChangeVersion(changeVersion))
+                return;
+
+            if (isCape && resolvedModel != null)
             {
+                Model = resolvedModel;
+
                 UpdateCapeExtents();
+
+                ApplyCapeState(true);
+            }
+            else
+            {
+                ApplyCapeState(false);
+
+                Model = resolvedModel;
             }
 
-            ApplyCapeState(isCape);
-            Status = Model == null ? GameControlStatus.Error : GameControlStatus.Ready;
+            UpdateStatusAfterAsyncResolve(
+                resolvedModel != null);
         }
 
         private void ApplyCapeState(bool isCape)
