@@ -32,7 +32,14 @@ namespace Client.Main.Controls
         public Vector3 LightDirection { get; set; } = Vector3.Normalize(-SunCycleManager.BaseSunDirection);
         public IReadOnlyList<DynamicLight> DynamicLights => _lightManager.DynamicLights;
         public IReadOnlyList<DynamicLightSnapshot> ActiveLights => _lightManager.ActiveLights;
+        public IReadOnlyList<DynamicLightSnapshot> VisibleLights => _lightManager.VisibleLights;
+
         public int ActiveLightsVersion => _lightManager.ActiveLightsVersion;
+        public int VisibleLightsVersion => _lightManager.VisibleLightsVersion;
+        public int LastFrameRegisteredDynamicLights => _lightManager?.LastFrameRegisteredCount ?? 0;
+        public int LastFrameActiveDynamicLights => _lightManager?.LastFrameActiveCount ?? 0;
+        public int LastFrameVisibleDynamicLights => _lightManager?.LastFrameVisibleCount ?? 0;
+        public int LastUploadedDynamicLights => _renderer?.LastUploadedDynamicLights ?? 0;
         public Texture2D HeightMapTexture => _data?.HeightMapTexture;
         private Dictionary<int, string> _pendingTextureMap = new();
         private bool _replaceTextureMapping;

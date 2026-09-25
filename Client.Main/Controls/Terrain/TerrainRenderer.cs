@@ -82,15 +82,7 @@ namespace Client.Main.Controls.Terrain
         private float _terrainBuffersAmbientLight = float.NaN;
         private byte[] _terrainBuffersAlphaMapRef;
 
-        private const int DynamicLightArrayCapacity = 32; // Must match DynamicLighting.fx MAX_LIGHTS.
-        private readonly Vector3[] _cachedLightPositions = new Vector3[DynamicLightArrayCapacity];
-        private readonly Vector3[] _cachedLightColors = new Vector3[DynamicLightArrayCapacity];
-        private readonly float[] _cachedLightRadii = new float[DynamicLightArrayCapacity];
-        private readonly float[] _cachedLightIntensities = new float[DynamicLightArrayCapacity];
-        private readonly float[] _cachedLightScores = new float[DynamicLightArrayCapacity];
-        private int _lastLightsVersion = -1;
-        private int _lastLightCount = 0;
-        private const float MinLightInfluence = 0.001f;
+        private readonly DynamicLightGpuUploader _dynamicLightUploader = new();
 
         private Vector2 _waterFlowDir = Vector2.UnitX;
         private float _waterTotal = 0f;
@@ -113,6 +105,7 @@ namespace Client.Main.Controls.Terrain
         public int DrawnTriangles { get; private set; }
         public int DrawnBlocks { get; private set; }
         public int DrawnCells { get; private set; }
+        public int LastUploadedDynamicLights { get; private set; }
         public bool IsGpuLightingActive => _useDynamicLightingShader;
         public bool IsDynamicLightingShaderAvailable => GraphicsManager.Instance.DynamicLightingEffect != null;
 
@@ -600,171 +593,38 @@ namespace Client.Main.Controls.Terrain
         {
             if (!Constants.ENABLE_DYNAMIC_LIGHTS)
             {
-                effect.Parameters["ActiveLightCount"]?.SetValue(0);
-                effect.Parameters["MaxLightsToProcess"]?.SetValue(0);
+                _dynamicLightUploader.Clear(effect);
+                LastUploadedDynamicLights = 0;
                 return;
             }
 
-            int maxLights = Math.Min(DynamicLightArrayCapacity, _cachedLightPositions.Length);
-            int version = _lightManager.ActiveLightsVersion;
+            var visibleLights = _lightManager.VisibleLights;
 
-            // Only rebuild when the light snapshot changes (throttled at
-            // DYNAMIC_LIGHT_UPDATE_FPS).  Between updates, reuse the cached arrays.
-            if (version != _lastLightsVersion)
+            if (visibleLights == null || visibleLights.Count == 0)
             {
-                _lastLightsVersion = version;
-                _lastLightCount = 0;
-
-                var activeLights = _lightManager.ActiveLights;
-                if (activeLights != null && activeLights.Count > 0)
-                {
-                    if (activeLights.Count <= maxLights)
-                    {
-                        // All lights fit — copy in natural order.  No scoring or
-                        // sorting needed because the shader processes ALL uploaded
-                        // lights (TERRAIN_MAX_LIGHTS == MAX_LIGHTS).  Stable order
-                        // eliminates flickering from lights swapping rank each snapshot.
-                        int count = activeLights.Count;
-                        for (int i = 0; i < count; i++)
-                        {
-                            var light = activeLights[i];
-                            _cachedLightPositions[i] = light.Position;
-                            _cachedLightColors[i] = light.Color;
-                            _cachedLightRadii[i] = light.Radius;
-                            _cachedLightIntensities[i] = light.Intensity;
-                        }
-                        _lastLightCount = count;
-                    }
-                    else
-                    {
-                        // Rare: more active lights than array capacity — pick best by proximity.
-                        Vector2 focusPos = Camera.Instance != null
-                            ? new Vector2(Camera.Instance.Target.X, Camera.Instance.Target.Y)
-                            : Vector2.Zero;
-                        _lastLightCount = SelectLightsByProximity(activeLights, focusPos, maxLights);
-                    }
-                }
+                _dynamicLightUploader.Clear(effect);
+                LastUploadedDynamicLights = 0;
+                return;
             }
 
-            effect.Parameters["ActiveLightCount"]?.SetValue(_lastLightCount);
-            effect.Parameters["MaxLightsToProcess"]?.SetValue(maxLights);
-            if (_lastLightCount > 0)
-            {
-                effect.Parameters["LightPositions"]?.SetValue(_cachedLightPositions);
-                effect.Parameters["LightColors"]?.SetValue(_cachedLightColors);
-                effect.Parameters["LightRadii"]?.SetValue(_cachedLightRadii);
-                effect.Parameters["LightIntensities"]?.SetValue(_cachedLightIntensities);
-            }
-        }
+            int maxLights =
+                Constants.OPTIMIZE_FOR_INTEGRATED_GPU
+                    ? 8
+                    : 32;
 
-        /// <summary>
-        /// Selects up to <paramref name="maxLights"/> from the active light pool,
-        /// ranked by proximity-weighted intensity, and sorts the result descending
-        /// so the first slots contain the most impactful lights.
-        /// </summary>
-        private int SelectLightsByProximity(
-            IReadOnlyList<DynamicLightSnapshot> activeLights,
-            Vector2 focusPos,
-            int maxLights)
-        {
-            maxLights = Math.Min(maxLights, _cachedLightPositions.Length);
-            if (activeLights == null || activeLights.Count == 0 || maxLights <= 0)
-                return 0;
+            Vector2 focusPos =
+                Camera.Instance != null
+                    ? new Vector2(
+                        Camera.Instance.Target.X,
+                        Camera.Instance.Target.Y)
+                    : Vector2.Zero;
 
-            int selected = 0;
-            float weakestScore = float.MaxValue;
-            int weakestIndex = 0;
-
-            for (int i = 0; i < activeLights.Count; i++)
-            {
-                var light = activeLights[i];
-                float radius = light.Radius;
-                float radiusSq = radius * radius;
-                if (radiusSq <= 0.001f) continue;
-
-                var lightPos2 = new Vector2(light.Position.X, light.Position.Y);
-                float distSq = Vector2.DistanceSquared(lightPos2, focusPos);
-
-                // Score: intensity weighted by proximity.  radiusSq in the denominator
-                // ensures large-radius lights score higher (they illuminate more terrain).
-                float score = light.Intensity * radiusSq / (radiusSq + distSq + 1f);
-
-                if (selected < maxLights)
-                {
-                    _cachedLightScores[selected] = score;
-                    _cachedLightPositions[selected] = light.Position;
-                    _cachedLightColors[selected] = light.Color;
-                    _cachedLightRadii[selected] = radius;
-                    _cachedLightIntensities[selected] = light.Intensity;
-
-                    if (score < weakestScore)
-                    {
-                        weakestScore = score;
-                        weakestIndex = selected;
-                    }
-
-                    selected++;
-                }
-                else if (score > weakestScore)
-                {
-                    _cachedLightScores[weakestIndex] = score;
-                    _cachedLightPositions[weakestIndex] = light.Position;
-                    _cachedLightColors[weakestIndex] = light.Color;
-                    _cachedLightRadii[weakestIndex] = radius;
-                    _cachedLightIntensities[weakestIndex] = light.Intensity;
-
-                    weakestScore = _cachedLightScores[0];
-                    weakestIndex = 0;
-                    for (int j = 1; j < selected; j++)
-                    {
-                        float s = _cachedLightScores[j];
-                        if (s < weakestScore)
-                        {
-                            weakestScore = s;
-                            weakestIndex = j;
-                        }
-                    }
-                }
-            }
-
-            // Sort descending so the shader's TERRAIN_MAX_LIGHTS limit gets the best lights.
-            if (selected > 1)
-                SortSelectedLightsByScore(selected);
-
-            return selected;
-        }
-
-        /// <summary>
-        /// Insertion sort (descending) on the cached light arrays by score.
-        /// Count is at most 32, so this is fast.
-        /// </summary>
-        private void SortSelectedLightsByScore(int count)
-        {
-            for (int i = 1; i < count; i++)
-            {
-                float key = _cachedLightScores[i];
-                var pos = _cachedLightPositions[i];
-                var col = _cachedLightColors[i];
-                float rad = _cachedLightRadii[i];
-                float inten = _cachedLightIntensities[i];
-
-                int j = i - 1;
-                while (j >= 0 && _cachedLightScores[j] < key)
-                {
-                    _cachedLightScores[j + 1] = _cachedLightScores[j];
-                    _cachedLightPositions[j + 1] = _cachedLightPositions[j];
-                    _cachedLightColors[j + 1] = _cachedLightColors[j];
-                    _cachedLightRadii[j + 1] = _cachedLightRadii[j];
-                    _cachedLightIntensities[j + 1] = _cachedLightIntensities[j];
-                    j--;
-                }
-
-                _cachedLightScores[j + 1] = key;
-                _cachedLightPositions[j + 1] = pos;
-                _cachedLightColors[j + 1] = col;
-                _cachedLightRadii[j + 1] = rad;
-                _cachedLightIntensities[j + 1] = inten;
-            }
+            LastUploadedDynamicLights =
+                _dynamicLightUploader.Upload(
+                    effect,
+                    visibleLights,
+                    focusPos,
+                    maxLights);
         }
 
         private void RenderTerrainBlock(int xi, int yi, bool after, int lodStep, TerrainBlock block = null)

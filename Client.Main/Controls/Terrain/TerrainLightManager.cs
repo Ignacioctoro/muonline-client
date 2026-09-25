@@ -24,11 +24,16 @@ namespace Client.Main.Controls.Terrain
 
         private readonly List<DynamicLight> _dynamicLights = new();
         private readonly List<DynamicLightSnapshot> _activeLights = new(32);
+
+        // Luces activas que realmente intersectan el frustum de la cámara.
+        private readonly List<DynamicLightSnapshot> _visibleLights = new(32);
+
         private readonly List<PrecomputedLight> _precomputedActiveLights = new(32);
         private readonly TerrainData _data;
         private readonly GameControl _parent;
         private float _lightUpdateTimer = 0;
         private int _activeLightsVersion = 0;
+        private int _visibleLightsVersion = 0;
         private const int MaxLightCacheEntries = 4096;
         private const float CacheQuantization = 8f; // Smaller cell to avoid cross-tile flicker
         private const float InvCacheQuantization = 1f / CacheQuantization;
@@ -46,7 +51,14 @@ namespace Client.Main.Controls.Terrain
 
         public IReadOnlyList<DynamicLight> DynamicLights => _dynamicLights;
         public IReadOnlyList<DynamicLightSnapshot> ActiveLights => _activeLights;
+        public IReadOnlyList<DynamicLightSnapshot> VisibleLights => _visibleLights;
+
         public int ActiveLightsVersion => _activeLightsVersion;
+        public int VisibleLightsVersion => _visibleLightsVersion;
+
+        public int LastFrameRegisteredCount { get; private set; }
+        public int LastFrameActiveCount { get; private set; }
+        public int LastFrameVisibleCount { get; private set; }
 
         public TerrainLightManager(TerrainData data, GameControl parent)
         {
@@ -133,19 +145,37 @@ namespace Client.Main.Controls.Terrain
 
             if (!Constants.ENABLE_DYNAMIC_LIGHTS)
             {
-                if (_activeLights.Count > 0 || _precomputedActiveLights.Count > 0)
+                if (_activeLights.Count > 0 ||
+                    _visibleLights.Count > 0 ||
+                    _precomputedActiveLights.Count > 0)
                 {
                     _activeLightsVersion++;
+                    _visibleLightsVersion++;
+
                     _activeLights.Clear();
+                    _visibleLights.Clear();
+
                     ClearLightGridState();
                     InvalidateLightCache();
                 }
+
+                LastFrameRegisteredCount = _dynamicLights.Count;
+                LastFrameActiveCount = 0;
+                LastFrameVisibleCount = 0;
+
                 return;
             }
 
             _activeLightsVersion++;
+            _visibleLightsVersion++;
 
             _activeLights.Clear();
+            _visibleLights.Clear();
+
+            LastFrameRegisteredCount = _dynamicLights.Count;
+            LastFrameActiveCount = 0;
+            LastFrameVisibleCount = 0;
+
             var world = _parent.World;
             if (_dynamicLights.Count == 0 || world == null)
             {
@@ -184,6 +214,33 @@ namespace Client.Main.Controls.Terrain
                 // Snapshot values so lighting updates are throttled (not per-frame).
                 _activeLights.Add(new DynamicLightSnapshot(light.Position, light.Color, light.Radius, light.Intensity));
             }
+        LastFrameActiveCount = _activeLights.Count;
+
+            if (_activeLights.Count > 0)
+            {
+                var camera = Camera.Instance;
+                var frustum = camera?.Frustum;
+
+                // Si no tenemos cámara/frustum, mantenemos todas las luces.
+                if (frustum == null)
+                {
+                    _visibleLights.AddRange(_activeLights);
+                }
+                else
+                {
+                    for (int i = 0; i < _activeLights.Count; i++)
+                    {
+                        var light = _activeLights[i];
+
+                        if (IsLightVisibleInFrustum(frustum, light))
+                        {
+                            _visibleLights.Add(light);
+                        }
+                    }
+                }
+            }
+
+            LastFrameVisibleCount = _visibleLights.Count;
 
             // Always rebuild spatial grid when lights are updated (lights can move/change)
             RebuildLightGrid();
@@ -191,6 +248,7 @@ namespace Client.Main.Controls.Terrain
             // Invalidate cache on light updates to ensure fresh calculations
             InvalidateLightCache();
         }
+        
 
         public Vector3 EvaluateDynamicLight(Vector2 position)
         {
@@ -281,6 +339,33 @@ namespace Client.Main.Controls.Terrain
                 _lightInfluenceCache[posKey] = result;
 
             return result;
+        }
+        private static bool IsLightVisibleInFrustum(
+            BoundingFrustum frustum,
+            in DynamicLightSnapshot light)
+        {
+            float baseRadius =
+                Math.Max(
+                    light.Radius,
+                    0.0001f);
+
+            // Margen para evitar que una luz aparezca/desaparezca
+            // bruscamente justo en el borde de la cámara.
+            float guardBand =
+                Math.Max(
+                    64f,
+                    baseRadius * 0.20f);
+
+            float sphereRadius =
+                baseRadius + guardBand;
+
+            var sphere =
+                new BoundingSphere(
+                    light.Position,
+                    sphereRadius);
+
+            return frustum.Contains(sphere) !=
+                ContainmentType.Disjoint;
         }
 
         private void RebuildLightGrid()
