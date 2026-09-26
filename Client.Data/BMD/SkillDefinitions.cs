@@ -70,7 +70,7 @@ namespace Client.Data.BMD
 
             // ID 55-79: Dark Lord/Mixed Skills
             { 55, SkillType.Area },    // Fire Slash
-            { 56, SkillType.Target },  // Power Slash
+            { 56, SkillType.Area },    // Power Slash
             { 57, SkillType.Area },    // Spiral Slash
             { 60, SkillType.Self },    // Force
             { 61, SkillType.Target },  // Fire Burst
@@ -222,7 +222,7 @@ namespace Client.Data.BMD
             Add(232, 176);  // Strike of Destruction → PlayerSkillBlowOfDestruction
             Add(64, 71);    // Increase Critical Damage → PlayerSkillVitality
             Add(65, 71);    // Electric Spike → PlayerSkillVitality
-            Add(56, 146);   // Power Slash → PlayerAttackTwoHandSwordTwo
+            Add(56, 145);   // Power Slash → PlayerAttackTwoHandSwordTwo
             Add(57, 65);    // Spiral Slash → PlayerAttackSkillWheel
 
             // ELF SKILLS
@@ -314,7 +314,7 @@ namespace Client.Data.BMD
             map[49] = "Sound/sKnightSkill1.wav";         // Fire Breath (ID 49)
             map[47] = "Sound/eRidingSpear.wav";          // Impale (ID 47)
             map[48] = "Sound/eSwellLife.wav";            // Greater Fortitude (ID 48)
-            map[56] = "Sound/eRaidShoot.wav";            // Raid (ID 56)
+            map[56] = "Sound/sKnightSkill3.wav";         // Power Slash (ID 56)
 
             // DARK LORD SKILLS
             map[62] = "Sound/sDarkEarthQuake.wav";       // Earthshake (ID 62)
