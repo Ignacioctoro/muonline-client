@@ -264,6 +264,25 @@ namespace Client.Main.Scenes
                     target.Location,
                     allowedRange))
                 {
+                    //
+                    // Already in range, but currently moving between tiles.
+                    // Stop after reaching the current tile and keep the skill
+                    // pending until movement finishes.
+                    //
+                    if (hero.IsMoving)
+                    {
+                        hero.StopAfterCurrentTile();
+
+                        QueueSkillCast(
+                            skill,
+                            target,
+                            allowedRange,
+                            isAreaSkill: true,
+                            moveTowardsTarget: false);
+
+                        return true;
+                    }
+
                     return UseAreaSkill(
                         skill,
                         target.NetworkId);
@@ -420,9 +439,26 @@ namespace Client.Main.Scenes
                     skillTarget.Location,
                     allowedRange))
                 {
-                    UseAreaSkill(
-                        skill,
-                        skillTarget.NetworkId);
+                    if (hero.IsMoving)
+                    {
+                        //
+                        // Finish the current tile, then cast.
+                        //
+                        hero.StopAfterCurrentTile();
+
+                        QueueSkillCast(
+                            skill,
+                            skillTarget,
+                            allowedRange,
+                            isAreaSkill: true,
+                            moveTowardsTarget: false);
+                    }
+                    else
+                    {
+                        UseAreaSkill(
+                            skill,
+                            skillTarget.NetworkId);
+                    }
                 }
                 else
                 {
@@ -528,6 +564,14 @@ namespace Client.Main.Scenes
 
             if (hero.IsAttackOrSkillAnimationPlaying())
                 return;
+            //
+            // If the character is between two tiles, don't snap it
+            // backwards. Finish the current tile first.
+            //
+            if (hero.IsMoving)
+            {
+                return;
+            }
 
             if (!TryConsumeSkillDelay(NovaSkillId))
                 return;
@@ -712,7 +756,8 @@ namespace Client.Main.Scenes
             WalkerObject target,
             uint allowedRange,
             bool isAreaSkill,
-            bool allowNonDuelPlayer = false)
+            bool allowNonDuelPlayer = false,
+            bool moveTowardsTarget = true)
         {
             var hero = _scene.Hero;
 
@@ -733,9 +778,12 @@ namespace Client.Main.Scenes
                 allowNonDuelPlayer &&
                 target is PlayerObject;
 
-            MoveHeroTowardsTarget(
-                target.Location,
-                force: true);
+            if (moveTowardsTarget)
+            {
+                MoveHeroTowardsTarget(
+                    target.Location,
+                    force: true);
+            }
         }
 
         private void UpdatePendingSkill()
@@ -1291,13 +1339,19 @@ namespace Client.Main.Scenes
             if (hero.IsAttackOrSkillAnimationPlaying())
                 return false;
 
+            //
+            // If we're still interpolating toward the current tile,
+            // wait until that step is complete before casting.
+            //
+            if (hero.IsMoving)
+                return false;
+
             if (!TryConsumeSkillDelay(
                 skill.SkillId))
             {
                 return false;
             }
 
-            // Check if player has enough mana and AG to use the skill
             var characterState =
                 MuGame.Network?.GetCharacterState();
 
@@ -1346,6 +1400,10 @@ namespace Client.Main.Scenes
                 isInSafeZone =
                     flags.HasFlag(TWFlags.SafeZone);
             }
+
+            //
+            // Classic MU behavior:
+            // stop walking before starting the skill animation.
 
             var action =
                 hero.GetSkillAction(

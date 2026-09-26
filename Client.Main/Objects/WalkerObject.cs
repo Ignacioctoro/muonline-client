@@ -155,6 +155,32 @@ namespace Client.Main.Objects
             // Reset animation state to clear any stuck death animations
             _animationController?.Reset();
         }
+        /// <summary>
+        /// Cancels the remaining movement path but lets the walker
+        /// finish the tile transition that is already in progress.
+        /// Useful before starting an attack or skill.
+        /// </summary>
+        public void StopAfterCurrentTile()
+        {
+            //
+            // Remove all future tiles from the path.
+            // Do NOT modify MoveTargetPosition or Location here:
+            // the character must finish the current interpolation naturally.
+            //
+            _currentPath?.Clear();
+            _currentPath = null;
+
+            _movementIntent = false;
+
+            //
+            // Invalidate an asynchronous pathfinding result which may
+            // still be calculated in the background.
+            //
+            if (IsMainWalker)
+            {
+                _moveRequestVersion++;
+            }
+        }
 
         /// <summary>
         /// Immediately stops any ongoing movement for this walker.
@@ -165,19 +191,79 @@ namespace Client.Main.Objects
         /// </summary>
         public void StopMovement()
         {
+            //
+            // Cancel any queued path immediately.
+            //
             _currentPath?.Clear();
             _currentPath = null;
+            _movementIntent = false;
 
-            // Freeze the object at its current rendered position
-            MoveTargetPosition = Position;
+            //
+            // Invalidate any asynchronous MoveTo request that may still
+            // be calculating a path. Otherwise an old path could be
+            // applied a few milliseconds after stopping.
+            //
+            if (IsMainWalker)
+            {
+                _moveRequestVersion++;
+            }
 
-            // Update the logical tile position without invoking OnLocationChanged
-            _location = new Vector2(
-                (int)(Position.X / Constants.TERRAIN_SCALE),
-                (int)(Position.Y / Constants.TERRAIN_SCALE));
+            //
+            // IMPORTANT:
+            // MoveTargetPosition is in terrain/world-ground coordinates.
+            // Position.Z contains the rendered height adjustment, so
+            // NEVER copy Position directly into MoveTargetPosition.
+            //
+            Vector3 currentGroundPosition = MoveTargetPosition;
 
-            // Align target angle with current rotation to prevent snapping
+            if (currentGroundPosition == Vector3.Zero)
+            {
+                currentGroundPosition = TargetPosition;
+            }
+
+            //
+            // Determine the tile where the character currently is.
+            //
+            int tileX =
+                Math.Clamp(
+                    (int)(currentGroundPosition.X / Constants.TERRAIN_SCALE),
+                    0,
+                    Constants.TERRAIN_SIZE - 1);
+
+            int tileY =
+                Math.Clamp(
+                    (int)(currentGroundPosition.Y / Constants.TERRAIN_SCALE),
+                    0,
+                    Constants.TERRAIN_SIZE - 1);
+
+            //
+            // Update logical position without triggering movement/direction.
+            //
+            _location =
+                new Vector2(
+                    tileX,
+                    tileY);
+
+            //
+            // Rebuild a valid ground-space position from the tile.
+            // This keeps Z based on terrain height and prevents the
+            // vertical/camera accumulation bug.
+            //
+            MoveTargetPosition = TargetPosition;
+
+            //
+            // Keep the current facing direction.
+            //
             _targetAngle = Angle;
+
+            //
+            // Update camera immediately to the stopped position.
+            //
+            if (IsMainWalker)
+            {
+                UpdateCameraPosition(
+                    MoveTargetPosition);
+            }
         }
 
         public void OnDirectionChanged()
@@ -266,19 +352,34 @@ namespace Client.Main.Objects
             PlayAction(actionIndex, false);
         }
 
-        public virtual void MoveTo(Vector2 targetLocation, bool sendToServer = true, bool usePathfinding = true)
+        public virtual void MoveTo(Vector2 targetLocation,bool sendToServer = true,bool usePathfinding = true)
         {
-            if (World == null) return;
+            if (World == null)
+                return;
+
+            //
+            // Classic MU behavior:
+            // the local player cannot start moving while an
+            // attack or skill one-shot animation is playing.
+            //
+            if (IsMainWalker && IsAttackOrSkillAnimationPlaying())
+            {
+                return;
+            }
 
             if (targetLocation == Location)
                 return;
 
             // Don't allow movement if player is dead
-            if (!this.IsAlive()) return;
-
-            // Don't allow movement while teleporting (waiting for server response)
-            if (IsMainWalker && MuGame.Network?.GetCharacterState()?.IsTeleporting == true)
+            if (!this.IsAlive())
                 return;
+
+            // Don't allow movement while teleporting
+            if (IsMainWalker &&
+                MuGame.Network?.GetCharacterState()?.IsTeleporting == true)
+            {
+                return;
+            }
 
             _movementIntent = true;
 
@@ -289,9 +390,13 @@ namespace Client.Main.Objects
                 player.OnPlayerMoved();
             }
 
-            Vector2 startPos = new Vector2((int)Location.X, (int)Location.Y);
+            Vector2 startPos =
+                new Vector2((int)Location.X,(int)Location.Y);
+
             WorldControl currentWorld = World;
+
             uint requestVersion = 0;
+
             if (sendToServer && IsMainWalker)
             {
                 requestVersion = ++_moveRequestVersion;
@@ -299,27 +404,43 @@ namespace Client.Main.Objects
 
             if (!usePathfinding)
             {
-                var path = Pathfinding.BuildDirectPath(startPos, targetLocation);
+                var path = Pathfinding.BuildDirectPath(startPos,targetLocation);
+
                 ApplyPathOnMainThread(path, sendToServer, currentWorld, startPos, requestVersion);
-                return;
+            return;
             }
 
             _ = Task.Run(() =>
             {
-                List<Vector2> path = usePathfinding
-                    ? Pathfinding.FindPath(startPos, targetLocation, currentWorld)
-                    : Pathfinding.BuildDirectPath(startPos, targetLocation);
+                List<Vector2> path =
+                    usePathfinding
+                        ? Pathfinding.FindPath(
+                            startPos,
+                            targetLocation,
+                            currentWorld)
+                        : Pathfinding.BuildDirectPath(
+                            startPos,
+                            targetLocation);
 
-                // If no path was found for a remote object, fall back to a simple
-                // straight-line path so that the character still moves visibly
-                if ((path == null || path.Count == 0) && !sendToServer && usePathfinding)
+                if ((path == null ||
+                    path.Count == 0) &&
+                    !sendToServer &&
+                    usePathfinding)
                 {
-                    path = Pathfinding.BuildDirectPath(startPos, targetLocation);
+                    path =
+                        Pathfinding.BuildDirectPath(
+                            startPos,
+                            targetLocation);
                 }
 
                 MuGame.ScheduleOnMainThread(() =>
                 {
-                    ApplyPathOnMainThread(path, sendToServer, currentWorld, startPos, requestVersion);
+                    ApplyPathOnMainThread(
+                        path,
+                        sendToServer,
+                        currentWorld,
+                        startPos,
+                        requestVersion);
                 });
             });
         }
