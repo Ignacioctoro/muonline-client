@@ -1951,6 +1951,11 @@ namespace Client.Main.Scenes
             World = world;
         }
 
+        internal void NotifyLocalSkillAnimation(ushort skillId)
+        {
+            _skillController?.NotifyLocalSkillAnimation(skillId);
+        }
+
         public override void Dispose()
         {
             // Liberar cualquier touch capturado por los controles móviles.
