@@ -30,6 +30,7 @@ namespace Client.Main.Scenes
         private readonly SkillQuickSlot _skillQuickSlot;
         private readonly SkillHotkeyHudControl _skillHotkeys;
         private readonly MainControl _mainControl;
+        private readonly SkillSelectionPanel _skillSelectionPanel;
         private readonly ILogger _logger;
 
         private readonly HotkeySet _global;
@@ -47,7 +48,8 @@ namespace Client.Main.Scenes
             GameSceneObjectEditorController objectEditorController,
             SkillQuickSlot skillQuickSlot,
             SkillHotkeyHudControl skillHotkeys,
-             MainControl mainControl,
+            MainControl mainControl,
+            SkillSelectionPanel skillSelectionPanel,
             ILogger logger = null)
         {
             _scene = scene;
@@ -63,6 +65,7 @@ namespace Client.Main.Scenes
             _skillQuickSlot = skillQuickSlot;
             _skillHotkeys = skillHotkeys;
             _mainControl = mainControl;
+            _skillSelectionPanel = skillSelectionPanel;
 
             _logger = logger ?? NullLogger.Instance;
 
@@ -175,7 +178,73 @@ namespace Client.Main.Scenes
                     }
 
         private void RegisterInWorldHotkeys(HotkeySet hotkeys)
-        {
+        {   
+            // ---------------------------------------------------------
+            // CTRL + 1..0
+            //
+            // Asigna la skill que está bajo el mouse
+            // al hotkey correspondiente.
+            // ---------------------------------------------------------
+
+            hotkeys.OnKeyPressed(
+                Keys.D1,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(0),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D2,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(1),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D3,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(2),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D4,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(3),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D5,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(4),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D6,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(5),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D7,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(6),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D8,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(7),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D9,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(8),
+                exactModifiers: true);
+
+            hotkeys.OnKeyPressed(
+                Keys.D0,
+                HotkeyModifiers.Control,
+                context => AssignHoveredSkillHotkey(9),
+                exactModifiers: true);
             // Object editor: "/" + left click
             hotkeys.OnCustom(
                 isTriggered: static context => context.Keyboard.IsKeyDown(Keys.OemQuestion) && context.IsLeftClickStarted,
@@ -437,7 +506,8 @@ namespace Client.Main.Scenes
 
             _chatInput.Show();
         }
-        private void SelectSkillHotkey(int slotIndex)
+        private void SelectSkillHotkey(
+            int slotIndex)
         {
             if (_skillHotkeys == null ||
                 _skillQuickSlot == null)
@@ -445,16 +515,42 @@ namespace Client.Main.Scenes
                 return;
             }
 
-            var skill =
-                _skillHotkeys.GetSkill(slotIndex);
+            var skill = _skillHotkeys.GetSkill(slotIndex);
 
             if (skill == null)
+            {
                 return;
+            }
 
             _skillQuickSlot.SelectSkill(skill);
+        }
+        private void AssignHoveredSkillHotkey(
+            int slotIndex)
+        {
+            if (_skillSelectionPanel == null ||
+                !_skillSelectionPanel.Visible)
+            {
+                return;
+            }
 
-            _mainControl?.SetSelectedSkillHotkey(
-                slotIndex);
+            var skill =
+                _skillSelectionPanel.HoveredSkill;
+
+            if (skill == null)
+            {
+                return;
+            }
+
+            _skillSelectionPanel.AssignSkillToQuickSlot(
+                slotIndex,
+                skill);
+
+            // Mostrar automáticamente el banco correspondiente.
+            _skillSelectionPanel.SetQuickSlotBank(
+                slotIndex < 5 ? 0 : 1);
+
+            _mainControl.SetSkillHotkeyBank(
+                slotIndex < 5 ? 0 : 1);
         }
 
         private void ActivateBlendingEditor(HotkeyContext context)

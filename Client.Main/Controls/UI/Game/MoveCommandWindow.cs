@@ -328,21 +328,55 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
+        public void Show()
+        {
+            if (Visible)
+                return;
+
+            Visible = true;
+
+            _logger.LogDebug(
+                "MoveCommandWindow opened. Refreshing map data.");
+
+            _currentScrollOffset = 0;
+
+            if (_scrollBar != null)
+            {
+                _scrollBar.Value = 0;
+            }
+
+            LoadMapData();
+
+            BringToFront();
+
+            if (Scene != null)
+            {
+                Scene.FocusControl = this;
+            }
+        }
+
+        public void Hide()
+        {
+            if (!Visible)
+                return;
+
+            Visible = false;
+
+            if (Scene?.FocusControl == this)
+            {
+                Scene.FocusControl = null;
+            }
+        }
+
         public void ToggleVisibility()
         {
-            Visible = !Visible;
             if (Visible)
             {
-                _logger.LogDebug("MoveCommandWindow toggled ON. Refreshing map data.");
-                _currentScrollOffset = 0;
-                if (_scrollBar != null) _scrollBar.Value = 0;
-                LoadMapData();
-                BringToFront();
-                Scene.FocusControl = this;
+                Hide();
             }
             else
             {
-                if (Scene?.FocusControl == this) Scene.FocusControl = null;
+                Show();
             }
         }
 

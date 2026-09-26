@@ -55,5 +55,22 @@ namespace Client.Main.Data
                 Target = targetGate
             };
         }
+        public bool TryGetMapIdFromGate(
+            int gateIndex,
+            out byte mapId)
+        {
+            mapId = 0;
+
+            if (_gates == null ||
+                gateIndex < 0 ||
+                gateIndex >= _gates.Length)
+            {
+                return false;
+            }
+
+            mapId = _gates[gateIndex].Map;
+
+            return true;
+        }
     }
 }

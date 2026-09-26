@@ -39,13 +39,36 @@ namespace Client.Main.Controls.UI.Game
 
         private readonly ItemHotkeyHudControl _itemHotkeys;
         private readonly SkillHotkeyHudControl _skillHotkeys;
+        private readonly MapPositionHudControl _mapPositionHud;
 
         // Yellow highlight taken from ActiveSkill_1.
-        // It will be moved dynamically over hotkeys 1-5.
         private TextureControl _skillHotkeyHighlight;
+
+        // Current visible bank:
+        //
+        // 0 = 1 2 3 4 5
+        // 1 = 6 7 8 9 0
+        private int _skillHotkeyBank;
+
+        // Real logical selected hotkey:
+        //
+        // 0 = 1
+        // 1 = 2
+        // ...
+        // 4 = 5
+        // 5 = 6
+        // ...
+        // 8 = 9
+        // 9 = 0
+        //
+        // -1 = none
+        private int _selectedSkillHotkey = -1;
 
         public SkillHotkeyHudControl SkillHotkeys =>
             _skillHotkeys;
+
+        public int SkillHotkeyBank =>
+            _skillHotkeyBank;
 
         private int _hoveredHudElements;
 
@@ -63,7 +86,6 @@ namespace Client.Main.Controls.UI.Game
 
         public MainControl(CharacterState state)
         {
-            // Semi-transparent HUD elements
             foreach (var key in new[]
             {
                 "ActiveSkill_1",
@@ -131,28 +153,63 @@ namespace Client.Main.Controls.UI.Game
             // ITEM HOTKEYS Q/W/E/R
             // =========================================================
 
-            _itemHotkeys = new ItemHotkeyHudControl
-            {
-                Name = "ItemHotkeys",
-                X = 435,
-                Y = 665,
-                RenderOrder = 7
-            };
+            _itemHotkeys =
+                new ItemHotkeyHudControl
+                {
+                    Name = "ItemHotkeys",
+                    X = 435,
+                    Y = 665,
+                    RenderOrder = 7
+                };
 
             // =========================================================
-            // SKILL HOTKEYS 1-5
+            // SKILL HOTKEYS
             // =========================================================
 
-            _skillHotkeys = new SkillHotkeyHudControl
-            {
-                Name = "SkillHotkeys",
-                X = 657,
-                Y = 661,
-                RenderOrder = 8
-            };
+            _skillHotkeys =
+                new SkillHotkeyHudControl
+                {
+                    Name = "SkillHotkeys",
+
+                    // Your already adjusted position.
+                    X = 657,
+                    Y = 661,
+
+                    RenderOrder = 8
+                };
+            // =========================================================
+            // MAP / COORDINATES HUD
+            // =========================================================
+
+            _mapPositionHud =
+                new MapPositionHudControl
+                {
+                    Name = "MapPositionHud",
+                    X = 0,
+                    Y = 0
+                };
+
+            _mapPositionHud.MapNameClicked +=
+                (_, _) =>
+                {
+                    if (Scene is not GameScene gameScene)
+                        return;
+
+                    var moveWindow =
+                        gameScene.MoveCommandWindow;
+
+                    if (moveWindow == null)
+                        return;
+
+                    moveWindow.Show();
+
+                    SoundController.Instance?
+                        .PlayBuffer(
+                            "Sound/iButtonClick.wav");
+                };
 
             // =========================================================
-            // INITIAL CHARACTER VALUES
+            // INITIAL VALUES
             // =========================================================
 
             _hp.SetValues(
@@ -185,6 +242,7 @@ namespace Client.Main.Controls.UI.Game
             Controls.Add(_hp);
             Controls.Add(_itemHotkeys);
             Controls.Add(_skillHotkeys);
+            Controls.Add(_mapPositionHud);
 
             ControlFactories["InventoryButton"] =
                 CreateHudButton;
@@ -192,19 +250,15 @@ namespace Client.Main.Controls.UI.Game
             ControlFactories["SettingsButton"] =
                 CreateHudButton;
 
+            // The HUD arrow now becomes a real button.
+            ControlFactories["arrow_right_2"] =
+                CreateHudButton;
+
             CreateControls();
             UpdateLayout();
 
             // =========================================================
-            // HOTKEY SELECTED HIGHLIGHT
-            // =========================================================
-            //
-            // ActiveSkill_1 corresponds to the yellow frame contained
-            // in main_IE.ozd.
-            //
-            // Instead of leaving it permanently over slot 1, we hide it
-            // initially and move it dynamically according to the selected
-            // hotkey.
+            // HOTKEY HIGHLIGHT
             // =========================================================
 
             _skillHotkeyHighlight =
@@ -214,16 +268,48 @@ namespace Client.Main.Controls.UI.Game
 
             if (_skillHotkeyHighlight != null)
             {
-                _skillHotkeyHighlight.Visible = false;
+                _skillHotkeyHighlight.Visible =
+                    false;
             }
 
-            // Clicking/tapping a HUD hotkey also moves the highlight.
+            // Start with 1-5.
+            _skillHotkeyBank = 0;
+
+            _skillHotkeys.SetVisibleBank(
+                _skillHotkeyBank);
+
+            UpdateSkillHotkeyNumbers();
+
+            // Clicking/tapping one of the five visible skills.
             _skillHotkeys.SkillClicked +=
                 (slotIndex, skill) =>
                 {
                     SetSelectedSkillHotkey(
                         slotIndex);
                 };
+
+            // =========================================================
+            // HOTKEY BANK ARROW
+            // =========================================================
+
+            if (Controls.FirstOrDefault(
+                    c => c.Name == "arrow_right_2")
+                is TextureControl arrowButton)
+            {
+                arrowButton.Interactive = true;
+                arrowButton.BringToFront();
+
+                arrowButton.Click += (_, _) =>
+                {
+                    Scene?.SetMouseInputConsumed();
+
+                    ToggleSkillHotkeyBank();
+
+                    SoundController.Instance?
+                        .PlayBuffer(
+                            "Sound/iButtonClick.wav");
+                };
+            }
 
             // =========================================================
             // INVENTORY BUTTON
@@ -316,18 +402,202 @@ namespace Client.Main.Controls.UI.Game
         }
 
         // =============================================================
+        // HOTKEY BANK
+        // =============================================================
+
+        public void ToggleSkillHotkeyBank()
+        {
+            SetSkillHotkeyBank(
+                _skillHotkeyBank == 0
+                    ? 1
+                    : 0);
+        }
+
+        public void SetSkillHotkeyBank(
+            int bank)
+        {
+            _skillHotkeyBank =
+                bank <= 0
+                    ? 0
+                    : 1;
+
+            // Change which five logical skills are drawn.
+            _skillHotkeys.SetVisibleBank(
+                _skillHotkeyBank);
+
+            // Change 1-5 into 6-0 or vice versa.
+            UpdateSkillHotkeyNumbers();
+
+            // Show/hide/reposition highlight.
+            UpdateSelectedSkillHighlight();
+        }
+
+        // =============================================================
+        // HUD NUMBERS
+        // =============================================================
+
+        private void UpdateSkillHotkeyNumbers()
+        {
+            int[] digits =
+                _skillHotkeyBank == 0
+                    ? new[]
+                    {
+                        1, 2, 3, 4, 5
+                    }
+                    : new[]
+                    {
+                        6, 7, 8, 9, 0
+                    };
+
+            for (int visualSlot = 0;
+                 visualSlot < 5;
+                 visualSlot++)
+            {
+                // These controls represent the five physical positions.
+                //
+                // Their names remain 1-5 internally even when the
+                // displayed graphics are 6-0.
+                string controlName =
+                    (visualSlot + 1)
+                    .ToString();
+
+                var control =
+                    Controls.FirstOrDefault(
+                        c =>
+                            c.Name ==
+                            controlName)
+                    as TextureControl;
+
+                if (control == null)
+                {
+                    continue;
+                }
+
+                control.TextureRectangle =
+                    GetHotkeyDigitRectangle(
+                        digits[
+                            visualSlot]);
+            }
+        }
+
+        private static Rectangle GetHotkeyDigitRectangle(
+            int digit)
+        {
+            return digit switch
+            {
+                // Coordinates from main_IE.ozd atlas.
+
+                0 => new Rectangle(
+                    959,
+                    68,
+                    14,
+                    18),
+
+                1 => new Rectangle(
+                    1002,
+                    68,
+                    12,
+                    18),
+
+                2 => new Rectangle(
+                    973,
+                    68,
+                    13,
+                    18),
+
+                3 => new Rectangle(
+                    930,
+                    68,
+                    15,
+                    18),
+
+                4 => new Rectangle(
+                    986,
+                    68,
+                    16,
+                    18),
+
+                5 => new Rectangle(
+                    945,
+                    68,
+                    14,
+                    18),
+
+                6 => new Rectangle(
+                    916,
+                    68,
+                    14,
+                    18),
+
+                7 => new Rectangle(
+                    902,
+                    68,
+                    14,
+                    18),
+
+                8 => new Rectangle(
+                    888,
+                    68,
+                    14,
+                    18),
+
+                9 => new Rectangle(
+                    874,
+                    68,
+                    14,
+                    18),
+
+                _ => Rectangle.Empty
+            };
+        }
+
+        // =============================================================
         // SELECTED SKILL HOTKEY
         // =============================================================
 
         public void SetSelectedSkillHotkey(
             int slotIndex)
         {
-            if (_skillHotkeyHighlight == null)
-                return;
-
-            // Slots 0-4 correspond to HUD numbers 1-5.
             if (slotIndex < 0 ||
-                slotIndex >= 5)
+                slotIndex >= 10)
+            {
+                ClearSelectedSkillHotkey();
+                return;
+            }
+
+            _selectedSkillHotkey =
+                slotIndex;
+
+            // Automatically show the bank containing the selected key.
+            //
+            // 0-4 -> bank 1-5
+            // 5-9 -> bank 6-0
+            int requiredBank =
+                slotIndex < 5
+                    ? 0
+                    : 1;
+
+            if (_skillHotkeyBank !=
+                requiredBank)
+            {
+                SetSkillHotkeyBank(
+                    requiredBank);
+
+                return;
+            }
+
+            UpdateSelectedSkillHighlight();
+        }
+
+        private void UpdateSelectedSkillHighlight()
+        {
+            if (_skillHotkeyHighlight == null)
+            {
+                return;
+            }
+
+            if (_selectedSkillHotkey < 0 ||
+                _selectedSkillHotkey >= 10)
             {
                 _skillHotkeyHighlight.Visible =
                     false;
@@ -335,13 +605,43 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            string numberName =
-                (slotIndex + 1)
+            int selectedBank =
+                _selectedSkillHotkey < 5
+                    ? 0
+                    : 1;
+
+            // The selected skill belongs to the other page.
+            // Hide the highlight until that page is visible again.
+            if (selectedBank !=
+                _skillHotkeyBank)
+            {
+                _skillHotkeyHighlight.Visible =
+                    false;
+
+                return;
+            }
+
+            // Convert logical slot to one of the five physical positions.
+            //
+            // 0 -> position 1
+            // 1 -> position 2
+            // ...
+            // 5 -> position 1
+            // 6 -> position 2
+            // ...
+            int visualSlot =
+                _selectedSkillHotkey %
+                5;
+
+            string numberControlName =
+                (visualSlot + 1)
                 .ToString();
 
             var numberControl =
                 Controls.FirstOrDefault(
-                    c => c.Name == numberName);
+                    c =>
+                        c.Name ==
+                        numberControlName);
 
             if (numberControl == null)
             {
@@ -350,23 +650,6 @@ namespace Client.Main.Controls.UI.Game
 
                 return;
             }
-
-            // Original positions:
-            //
-            // ActiveSkill_1:
-            //   X = 650
-            //   Y = 653
-            //
-            // Number 1:
-            //   X = 663
-            //   Y = 645
-            //
-            // Difference:
-            //   X -13
-            //   Y +8
-            //
-            // Using the number control lets the same calculation work
-            // for slots 1,2,3,4,5.
 
             _skillHotkeyHighlight.X =
                 numberControl.X - 13;
@@ -380,11 +663,14 @@ namespace Client.Main.Controls.UI.Game
 
         public void ClearSelectedSkillHotkey()
         {
-            if (_skillHotkeyHighlight == null)
-                return;
+            _selectedSkillHotkey =
+                -1;
 
-            _skillHotkeyHighlight.Visible =
-                false;
+            if (_skillHotkeyHighlight != null)
+            {
+                _skillHotkeyHighlight.Visible =
+                    false;
+            }
         }
 
         // =============================================================
@@ -634,9 +920,11 @@ namespace Client.Main.Controls.UI.Game
             var button =
                 new HudTextureButton
                 {
-                    Name = info.Name,
+                    Name =
+                        info.Name,
 
-                    AutoViewSize = false,
+                    AutoViewSize =
+                        false,
 
                     TexturePath =
                         DefaultTexturePath,
@@ -677,7 +965,8 @@ namespace Client.Main.Controls.UI.Game
         {
             public HudTextureButton()
             {
-                Interactive = true;
+                Interactive =
+                    true;
             }
 
             public override void Update(

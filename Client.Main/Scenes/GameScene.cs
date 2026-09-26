@@ -45,6 +45,7 @@ namespace Client.Main.Scenes
         private MapListControl _mapListControl;
         private ChatLogWindow _chatLog;
         private MoveCommandWindow _moveCommandWindow;
+        public MoveCommandWindow MoveCommandWindow => _moveCommandWindow;
         private ChatInputBoxControl _chatInput;
         private InventoryControl _inventoryControl;
         private Controls.UI.NotificationManager _notificationManager;
@@ -963,6 +964,7 @@ namespace Client.Main.Scenes
                 _skillQuickSlot,
                 _main.SkillHotkeys,
                 _main,
+                _skillSelectionPanel,
                 _logger);
             try
             {
@@ -1887,7 +1889,6 @@ namespace Client.Main.Scenes
                 ChaosMixControl.Instance?.DrawPickedPreview(sprite, gameTime);
                 TradeControl.Instance?.DrawPickedPreview(sprite, gameTime);
             }
-            _characterInfoWindow?.BringToFront();
         }
 
         private new void DrawBackground()

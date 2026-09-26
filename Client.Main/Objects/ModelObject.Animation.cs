@@ -658,13 +658,10 @@ namespace Client.Main.Objects
                     anyBoneChanged = true;
                 }
 
-                if (anyBoneChanged ||
-                    forceUpdate)
+                if (anyBoneChanged ||forceUpdate)
                 {
-                    Array.Copy(
-                        tempBoneTransforms,
-                        BoneTransform,
-                        bones.Length);
+                    Array.Copy(tempBoneTransforms, BoneTransform, bones.Length);
+                    _animationPoseVersion++;
 
                     bool isImportantObject =
                         RequiresPerFrameAnimation;

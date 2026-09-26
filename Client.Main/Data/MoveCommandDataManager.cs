@@ -132,17 +132,91 @@ namespace Client.Main.Data
                 var normalizedIndex = NormalizeWarpIndex(record);
 
                 moveCommands.Add(new MoveCommandInfo
-                {
-                    Index = normalizedIndex,
-                    ServerMapName = record.Main,
-                    DisplayName = displayName,
-                    RequiredLevel = record.RequiredLevel,
-                    RequiredZen = record.RequiredZen,
-                    IsEventMap = IsEventMap(record.Index)
-                });
+            {
+                Index = normalizedIndex,
+                ServerMapName = record.Main,
+                DisplayName = displayName,
+                RequiredLevel = record.RequiredLevel,
+                RequiredZen = record.RequiredZen,
+                Gate = record.Gate,
+                IsEventMap = IsEventMap(record.Index)
+            });
             }
 
             return moveCommands;
+        }
+        public string GetDisplayNameForMap(
+            byte mapId,
+            string fallbackName)
+        {
+            if (_moveCommands == null ||
+                _moveCommands.Count == 0)
+            {
+                return fallbackName;
+            }
+
+            var candidates =
+                _moveCommands
+                    .Where(command =>
+                        GateDataManager.Instance
+                            .TryGetMapIdFromGate(
+                                command.Gate,
+                                out byte commandMapId) &&
+                        commandMapId == mapId)
+                    .ToList();
+
+            if (candidates.Count == 0)
+                return fallbackName;
+
+            // Si existe en movereq un nombre equivalente
+            // al nombre real del World, lo preferimos.
+            var exactMatch =
+                candidates.FirstOrDefault(command =>
+                    NamesAreEquivalent(
+                        command.DisplayName,
+                        fallbackName));
+
+            if (!string.IsNullOrWhiteSpace(
+                exactMatch.DisplayName))
+            {
+                return exactMatch.DisplayName;
+            }
+
+            // Si solo hay una entrada para ese mapa,
+            // podemos usarla con seguridad.
+            if (candidates.Count == 1)
+            {
+                return candidates[0].DisplayName;
+            }
+
+            // Dungeon, Atlans, Lost Tower, etc.
+            // pueden tener varios destinos dentro del
+            // mismo mapa. Ahí es mejor mostrar el nombre
+            // general del World y no elegir uno al azar.
+            return fallbackName;
+        }
+
+        private static bool NamesAreEquivalent(
+            string left,
+            string right)
+        {
+            if (string.IsNullOrWhiteSpace(left) ||
+                string.IsNullOrWhiteSpace(right))
+            {
+                return false;
+            }
+
+            static string Normalize(string value)
+            {
+                return new string(
+                    value
+                        .Where(char.IsLetterOrDigit)
+                        .Select(char.ToLowerInvariant)
+                        .ToArray());
+            }
+
+            return Normalize(left) ==
+                Normalize(right);
         }
 
         private static void ApplyMovereqXor(byte[] buffer)

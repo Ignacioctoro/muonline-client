@@ -44,6 +44,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         private const int COLUMNS = 6;
         private const int ROWS = 3;
         private const int PAGE_SIZE = COLUMNS * ROWS;
+        private const float SKILL_GRID_SCALE = 1.30f;
 
         private const int GRID_GAP_X = 10;
         private const int GRID_GAP_Y = 8;
@@ -53,11 +54,18 @@ namespace Client.Main.Controls.UI.Game.Skills
 
         private readonly List<SkillSlotControl> _skillSlots = new();
 
-        private readonly SkillSlotControl[] _quickSlots =
-            new SkillSlotControl[5];
+        private const int QUICK_SLOT_COUNT = 10;
+        private const int QUICK_VISIBLE_COUNT = 5;
 
-        private readonly LabelControl[] _quickSlotLabels =
-            new LabelControl[5];
+        private readonly SkillSlotControl[] _quickSlots = new SkillSlotControl[QUICK_VISIBLE_COUNT];
+
+        private readonly LabelControl[] _quickSlotLabels = new LabelControl[QUICK_VISIBLE_COUNT];
+
+        private readonly SkillEntryState?[] _quickSlotSkills = new SkillEntryState?[QUICK_SLOT_COUNT];
+
+        private int _quickSlotBank;
+
+        private SkillEntryState? _hoveredSkill;
 
         private List<SkillEntryState> _allSkills =
             new();
@@ -78,6 +86,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         private readonly LabelControl _pageLabel;
 
         private readonly LabelControl _quickTitleLabel;
+        private readonly ButtonControl _quickBankButton;
 
         private int _currentPage;
         private int _pageCount = 1;
@@ -95,6 +104,8 @@ namespace Client.Main.Controls.UI.Game.Skills
         /// </summary>
         public event Action<SkillEntryState>? SkillSelected;
 
+        public SkillEntryState? HoveredSkill => _hoveredSkill;
+
         /// <summary>
         /// Fired whenever one of the five quick slots changes.
         ///
@@ -102,7 +113,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         /// slot index: 0-4
         /// skill: assigned skill
         /// </summary>
-        public event Action<int, SkillEntryState>? QuickSlotAssigned;
+        public event Action<int, SkillEntryState?>? QuickSlotAssigned;
 
         public SkillSelectionPanel()
         {
@@ -537,8 +548,160 @@ namespace Client.Main.Controls.UI.Game.Skills
                 _quickTitleLabel);
 
             CreateQuickSlots();
+            _quickBankButton =
+            new ButtonControl
+            {
+                Text = ">",
+
+                FontSize = 11f,
+
+                AutoViewSize = false,
+
+                ControlSize =
+                    new Point(
+                        26,
+                        30),
+
+                ViewSize =
+                    new Point(
+                        26,
+                        30),
+
+                X =
+                    PANEL_WIDTH - 38,
+
+                Y =
+                    QUICK_AREA_Y + 27,
+
+                BackgroundColor =
+                    new Color(
+                        30,
+                        28,
+                        24),
+
+                HoverBackgroundColor =
+                    new Color(
+                        70,
+                        55,
+                        30),
+
+                PressedBackgroundColor =
+                    new Color(
+                        90,
+                        65,
+                        30),
+
+                TextColor =
+                    Color.Silver,
+
+                HoverTextColor =
+                    Color.White
+            };
+
+        _quickBankButton.Click +=
+            (_, _) =>
+            {
+                ToggleQuickSlotBank();
+            };
+
+        Controls.Add(
+            _quickBankButton);
+        }
+        private int GetQuickSlotRealIndex(
+            int visualIndex)
+        {
+            return
+                (_quickSlotBank *
+                QUICK_VISIBLE_COUNT)
+                +
+                visualIndex;
         }
 
+        private string GetQuickSlotLabel(
+            int visualIndex)
+        {
+            int realIndex =
+                GetQuickSlotRealIndex(
+                    visualIndex);
+
+            return realIndex switch
+            {
+                0 => "1",
+                1 => "2",
+                2 => "3",
+                3 => "4",
+                4 => "5",
+                5 => "6",
+                6 => "7",
+                7 => "8",
+                8 => "9",
+                9 => "0",
+                _ => string.Empty
+            };
+        }
+        private void RefreshQuickSlotBank()
+        {
+            for (int visualIndex = 0;
+                visualIndex < QUICK_VISIBLE_COUNT;
+                visualIndex++)
+            {
+                int realIndex =
+                    GetQuickSlotRealIndex(
+                        visualIndex);
+
+                _quickSlots[visualIndex].Skill =
+                    _quickSlotSkills[
+                        realIndex];
+
+                _quickSlotLabels[visualIndex].Text =
+                    GetQuickSlotLabel(
+                        visualIndex);
+            }
+        }
+        public void ToggleQuickSlotBank()
+        {
+            _quickSlotBank =
+                _quickSlotBank == 0
+                    ? 1
+                    : 0;
+
+            RefreshQuickSlotBank();
+
+            // Evita que el botón quede visualmente "pegado"
+            // después de cambiar de banco.
+            if (_quickBankButton != null)
+            {
+                _quickBankButton.IsMousePressed = false;
+                _quickBankButton.IsMouseOver = false;
+
+                _quickBankButton.Text =
+                    _quickSlotBank == 0
+                        ? ">"
+                        : "<";
+            }
+        }
+
+        public void SetQuickSlotBank(
+            int bank)
+        {
+            _quickSlotBank =
+                bank <= 0
+                    ? 0
+                    : 1;
+
+            RefreshQuickSlotBank();
+
+            if (_quickBankButton != null)
+            {
+                _quickBankButton.IsMousePressed = false;
+                _quickBankButton.IsMouseOver = false;
+
+                _quickBankButton.Text =
+                    _quickSlotBank == 0
+                        ? ">"
+                        : "<";
+            }
+        }
         // =============================================================
         // OPEN / CLOSE
         // =============================================================
@@ -641,9 +804,14 @@ namespace Client.Main.Controls.UI.Game.Skills
                         PAGE_SIZE)
                     .ToList();
 
+            int scaledSlotWidth =
+                (int)(
+                    SkillSlotControl.SLOT_WIDTH *
+                    SKILL_GRID_SCALE);
+
             int gridWidth =
                 COLUMNS *
-                SkillSlotControl.SLOT_WIDTH
+                scaledSlotWidth
                 +
                 (COLUMNS - 1) *
                 GRID_GAP_X;
@@ -665,17 +833,20 @@ namespace Client.Main.Controls.UI.Game.Skills
                 SkillEntryState skill =
                     pageSkills[i];
 
-                var slot =
-                    new SkillSlotControl
+                var slot = new SkillSlotControl
                     {
-                        Skill =
-                            skill,
+                        Skill = skill,
+
+                        VisualScale = SKILL_GRID_SCALE,
 
                         X =
                             startX +
                             column *
                             (
-                                SkillSlotControl.SLOT_WIDTH +
+                                (int)(
+                                    SkillSlotControl.SLOT_WIDTH *
+                                    SKILL_GRID_SCALE)
+                                +
                                 GRID_GAP_X
                             ),
 
@@ -683,7 +854,10 @@ namespace Client.Main.Controls.UI.Game.Skills
                             GRID_Y +
                             row *
                             (
-                                SkillSlotControl.SLOT_HEIGHT +
+                                (int)(
+                                    SkillSlotControl.SLOT_HEIGHT *
+                                    SKILL_GRID_SCALE)
+                                +
                                 GRID_GAP_Y
                             ),
 
@@ -778,15 +952,15 @@ namespace Client.Main.Controls.UI.Game.Skills
         private void OnSkillHover(
             SkillEntryState? skill)
         {
+            _hoveredSkill = skill;
+
             if (skill != null)
             {
-                UpdateSkillInfo(
-                    skill);
+                UpdateSkillInfo(skill);
                 return;
             }
 
-            UpdateSkillInfo(
-                _selectedSkill);
+            UpdateSkillInfo(_selectedSkill);
         }
 
         // =============================================================
@@ -912,21 +1086,21 @@ namespace Client.Main.Controls.UI.Game.Skills
         private void CreateQuickSlots()
         {
             int totalWidth =
-                5 *
+                QUICK_VISIBLE_COUNT *
                 SkillSlotControl.SLOT_WIDTH
                 +
-                4 *
+                (QUICK_VISIBLE_COUNT - 1) *
                 QUICK_SLOT_GAP;
 
             int startX =
                 (PANEL_WIDTH -
-                 totalWidth) / 2;
+                totalWidth) / 2;
 
             for (int i = 0;
-                 i < 5;
-                 i++)
+                i < QUICK_VISIBLE_COUNT;
+                i++)
             {
-                int slotIndex =
+                int visualSlotIndex =
                     i;
 
                 var quickSlot =
@@ -954,8 +1128,12 @@ namespace Client.Main.Controls.UI.Game.Skills
                 quickSlot.Click +=
                     (_, _) =>
                     {
+                        int realSlotIndex =
+                            GetQuickSlotRealIndex(
+                                visualSlotIndex);
+
                         AssignSelectedSkillToQuickSlot(
-                            slotIndex);
+                            realSlotIndex);
                     };
 
                 _quickSlots[i] =
@@ -965,36 +1143,35 @@ namespace Client.Main.Controls.UI.Game.Skills
                     quickSlot);
 
                 var numberLabel =
-                    new LabelControl
-                    {
-                        Text =
-                            (i + 1)
-                            .ToString(),
+                new LabelControl
+                {
+                    Text =
+                        GetQuickSlotLabel(i),
 
-                        TextColor =
-                            new Color(
-                                190,
-                                170,
-                                115),
+                    TextColor =
+                        new Color(
+                            220,
+                            195,
+                            120),
 
-                        FontSize = 9f,
+                    FontSize = 10f,
 
-                        X =
-                            quickSlot.X,
+                    X =
+                        quickSlot.X,
 
-                        Y =
-                            quickSlot.Y +
-                            SkillSlotControl.SLOT_HEIGHT +
-                            2,
+                    Y =
+                        quickSlot.Y +
+                        SkillSlotControl.SLOT_HEIGHT +
+                        1,
 
-                        ViewSize =
-                            new Point(
-                                SkillSlotControl.SLOT_WIDTH,
-                                14),
+                    ViewSize =
+                        new Point(
+                            SkillSlotControl.SLOT_WIDTH,
+                            14),
 
-                        Align =
-                            ControlAlign.HorizontalCenter
-                    };
+                    TextAlign =
+                        HorizontalAlign.Center
+                };
 
                 _quickSlotLabels[i] =
                     numberLabel;
@@ -1002,6 +1179,8 @@ namespace Client.Main.Controls.UI.Game.Skills
                 Controls.Add(
                     numberLabel);
             }
+
+            RefreshQuickSlotBank();
         }
 
         private void AssignSelectedSkillToQuickSlot(
@@ -1010,19 +1189,61 @@ namespace Client.Main.Controls.UI.Game.Skills
             if (_selectedSkill == null)
                 return;
 
+            AssignSkillToQuickSlot(
+                slotIndex,
+                _selectedSkill);
+        }
+        public void AssignSkillToQuickSlot(
+            int slotIndex,
+            SkillEntryState skill)
+        {
+            if (skill == null)
+                return;
+
             if (slotIndex < 0 ||
-                slotIndex >=
-                _quickSlots.Length)
+                slotIndex >= QUICK_SLOT_COUNT)
             {
                 return;
             }
 
-            _quickSlots[slotIndex].Skill =
-                _selectedSkill;
+            // ---------------------------------------------------------
+            // Remove the same skill from any previous hotkey.
+            // ---------------------------------------------------------
 
+            for (int i = 0;
+                i < QUICK_SLOT_COUNT;
+                i++)
+            {
+                if (i == slotIndex)
+                    continue;
+
+                if (_quickSlotSkills[i]?.SkillId ==
+                    skill.SkillId)
+                {
+                    _quickSlotSkills[i] = null;
+
+                    // IMPORTANT:
+                    // Tell external controls that this old slot
+                    // has been cleared.
+                    QuickSlotAssigned?.Invoke(
+                        i,
+                        null);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // Assign to new hotkey.
+            // ---------------------------------------------------------
+
+            _quickSlotSkills[slotIndex] =
+                skill;
+
+            RefreshQuickSlotBank();
+
+            // Notify HUD / external controls.
             QuickSlotAssigned?.Invoke(
                 slotIndex,
-                _selectedSkill);
+                skill);
         }
 
         /// <summary>
@@ -1034,14 +1255,15 @@ namespace Client.Main.Controls.UI.Game.Skills
             SkillEntryState? skill)
         {
             if (slotIndex < 0 ||
-                slotIndex >=
-                _quickSlots.Length)
+                slotIndex >= QUICK_SLOT_COUNT)
             {
                 return;
             }
 
-            _quickSlots[slotIndex].Skill =
+            _quickSlotSkills[slotIndex] =
                 skill;
+
+            RefreshQuickSlotBank();
         }
 
         // =============================================================
@@ -1068,7 +1290,6 @@ namespace Client.Main.Controls.UI.Game.Skills
 
             RebuildSkillGrid();
         }
-
         // =============================================================
         // EXISTING API
         // =============================================================

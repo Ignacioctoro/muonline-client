@@ -7,6 +7,8 @@ namespace Client.Main.Models
         public string DisplayName;
         public int RequiredLevel;
         public int RequiredZen;
+        public int Gate;
+
         public bool CanMove;
         public bool IsSelected;
         public bool IsStrifeMap;

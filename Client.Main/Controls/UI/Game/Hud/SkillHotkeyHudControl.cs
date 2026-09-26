@@ -13,36 +13,74 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Client.Main.Controls.UI.Game.Hud
 {
     /// <summary>
-    /// Draws the assigned skill hotkeys over the 1-5 slots
-    /// which already exist in the HUD artwork.
+    /// Draws the assigned skill hotkeys over the five physical
+    /// skill slots which already exist in the HUD artwork.
     ///
-    /// The original MU client uses 20x28 skill icons inside
-    /// 32x38 hotkey cells. We keep the source dimensions and
-    /// enlarge them slightly to fit the custom B Royal HUD.
+    /// There are 10 logical hotkeys:
+    ///
+    /// Bank 0:
+    /// 1 2 3 4 5
+    ///
+    /// Bank 1:
+    /// 6 7 8 9 0
+    ///
+    /// Only five are rendered at a time.
     /// </summary>
     public class SkillHotkeyHudControl : ExtendedUIControl
     {
-        private const int SLOT_COUNT = 5;
+        // Total logical hotkeys.
+        private const int TOTAL_SLOT_COUNT = 10;
+
+        // Physical slots visible in the HUD.
+        private const int VISIBLE_SLOT_COUNT = 5;
 
         // Visual size inside our HUD.
         private const int ICON_WIDTH = 24;
         private const int ICON_HEIGHT = 34;
 
         // Positions are relative to this control.
-        //
-        // These follow the existing 1-5 slots in MainLayout.json.
+        // These are the five physical HUD positions.
         private static readonly Point[] SlotPositions =
         {
-            new(0,   0), // 1
-            new(35,  0), // 2
-            new(71,  0), // 3
-            new(104, 0), // 4
-            new(140, 0), // 5
+            new(0,   0),
+            new(35,  0),
+            new(71,  0),
+            new(104, 0),
+            new(140, 0)
         };
 
+        // 0-4 = keys 1-5
+        // 5-9 = keys 6-0
         private readonly SkillEntryState?[] _skills =
-            new SkillEntryState?[SLOT_COUNT];
+            new SkillEntryState?[TOTAL_SLOT_COUNT];
 
+        // 0 = 1-5
+        // 1 = 6-0
+        private int _visibleBank;
+
+        /// <summary>
+        /// Returns the currently visible bank.
+        ///
+        /// 0 = 1-5
+        /// 1 = 6-0
+        /// </summary>
+        public int VisibleBank =>
+            _visibleBank;
+
+        /// <summary>
+        /// Fired when the user clicks/touches a skill.
+        ///
+        /// The slot index is the real logical index:
+        ///
+        /// 0 = 1
+        /// 1 = 2
+        /// ...
+        /// 4 = 5
+        /// 5 = 6
+        /// ...
+        /// 8 = 9
+        /// 9 = 0
+        /// </summary>
         public event Action<int, SkillEntryState>? SkillClicked;
 
         public SkillHotkeyHudControl()
@@ -56,32 +94,78 @@ namespace Client.Main.Controls.UI.Game.Hud
             ControlSize = ViewSize;
 
             Interactive = true;
+
+            _visibleBank = 0;
         }
+
+        // =============================================================
+        // BANK
+        // =============================================================
+
+        public void SetVisibleBank(
+            int bank)
+        {
+            _visibleBank =
+                bank <= 0
+                    ? 0
+                    : 1;
+        }
+
+        public void ToggleBank()
+        {
+            _visibleBank =
+                _visibleBank == 0
+                    ? 1
+                    : 0;
+        }
+
+        // =============================================================
+        // SKILLS
+        // =============================================================
 
         public void SetSkill(
             int slotIndex,
             SkillEntryState? skill)
         {
             if (slotIndex < 0 ||
-                slotIndex >= SLOT_COUNT)
+                slotIndex >= TOTAL_SLOT_COUNT)
             {
                 return;
             }
 
-            _skills[slotIndex] = skill;
+            _skills[slotIndex] =
+                skill;
         }
 
         public SkillEntryState? GetSkill(
             int slotIndex)
         {
             if (slotIndex < 0 ||
-                slotIndex >= SLOT_COUNT)
+                slotIndex >= TOTAL_SLOT_COUNT)
             {
                 return null;
             }
 
             return _skills[slotIndex];
         }
+
+        // =============================================================
+        // INDEX HELPERS
+        // =============================================================
+
+        private int GetRealSlotIndex(
+            int visualSlotIndex)
+        {
+            return
+                (_visibleBank *
+                 VISIBLE_SLOT_COUNT)
+                +
+                visualSlotIndex;
+        }
+
+        // =============================================================
+        // INPUT
+        // =============================================================
 
         public override void Update(
             GameTime gameTime)
@@ -114,17 +198,21 @@ namespace Client.Main.Controls.UI.Game.Hud
             Rectangle controlRect =
                 DisplayRectangle;
 
-            for (int i = 0;
-                 i < SLOT_COUNT;
-                 i++)
+            for (int visualSlot = 0;
+                 visualSlot < VISIBLE_SLOT_COUNT;
+                 visualSlot++)
             {
                 Point pos =
-                    SlotPositions[i];
+                    SlotPositions[visualSlot];
 
                 Rectangle slotRectangle =
                     new Rectangle(
-                        controlRect.X + pos.X,
-                        controlRect.Y + pos.Y,
+                        controlRect.X +
+                        pos.X,
+
+                        controlRect.Y +
+                        pos.Y,
+
                         ICON_WIDTH,
                         ICON_HEIGHT);
 
@@ -134,23 +222,33 @@ namespace Client.Main.Controls.UI.Game.Hud
                     continue;
                 }
 
+                int realSlot =
+                    GetRealSlotIndex(
+                        visualSlot);
+
                 SkillEntryState? skill =
-                    _skills[i];
+                    _skills[realSlot];
 
                 if (skill == null)
                 {
                     return;
                 }
 
-                Scene?.SetMouseInputConsumed();
+                Scene?
+                    .SetMouseInputConsumed();
 
-                SkillClicked?.Invoke(
-                    i,
-                    skill);
+                SkillClicked?
+                    .Invoke(
+                        realSlot,
+                        skill);
 
                 return;
             }
         }
+
+        // =============================================================
+        // DRAW
+        // =============================================================
 
         public override void Draw(
             GameTime gameTime)
@@ -163,7 +261,9 @@ namespace Client.Main.Controls.UI.Game.Hud
             }
 
             var spriteBatch =
-                GraphicsManager.Instance.Sprite;
+                GraphicsManager
+                    .Instance
+                    .Sprite;
 
             Rectangle controlRect =
                 DisplayRectangle;
@@ -177,12 +277,16 @@ namespace Client.Main.Controls.UI.Game.Hud
                     transform:
                         UiScaler.SpriteTransform))
             {
-                for (int i = 0;
-                     i < SLOT_COUNT;
-                     i++)
+                for (int visualSlot = 0;
+                     visualSlot < VISIBLE_SLOT_COUNT;
+                     visualSlot++)
                 {
+                    int realSlot =
+                        GetRealSlotIndex(
+                            visualSlot);
+
                     SkillEntryState? skill =
-                        _skills[i];
+                        _skills[realSlot];
 
                     if (skill == null)
                     {
@@ -212,7 +316,8 @@ namespace Client.Main.Controls.UI.Game.Hud
                     }
 
                     Point pos =
-                        SlotPositions[i];
+                        SlotPositions[
+                            visualSlot];
 
                     Rectangle destination =
                         new Rectangle(
