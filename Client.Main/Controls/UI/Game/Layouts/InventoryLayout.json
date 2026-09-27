@@ -1,8 +1,8 @@
 [
   {
     "Name": "Board",
-    "ScreenX": 0,
-    "ScreenY": 0,
+    "ScreenX": 2,
+    "ScreenY": 2,
     "Width": 420,
     "Height": 690,
     "Z": 1
@@ -17,7 +17,7 @@
   },
   {
     "Name": "ContentBorder",
-    "ScreenX": 0,
+    "ScreenX": -1,
     "ScreenY": 60,
     "Width": 420,
     "Height": 210,

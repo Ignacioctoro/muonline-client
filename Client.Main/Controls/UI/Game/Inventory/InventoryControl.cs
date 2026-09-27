@@ -26,9 +26,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
 {
     public class InventoryControl : UIControl, IUiTexturePreloadable
     {
+        // EXPERIMENT:
+        // Visual renderer restored from NaffisDev immediately before
+        // commit e5d1988 ("inventory redesign", 2025-11-25).
+        // Newer gameplay/network/hotkey/repair logic is kept from this project.
         private const string LayoutJsonResource = "Client.Main.Controls.UI.Game.Layouts.InventoryLayout.json";
         private const string TextureRectJsonResource = "Client.Main.Controls.UI.Game.Layouts.InventoryRect.json";
         private const string LayoutTexturePath = "Interface/GFx/NpcShop_I3.ozd";
+        private Texture2D _invenBg01;
+        private Texture2D _invenBg02;
+        private Texture2D _invenBg03;
 
         private static readonly string[] s_inventoryTexturePaths =
         {
@@ -44,23 +51,38 @@ namespace Client.Main.Controls.UI.Game.Inventory
             "Interface/newui_msgbox_back.jpg"
         };
 
-        // ═══════════════════════════════════════════════════════════════
-        // WINDOW DIMENSIONS - REDESIGNED
-        // ═══════════════════════════════════════════════════════════════
-        private const int WINDOW_WIDTH = 396;
-        private const int WINDOW_HEIGHT = 700;
+        // Pre-redesign Naffis inventory layout (before commit e5d1988).
+        private const int WINDOW_WIDTH = 420;
+        private const int WINDOW_HEIGHT = 690;
 
-        private const int HEADER_HEIGHT = 52;
-        private const int SECTION_SPACING = 16;
-        private const int PANEL_PADDING = 12;
-        private const int EQUIP_SECTION_HEIGHT = 270;
+        private const int HEADER_HEIGHT = 70;
+        private const int FOOTER_HEIGHT = 48;
+        private const int PAPERDOLL_TOP = HEADER_HEIGHT +10;
+        private const int PAPERDOLL_PADDING = 6;
+        private const int COLUMN_SPACING = 24;
 
-        public const int INVENTORY_SQUARE_WIDTH = 34;
-        public const int INVENTORY_SQUARE_HEIGHT = 34;
+        private const int BEAM_HEIGHT = 8;
+        private const int BEAM_SPACING = 4;
+
+        private const int GRID_TOP_SPACING = 16;
+        private const int FOOTER_SPACING = 5;
+        private const int FOOTER_BUTTON_SIZE = 30;
+
+        // Mochila 8x8
+        public const int INVENTORY_SQUARE_WIDTH = 32;
+        public const int INVENTORY_SQUARE_HEIGHT = 32;
+
+        // Equipamiento: un poco más compacto que la mochila
+        private const int EQUIP_SQUARE_WIDTH = 32;
+        private const int EQUIP_SQUARE_HEIGHT = 32;
 
         public const int Columns = 8;
         public const int Rows = 8;
+
         internal const int InventorySlotOffsetConstant = 12;
+
+        // Original source rect used by the pre-redesign renderer against NpcShop_I3.
+        private static readonly Rectangle SlotSourceRect = new(546, 220, 29, 29);
 
         // ═══════════════════════════════════════════════════════════════
         // MODERN DARK THEME
@@ -196,11 +218,27 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private Texture2D _texTableLeftPixel;
         private Texture2D _texTableRightPixel;
         private Texture2D _texBackground;
+        // Fondos originales de slots del inventario GFx
+        private Texture2D _equipBox001;
+        private Texture2D _equipBox002;
+        private Texture2D _equipBox003;
+        private Texture2D _equipBox004;
+        private Texture2D _equipBox005;
+        private Texture2D _equipBox006;
+        private Texture2D _equipBox007;
+        private Texture2D _equipBox008;
+        private Texture2D _equipBox009;
+        private Texture2D _equipBox010;
+        private Texture2D _equipBox012;
+        private Texture2D _invenFrame01;
+        private Texture2D _invenFrame02;
 
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
 
         private readonly List<InventoryTextEntry> _texts = new();
+        private InventoryTextEntry _titleText;
+        private InventoryTextEntry _subtitleText;
         private InventoryTextEntry _zenText;
 
         private readonly Dictionary<string, Texture2D> _itemTextureCache = new(StringComparer.OrdinalIgnoreCase);
@@ -630,11 +668,57 @@ namespace Client.Main.Controls.UI.Game.Inventory
             _layoutTexture = await tl.PrepareAndGetTexture(LayoutTexturePath);
             _slotTexture = _layoutTexture;
 
+            _equipBox001 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box001.ozd");
+            _equipBox002 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box002.ozd");
+            _equipBox003 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box003.ozd");
+
+            _equipBox004 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box004.ozd");
+            _equipBox005 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box005.ozd");
+            _equipBox006 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box006.ozd");
+            _equipBox007 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box007.ozd");
+            _equipBox008 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box008.ozd");
+            _equipBox009 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box009.ozd");
+            _equipBox010 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box010.ozd");
+            _equipBox012 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box012.ozd");
+
+            _invenBg01 = await tl.PrepareAndGetTexture("Interface/GFx/invenbg01.ozd");
+            _invenBg02 = await tl.PrepareAndGetTexture("Interface/GFx/invenbg02.ozd");
+            _invenBg03 = await tl.PrepareAndGetTexture("Interface/GFx/invenbg03.ozd");
+            _invenFrame01 = await tl.PrepareAndGetTexture("Interface/GFx/invenframe_01.ozd");
+            _invenFrame02 = await tl.PrepareAndGetTexture("Interface/GFx/invenframe_02.ozd");
+
             _font = GraphicsManager.Instance.Font;
 
             UpdateZenFromNetwork();
             UpdateZenText();
             InvalidateStaticSurface();
+        }
+        private Texture2D GetEquipSlotBackground(byte slot)
+        {
+            return slot switch
+            {
+                // Estas tres las afinaremos después de verlas renderizadas.
+                8 => _equipBox001, // Pet
+                2 => _equipBox003, // Helm
+                9 => _equipBox002, // Pendant
+
+                // Confirmadas visualmente por los previews.
+                7 => _equipBox004, // Wings
+
+                0 => _equipBox005, // Left hand
+                1 => _equipBox007, // Right hand / shield
+
+                3 => _equipBox006, // Armor
+                5 => _equipBox008, // Gloves
+
+                10 => _equipBox009, // Left ring
+                11 => _equipBox009, // Right ring
+
+                4 => _equipBox010, // Pants
+                6 => _equipBox012, // Boots
+
+                _ => null
+            };
         }
 
         public void Preload()
@@ -924,11 +1008,24 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             _texts.Clear();
 
-            // Title is now drawn in DrawModernHeader, so we skip the title text
+            _titleText = CreateText(
+                new Vector2(WINDOW_WIDTH / 2f, HEADER_HEIGHT * 0.5f - 6f),
+                14f,
+                Color.White,
+                TextAlignment.Center);
+            _titleText.Text = "Inventory";
 
-            // Zen text - positioned inside zen field
-            _zenText = CreateText(new Vector2(_zenFieldRect.X + 8, _zenFieldRect.Y + _zenFieldRect.Height * 0.5f - 6f),
-                                  12f, Theme.TextGold);
+            _subtitleText = CreateText(
+                new Vector2(WINDOW_WIDTH / 2f, HEADER_HEIGHT - 18f),
+                9.5f,
+                new Color(170, 170, 170),
+                TextAlignment.Center);
+            _subtitleText.Text = "[Set option]   [Socket option]";
+
+            _zenText = CreateText(
+                new Vector2(_zenFieldRect.X + 8, _zenFieldRect.Y + _zenFieldRect.Height * 0.5f - 7f),
+                13f,
+                new Color(235, 210, 120));
             _zenText.Visible = false;
         }
 
@@ -1011,91 +1108,174 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             BuildEquipSlots();
 
-            // Header
             _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, HEADER_HEIGHT);
 
-            // Equipment panel - centered, fixed height
-            int equipPanelWidth = WINDOW_WIDTH - PANEL_PADDING * 2;
-            int equipPanelTop = HEADER_HEIGHT + 8;
-            _paperdollPanelRect = new Rectangle(PANEL_PADDING, equipPanelTop, equipPanelWidth, EQUIP_SECTION_HEIGHT);
-
-            // Grid section - positioned BELOW equipment with proper spacing
-            int gridTotalWidth = Columns * INVENTORY_SQUARE_WIDTH;
-            int gridTotalHeight = Rows * INVENTORY_SQUARE_HEIGHT;
-            int gridX = (WINDOW_WIDTH - gridTotalWidth) / 2;
-            int minGridY = _paperdollPanelRect.Bottom + Math.Max(SECTION_SPACING / 2, 4);
-            int gridY = minGridY;
-
-            int footerHeight = 50;
-            int footerTop = WINDOW_HEIGHT - footerHeight - 10;
-
-            // Ensure grid section does not overlap footer
-            int availableBottom = footerTop - SECTION_SPACING;
-            int maxGridY = Math.Max(minGridY, availableBottom - gridTotalHeight - 8);
-            gridY = Math.Min(gridY, maxGridY);
-            if (gridY < minGridY)
+            var hasUnion = false;
+            var union = new Rectangle();
+            foreach (var slot in _equipSlots.Values)
             {
-                gridY = minGridY;
+                if (!hasUnion)
+                {
+                    union = slot.Rect;
+                    hasUnion = true;
+                }
+                else
+                {
+                    union = Rectangle.Union(union, slot.Rect);
+                }
             }
 
-            _gridRect = new Rectangle(gridX, gridY, gridTotalWidth, gridTotalHeight);
-            _gridFrameRect = new Rectangle(gridX - 8, gridY - 8, gridTotalWidth + 16, gridTotalHeight + 16);
+            if (!hasUnion)
+            {
+                union = new Rectangle(
+                    PAPERDOLL_TOP,
+                    PAPERDOLL_TOP,
+                    INVENTORY_SQUARE_WIDTH * 4,
+                    INVENTORY_SQUARE_HEIGHT * 4);
+            }
 
-            // Footer - at bottom
-            _footerRect = new Rectangle(PANEL_PADDING, footerTop,
-                                         WINDOW_WIDTH - PANEL_PADDING * 2, footerHeight);
+            union.Inflate(PAPERDOLL_PADDING, PAPERDOLL_PADDING);
+            _paperdollPanelRect = union;
 
-            // Zen display
-            _zenIconRect = new Rectangle(_footerRect.X + 12, _footerRect.Y + 14, 22, 22);
-            _zenFieldRect = new Rectangle(_zenIconRect.Right + 10, _footerRect.Y + 10, 160, 30);
-
-            // Buttons
-            int btnSize = 38;
-            _closeButtonRect = new Rectangle(WINDOW_WIDTH - btnSize - 12, 10, btnSize, btnSize);
-            _footerLeftButtonRect = new Rectangle(_footerRect.Right - btnSize * 2 - 20, _footerRect.Y + 6, btnSize, btnSize);
-            _footerRightButtonRect = new Rectangle(_footerRect.Right - btnSize - 8, _footerRect.Y + 6, btnSize, btnSize);
-
-            // Beam rect not used in new design
             _beamRect = Rectangle.Empty;
+
+            int gridX = (WINDOW_WIDTH - Columns * INVENTORY_SQUARE_WIDTH) / 2;
+            int gridY = _paperdollPanelRect.Bottom + GRID_TOP_SPACING;
+
+            _gridRect = new Rectangle(
+                gridX,
+                gridY,
+                Columns * INVENTORY_SQUARE_WIDTH,
+                Rows * INVENTORY_SQUARE_HEIGHT);
+
+            _gridFrameRect = new Rectangle(
+                _gridRect.X,
+                _gridRect.Y,
+                _gridRect.Width,
+                _gridRect.Height);
+
+            _footerRect = new Rectangle(
+                10,
+                _gridRect.Bottom + FOOTER_SPACING,
+                WINDOW_WIDTH - 20,
+                FOOTER_HEIGHT);
+
+            int buttonY = _footerRect.Bottom - FOOTER_BUTTON_SIZE - 4;
+
+            _footerLeftButtonRect = new Rectangle(
+                _footerRect.X + 14,
+                buttonY,
+                FOOTER_BUTTON_SIZE,
+                FOOTER_BUTTON_SIZE);
+
+            _footerRightButtonRect = new Rectangle(
+                _footerRect.Right - FOOTER_BUTTON_SIZE - 14,
+                buttonY,
+                FOOTER_BUTTON_SIZE,
+                FOOTER_BUTTON_SIZE);
+
+            _zenIconRect = new Rectangle(
+                _footerLeftButtonRect.Right + 10,
+                _footerRect.Y + 10,
+                18,
+                18);
+
+            int zenFieldX = _zenIconRect.Right + 6;
+            int zenFieldRightLimit = _footerRightButtonRect.X - 16;
+            int zenFieldWidth = Math.Max(110, zenFieldRightLimit - zenFieldX);
+
+            _zenFieldRect = new Rectangle(
+                zenFieldX,
+                _footerRect.Y + 8,
+                zenFieldWidth,
+                FOOTER_BUTTON_SIZE - 6);
+
+            _closeButtonRect = new Rectangle(
+                _headerRect.Right - 34,
+                _headerRect.Y + 10,
+                28,
+                28);
         }
 
         private void BuildEquipSlots()
         {
             _equipSlots.Clear();
 
-            int cell = INVENTORY_SQUARE_WIDTH;
-            int panelCenterX = WINDOW_WIDTH / 2;
-            int baseY = HEADER_HEIGHT + 20;
+            const byte PendantSlot = 9;
+            const byte LeftRingSlot = 10;
+            const byte RightRingSlot = 11;
 
-            // Left column (pet, left-hand weapon, gloves)
-            int leftColX = panelCenterX - cell * 4 - 24;
-            AddEquipSlot(8, new Point(leftColX, baseY), new Point(2, 2), "PET");
-            AddEquipSlot(0, new Point(leftColX, baseY + cell * 2 + 8), new Point(2, 3), "L.HAND");
-            AddEquipSlot(5, new Point(leftColX, baseY + cell * 5 + 16), new Point(2, 2), "GLOVES");
+            int cell = EQUIP_SQUARE_WIDTH;
+            int centerX = (WINDOW_WIDTH - cell * 2) / 2;
+            int lateralOffset = COLUMN_SPACING + INVENTORY_SQUARE_WIDTH + 8;
+            int leftX = centerX - (cell * 2 + lateralOffset);
+            int rightX = centerX + cell * 2 + lateralOffset;
+            int topY = PAPERDOLL_TOP;
+            int ringOffset = 16;
 
-            // Center column (helm, armor, pants + rings/pendant)
-            int centerColX = panelCenterX - cell;
-            AddEquipSlot(2, new Point(centerColX, baseY), new Point(2, 2), "HELM");
-            AddEquipSlot(3, new Point(centerColX, baseY + cell * 2 + 8), new Point(2, 3), "ARMOR");
-            AddEquipSlot(4, new Point(centerColX, baseY + cell * 5 + 16), new Point(2, 2), "PANTS");
+            AddEquipSlot(8, new Point(leftX, topY), new Point(2, 2), "PET");
 
-            // Rings and pendant next to the center column
-            int accessoryOffset = 6;
-            AddEquipSlot(9, new Point(centerColX - cell - accessoryOffset, baseY + cell * 2 + 20), new Point(1, 1), "PEND");
-            AddEquipSlot(10, new Point(centerColX - cell - accessoryOffset, baseY + cell * 5 + 28), new Point(1, 1), "RING");
-            AddEquipSlot(11, new Point(centerColX + cell * 2 + accessoryOffset, baseY + cell * 5 + 28), new Point(1, 1), "RING");
+            int leftWeaponY = topY + cell * 2 + 4;
+            AddEquipSlot(0, new Point(leftX, leftWeaponY), new Point(2, 3), "LEFT", accentRed: true);
 
-            // Right column (wings, right-hand weapon, boots)
-            int rightColX = panelCenterX + cell * 2 + 16;
-            AddEquipSlot(7, new Point(rightColX - cell / 2, baseY - 4), new Point(3, 2), "WINGS");
-            AddEquipSlot(1, new Point(rightColX, baseY + cell * 2 + 8), new Point(2, 3), "R.HAND");
-            AddEquipSlot(6, new Point(rightColX, baseY + cell * 5 + 16), new Point(2, 2), "BOOTS");
+            int glovesY = leftWeaponY + cell * 3 + 6;
+            AddEquipSlot(5, new Point(leftX, glovesY), new Point(2, 2), "GLOVES");
+
+            AddEquipSlot(2, new Point(centerX, topY - 2), new Point(2, 2), "HELM");
+
+            int chestY = topY - 2 + cell * 2;
+            int pendantY = chestY + cell / 2;
+
+            AddEquipSlot(
+                PendantSlot,
+                new Point(centerX - (ringOffset + cell), pendantY),
+                new Point(1, 1),
+                "PEND");
+
+            AddEquipSlot(3, new Point(centerX, chestY), new Point(2, 3), "CHEST");
+
+            int pantsY = chestY + cell * 3 + 2;
+            AddEquipSlot(4, new Point(centerX, pantsY), new Point(2, 2), "PANTS");
+
+            int ringsY = pantsY + cell / 2;
+
+            AddEquipSlot(
+                LeftRingSlot,
+                new Point(centerX - (ringOffset + cell), ringsY),
+                new Point(1, 1),
+                "RING");
+
+            AddEquipSlot(
+                RightRingSlot,
+                new Point(centerX + cell * 2 + ringOffset, ringsY),
+                new Point(1, 1),
+                "RING");
+
+            int wingsX = rightX - cell / 2;
+            AddEquipSlot(7, new Point(wingsX, topY - 6), new Point(3, 2), "WINGS");
+
+            int rightWeaponY = topY + cell * 2 + 4;
+            AddEquipSlot(1, new Point(rightX, rightWeaponY), new Point(2, 3), "RIGHT");
+
+            int bootsY = rightWeaponY + cell * 3 + 6;
+            AddEquipSlot(6, new Point(rightX, bootsY), new Point(2, 2), "BOOTS");
         }
 
-        private void AddEquipSlot(byte slot, Point origin, Point size, string ghostLabel, bool accentRed = false)
+          private void AddEquipSlot(byte slot, Point origin, Point size, string ghostLabel, bool accentRed = false)
         {
-            var rect = new Rectangle(origin.X, origin.Y, size.X * INVENTORY_SQUARE_WIDTH, size.Y * INVENTORY_SQUARE_HEIGHT);
-            _equipSlots[slot] = new EquipSlotLayout(slot, rect, size, ghostLabel, accentRed);
+            var rect = new Rectangle(
+                origin.X,
+                origin.Y,
+                size.X * EQUIP_SQUARE_WIDTH,
+                size.Y * EQUIP_SQUARE_HEIGHT);
+
+            _equipSlots[slot] =
+                new EquipSlotLayout(
+                    slot,
+                    rect,
+                    size,
+                    ghostLabel,
+                    accentRed);
         }
 
         private static T LoadEmbeddedJson<T>(string resourceName)
@@ -1220,35 +1400,288 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private void DrawStaticElements(SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
+            var pixel = GraphicsManager.Instance?.Pixel;
             var fullRect = new Rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-            // ═══════════════════════════════════════════════════════════
-            // 1. MAIN WINDOW BACKGROUND
-            // ═══════════════════════════════════════════════════════════
-            DrawWindowBackground(spriteBatch, fullRect);
+            // This is the original pre-redesign layout renderer from Naffis.
+            // It consumes InventoryLayout.json + InventoryRect.json and crops
+            // the configured regions from NpcShop_I3.ozd.
+            if (_layoutTexture != null && _layoutInfos.Count > 0)
+            {
+                foreach (var info in _layoutInfos)
+                {
+                    var destRect = new Rectangle(
+                        (int)MathF.Round(info.ScreenX * _layoutScale.X),
+                        (int)MathF.Round(info.ScreenY * _layoutScale.Y),
+                        (int)MathF.Round(info.Width * _layoutScale.X),
+                        (int)MathF.Round(info.Height * _layoutScale.Y));
 
-            // ═══════════════════════════════════════════════════════════
-            // 2. HEADER
-            // ═══════════════════════════════════════════════════════════
-            DrawModernHeader(spriteBatch);
+                    if (_textureRectLookup.TryGetValue(info.Name, out var src))
+                    {
+                        var sourceRect = new Rectangle(
+                            src.X,
+                            src.Y,
+                            src.Width,
+                            src.Height);
 
-            // ═══════════════════════════════════════════════════════════
-            // 3. EQUIPMENT SECTION
-            // ═══════════════════════════════════════════════════════════
-            DrawModernEquipSection(spriteBatch);
+                        spriteBatch.Draw(
+                            _layoutTexture,
+                            destRect,
+                            sourceRect,
+                            Color.White);
+                    }
+                    else
+                    {
+                        spriteBatch.Draw(
+                            _layoutTexture,
+                            destRect,
+                            Color.White);
+                    }
+                }
+            }
+            else if (_layoutTexture != null &&
+                     _textureRectLookup.TryGetValue("Board", out var board))
+            {
+                var src = new Rectangle(
+                    board.X,
+                    board.Y,
+                    board.Width,
+                    board.Height);
 
-            // ═══════════════════════════════════════════════════════════
-            // 4. INVENTORY GRID SECTION
-            // ═══════════════════════════════════════════════════════════
-            DrawModernGridSection(spriteBatch);
+                spriteBatch.Draw(
+                    _layoutTexture,
+                    fullRect,
+                    src,
+                    Color.White);
+            }
+            else if (pixel != null)
+            {
+                spriteBatch.Draw(
+                    pixel,
+                    fullRect,
+                    new Color(10, 10, 10, 220));
+            }
 
-            // ═══════════════════════════════════════════════════════════
-            // 5. FOOTER
-            // ═══════════════════════════════════════════════════════════
-            DrawModernFooter(spriteBatch);
+            if (pixel != null)
+            {
+                DrawHeaderBar(spriteBatch, pixel);
+                DrawEquipBackground(spriteBatch);
+                DrawGridBackground(spriteBatch);
+                DrawFooterBase(spriteBatch, pixel);
+            }
+        }
+
+
+
+        private void DrawHeaderBar(SpriteBatch spriteBatch, Texture2D pixel)
+        {
+            // Pre-redesign Naffis: header artwork comes from the JSON/base layout.
+        }
+
+        private void DrawBeam(SpriteBatch spriteBatch, Texture2D pixel)
+        {
+            // Pre-redesign Naffis: compact layout did not draw an extra separator.
+        }
+
+        private void DrawGridBackground(SpriteBatch spriteBatch)
+        {
+            // Fondo visual un poco más grande que la grilla lógica
+            var gridBackgroundRect = new Rectangle(
+            _gridRect.X - 6,
+            _gridRect.Y - 6,
+            _gridRect.Width + 12,
+            _gridRect.Height + 12);
+
+            // Dibujar las 8 filas del fondo
+            for (int row = 0; row < Rows; row++)
+            {
+                Texture2D rowTexture =
+                    row == 0 ? _invenBg01 :
+                    row == Rows - 1 ? _invenBg03 :
+                    _invenBg02;
+
+                if (rowTexture == null)
+                    continue;
+
+                var destination = new Rectangle(
+                    gridBackgroundRect.X,
+                    gridBackgroundRect.Y + row * (gridBackgroundRect.Height / Rows),
+                    gridBackgroundRect.Width,
+                    gridBackgroundRect.Height / Rows);
+
+                spriteBatch.Draw(
+                    rowTexture,
+                    destination,
+                    Color.White);
+            }
+
+            // Marco del inventario
+            if (_invenFrame02 != null)
+            {
+                spriteBatch.Draw(
+                    _invenFrame02,
+                    gridBackgroundRect,
+                    Color.White);
+            }
+
+            if (_invenFrame01 != null)
+            {
+                var topRect = new Rectangle(
+                    gridBackgroundRect.X,
+                    gridBackgroundRect.Y,
+                    gridBackgroundRect.Width,
+                    32);
+
+                spriteBatch.Draw(
+                    _invenFrame01,
+                    topRect,
+                    Color.White);
+
+                var bottomRect = new Rectangle(
+                    gridBackgroundRect.X,
+                    gridBackgroundRect.Bottom - 32,
+                    gridBackgroundRect.Width,
+                    32);
+
+                spriteBatch.Draw(
+                    _invenFrame01,
+                    bottomRect,
+                    null,
+                    Color.White,
+                    0f,
+                    Vector2.Zero,
+                    SpriteEffects.FlipVertically,
+                    0f);
+            }
+        }
+
+        private void DrawEquipBackground(SpriteBatch spriteBatch)
+        {
+            foreach (var layout in _equipSlots.Values)
+            {
+                DrawPreRedesignEquipSlot(spriteBatch, layout);
+            }
+        }
+
+        private void DrawPreRedesignEquipSlot(
+            SpriteBatch spriteBatch,
+            EquipSlotLayout layout)
+        {
+            Rectangle rect = layout.Rect;
+
+            Texture2D background =
+                GetEquipSlotBackground(layout.Slot);
+
+            if (background != null)
+            {
+                spriteBatch.Draw(
+                    background,
+                    rect,
+                    Color.White);
+            }
+        }
+
+        private void DrawFooterBase(
+            SpriteBatch spriteBatch,
+            Texture2D pixel)
+        {
+            // Pre-redesign renderer only drew the Zen field here.
+            // Current repair/close button behavior is intentionally preserved.
+            DrawInsetPanel(
+                spriteBatch,
+                _zenFieldRect,
+                new Color(12, 12, 12, 230),
+                new Color(80, 80, 80, 180),
+                new Color(0, 0, 0, 210));
+        }
+
+        private static void DrawBevel(
+            SpriteBatch spriteBatch,
+            Rectangle rect,
+            Color light,
+            Color dark)
+        {
+            var pixel = GraphicsManager.Instance?.Pixel;
+            if (pixel == null)
+            {
+                return;
+            }
+
+            spriteBatch.Draw(
+                pixel,
+                new Rectangle(rect.X, rect.Y, rect.Width, 1),
+                light);
+
+            spriteBatch.Draw(
+                pixel,
+                new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1),
+                dark);
+
+            spriteBatch.Draw(
+                pixel,
+                new Rectangle(rect.X, rect.Y, 1, rect.Height),
+                light);
+
+            spriteBatch.Draw(
+                pixel,
+                new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height),
+                dark);
+        }
+
+        private static void DrawInsetPanel(
+            SpriteBatch spriteBatch,
+            Rectangle rect,
+            Color fill,
+            Color light,
+            Color dark,
+            int thickness = 1)
+        {
+            var pixel = GraphicsManager.Instance?.Pixel;
+            if (pixel == null)
+            {
+                return;
+            }
+
+            spriteBatch.Draw(pixel, rect, fill);
+
+            for (int i = 0; i < thickness; i++)
+            {
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        rect.X + i,
+                        rect.Y + i,
+                        rect.Width - i * 2,
+                        1),
+                    light);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        rect.X + i,
+                        rect.Bottom - 1 - i,
+                        rect.Width - i * 2,
+                        1),
+                    dark);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        rect.X + i,
+                        rect.Y + i,
+                        1,
+                        rect.Height - i * 2),
+                    light);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        rect.Right - 1 - i,
+                        rect.Y + i,
+                        1,
+                        rect.Height - i * 2),
+                    dark);
+            }
         }
 
         private void DrawModernHeader(SpriteBatch spriteBatch)
@@ -2457,7 +2890,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Color glowColor = ItemUiHelper.GetItemGlowColor(item, GlowPalette);
                 if (glowColor.A > 0)
                 {
-                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, itemRect, glowColor);
+                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, itemRect, glowColor, glowSize: 1);
                 }
 
                 // Item texture
