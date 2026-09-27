@@ -225,6 +225,9 @@ namespace Client.Data.BMD
             Add(56, 145);   // Power Slash → PlayerAttackTwoHandSwordTwo
             Add(57, 65);    // Spiral Slash → PlayerAttackSkillWheel
 
+            //MG SKILLS
+            Add(56, 145);   // Power Slash → PlayerAttackTwoHandSwordTwo
+
             // ELF SKILLS
             Add(234, 246);  // Recovery → PlayerRecoverSkill
             Add(46, 178);   // Starfall → PlayerSkillMultishotBowStand
@@ -314,6 +317,7 @@ namespace Client.Data.BMD
             map[49] = "Sound/sKnightSkill1.wav";         // Fire Breath (ID 49)
             map[47] = "Sound/eRidingSpear.wav";          // Impale (ID 47)
             map[48] = "Sound/eSwellLife.wav";            // Greater Fortitude (ID 48)
+            map[55] = "Sound/sKnightSkill3.wav";         // Fire Slash
             map[56] = "Sound/sKnightSkill3.wav";         // Power Slash (ID 56)
 
             // DARK LORD SKILLS
