@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Reflection;
+using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
 using Client.Main;
@@ -18,7 +21,7 @@ using Microsoft.Xna.Framework.Input;
 
 namespace Client.Main.Controls.UI.Game
 {
-    public class NpcShopControl : UIControl
+    public class NpcShopControl : UIControl, IUiTexturePreloadable
     {
         // ═══════════════════════════════════════════════════════════════
         // SHOP MODE
@@ -30,48 +33,89 @@ namespace Client.Main.Controls.UI.Game
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // WINDOW DIMENSIONS
+        // CLASSIC GFx LAYOUT (pre-redesign Naffis)
         // ═══════════════════════════════════════════════════════════════
+        private const string LayoutJsonResource =
+            "Client.Main.Controls.UI.Game.Layouts.NpcShopLayout.json";
+
+        private const string TextureRectJsonResource =
+            "Client.Main.Controls.UI.Game.Layouts.NpcShopRect.json";
+
+        private const string LayoutTexturePath =
+            "Interface/GFx/NpcShop_I3.ozd";
+
         private const int SHOP_COLUMNS = 8;
+
+        // Conservamos las 15 filas de tu implementación actual.
         private const int SHOP_ROWS = 15;
+
+        // Tamaño elegido para los slots/items.
         private const int SHOP_SQUARE_WIDTH = 32;
         private const int SHOP_SQUARE_HEIGHT = 32;
 
-        private const int HEADER_HEIGHT = 46;
-        private const int SECTION_HEADER_HEIGHT = 22;
-        private const int GRID_PADDING = 10;
-        private const int BUTTON_AREA_HEIGHT = 40;
-        private const int FOOTER_HEIGHT = 46;
-        private const int WINDOW_MARGIN = 12;
+        // El layout original de Naffis estaba construido para celdas de 25 px.
+        // Escalamos TODO el skin clásico en la misma proporción que la grilla:
+        // 32 / 25 = 1.28. Así fondo, grilla, botones e hitboxes vuelven a coincidir.
+        private const float CLASSIC_UI_SCALE =
+            SHOP_SQUARE_WIDTH / 25f;
 
-        private static readonly int GRID_WIDTH = SHOP_COLUMNS * SHOP_SQUARE_WIDTH;
-        private static readonly int GRID_HEIGHT = SHOP_ROWS * SHOP_SQUARE_HEIGHT;
-        private static readonly int WINDOW_WIDTH = GRID_WIDTH + GRID_PADDING * 2 + WINDOW_MARGIN * 2;
-        private int WindowHeight => HEADER_HEIGHT + SECTION_HEADER_HEIGHT + GRID_PADDING * 2 + GRID_HEIGHT + (_isRepairShop ? BUTTON_AREA_HEIGHT : 0) + FOOTER_HEIGHT + WINDOW_MARGIN;
+        // Bounding box real de NpcShopLayout.json:
+        // X 148..423 / Y 89..624.
+        private const int CLASSIC_ORIGIN_X = 148;
+        private const int CLASSIC_ORIGIN_Y = 89;
+        private const int CLASSIC_PANEL_WIDTH = 275;
+        private const int CLASSIC_PANEL_HEIGHT = 535;
+        private const int PANEL_MARGIN = 8;
 
+        private static readonly int WINDOW_WIDTH =
+            PANEL_MARGIN * 2 +
+            (int)MathF.Ceiling(
+                CLASSIC_PANEL_WIDTH * CLASSIC_UI_SCALE);
+
+        private static readonly int WINDOW_HEIGHT =
+            PANEL_MARGIN * 2 +
+            (int)MathF.Ceiling(
+                CLASSIC_PANEL_HEIGHT * CLASSIC_UI_SCALE);
+
+        // El crop antiguo 29x31 contiene margen/borde extra.
+        // Usamos únicamente la celda interior real de 25x25 para evitar
+        // la doble rejilla (línea exterior + línea interior desplazada).
+        private static readonly Rectangle SlotSourceRect =
+            new(548, 223, 25, 25);
+
+        
+        private static readonly int GRID_WIDTH =
+            SHOP_COLUMNS * SHOP_SQUARE_WIDTH;
+
+        private static readonly int GRID_HEIGHT =
+            SHOP_ROWS * SHOP_SQUARE_HEIGHT;
+
+        // Posición LÓGICA del grid: items, hover, clicks e hitboxes.
+        // No usar estos valores para corregir el dibujo blanco del grid.
+        private const int GRID_LOGIC_OFFSET_X = 4;
+        private const int GRID_LOGIC_OFFSET_Y = 5;
+
+        // La celda visual ahora es exactamente 25x25 en origen y se escala
+        // al mismo 32x32 que la lógica. No necesita desplazamiento adicional.
+        private const int GRID_ART_OFFSET_X = 0;
+        private const int GRID_ART_OFFSET_Y = 0;
+
+        private int WindowHeight => WINDOW_HEIGHT;
         // ═══════════════════════════════════════════════════════════════
-        // MODERN DARK THEME
+        // UI COLORS / CLASSIC SHOP HELPERS
         // ═══════════════════════════════════════════════════════════════
         private static class Theme
         {
-            public static readonly Color BgDarkest = new(8, 10, 14, 252);
-            public static readonly Color BgDark = new(16, 20, 26, 250);
-            public static readonly Color BgMid = new(24, 30, 38, 248);
             public static readonly Color BgLight = new(35, 42, 52, 245);
 
             public static readonly Color Accent = new(212, 175, 85);
             public static readonly Color AccentBright = new(255, 215, 120);
             public static readonly Color AccentDim = new(140, 115, 55);
-            public static readonly Color AccentGlow = new(255, 200, 80, 40);
 
             public static readonly Color BorderOuter = new(5, 6, 8, 255);
             public static readonly Color BorderInner = new(60, 70, 85, 200);
-            public static readonly Color BorderHighlight = new(100, 110, 130, 120);
 
-            public static readonly Color SlotBg = new(12, 15, 20, 240);
-            public static readonly Color SlotBorder = new(45, 52, 65, 180);
             public static readonly Color SlotHover = new(70, 85, 110, 150);
-            public static readonly Color SlotSelected = new(212, 175, 85, 100);
 
             public static readonly Color GlowNormal = new(150, 150, 150, 25);
             public static readonly Color GlowMagic = new(100, 150, 255, 50);
@@ -82,6 +126,14 @@ namespace Client.Main.Controls.UI.Game
             public static readonly Color TextWhite = new(240, 240, 245);
             public static readonly Color TextGold = new(255, 220, 130);
             public static readonly Color TextGray = new(160, 165, 175);
+
+            // Colores temporales más acordes al skin clásico GFx.
+            // Más adelante se pueden reemplazar por sprites originales.
+            public static readonly Color ClassicButtonBg = new(48, 31, 25, 245);
+            public static readonly Color ClassicButtonHover = new(72, 42, 30, 245);
+            public static readonly Color ClassicButtonActive = new(100, 48, 30, 245);
+            public static readonly Color ClassicButtonBorder = new(112, 76, 46, 220);
+            public static readonly Color ClassicButtonBorderHover = new(178, 122, 70, 240);
         }
 
         private static readonly ItemGlowPalette GlowPalette = new(
@@ -90,6 +142,24 @@ namespace Client.Main.Controls.UI.Game
             Theme.GlowExcellent,
             Theme.GlowAncient,
             Theme.GlowLegendary);
+        private readonly struct LayoutInfo
+        {
+            public string Name { get; init; }
+            public float ScreenX { get; init; }
+            public float ScreenY { get; init; }
+            public int Width { get; init; }
+            public int Height { get; init; }
+            public int Z { get; init; }
+        }
+
+        private readonly struct TextureRectData
+        {
+            public string Name { get; init; }
+            public int X { get; init; }
+            public int Y { get; init; }
+            public int Width { get; init; }
+            public int Height { get; init; }
+        }
 
         private static NpcShopControl _instance;
 
@@ -97,9 +167,17 @@ namespace Client.Main.Controls.UI.Game
         private readonly Dictionary<string, Texture2D> _itemTextureCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<(InventoryItem item, int width, int height, bool animated), Texture2D> _bmdPreviewCache = new();
 
+        private readonly List<LayoutInfo> _layoutInfos = new();
+
+        private readonly Dictionary<string, TextureRectData> _textureRectLookup =
+            new(StringComparer.OrdinalIgnoreCase);
+
+
+        private Texture2D _layoutTexture;
+        private Texture2D _slotTexture;
+
         private Rectangle _headerRect;
         private Rectangle _gridRect;
-        private Rectangle _gridFrameRect;
         private Rectangle _buttonAreaRect;
         private Rectangle _footerRect;
         private Rectangle _closeButtonRect;
@@ -135,6 +213,7 @@ namespace Client.Main.Controls.UI.Game
 
         private NpcShopControl()
         {
+            LoadLayoutDefinitions();
             BuildLayoutMetrics();
 
             ControlSize = new Point(WINDOW_WIDTH, WindowHeight);
@@ -177,44 +256,127 @@ namespace Client.Main.Controls.UI.Game
                 X = (Parent.DisplaySize.X / 2) - (DisplaySize.X / 2);
         }
 
+        private static int ScaleClassicX(float sourceX)
+            => PANEL_MARGIN +
+               (int)MathF.Round(
+                   (sourceX - CLASSIC_ORIGIN_X) *
+                   CLASSIC_UI_SCALE);
+
+        private static int ScaleClassicY(float sourceY)
+            => PANEL_MARGIN +
+               (int)MathF.Round(
+                   (sourceY - CLASSIC_ORIGIN_Y) *
+                   CLASSIC_UI_SCALE);
+
+        private static int ScaleClassicSize(float value)
+            => (int)MathF.Round(
+                value * CLASSIC_UI_SCALE);
+
         private void BuildLayoutMetrics()
         {
-            int buttonAreaHeight = _isRepairShop ? BUTTON_AREA_HEIGHT : 0;
+            // Coordenadas originales del renderer pre-redesign:
+            // TopCorner 149.3,89 / grid 170,180.
+            // El skin completo se escala con CLASSIC_UI_SCALE, mientras que
+            // estos offsets de pocos píxeles corrigen únicamente el calce
+            // visual del grid con el dibujo del Board.
 
-            _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, HEADER_HEIGHT);
-
-            int gridFrameX = WINDOW_MARGIN;
-            int gridFrameY = HEADER_HEIGHT;
-            int gridFrameWidth = GRID_WIDTH + GRID_PADDING * 2;
-            int gridFrameHeight = SECTION_HEADER_HEIGHT + GRID_PADDING * 2 + GRID_HEIGHT;
-            _gridFrameRect = new Rectangle(gridFrameX, gridFrameY, gridFrameWidth, gridFrameHeight);
+            _headerRect = new Rectangle(
+                ScaleClassicX(149.3f),
+                ScaleClassicY(89f),
+                ScaleClassicSize(273f),
+                ScaleClassicSize(70f));
 
             _gridRect = new Rectangle(
-                gridFrameX + GRID_PADDING,
-                gridFrameY + SECTION_HEADER_HEIGHT + GRID_PADDING,
+                ScaleClassicX(170f) + GRID_LOGIC_OFFSET_X,
+                ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
                 GRID_WIDTH,
                 GRID_HEIGHT);
 
-            _buttonAreaRect = new Rectangle(WINDOW_MARGIN, _gridFrameRect.Bottom + 2, _gridFrameRect.Width, buttonAreaHeight);
-            _footerRect = new Rectangle(WINDOW_MARGIN, _buttonAreaRect.Bottom + 4, _gridFrameRect.Width, FOOTER_HEIGHT - 8);
-            _closeButtonRect = new Rectangle(WINDOW_WIDTH - 30, 10, 20, 20);
+// A partir de aquí el layout inferior se calcula RELATIVO al grid.
+            // Así el tamaño de los slots puede cambiar sin que Repair/Footer
+            // vuelvan a salir del panel.
+            int lowerGap = ScaleClassicSize(1f);
 
-            // Repair buttons in button area
-            int buttonWidth = 100;
-            int buttonHeight = 29;
-            int buttonSpacing = 10;
-            int buttonY = _buttonAreaRect.Y + (_buttonAreaRect.Height - buttonHeight) / 2;
-            int startX = _buttonAreaRect.X + 10;
+            int buttonAreaHeight =
+                _isRepairShop
+                    ? ScaleClassicSize(21f)
+                    : 0;
 
-            _repairButtonRect = new Rectangle(startX, buttonY, buttonWidth, buttonHeight);
-            _repairAllButtonRect = new Rectangle(startX + buttonWidth + buttonSpacing, buttonY, buttonWidth, buttonHeight);
+            _buttonAreaRect = new Rectangle(
+                _gridRect.X,
+                _gridRect.Bottom + lowerGap,
+                _gridRect.Width,
+                buttonAreaHeight);
+
+            int footerY =
+                _isRepairShop
+                    ? _buttonAreaRect.Bottom + ScaleClassicSize(3f)
+                    : _gridRect.Bottom + lowerGap;
+
+            _footerRect = new Rectangle(
+                _gridRect.X,
+                footerY,
+                _gridRect.Width,
+                ScaleClassicSize(18f));
+
+            // Botones más compactos y centrados en el ancho del grid.
+            int sidePadding = ScaleClassicSize(6f);
+            int repairGap = ScaleClassicSize(6f);
+
+            int repairButtonWidth =
+                (_buttonAreaRect.Width -
+                 sidePadding * 2 -
+                 repairGap) / 2;
+
+            int repairButtonHeight =
+                ScaleClassicSize(18f);
+
+            int repairButtonY =
+                _buttonAreaRect.Y +
+                Math.Max(
+                    0,
+                    (_buttonAreaRect.Height -
+                     repairButtonHeight) / 2);
+
+            _repairButtonRect = new Rectangle(
+                _buttonAreaRect.X + sidePadding,
+                repairButtonY,
+                repairButtonWidth,
+                repairButtonHeight);
+
+            _repairAllButtonRect = new Rectangle(
+                _repairButtonRect.Right + repairGap,
+                repairButtonY,
+                repairButtonWidth,
+                repairButtonHeight);
+
+            _closeButtonRect = new Rectangle(
+                ScaleClassicX(392f),
+                ScaleClassicY(98f),
+                ScaleClassicSize(20f),
+                ScaleClassicSize(20f));
         }
 
         public override async System.Threading.Tasks.Task Load()
         {
             await base.Load();
+
+            var loader = TextureLoader.Instance;
+
+            _layoutTexture =
+                await loader.PrepareAndGetTexture(
+                    LayoutTexturePath);
+
+            _slotTexture = _layoutTexture;
+
             _font = GraphicsManager.Instance.Font;
+
             InvalidateStaticSurface();
+        }
+
+        public IEnumerable<string> GetPreloadTexturePaths()
+        {
+            yield return LayoutTexturePath;
         }
 
         public override void Update(GameTime gameTime)
@@ -388,23 +550,51 @@ namespace Client.Main.Controls.UI.Game
             if (spriteBatch == null) return;
 
             SpriteBatchScope? scope = null;
+
             if (!SpriteBatchScope.BatchIsBegun)
             {
-                scope = new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: UiScaler.SpriteTransform);
+                scope = new SpriteBatchScope(
+                    spriteBatch,
+                    SpriteSortMode.Deferred,
+                    BlendState.AlphaBlend,
+                    transform: UiScaler.SpriteTransform);
             }
 
             try
             {
-                if (_staticSurface != null && !_staticSurface.IsDisposed)
+                if (_staticSurface != null &&
+                    !_staticSurface.IsDisposed)
                 {
-                    spriteBatch.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
+                    spriteBatch.Draw(
+                        _staticSurface,
+                        DisplayRectangle,
+                        Color.White * Alpha);
                 }
 
+                // Título dinámico.
+                DrawShopTitle(spriteBatch);
+
                 var pixel = GraphicsManager.Instance.Pixel;
-                ItemGridRenderHelper.DrawGridOverlays(spriteBatch, pixel, DisplayRectangle, _gridRect, _hoveredItem, _hoveredSlot,
-                                                      SHOP_SQUARE_WIDTH, SHOP_SQUARE_HEIGHT, Theme.SlotHover, Theme.Accent, Alpha);
+
+                ItemGridRenderHelper.DrawGridOverlays(
+                    spriteBatch,
+                    pixel,
+                    DisplayRectangle,
+                    _gridRect,
+                    _hoveredItem,
+                    _hoveredSlot,
+                    SHOP_SQUARE_WIDTH,
+                    SHOP_SQUARE_HEIGHT,
+                    Theme.SlotHover,
+                    Theme.Accent,
+                    Alpha);
+
                 DrawShopItems(spriteBatch);
+
                 DrawCloseButton(spriteBatch);
+
+                // IMPORTANTE:
+                // Estos son los dos botones Repair item / Repair all.
                 if (_isRepairShop)
                 {
                     DrawRepairButtons(spriteBatch);
@@ -464,21 +654,6 @@ namespace Client.Main.Controls.UI.Game
         // DRAWING PRIMITIVES
         // ═══════════════════════════════════════════════════════════════
 
-        private void DrawWindowBackground(SpriteBatch spriteBatch, Rectangle rect)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            spriteBatch.Draw(pixel, rect, Theme.BorderOuter);
-
-            var innerRect = new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4);
-            UiDrawHelper.DrawVerticalGradient(spriteBatch, innerRect, Theme.BgDark, Theme.BgDarkest);
-
-            spriteBatch.Draw(pixel, new Rectangle(innerRect.X, innerRect.Y, innerRect.Width, 1), Theme.BorderInner * 0.5f);
-            spriteBatch.Draw(pixel, new Rectangle(innerRect.X, innerRect.Y, 1, innerRect.Height), Theme.BorderInner * 0.3f);
-
-            UiDrawHelper.DrawCornerAccents(spriteBatch, rect, Theme.Accent * 0.4f);
-        }
 
         private void DrawPanel(SpriteBatch spriteBatch, Rectangle rect, Color bgColor, bool withBorder = true)
         {
@@ -488,19 +663,6 @@ namespace Client.Main.Controls.UI.Game
                 withBorder ? Theme.BorderInner * 0.6f : null);
         }
 
-        private void DrawSectionHeader(SpriteBatch spriteBatch, string title, int x, int y, int width)
-        {
-            if (_font == null) return;
-
-            float scale = 0.32f;
-            Vector2 size = _font.MeasureString(title) * scale;
-            float textX = x + (width - size.X) / 2;
-
-            spriteBatch.DrawString(_font, title, new Vector2(textX + 1, y + 1), Color.Black * 0.6f,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, title, new Vector2(textX, y), Theme.TextGold,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-        }
 
         // ═══════════════════════════════════════════════════════════════
         // STATIC SURFACE RENDERING
@@ -532,166 +694,407 @@ namespace Client.Main.Controls.UI.Game
         }
 
         private void InvalidateStaticSurface() => _staticSurfaceDirty = true;
+        private void LoadLayoutDefinitions()
+        {
+            try
+            {
+                var layoutData =
+                    LoadEmbeddedJson<List<LayoutInfo>>(
+                        LayoutJsonResource);
+
+                if (layoutData != null)
+                {
+                    _layoutInfos.Clear();
+
+                    _layoutInfos.AddRange(
+                        layoutData.OrderBy(
+                            info => info.Z));
+                }
+
+                var rectData =
+                    LoadEmbeddedJson<List<TextureRectData>>(
+                        TextureRectJsonResource);
+
+                if (rectData != null)
+                {
+                    _textureRectLookup.Clear();
+
+                    foreach (var rect in rectData)
+                    {
+                        _textureRectLookup[
+                            rect.Name] = rect;
+                    }
+                }
+            }
+            catch
+            {
+                // Si algún recurso falla, DrawStaticElements usa el fallback.
+            }
+        }
+
+        private static T LoadEmbeddedJson<T>(
+            string resourceName)
+        {
+            var assembly =
+                Assembly.GetExecutingAssembly();
+
+            using Stream stream =
+                assembly.GetManifestResourceStream(
+                    resourceName)
+                ?? throw new FileNotFoundException(
+                    $"Resource not found: {resourceName}");
+
+            using var reader =
+                new StreamReader(stream);
+
+            string json =
+                reader.ReadToEnd();
+
+            return JsonSerializer.Deserialize<T>(
+                json);
+        }
 
         private void DrawStaticElements(SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
+            // Fondo/frame clásico completo. Se dibuja dentro de un control
+            // normalizado, sin los 148 px / 89 px de espacio vacío que tenía
+            // el stage antiguo.
+            if (_layoutTexture != null &&
+                _layoutInfos.Count > 0)
+            {
+                foreach (var info in
+                         _layoutInfos.OrderBy(i => i.Z))
+                {
+                    var destRect = new Rectangle(
+                        ScaleClassicX(info.ScreenX),
+                        ScaleClassicY(info.ScreenY),
+                        ScaleClassicSize(info.Width),
+                        ScaleClassicSize(info.Height));
 
-            var fullRect = new Rectangle(0, 0, WINDOW_WIDTH, WindowHeight);
-            DrawWindowBackground(spriteBatch, fullRect);
-            DrawModernHeader(spriteBatch);
-            DrawModernGridSection(spriteBatch);
-            DrawModernButtonArea(spriteBatch);
-            DrawModernFooter(spriteBatch);
+                    if (_textureRectLookup.TryGetValue(
+                            info.Name,
+                            out var src))
+                    {
+                        var sourceRect =
+                            new Rectangle(
+                                src.X,
+                                src.Y,
+                                src.Width,
+                                src.Height);
+
+                        spriteBatch.Draw(
+                            _layoutTexture,
+                            destRect,
+                            sourceRect,
+                            Color.White);
+                    }
+                    else
+                    {
+                        spriteBatch.Draw(
+                            _layoutTexture,
+                            destRect,
+                            Color.White);
+                    }
+                }
+            }
+            else if (GraphicsManager.Instance?.Pixel != null)
+            {
+                spriteBatch.Draw(
+                    GraphicsManager.Instance.Pixel,
+                    new Rectangle(
+                        0,
+                        0,
+                        WINDOW_WIDTH,
+                        WINDOW_HEIGHT),
+                    new Color(10, 10, 10, 220));
+            }
+
+            DrawClassicGridBackground(spriteBatch);
+
+            if (_isRepairShop)
+            {
+                DrawRepairButtonArea(spriteBatch);
+            }
+
+            DrawFooter(spriteBatch);
         }
 
-        private void DrawModernHeader(SpriteBatch spriteBatch)
+        private void DrawShopTitle(SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var headerBg = new Rectangle(8, 6, WINDOW_WIDTH - 16, HEADER_HEIGHT - 8);
-            DrawPanel(spriteBatch, headerBg, Theme.BgMid);
-
-            spriteBatch.Draw(pixel, new Rectangle(20, 8, WINDOW_WIDTH - 40, 2), Theme.Accent * 0.8f);
-            spriteBatch.Draw(pixel, new Rectangle(30, 10, WINDOW_WIDTH - 60, 1), Theme.AccentDim * 0.4f);
-
-            if (_font != null)
+            if (_font == null)
             {
-                string title = "NPC SHOP";
-                float scale = 0.50f;
-                Vector2 size = _font.MeasureString(title) * scale;
-                Vector2 pos = new((WINDOW_WIDTH - size.X) / 2, (HEADER_HEIGHT - size.Y) / 2 + 2);
-
-                spriteBatch.Draw(pixel, new Rectangle((int)pos.X - 20, (int)pos.Y - 4, (int)size.X + 40, (int)size.Y + 8),
-                                Theme.AccentGlow * 0.3f);
-
-                spriteBatch.DrawString(_font, title, pos + new Vector2(2, 2), Color.Black * 0.5f,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, title, pos, Theme.TextWhite,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                return;
             }
 
-            int sepY = HEADER_HEIGHT - 2;
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(20, sepY, (WINDOW_WIDTH - 40) / 2, 1),
-                                  Color.Transparent, Theme.BorderInner);
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(WINDOW_WIDTH / 2, sepY, (WINDOW_WIDTH - 40) / 2, 1),
-                                  Theme.BorderInner, Color.Transparent);
+            const string title = "NPC SHOP";
+
+            // Mismo tamaño de fuente que InventoryControl.
+            float textScale =
+                (14f / Constants.BASE_FONT_SIZE) * Scale;
+
+            Vector2 size =
+                _font.MeasureString(title) * textScale;
+
+            // Inventory:
+            // TopCorner Y = -20
+            // título Y = 29
+            // => 49 / 90 = posición relativa dentro del TopCorner.
+            const float titleRatioInTopCorner = 49f / 90f;
+
+            float titleX =
+                _headerRect.X +
+                _headerRect.Width * 0.5f;
+
+            float titleY =
+                _headerRect.Y +
+                _headerRect.Height * titleRatioInTopCorner;
+
+            Vector2 pos =
+                DisplayRectangle.Location.ToVector2() +
+                new Vector2(
+                    titleX * Scale,
+                    titleY * Scale);
+
+            // Centrado horizontal.
+            pos.X -= size.X * 0.5f;
+
+            spriteBatch.DrawString(
+                _font,
+                title,
+                pos,
+                Color.White * Alpha,
+                0f,
+                Vector2.Zero,
+                textScale,
+                SpriteEffects.None,
+                0f);
         }
 
-        private void DrawModernGridSection(SpriteBatch spriteBatch)
+        private void DrawClassicGridBackground(
+            SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            DrawSectionHeader(spriteBatch, "ITEMS FOR SALE", _gridFrameRect.X, _gridFrameRect.Y + 4, _gridFrameRect.Width);
-            DrawPanel(spriteBatch, _gridFrameRect, Theme.BgMid);
-
-            spriteBatch.Draw(pixel, _gridRect, Theme.SlotBg);
-
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, _gridRect.Y, _gridRect.Width, 2), Color.Black * 0.4f);
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, _gridRect.Y, 2, _gridRect.Height), Color.Black * 0.3f);
-
-            Color gridLine = new(40, 48, 60, 100);
-            Color gridLineMajor = new(55, 65, 80, 120);
-
-            for (int x = 1; x < SHOP_COLUMNS; x++)
+            if (_slotTexture == null)
             {
-                int lineX = _gridRect.X + x * SHOP_SQUARE_WIDTH;
-                bool isMajor = x == SHOP_COLUMNS / 2;
-                spriteBatch.Draw(pixel, new Rectangle(lineX, _gridRect.Y, 1, _gridRect.Height), isMajor ? gridLineMajor : gridLine);
+                return;
             }
 
-            for (int y = 1; y < SHOP_ROWS; y++)
+            for (int y = 0; y < SHOP_ROWS; y++)
             {
-                int lineY = _gridRect.Y + y * SHOP_SQUARE_HEIGHT;
-                bool isMajor = y == SHOP_ROWS / 2;
-                spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, lineY, _gridRect.Width, 1), isMajor ? gridLineMajor : gridLine);
-            }
+                for (int x = 0; x < SHOP_COLUMNS; x++)
+                {
+                    var destRect = new Rectangle(
+                        _gridRect.X +
+                            GRID_ART_OFFSET_X +
+                            x * SHOP_SQUARE_WIDTH,
+                        _gridRect.Y +
+                            GRID_ART_OFFSET_Y +
+                            y * SHOP_SQUARE_HEIGHT,
+                        SHOP_SQUARE_WIDTH,
+                        SHOP_SQUARE_HEIGHT);
 
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, _gridRect.Bottom - 1, _gridRect.Width, 1), Theme.BorderHighlight * 0.2f);
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.Right - 1, _gridRect.Y, 1, _gridRect.Height), Theme.BorderHighlight * 0.15f);
+                    spriteBatch.Draw(
+                        _slotTexture,
+                        destRect,
+                        SlotSourceRect,
+                        Color.White);
+                }
+            }
         }
 
-        private void DrawModernButtonArea(SpriteBatch spriteBatch)
+
+        private void DrawRepairButtonArea(SpriteBatch spriteBatch)
         {
             if (_buttonAreaRect.Height == 0) return;
 
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null) return;
 
-            DrawPanel(spriteBatch, _buttonAreaRect, Theme.BgMid);
+            DrawPanel(
+                spriteBatch,
+                _buttonAreaRect,
+                new Color(30, 22, 19, 225));
         }
 
-        private void DrawModernFooter(SpriteBatch spriteBatch)
+        private void DrawFooter(SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
+            var pixel =
+                GraphicsManager.Instance.Pixel;
 
-            int sepY = _footerRect.Y - 4;
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(30, sepY, (WINDOW_WIDTH - 60) / 2, 1),
-                                  Color.Transparent, Theme.Accent * 0.4f);
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(WINDOW_WIDTH / 2, sepY, (WINDOW_WIDTH - 60) / 2, 1),
-                                  Theme.Accent * 0.4f, Color.Transparent);
-
-            DrawPanel(spriteBatch, _footerRect, Theme.BgMid);
-
-            if (_font != null)
+            if (pixel == null)
             {
-                string hint = _isRepairShop
-                    ? (_shopMode == ShopMode.Repair ? "Repair mode - Click items" : "Buy/Sell - Press 'L' to repair")
-                    : "Click item to buy";
-                float scale = 0.38f;
-                Vector2 size = _font.MeasureString(hint) * scale;
-                int hintX = _footerRect.X;
-                Vector2 pos = new(hintX + ((_footerRect.Width - (hintX - _footerRect.X)) - size.X) / 2,
-                                  _footerRect.Y + (_footerRect.Height - size.Y) / 2);
-
-                spriteBatch.DrawString(_font, hint, pos + Vector2.One, Color.Black * 0.5f,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, hint, pos, Theme.TextGold,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                return;
             }
+
+            DrawPanel(
+                spriteBatch,
+                _footerRect,
+                new Color(27, 20, 18, 230));
+
+            if (_font == null)
+            {
+                return;
+            }
+
+            string hint =
+                _isRepairShop
+                    ? (_shopMode == ShopMode.Repair
+                        ? "Repair mode - Click items"
+                        : "Buy/Sell - Press 'L' to repair")
+                    : "Click item to buy";
+
+            float scale =
+                0.32f * CLASSIC_UI_SCALE;
+
+            Vector2 size =
+                _font.MeasureString(hint) * scale;
+
+            Vector2 pos = new(
+                _footerRect.X +
+                    (_footerRect.Width - size.X) / 2f,
+                _footerRect.Y +
+                    (_footerRect.Height - size.Y) / 2f);
+
+            spriteBatch.DrawString(
+                _font,
+                hint,
+                pos + Vector2.One,
+                Color.Black * 0.5f,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+
+            spriteBatch.DrawString(
+                _font,
+                hint,
+                pos,
+                Theme.TextWhite,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
         }
 
         private void DrawRepairButtons(SpriteBatch spriteBatch)
         {
             var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null || _font == null) return;
 
-            // Draw Repair button
-            var repairRect = Translate(_repairButtonRect);
-            Color repairBg = _shopMode == ShopMode.Repair ? Theme.AccentDim : Theme.BgLight;
-            Color repairBorder = _repairButtonHovered ? Theme.Accent : Theme.BorderInner;
-            UiDrawHelper.DrawPanel(spriteBatch, repairRect, repairBg, repairBorder, Theme.BorderOuter);
+            if (pixel == null || _font == null)
+            {
+                return;
+            }
 
-            // Draw "Repair item" text for Repair
+            var repairRect =
+                Translate(_repairButtonRect);
+
+            Color repairBg =
+                _shopMode == ShopMode.Repair
+                    ? Theme.ClassicButtonActive
+                    : (_repairButtonHovered
+                        ? Theme.ClassicButtonHover
+                        : Theme.ClassicButtonBg);
+
+            Color repairBorder =
+                _repairButtonHovered
+                    ? Theme.ClassicButtonBorderHover
+                    : Theme.ClassicButtonBorder;
+
+            UiDrawHelper.DrawPanel(
+                spriteBatch,
+                repairRect,
+                repairBg,
+                repairBorder,
+                Theme.BorderOuter);
+
             string repairText = "Repair item";
-            float scale = 0.4f;
-            Vector2 textSize = _font.MeasureString(repairText) * scale;
-            Vector2 textPos = new(repairRect.X + (repairRect.Width - textSize.X) / 2,
-                                  repairRect.Y + (repairRect.Height - textSize.Y) / 2);
-            spriteBatch.DrawString(_font, repairText, textPos + Vector2.One, Color.Black * 0.6f,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, repairText, textPos, Theme.TextWhite,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            float scale =
+                0.34f * CLASSIC_UI_SCALE;
 
-            // Draw Repair All button
-            var repairAllRect = Translate(_repairAllButtonRect);
-            Color repairAllBorder = _repairAllButtonHovered ? Theme.Accent : Theme.BorderInner;
-            UiDrawHelper.DrawPanel(spriteBatch, repairAllRect, Theme.BgLight, repairAllBorder, Theme.BorderOuter);
+            Vector2 textSize =
+                _font.MeasureString(repairText) * scale;
 
-            // Draw "Repair all" text for Repair All
+            Vector2 textPos = new(
+                repairRect.X +
+                    (repairRect.Width - textSize.X) / 2f,
+                repairRect.Y +
+                    (repairRect.Height - textSize.Y) / 2f);
+
+            spriteBatch.DrawString(
+                _font,
+                repairText,
+                textPos + Vector2.One,
+                Color.Black * 0.6f,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+
+            spriteBatch.DrawString(
+                _font,
+                repairText,
+                textPos,
+                Theme.TextWhite,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+
+            var repairAllRect =
+                Translate(_repairAllButtonRect);
+
+            Color repairAllBg =
+                _repairAllButtonHovered
+                    ? Theme.ClassicButtonHover
+                    : Theme.ClassicButtonBg;
+
+            Color repairAllBorder =
+                _repairAllButtonHovered
+                    ? Theme.ClassicButtonBorderHover
+                    : Theme.ClassicButtonBorder;
+
+            UiDrawHelper.DrawPanel(
+                spriteBatch,
+                repairAllRect,
+                repairAllBg,
+                repairAllBorder,
+                Theme.BorderOuter);
+
             string allText = "Repair all";
-            scale = 0.4f;
-            textSize = _font.MeasureString(allText) * scale;
-            textPos = new(repairAllRect.X + (repairAllRect.Width - textSize.X) / 2,
-                          repairAllRect.Y + (repairAllRect.Height - textSize.Y) / 2);
-            spriteBatch.DrawString(_font, allText, textPos + Vector2.One, Color.Black * 0.6f,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, allText, textPos, Theme.TextWhite,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+
+            textSize =
+                _font.MeasureString(allText) * scale;
+
+            textPos = new(
+                repairAllRect.X +
+                    (repairAllRect.Width - textSize.X) / 2f,
+                repairAllRect.Y +
+                    (repairAllRect.Height - textSize.Y) / 2f);
+
+            spriteBatch.DrawString(
+                _font,
+                allText,
+                textPos + Vector2.One,
+                Color.Black * 0.6f,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+
+            spriteBatch.DrawString(
+                _font,
+                allText,
+                textPos,
+                Theme.TextWhite,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -701,22 +1104,54 @@ namespace Client.Main.Controls.UI.Game
         private void DrawCloseButton(SpriteBatch spriteBatch)
         {
             var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
 
-            var rect = Translate(_closeButtonRect);
-            Color btnColor = _closeHovered ? Theme.Accent : Theme.TextGray;
-
-            // Draw X symbol
-            int cx = rect.X + rect.Width / 2;
-            int cy = rect.Y + rect.Height / 2;
-            int halfSize = 6;
-            int thickness = 2;
-
-            // Draw diagonal lines for X
-            for (int i = -halfSize; i <= halfSize; i++)
+            if (pixel == null)
             {
-                spriteBatch.Draw(pixel, new Rectangle(cx + i - thickness / 2, cy + i - thickness / 2, thickness, thickness), btnColor);
-                spriteBatch.Draw(pixel, new Rectangle(cx + i - thickness / 2, cy - i - thickness / 2, thickness, thickness), btnColor);
+                return;
+            }
+
+            var rect =
+                Translate(_closeButtonRect);
+
+            Color btnColor =
+                _closeHovered
+                    ? Theme.Accent
+                    : Theme.TextGray;
+
+            int cx =
+                rect.X + rect.Width / 2;
+
+            int cy =
+                rect.Y + rect.Height / 2;
+
+            int halfSize =
+                Math.Max(
+                    5,
+                    rect.Width / 4);
+
+            const int thickness = 2;
+
+            for (int i = -halfSize;
+                 i <= halfSize;
+                 i++)
+            {
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        cx + i - thickness / 2,
+                        cy + i - thickness / 2,
+                        thickness,
+                        thickness),
+                    btnColor);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        cx + i - thickness / 2,
+                        cy - i - thickness / 2,
+                        thickness,
+                        thickness),
+                    btnColor);
             }
         }
 
@@ -744,15 +1179,9 @@ namespace Client.Main.Controls.UI.Game
                 {
                     Color finalGlow = isHovered ? Color.Lerp(glowColor, Theme.Accent, 0.4f) : glowColor;
                     finalGlow.A = (byte)Math.Min(255, finalGlow.A + (isHovered ? 40 : 0));
-                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, finalGlow);
+                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, finalGlow, glowSize: 1);
                 }
 
-                // Cell background
-                if (pixel != null)
-                {
-                    var bgRect = new Rectangle(rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2);
-                    spriteBatch.Draw(pixel, bgRect, isHovered ? Theme.SlotHover : Theme.SlotBg);
-                }
 
                 if (texture != null)
                 {
@@ -1194,3 +1623,4 @@ namespace Client.Main.Controls.UI.Game
 
     }
 }
+

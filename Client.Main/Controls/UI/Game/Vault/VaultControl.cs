@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Reflection;
+using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,52 +26,100 @@ using MUnique.OpenMU.Network.Packets.ClientToServer;
 
 namespace Client.Main.Controls.UI.Game
 {
-    public class VaultControl : UIControl
+    public class VaultControl : UIControl, IUiTexturePreloadable
     {
         // ═══════════════════════════════════════════════════════════════
-        // WINDOW DIMENSIONS
+        // CLASSIC GFx LAYOUT
+        // Usa el mismo frame/atlas que el NPC Shop clásico ya probado.
         // ═══════════════════════════════════════════════════════════════
+        private const string LayoutJsonResource =
+            "Client.Main.Controls.UI.Game.Layouts.NpcShopLayout.json";
+
+        private const string TextureRectJsonResource =
+            "Client.Main.Controls.UI.Game.Layouts.NpcShopRect.json";
+
+        private const string LayoutTexturePath =
+            "Interface/GFx/NpcShop_I3.ozd";
+
         public const int Columns = 8;
         public const int Rows = 15;
+
         private const int VAULT_SQUARE_WIDTH = 32;
         private const int VAULT_SQUARE_HEIGHT = 32;
 
-        private const int HEADER_HEIGHT = 46;
-        private const int SECTION_HEADER_HEIGHT = 22;
-        private const int GRID_PADDING = 10;
-        private const int FOOTER_HEIGHT = 50;
-        private const int WINDOW_MARGIN = 12;
+        private const float CLASSIC_UI_SCALE =
+            VAULT_SQUARE_WIDTH / 25f;
 
-        private static readonly int GRID_WIDTH = Columns * VAULT_SQUARE_WIDTH;
-        private static readonly int GRID_HEIGHT = Rows * VAULT_SQUARE_HEIGHT;
-        private static readonly int WINDOW_WIDTH = GRID_WIDTH + GRID_PADDING * 2 + WINDOW_MARGIN * 2;
-        private static readonly int WINDOW_HEIGHT = HEADER_HEIGHT + SECTION_HEADER_HEIGHT + GRID_PADDING * 2 + GRID_HEIGHT + FOOTER_HEIGHT + WINDOW_MARGIN;
+        private const int CLASSIC_ORIGIN_X = 148;
+        private const int CLASSIC_ORIGIN_Y = 89;
+        private const int CLASSIC_PANEL_WIDTH = 275;
+        private const int CLASSIC_PANEL_HEIGHT = 535;
+        private const int PANEL_MARGIN = 8;
+
+        private static readonly int WINDOW_WIDTH =
+            PANEL_MARGIN * 2 +
+            (int)MathF.Ceiling(
+                CLASSIC_PANEL_WIDTH * CLASSIC_UI_SCALE);
+
+        private static readonly int WINDOW_HEIGHT =
+            PANEL_MARGIN * 2 +
+            (int)MathF.Ceiling(
+                CLASSIC_PANEL_HEIGHT * CLASSIC_UI_SCALE);
+
+        // Misma celda interior usada por el NPC Shop limpio.
+        private static readonly Rectangle SlotSourceRect =
+            new(548, 223, 25, 25);
+
+        private static readonly int GRID_WIDTH =
+            Columns * VAULT_SQUARE_WIDTH;
+
+        private static readonly int GRID_HEIGHT =
+            Rows * VAULT_SQUARE_HEIGHT;
+
+        // Mismos offsets lógicos del NPC Shop terminado.
+        private const int GRID_LOGIC_OFFSET_X = 4;
+        private const int GRID_LOGIC_OFFSET_Y = 5;
+
+        private const int GRID_ART_OFFSET_X = 0;
+        private const int GRID_ART_OFFSET_Y = 0;
+
+        private readonly struct LayoutInfo
+        {
+            public string Name { get; init; }
+            public float ScreenX { get; init; }
+            public float ScreenY { get; init; }
+            public int Width { get; init; }
+            public int Height { get; init; }
+            public int Z { get; init; }
+        }
+
+        private readonly struct TextureRectData
+        {
+            public string Name { get; init; }
+            public int X { get; init; }
+            public int Y { get; init; }
+            public int Width { get; init; }
+            public int Height { get; init; }
+        }
 
         // ═══════════════════════════════════════════════════════════════
-        // MODERN DARK THEME
+        // UI COLORS / CLASSIC VAULT HELPERS
         // ═══════════════════════════════════════════════════════════════
         private static class Theme
         {
-            public static readonly Color BgDarkest = new(8, 10, 14, 252);
-            public static readonly Color BgDark = new(16, 20, 26, 250);
-            public static readonly Color BgMid = new(24, 30, 38, 248);
             public static readonly Color BgLight = new(35, 42, 52, 245);
 
             public static readonly Color Accent = new(212, 175, 85);
             public static readonly Color AccentBright = new(255, 215, 120);
             public static readonly Color AccentDim = new(140, 115, 55);
-            public static readonly Color AccentGlow = new(255, 200, 80, 40);
 
             public static readonly Color Secondary = new(90, 140, 200);
 
             public static readonly Color BorderOuter = new(5, 6, 8, 255);
             public static readonly Color BorderInner = new(60, 70, 85, 200);
-            public static readonly Color BorderHighlight = new(100, 110, 130, 120);
 
             public static readonly Color SlotBg = new(12, 15, 20, 240);
-            public static readonly Color SlotBorder = new(45, 52, 65, 180);
             public static readonly Color SlotHover = new(70, 85, 110, 150);
-            public static readonly Color SlotSelected = new(212, 175, 85, 100);
 
             public static readonly Color GlowNormal = new(150, 150, 150, 25);
             public static readonly Color GlowMagic = new(100, 150, 255, 50);
@@ -80,8 +131,14 @@ namespace Client.Main.Controls.UI.Game
             public static readonly Color TextGold = new(255, 220, 130);
             public static readonly Color TextGray = new(160, 165, 175);
 
-            public static readonly Color Success = new(80, 200, 120);
             public static readonly Color Danger = new(220, 80, 80);
+
+            // Paleta clásica para los botones IN / OUT.
+            public static readonly Color ClassicButtonBg = new(48, 31, 25, 245);
+            public static readonly Color ClassicButtonHover = new(72, 42, 30, 245);
+            public static readonly Color ClassicButtonActive = new(100, 48, 30, 245);
+            public static readonly Color ClassicButtonBorder = new(112, 76, 46, 220);
+            public static readonly Color ClassicButtonBorderHover = new(178, 122, 70, 240);
         }
 
         private static readonly ItemGlowPalette GlowPalette = new(
@@ -99,9 +156,16 @@ namespace Client.Main.Controls.UI.Game
         private readonly Dictionary<string, Texture2D> _itemTextureCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<(InventoryItem item, int width, int height, bool animated), Texture2D> _bmdPreviewCache = new();
 
+        private readonly List<LayoutInfo> _layoutInfos = new();
+
+        private readonly Dictionary<string, TextureRectData> _textureRectLookup =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private Texture2D _layoutTexture;
+        private Texture2D _slotTexture;
+
         private Rectangle _headerRect;
         private Rectangle _gridRect;
-        private Rectangle _gridFrameRect;
         private Rectangle _footerRect;
         private Rectangle _zenFieldRect;
         private Rectangle _depositButtonRect;
@@ -156,6 +220,7 @@ namespace Client.Main.Controls.UI.Game
             var factory = loggerFactory ?? MuGame.AppLoggerFactory;
             _logger = factory?.CreateLogger<VaultControl>();
 
+            LoadLayoutDefinitions();
             BuildLayoutMetrics();
 
             ControlSize = new Point(WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -197,40 +262,186 @@ namespace Client.Main.Controls.UI.Game
                 X = (Parent.DisplaySize.X / 2) - (DisplaySize.X / 2);
         }
 
+        private static int ScaleClassicX(float sourceX)
+            => PANEL_MARGIN +
+               (int)MathF.Round(
+                   (sourceX - CLASSIC_ORIGIN_X) *
+                   CLASSIC_UI_SCALE);
+
+        private static int ScaleClassicY(float sourceY)
+            => PANEL_MARGIN +
+               (int)MathF.Round(
+                   (sourceY - CLASSIC_ORIGIN_Y) *
+                   CLASSIC_UI_SCALE);
+
+        private static int ScaleClassicSize(float value)
+            => (int)MathF.Round(
+                value * CLASSIC_UI_SCALE);
+
         private void BuildLayoutMetrics()
         {
-            _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, HEADER_HEIGHT);
+            // Mismo TopCorner del NPC Shop clásico.
+            _headerRect = new Rectangle(
+                ScaleClassicX(149.3f),
+                ScaleClassicY(89f),
+                ScaleClassicSize(273f),
+                ScaleClassicSize(70f));
 
-            int gridFrameX = WINDOW_MARGIN;
-            int gridFrameY = HEADER_HEIGHT;
-            int gridFrameWidth = GRID_WIDTH + GRID_PADDING * 2;
-            int gridFrameHeight = SECTION_HEADER_HEIGHT + GRID_PADDING * 2 + GRID_HEIGHT;
-            _gridFrameRect = new Rectangle(gridFrameX, gridFrameY, gridFrameWidth, gridFrameHeight);
-
+            // El baúl también es 8x15 y 32x32, así que usa exactamente
+            // el mismo encaje de grilla que ya quedó correcto en el Shop.
             _gridRect = new Rectangle(
-                gridFrameX + GRID_PADDING,
-                gridFrameY + SECTION_HEADER_HEIGHT + GRID_PADDING,
+                ScaleClassicX(170f) + GRID_LOGIC_OFFSET_X,
+                ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
                 GRID_WIDTH,
                 GRID_HEIGHT);
 
-            _footerRect = new Rectangle(WINDOW_MARGIN, _gridFrameRect.Bottom + 4, _gridFrameRect.Width, FOOTER_HEIGHT - 8);
+            // Zona inferior dedicada al Zen.
+            int footerY =
+                _gridRect.Bottom +
+                ScaleClassicSize(2f);
 
-            const int buttonWidth = 44;
-            const int buttonGap = 6;
-            const int fieldHeight = 28;
-            int fieldX = _footerRect.X + 36;
-            int fieldWidth = _footerRect.Width - (fieldX - _footerRect.X) - (buttonWidth * 2 + buttonGap * 2);
-            _zenFieldRect = new Rectangle(fieldX, _footerRect.Y + 8, fieldWidth, fieldHeight);
-            _depositButtonRect = new Rectangle(_zenFieldRect.Right + buttonGap, _zenFieldRect.Y, buttonWidth, fieldHeight);
-            _withdrawButtonRect = new Rectangle(_depositButtonRect.Right + buttonGap, _zenFieldRect.Y, buttonWidth, fieldHeight);
-            _closeButtonRect = new Rectangle(WINDOW_WIDTH - 30, 10, 20, 20);
+            _footerRect = new Rectangle(
+                _gridRect.X,
+                footerY,
+                _gridRect.Width,
+                ScaleClassicSize(39f));
+
+            int innerPadding = ScaleClassicSize(5f);
+            int labelWidth = ScaleClassicSize(25f);
+            int buttonWidth = ScaleClassicSize(28f);
+            int buttonGap = ScaleClassicSize(4f);
+            int fieldHeight = ScaleClassicSize(18f);
+
+            int controlsY =
+                _footerRect.Y +
+                Math.Max(
+                    0,
+                    (_footerRect.Height -
+                     fieldHeight) / 2);
+
+            int fieldX =
+                _footerRect.X +
+                labelWidth;
+
+            int fieldWidth =
+                _footerRect.Width -
+                labelWidth -
+                buttonWidth * 2 -
+                buttonGap * 3 -
+                innerPadding;
+
+            _zenFieldRect = new Rectangle(
+                fieldX,
+                controlsY,
+                Math.Max(
+                    ScaleClassicSize(55f),
+                    fieldWidth),
+                fieldHeight);
+
+            _depositButtonRect = new Rectangle(
+                _zenFieldRect.Right +
+                    buttonGap,
+                controlsY,
+                buttonWidth,
+                fieldHeight);
+
+            _withdrawButtonRect = new Rectangle(
+                _depositButtonRect.Right +
+                    buttonGap,
+                controlsY,
+                buttonWidth,
+                fieldHeight);
+
+            _closeButtonRect = new Rectangle(
+                ScaleClassicX(392f),
+                ScaleClassicY(98f),
+                ScaleClassicSize(20f),
+                ScaleClassicSize(20f));
         }
 
         public override async Task Load()
         {
             await base.Load();
-            _font = GraphicsManager.Instance.Font;
+
+            var loader =
+                TextureLoader.Instance;
+
+            _layoutTexture =
+                await loader.PrepareAndGetTexture(
+                    LayoutTexturePath);
+
+            _slotTexture =
+                _layoutTexture;
+
+            _font =
+                GraphicsManager.Instance.Font;
+
             InvalidateStaticSurface();
+        }
+
+        public IEnumerable<string> GetPreloadTexturePaths()
+        {
+            yield return LayoutTexturePath;
+        }
+
+        private void LoadLayoutDefinitions()
+        {
+            try
+            {
+                var layoutData =
+                    LoadEmbeddedJson<List<LayoutInfo>>(
+                        LayoutJsonResource);
+
+                if (layoutData != null)
+                {
+                    _layoutInfos.Clear();
+
+                    _layoutInfos.AddRange(
+                        layoutData.OrderBy(
+                            info => info.Z));
+                }
+
+                var rectData =
+                    LoadEmbeddedJson<List<TextureRectData>>(
+                        TextureRectJsonResource);
+
+                if (rectData != null)
+                {
+                    _textureRectLookup.Clear();
+
+                    foreach (var rect in rectData)
+                    {
+                        _textureRectLookup[
+                            rect.Name] = rect;
+                    }
+                }
+            }
+            catch
+            {
+                // DrawStaticElements tiene fallback.
+            }
+        }
+
+        private static T LoadEmbeddedJson<T>(
+            string resourceName)
+        {
+            var assembly =
+                Assembly.GetExecutingAssembly();
+
+            using Stream stream =
+                assembly.GetManifestResourceStream(
+                    resourceName)
+                ?? throw new FileNotFoundException(
+                    $"Resource not found: {resourceName}");
+
+            using var reader =
+                new StreamReader(stream);
+
+            string json =
+                reader.ReadToEnd();
+
+            return JsonSerializer.Deserialize<T>(
+                json);
         }
 
         public override void Update(GameTime gameTime)
@@ -395,6 +606,8 @@ namespace Client.Main.Controls.UI.Game
                     spriteBatch.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
                 }
 
+                DrawVaultTitle(spriteBatch);
+
                 DrawGridOverlays(spriteBatch);
                 DrawVaultItems(spriteBatch);
                 DrawCloseButton(spriteBatch);
@@ -522,21 +735,6 @@ namespace Client.Main.Controls.UI.Game
         // DRAWING PRIMITIVES
         // ═══════════════════════════════════════════════════════════════
 
-        private void DrawWindowBackground(SpriteBatch spriteBatch, Rectangle rect)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            spriteBatch.Draw(pixel, rect, Theme.BorderOuter);
-
-            var innerRect = new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4);
-            UiDrawHelper.DrawVerticalGradient(spriteBatch, innerRect, Theme.BgDark, Theme.BgDarkest);
-
-            spriteBatch.Draw(pixel, new Rectangle(innerRect.X, innerRect.Y, innerRect.Width, 1), Theme.BorderInner * 0.5f);
-            spriteBatch.Draw(pixel, new Rectangle(innerRect.X, innerRect.Y, 1, innerRect.Height), Theme.BorderInner * 0.3f);
-
-            UiDrawHelper.DrawCornerAccents(spriteBatch, rect, Theme.Secondary * 0.5f);
-        }
 
         private void DrawPanel(SpriteBatch spriteBatch, Rectangle rect, Color bgColor, bool withBorder = true)
         {
@@ -546,34 +744,6 @@ namespace Client.Main.Controls.UI.Game
                 withBorder ? Theme.BorderInner * 0.6f : null);
         }
 
-        private void DrawSectionHeader(SpriteBatch spriteBatch, string title, int x, int y, int width)
-        {
-            if (_font == null) return;
-
-            float scale = 0.32f;
-            Vector2 size = _font.MeasureString(title) * scale;
-            float textX = x + (width - size.X) / 2;
-
-            spriteBatch.DrawString(_font, title, new Vector2(textX + 1, y + 1), Color.Black * 0.6f,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, title, new Vector2(textX, y), Theme.TextGold,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-        }
-
-        private void DrawFilledCircle(SpriteBatch spriteBatch, int centerX, int centerY, int radius, Color color)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null || radius <= 0) return;
-
-            for (int y = -radius; y <= radius; y++)
-            {
-                int halfWidth = (int)MathF.Sqrt(radius * radius - y * y);
-                if (halfWidth > 0)
-                {
-                    spriteBatch.Draw(pixel, new Rectangle(centerX - halfWidth, centerY + y, halfWidth * 2, 1), color);
-                }
-            }
-        }
 
         // ═══════════════════════════════════════════════════════════════
         // STATIC SURFACE RENDERING
@@ -606,117 +776,241 @@ namespace Client.Main.Controls.UI.Game
 
         private void InvalidateStaticSurface() => _staticSurfaceDirty = true;
 
-        private void DrawStaticElements(SpriteBatch spriteBatch)
+        private void DrawStaticElements(
+            SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var fullRect = new Rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-            DrawWindowBackground(spriteBatch, fullRect);
-            DrawModernHeader(spriteBatch);
-            DrawModernGridSection(spriteBatch);
-            DrawModernFooter(spriteBatch);
-        }
-
-        private void DrawModernHeader(SpriteBatch spriteBatch)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var headerBg = new Rectangle(8, 6, WINDOW_WIDTH - 16, HEADER_HEIGHT - 8);
-            DrawPanel(spriteBatch, headerBg, Theme.BgMid);
-
-            spriteBatch.Draw(pixel, new Rectangle(20, 8, WINDOW_WIDTH - 40, 2), Theme.Secondary * 0.8f);
-            spriteBatch.Draw(pixel, new Rectangle(30, 10, WINDOW_WIDTH - 60, 1), Theme.Secondary * 0.3f);
-
-            if (_font != null)
+            // Frame clásico completo reutilizando exactamente
+            // el atlas/layout que ya quedó correcto en NpcShopControl.
+            if (_layoutTexture != null &&
+                _layoutInfos.Count > 0)
             {
-                string title = "VAULT";
-                float scale = 0.50f;
-                Vector2 size = _font.MeasureString(title) * scale;
-                Vector2 pos = new((WINDOW_WIDTH - size.X) / 2, (HEADER_HEIGHT - size.Y) / 2 + 2);
+                foreach (var info in
+                         _layoutInfos.OrderBy(i => i.Z))
+                {
+                    var destRect =
+                        new Rectangle(
+                            ScaleClassicX(info.ScreenX),
+                            ScaleClassicY(info.ScreenY),
+                            ScaleClassicSize(info.Width),
+                            ScaleClassicSize(info.Height));
 
-                spriteBatch.Draw(pixel, new Rectangle((int)pos.X - 20, (int)pos.Y - 4, (int)size.X + 40, (int)size.Y + 8),
-                                new Color(90, 140, 200, 30));
+                    if (_textureRectLookup.TryGetValue(
+                            info.Name,
+                            out var srcData))
+                    {
+                        var sourceRect =
+                            new Rectangle(
+                                srcData.X,
+                                srcData.Y,
+                                srcData.Width,
+                                srcData.Height);
 
-                spriteBatch.DrawString(_font, title, pos + new Vector2(2, 2), Color.Black * 0.5f,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, title, pos, Theme.TextWhite,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                        spriteBatch.Draw(
+                            _layoutTexture,
+                            destRect,
+                            sourceRect,
+                            Color.White);
+                    }
+                    else
+                    {
+                        spriteBatch.Draw(
+                            _layoutTexture,
+                            destRect,
+                            Color.White);
+                    }
+                }
+            }
+            else if (
+                GraphicsManager.Instance?.Pixel != null)
+            {
+                spriteBatch.Draw(
+                    GraphicsManager.Instance.Pixel,
+                    new Rectangle(
+                        0,
+                        0,
+                        WINDOW_WIDTH,
+                        WINDOW_HEIGHT),
+                    new Color(
+                        10,
+                        10,
+                        10,
+                        220));
             }
 
-            int sepY = HEADER_HEIGHT - 2;
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(20, sepY, (WINDOW_WIDTH - 40) / 2, 1),
-                                  Color.Transparent, Theme.BorderInner);
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(WINDOW_WIDTH / 2, sepY, (WINDOW_WIDTH - 40) / 2, 1),
-                                  Theme.BorderInner, Color.Transparent);
+            DrawClassicGridBackground(
+                spriteBatch);
+
+            DrawClassicFooter(
+                spriteBatch);
         }
 
-        private void DrawModernGridSection(SpriteBatch spriteBatch)
+        private void DrawVaultTitle(
+            SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            DrawSectionHeader(spriteBatch, "STORED ITEMS", _gridFrameRect.X, _gridFrameRect.Y + 4, _gridFrameRect.Width);
-            DrawPanel(spriteBatch, _gridFrameRect, Theme.BgMid);
-
-            spriteBatch.Draw(pixel, _gridRect, Theme.SlotBg);
-
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, _gridRect.Y, _gridRect.Width, 2), Color.Black * 0.4f);
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, _gridRect.Y, 2, _gridRect.Height), Color.Black * 0.3f);
-
-            Color gridLine = new(40, 48, 60, 100);
-            Color gridLineMajor = new(55, 65, 80, 120);
-
-            for (int x = 1; x < Columns; x++)
+            if (_font == null)
             {
-                int lineX = _gridRect.X + x * VAULT_SQUARE_WIDTH;
-                bool isMajor = x == Columns / 2;
-                spriteBatch.Draw(pixel, new Rectangle(lineX, _gridRect.Y, 1, _gridRect.Height), isMajor ? gridLineMajor : gridLine);
+                return;
             }
 
-            for (int y = 1; y < Rows; y++)
+            const string title = "VAULT";
+
+            float textScale =
+                (14f /
+                 Constants.BASE_FONT_SIZE) *
+                Scale;
+
+            Vector2 size =
+                _font.MeasureString(title) *
+                textScale;
+
+            // Misma posición relativa que dejó NPC SHOP
+            // correctamente centrado en su barra roja.
+            const float titleRatioInTopCorner =
+                49f / 90f;
+
+            float titleX =
+                _headerRect.X +
+                _headerRect.Width * 0.5f;
+
+            float titleY =
+                _headerRect.Y +
+                _headerRect.Height *
+                titleRatioInTopCorner;
+
+            Vector2 pos =
+                DisplayRectangle.Location.ToVector2() +
+                new Vector2(
+                    titleX * Scale,
+                    titleY * Scale);
+
+            pos.X -=
+                size.X * 0.5f;
+
+            spriteBatch.DrawString(
+                _font,
+                title,
+                pos,
+                Color.White * Alpha,
+                0f,
+                Vector2.Zero,
+                textScale,
+                SpriteEffects.None,
+                0f);
+        }
+
+        private void DrawClassicGridBackground(
+            SpriteBatch spriteBatch)
+        {
+            if (_slotTexture == null)
             {
-                int lineY = _gridRect.Y + y * VAULT_SQUARE_HEIGHT;
-                bool isMajor = y == Rows / 2;
-                spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, lineY, _gridRect.Width, 1), isMajor ? gridLineMajor : gridLine);
+                return;
             }
 
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.X, _gridRect.Bottom - 1, _gridRect.Width, 1), Theme.BorderHighlight * 0.2f);
-            spriteBatch.Draw(pixel, new Rectangle(_gridRect.Right - 1, _gridRect.Y, 1, _gridRect.Height), Theme.BorderHighlight * 0.15f);
+            for (int y = 0;
+                 y < Rows;
+                 y++)
+            {
+                for (int x = 0;
+                     x < Columns;
+                     x++)
+                {
+                    var destRect =
+                        new Rectangle(
+                            _gridRect.X +
+                                GRID_ART_OFFSET_X +
+                                x *
+                                VAULT_SQUARE_WIDTH,
+                            _gridRect.Y +
+                                GRID_ART_OFFSET_Y +
+                                y *
+                                VAULT_SQUARE_HEIGHT,
+                            VAULT_SQUARE_WIDTH,
+                            VAULT_SQUARE_HEIGHT);
+
+                    spriteBatch.Draw(
+                        _slotTexture,
+                        destRect,
+                        SlotSourceRect,
+                        Color.White);
+                }
+            }
         }
 
-        private void DrawModernFooter(SpriteBatch spriteBatch)
+        private void DrawClassicFooter(
+            SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
+            var pixel =
+                GraphicsManager.Instance.Pixel;
 
-            int sepY = _footerRect.Y - 4;
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(30, sepY, (WINDOW_WIDTH - 60) / 2, 1),
-                                  Color.Transparent, Theme.Secondary * 0.4f);
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(WINDOW_WIDTH / 2, sepY, (WINDOW_WIDTH - 60) / 2, 1),
-                                  Theme.Secondary * 0.4f, Color.Transparent);
+            if (pixel == null)
+            {
+                return;
+            }
 
-            DrawPanel(spriteBatch, _footerRect, Theme.BgMid);
+            DrawPanel(
+                spriteBatch,
+                _footerRect,
+                new Color(
+                    27,
+                    20,
+                    18,
+                    230));
 
-            // Zen coin icon
-            int coinX = _footerRect.X + 18;
-            int coinY = _footerRect.Y + _footerRect.Height / 2;
+            DrawPanel(
+                spriteBatch,
+                _zenFieldRect,
+                new Color(
+                    18,
+                    14,
+                    12,
+                    240));
 
-            DrawFilledCircle(spriteBatch, coinX, coinY, 10, Theme.AccentDim);
-            DrawFilledCircle(spriteBatch, coinX, coinY, 7, Theme.Accent);
-            DrawFilledCircle(spriteBatch, coinX - 2, coinY - 2, 3, Theme.AccentBright * 0.6f);
+            if (_font == null)
+            {
+                return;
+            }
 
-            // Zen field background
-            DrawPanel(spriteBatch, _zenFieldRect, Theme.SlotBg);
-            var innerField = new Rectangle(_zenFieldRect.X + 2, _zenFieldRect.Y + 2,
-                                           _zenFieldRect.Width - 4, _zenFieldRect.Height - 4);
-            spriteBatch.Draw(pixel, innerField, Theme.BgDarkest * 0.7f);
+            const string label =
+                "ZEN";
+
+            float scale =
+                0.30f *
+                CLASSIC_UI_SCALE;
+
+            Vector2 size =
+                _font.MeasureString(label) *
+                scale;
+
+            Vector2 pos =
+                new(
+                    _footerRect.X +
+                        ScaleClassicSize(4f),
+                    _footerRect.Y +
+                        (_footerRect.Height -
+                         size.Y) / 2f);
+
+            spriteBatch.DrawString(
+                _font,
+                label,
+                pos + Vector2.One,
+                Color.Black * 0.6f,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+
+            spriteBatch.DrawString(
+                _font,
+                label,
+                pos,
+                Theme.TextGold,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
         }
-
-        // ═══════════════════════════════════════════════════════════════
-        // DYNAMIC DRAWING
-        // ═══════════════════════════════════════════════════════════════
 
         private void DrawCloseButton(SpriteBatch spriteBatch)
         {
@@ -739,31 +1033,94 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
-        private void DrawZenText(SpriteBatch spriteBatch)
+        private void DrawZenText(
+            SpriteBatch spriteBatch)
         {
-            if (_font == null) return;
-
-            var zenRect = Translate(_zenFieldRect);
-            var pixel = GraphicsManager.Instance.Pixel;
-
-            if (_isZenInputActive && pixel != null)
+            if (_font == null)
             {
-                var borderColor = Theme.AccentBright * 0.9f;
-                spriteBatch.Draw(pixel, new Rectangle(zenRect.X, zenRect.Y, zenRect.Width, 2), borderColor);
-                spriteBatch.Draw(pixel, new Rectangle(zenRect.X, zenRect.Bottom - 2, zenRect.Width, 2), borderColor);
-                spriteBatch.Draw(pixel, new Rectangle(zenRect.X, zenRect.Y, 2, zenRect.Height), borderColor);
-                spriteBatch.Draw(pixel, new Rectangle(zenRect.Right - 2, zenRect.Y, 2, zenRect.Height), borderColor);
+                return;
             }
 
-            string zenText = _isZenInputActive
-                ? $"{(_zenMoveDirection == VaultMoveMoneyRequest.VaultMoneyMoveDirection.InventoryToVault ? "IN" : "OUT")}: {(_zenInputText.Length == 0 ? "0" : _zenInputText)}{(_zenInputShowCursor ? "|" : string.Empty)}"
-                : _vaultZen.ToString();
-            float scale = 0.35f;
-            Vector2 size = _font.MeasureString(zenText) * scale;
-            Vector2 pos = new(zenRect.X + 8, zenRect.Y + (zenRect.Height - size.Y) / 2);
+            var zenRect =
+                Translate(_zenFieldRect);
 
-            spriteBatch.DrawString(_font, zenText, pos, Theme.TextGold * Alpha,
-                                  0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            var pixel =
+                GraphicsManager.Instance.Pixel;
+
+            if (_isZenInputActive &&
+                pixel != null)
+            {
+                Color borderColor =
+                    Theme.ClassicButtonBorderHover;
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        zenRect.X,
+                        zenRect.Y,
+                        zenRect.Width,
+                        1),
+                    borderColor);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        zenRect.X,
+                        zenRect.Bottom - 1,
+                        zenRect.Width,
+                        1),
+                    borderColor);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        zenRect.X,
+                        zenRect.Y,
+                        1,
+                        zenRect.Height),
+                    borderColor);
+
+                spriteBatch.Draw(
+                    pixel,
+                    new Rectangle(
+                        zenRect.Right - 1,
+                        zenRect.Y,
+                        1,
+                        zenRect.Height),
+                    borderColor);
+            }
+
+            string zenText =
+                _isZenInputActive
+                    ? $"{(_zenMoveDirection == VaultMoveMoneyRequest.VaultMoneyMoveDirection.InventoryToVault ? "IN" : "OUT")}: {(_zenInputText.Length == 0 ? "0" : _zenInputText)}{(_zenInputShowCursor ? "|" : string.Empty)}"
+                    : _vaultZen.ToString();
+
+            float scale =
+                0.32f *
+                CLASSIC_UI_SCALE;
+
+            Vector2 size =
+                _font.MeasureString(zenText) *
+                scale;
+
+            Vector2 pos =
+                new(
+                    zenRect.X +
+                        ScaleClassicSize(4f),
+                    zenRect.Y +
+                        (zenRect.Height -
+                         size.Y) / 2f);
+
+            spriteBatch.DrawString(
+                _font,
+                zenText,
+                pos,
+                Theme.TextGold * Alpha,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
         }
 
         private void DrawZenButtons(SpriteBatch spriteBatch)
@@ -775,33 +1132,87 @@ namespace Client.Main.Controls.UI.Game
             DrawZenButton(spriteBatch, _withdrawButtonRect, "OUT", _withdrawHovered, VaultMoveMoneyRequest.VaultMoneyMoveDirection.VaultToInventory);
         }
 
-        private void DrawZenButton(SpriteBatch spriteBatch, Rectangle localRect, string label, bool hovered, VaultMoveMoneyRequest.VaultMoneyMoveDirection direction)
+        private void DrawZenButton(
+            SpriteBatch spriteBatch,
+            Rectangle localRect,
+            string label,
+            bool hovered,
+            VaultMoveMoneyRequest.VaultMoneyMoveDirection direction)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null || _font == null) return;
+            var pixel =
+                GraphicsManager.Instance.Pixel;
 
-            var rect = Translate(localRect);
-            bool selected = _isZenInputActive && _zenMoveDirection == direction;
+            if (pixel == null ||
+                _font == null)
+            {
+                return;
+            }
 
-            Color bg = Theme.BgDarkest * 0.7f;
-            if (hovered) bg = Color.Lerp(bg, Theme.BgLight, 0.25f);
-            if (selected) bg = Color.Lerp(bg, Theme.Secondary, 0.45f);
+            var rect =
+                Translate(localRect);
 
-            Color border = selected ? Theme.Accent : Theme.BorderInner;
+            bool selected =
+                _isZenInputActive &&
+                _zenMoveDirection ==
+                    direction;
 
-            spriteBatch.Draw(pixel, rect, bg);
-            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 2), border);
-            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 2, rect.Width, 2), border);
-            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, 2, rect.Height), border);
-            spriteBatch.Draw(pixel, new Rectangle(rect.Right - 2, rect.Y, 2, rect.Height), border);
+            Color bg =
+                selected
+                    ? Theme.ClassicButtonActive
+                    : (hovered
+                        ? Theme.ClassicButtonHover
+                        : Theme.ClassicButtonBg);
 
-            float scale = 0.30f;
-            Vector2 size = _font.MeasureString(label) * scale;
-            Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
-            Color textColor = selected ? Theme.TextWhite : Theme.TextGray;
+            Color border =
+                hovered || selected
+                    ? Theme.ClassicButtonBorderHover
+                    : Theme.ClassicButtonBorder;
 
-            spriteBatch.DrawString(_font, label, pos + Vector2.One, Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, label, pos, textColor, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            UiDrawHelper.DrawPanel(
+                spriteBatch,
+                rect,
+                bg,
+                border,
+                Theme.BorderOuter);
+
+            float scale =
+                0.30f *
+                CLASSIC_UI_SCALE;
+
+            Vector2 size =
+                _font.MeasureString(label) *
+                scale;
+
+            Vector2 pos =
+                new(
+                    rect.X +
+                        (rect.Width -
+                         size.X) / 2f,
+                    rect.Y +
+                        (rect.Height -
+                         size.Y) / 2f);
+
+            spriteBatch.DrawString(
+                _font,
+                label,
+                pos + Vector2.One,
+                Color.Black * 0.6f,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
+
+            spriteBatch.DrawString(
+                _font,
+                label,
+                pos,
+                Theme.TextWhite,
+                0f,
+                Vector2.Zero,
+                scale,
+                SpriteEffects.None,
+                0f);
         }
 
         private void DrawGridOverlays(SpriteBatch spriteBatch)
@@ -837,7 +1248,7 @@ namespace Client.Main.Controls.UI.Game
             if (activeDragged == null)
             {
                 ItemGridRenderHelper.DrawGridOverlays(spriteBatch, pixel, DisplayRectangle, _gridRect, _hoveredItem, _hoveredSlot,
-                                 VAULT_SQUARE_WIDTH, VAULT_SQUARE_HEIGHT, Theme.SlotHover, Theme.Secondary, Alpha);
+                                 VAULT_SQUARE_WIDTH, VAULT_SQUARE_HEIGHT, Theme.SlotHover, Theme.Accent, Alpha);
             }
         }
 
@@ -870,13 +1281,6 @@ namespace Client.Main.Controls.UI.Game
                     ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, finalGlow);
                 }
 
-                // Cell background
-                if (pixel != null)
-                {
-                    var bgRect = new Rectangle(rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2);
-                    spriteBatch.Draw(pixel, bgRect, isHovered ? Theme.SlotHover : Theme.SlotBg);
-                }
-
                 if (texture != null)
                 {
                     spriteBatch.Draw(texture, rect, Color.White * Alpha);
@@ -899,7 +1303,7 @@ namespace Client.Main.Controls.UI.Game
                 if (font != null && item.Details.Level > 0)
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, rect, item.Details.Level,
-                                       lvl => lvl >= 9 ? Theme.Danger :
+                                       lvl => lvl >= 9 ? Theme.AccentBright :
                                               lvl >= 7 ? Theme.Accent :
                                               lvl >= 4 ? Theme.AccentDim :
                                               Theme.TextGray,
