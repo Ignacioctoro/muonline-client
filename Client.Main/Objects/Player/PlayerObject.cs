@@ -210,6 +210,11 @@ namespace Client.Main.Objects.Player
             Children.Add(Boots);
             Children.Add(Weapon1);
             Children.Add(Weapon2);
+            Weapon1.Children.Add(
+                new Grade15WeaponEffect());
+
+            Weapon2.Children.Add(
+                new Grade15WeaponEffect());
             Children.Add(EquippedWings);
             Children.Add(GuildEmblem3D = new GuildEmblem3DObject());
             Children.Add(Vehicle);
