@@ -1,6 +1,7 @@
 ﻿#nullable enable
 
 using Client.Main;
+using Client.Main.Helpers;
 using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Graphics;
@@ -45,7 +46,7 @@ namespace Client.Main.Objects.Effects
     ///        -> Effect/Magic_Ground1
     ///
     ///    BITMAP_SHINY + 5
-    ///        -> Effect/Shiny05
+    ///        -> Effect/Shiny04
     ///
     ///    BITMAP_PIN_LIGHT
     ///        -> Effect/pin_lights
@@ -311,13 +312,13 @@ namespace Client.Main.Objects.Effects
             // ----------------------------------------------------------------
 
             _shinySprite =
-                new Grade15Sprite(
-                    "Effect/Shiny05.jpg",
-                    0.40f,
-                    new Vector3(
-                        0.4f,
-                        0.7f,
-                        1.0f));
+            new Grade15Sprite(
+                "Effect/shiny04.jpg",
+                0.40f,
+                new Vector3(
+                    0.4f,
+                    0.7f,
+                    1.0f));
 
 
             // ----------------------------------------------------------------
@@ -329,21 +330,18 @@ namespace Client.Main.Objects.Effects
             // ----------------------------------------------------------------
 
             _pinLightSprite =
-                new Grade15Sprite(
-                    "Effect/pin_lights.jpg",
-                    0.60f,
-                    new Vector3(
-                        0.1f,
-                        0.3f,
-                        1.0f))
-                {
-                    Angle =
-                        new Vector3(
-                            0.0f,
-                            0.0f,
-                            MathHelper.ToRadians(
-                                90.0f))
-                };
+            new Grade15Sprite(
+                "Effect/pin_lights.jpg",
+                0.60f,
+                new Vector3(
+                    0.1f,
+                    0.3f,
+                    1.0f))
+            {
+                SpriteRotation =
+                    MathHelper.ToRadians(
+                        90.0f)
+            };
 
 
             Children.Add(
@@ -1270,6 +1268,23 @@ namespace Client.Main.Objects.Effects
         // Persistent classic billboard
         // --------------------------------------------------------------------
 
+        // --------------------------------------------------------------------
+        // Persistent classic billboard
+        //
+        // MU original CreateSprite():
+        //
+        // Width  = texture.Width  * Scale
+        // Height = texture.Height * Scale
+        //
+        // The normal Neffis SpriteObject renderer applies its own
+        // distance-based scaling, which makes these small classic +15 sprites
+        // almost disappear.
+        //
+        // This renderer converts the original camera-space scale to screen
+        // pixels exactly like the renderer already used by
+        // Grade15WeaponEffect.
+        // --------------------------------------------------------------------
+
         private sealed class Grade15Sprite :
             SpriteObject
         {
@@ -1279,6 +1294,19 @@ namespace Client.Main.Objects.Effects
 
             public override string TexturePath =>
                 _texturePath;
+
+
+            /// <summary>
+            /// Explicit billboard rotation.
+            ///
+            /// Classic CreateSprite() receives Rotation separately from the
+            /// model/object rotation, so it must not use WorldObject.Angle.
+            /// </summary>
+            public float SpriteRotation
+            {
+                get;
+                set;
+            }
 
 
             public Grade15Sprite(
@@ -1320,6 +1348,173 @@ namespace Client.Main.Objects.Effects
 
                 Interactive =
                     false;
+            }
+
+
+            public override void Draw(
+                GameTime gameTime)
+            {
+                if (!Visible ||
+                    SpriteTexture == null)
+                {
+                    return;
+                }
+
+
+                // ------------------------------------------------------------
+                // WorldPosition already contains:
+                //
+                // class15 local bone position
+                //      *
+                // class15 attachment transform
+                //      *
+                // player bone/world transform
+                //
+                // Therefore we only need its final translation here.
+                // ------------------------------------------------------------
+
+                Vector3 worldPosition =
+                    WorldPosition.Translation;
+
+
+                Matrix view =
+                    Camera.Instance.View;
+
+
+                Matrix projection =
+                    Camera.Instance.Projection;
+
+
+                Vector3 cameraPosition =
+                    Vector3.Transform(
+                        worldPosition,
+                        view);
+
+
+                // XNA's CreateLookAt is right-handed.
+                // Visible geometry lies on negative camera Z.
+                float cameraDepth =
+                    -cameraPosition.Z;
+
+
+                if (cameraDepth <=
+                    Camera.Instance.ViewNear)
+                {
+                    return;
+                }
+
+
+                var viewport =
+                    GraphicsDevice.Viewport;
+
+
+                Vector3 projected =
+                    viewport.Project(
+                        worldPosition,
+                        projection,
+                        view,
+                        Matrix.Identity);
+
+
+                if (projected.Z < 0.0f ||
+                    projected.Z > 1.0f)
+                {
+                    return;
+                }
+
+
+                // ------------------------------------------------------------
+                // MU original:
+                //
+                // Width  = texture.Width  * Scale;
+                // Height = texture.Height * Scale;
+                //
+                // Those dimensions are effectively camera-space dimensions.
+                //
+                // Convert one camera-space unit into pixels at the current
+                // camera depth.
+                //
+                // This is the same correction already used successfully by
+                // Grade15WeaponEffect.
+                // ------------------------------------------------------------
+
+                float pixelsPerCameraUnit =
+                    viewport.Height *
+                    MathF.Abs(
+                        projection.M22) /
+                    (2.0f *
+                    cameraDepth);
+
+
+                float spriteScale =
+                    Scale *
+                    pixelsPerCameraUnit;
+
+
+                if (!float.IsFinite(
+                        spriteScale) ||
+                    spriteScale <= 0.0f)
+                {
+                    return;
+                }
+
+
+                Color color =
+                    LightEnabled
+                        ? new Color(
+                            Light) *
+                        TotalAlpha
+                        : Color.White *
+                        TotalAlpha;
+
+
+                float depth =
+                    MathHelper.Clamp(
+                        projected.Z,
+                        0.0f,
+                        1.0f);
+
+
+                Vector2 origin =
+                    new Vector2(
+                        SpriteTexture.Width *
+                        0.5f,
+
+                        SpriteTexture.Height *
+                        0.5f);
+
+
+                // MU's sprite effects are filtered linearly.
+                using (
+                    new SpriteBatchScope(
+                        SpriteBatch,
+                        SpriteSortMode.Deferred,
+                        BlendState,
+                        SamplerState.LinearClamp,
+                        DepthState,
+                        RasterizerState.CullNone))
+                {
+                    SpriteBatch.Draw(
+                        SpriteTexture,
+
+                        new Vector2(
+                            projected.X,
+                            projected.Y),
+
+                        null,
+
+                        color,
+
+                        SpriteRotation,
+
+                        origin,
+
+                        spriteScale,
+
+                        SpriteEffects.None,
+
+                        depth);
+                }
             }
         }
     }
