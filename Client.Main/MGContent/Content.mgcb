@@ -82,3 +82,9 @@
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
 /build:DynamicLighting.fx
+
+#begin Grade15Effect.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Grade15Effect.fx
