@@ -45,7 +45,7 @@ namespace Client.Main.Objects.Effects
     ///    BITMAP_MAGIC
     ///        -> Effect/Magic_Ground1
     ///
-    ///    BITMAP_SHINY + 5
+    ///    BITMAP_SHINY + 
     ///        -> Effect/Shiny04
     ///
     ///    BITMAP_PIN_LIGHT

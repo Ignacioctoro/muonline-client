@@ -32,7 +32,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             public bool IsAncient { get; }
 
             public bool RequiresDistinctKey => Level != 0 || IsExcellent || IsAncient;
-            public bool ShouldUseItemMaterial => Level >= 7 || IsExcellent || IsAncient;
+            public bool ShouldUseItemMaterial =>
+                Level >= 7 ||
+                IsExcellent;
             public int ItemOptions => (Level & 0x0F) | (IsExcellent ? 0x10 : 0);
         }
 
@@ -189,6 +191,108 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             return GetPreviewInternal(definition, width, height, rotationAngle, ItemRenderProperties.Default, gameTime: null, useCache: true);
         }
+        private static readonly BlendState
+            _classicPreviewBrightAdditive =
+                new BlendState
+                {
+                    ColorBlendFunction =
+                        BlendFunction.Add,
+
+                    ColorSourceBlend =
+                        Blend.One,
+
+                    ColorDestinationBlend =
+                        Blend.One,
+
+                    AlphaBlendFunction =
+                        BlendFunction.Add,
+
+                    AlphaSourceBlend =
+                        Blend.One,
+
+                    AlphaDestinationBlend =
+                        Blend.One
+                };
+
+
+        private static Texture2D
+            _previewChrome01;
+
+        private static Texture2D
+            _previewChrome02;
+
+        private static Texture2D
+            _previewShiny01;
+
+        private static bool
+            _previewClassicTexturesAttempted;
+
+
+        private static Texture2D LoadClassicPreviewTexture(
+            string path)
+        {
+            try
+            {
+                TextureLoader.Instance
+                    .Prepare(path)
+                    .GetAwaiter()
+                    .GetResult();
+
+                return
+                    TextureLoader.Instance
+                        .GetTexture2D(path);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
+        private static bool EnsureClassicPreviewTextures()
+        {
+            bool ready =
+                _previewChrome01 != null &&
+                !_previewChrome01.IsDisposed &&
+                _previewChrome02 != null &&
+                !_previewChrome02.IsDisposed &&
+                _previewShiny01 != null &&
+                !_previewShiny01.IsDisposed;
+
+            if (ready)
+            {
+                return true;
+            }
+
+
+            if (_previewClassicTexturesAttempted)
+            {
+                return false;
+            }
+
+
+            _previewClassicTexturesAttempted =
+                true;
+
+
+            _previewChrome01 =
+                LoadClassicPreviewTexture(
+                    "Effect/Chrome01.jpg");
+
+            _previewChrome02 =
+                LoadClassicPreviewTexture(
+                    "Effect/Chrome02.jpg");
+
+            _previewShiny01 =
+                LoadClassicPreviewTexture(
+                    "Effect/Shiny01.jpg");
+
+
+            return
+                _previewChrome01 != null &&
+                _previewChrome02 != null &&
+                _previewShiny01 != null;
+        }
 
         public static Texture2D GetPreview(InventoryItem item, int width, int height, float rotationAngle = 0f)
         {
@@ -321,7 +425,12 @@ namespace Client.Main.Controls.UI.Game.Inventory
             bool isRotating = rotationAngle != 0f;
             string key = BuildCacheKey(definition, width, height, rotationAngle, props);
             float now = ResolveEffectTime(gameTime);
-            bool requiresAnimation = props.ShouldUseItemMaterial && Constants.ENABLE_ITEM_MATERIAL_ANIMATION;
+            // Classic inventory material multipass is temporarily disabled while
+            // validating the world renderer. There is no reason to regenerate the
+            // preview 23 times per second just for the base pass.
+            bool requiresAnimation =
+                props.ShouldUseItemMaterial &&
+                Constants.ENABLE_ITEM_MATERIAL_ANIMATION;
 
             PreviewCacheEntry entry = useCache ? GetCacheEntry(key, isRotating) : null;
 
@@ -659,91 +768,399 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
         }
 
-        private static void RenderMeshWithItemMaterialPreview(GraphicsDevice gd,
-                                                              Client.Data.BMD.BMD bmd,
-                                                              int meshIdx,
-                                                              Matrix[] bones,
-                                                              Matrix world,
-                                                              Matrix view,
-                                                              Matrix projection,
-                                                              Matrix worldViewProjection,
-                                                              Vector3 eyePosition,
-                                                              in ItemRenderProperties props,
-                                                              float shaderTime)
+        private static void RenderMeshWithItemMaterialPreview(
+            GraphicsDevice gd,
+            Client.Data.BMD.BMD bmd,
+            int meshIdx,
+            Matrix[] bones,
+            Matrix world,
+            Matrix view,
+            Matrix projection,
+            Matrix worldViewProjection,
+            Vector3 eyePosition,
+            in ItemRenderProperties props,
+            float shaderTime)
         {
-            var effect = GraphicsManager.Instance.ItemMaterialEffect;
+            var effect =
+                GraphicsManager.Instance
+                    .ItemMaterialEffect;
+
             if (effect == null)
             {
                 return;
             }
 
-            var mesh = bmd.Meshes[meshIdx];
 
-            var currentBlendState = gd.BlendState;
-            var currentRasterizerState = gd.RasterizerState;
+            var mesh =
+                bmd.Meshes[meshIdx];
+
+
+            BlendState oldBlend =
+                gd.BlendState;
+
+            RasterizerState oldRasterizer =
+                gd.RasterizerState;
+
+            DepthStencilState oldDepth =
+                gd.DepthStencilState;
+
 
             try
             {
-                BlendState customBlendState = GetBlendStateForMesh(mesh);
-                if (customBlendState != null)
-                {
-                    gd.BlendState = customBlendState;
-                }
+                DynamicVertexBuffer vb =
+                    null;
 
-                bool isTwoSided = customBlendState != null && customBlendState != BlendState.Opaque;
-                if (isTwoSided)
-                {
-                    gd.RasterizerState = RasterizerState.CullNone;
-                }
+                DynamicIndexBuffer ib =
+                    null;
 
-                DynamicVertexBuffer vb = null;
-                DynamicIndexBuffer ib = null;
 
-                BMDLoader.Instance.GetModelBuffers(bmd, meshIdx, Color.White, bones, ref vb, ref ib, skipCache: false);
+                BMDLoader.Instance.GetModelBuffers(
+                    bmd,
+                    meshIdx,
+                    Color.White,
+                    bones,
+                    ref vb,
+                    ref ib,
+                    skipCache: false);
 
-                if (vb == null || ib == null)
-                {
-                    return;
-                }
 
-                var texturePath = BMDLoader.Instance.GetTexturePath(bmd, mesh.TexturePath);
-                if (string.IsNullOrEmpty(texturePath))
+                if (vb == null ||
+                    ib == null)
                 {
                     return;
                 }
 
-                var texture = TextureLoader.Instance.GetTexture2D(texturePath);
-                if (texture == null)
+
+                string texturePath =
+                    BMDLoader.Instance
+                        .GetTexturePath(
+                            bmd,
+                            mesh.TexturePath);
+
+
+                if (string.IsNullOrEmpty(
+                        texturePath))
                 {
                     return;
                 }
 
-                effect.Parameters["World"]?.SetValue(world);
-                effect.Parameters["View"]?.SetValue(view);
-                effect.Parameters["Projection"]?.SetValue(projection);
-                effect.Parameters["WorldViewProjection"]?.SetValue(worldViewProjection);
-                effect.Parameters["EyePosition"]?.SetValue(eyePosition);
-                effect.Parameters["DiffuseTexture"]?.SetValue(texture);
-                effect.Parameters["ItemOptions"]?.SetValue(props.ItemOptions);
-                effect.Parameters["IsExcellent"]?.SetValue(props.IsExcellent);
-                effect.Parameters["IsAncient"]?.SetValue(props.IsAncient);
-                effect.Parameters["Time"]?.SetValue(shaderTime);
-                effect.Parameters["Alpha"]?.SetValue(1f);
+
+                Texture2D diffuseTexture =
+                    TextureLoader.Instance
+                        .GetTexture2D(
+                            texturePath);
+
+
+                if (diffuseTexture == null)
+                {
+                    return;
+                }
+
+
+                effect.CurrentTechnique =
+                    effect.Techniques[0];
+
+
+                effect.Parameters["World"]
+                    ?.SetValue(world);
+
+                effect.Parameters["View"]
+                    ?.SetValue(view);
+
+                effect.Parameters["Projection"]
+                    ?.SetValue(projection);
+
+                effect.Parameters["DiffuseTexture"]
+                    ?.SetValue(diffuseTexture);
+
+                effect.Parameters["Time"]
+                    ?.SetValue(shaderTime);
+
+                effect.Parameters["Alpha"]
+                    ?.SetValue(1.0f);
+
+                effect.Parameters["ShadowStrength"]
+                    ?.SetValue(0.0f);
+
 
                 gd.SetVertexBuffer(vb);
                 gd.Indices = ib;
 
-                int primitiveCount = ib.IndexCount / 3;
-                foreach (var pass in effect.CurrentTechnique.Passes)
+
+                int primitiveCount =
+                    ib.IndexCount /
+                    3;
+
+
+                EffectPass pass =
+                    effect.CurrentTechnique
+                        .Passes[0];
+
+
+                bool isTwoSided =
+                    GetBlendStateForMesh(mesh) != null;
+
+
+                // ================================================================
+                // BASE ITEM
+                // ================================================================
+
+                float baseLightScale =
+                    props.Level >= 9
+                        ? 0.90f
+                        : props.Level >= 7
+                            ? 0.80f
+                            : 1.00f;
+
+
+                effect.Parameters["PassMode"]
+                    ?.SetValue(0);
+
+                effect.Parameters["BaseLightScale"]
+                    ?.SetValue(baseLightScale);
+
+                effect.Parameters["MaterialColor"]
+                    ?.SetValue(Vector3.One);
+
+                effect.Parameters["MaterialIntensity"]
+                    ?.SetValue(1.0f);
+
+
+                BlendState meshBlend =
+                    GetBlendStateForMesh(mesh);
+
+
+                gd.BlendState =
+                    meshBlend ??
+                    BlendState.AlphaBlend;
+
+
+                gd.RasterizerState =
+                    isTwoSided
+                        ? RasterizerState.CullNone
+                        : RasterizerState.CullClockwise;
+
+
+                pass.Apply();
+
+                gd.DrawIndexedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    primitiveCount);
+
+
+                // ================================================================
+                // CLASSIC LEVEL MATERIAL
+                // ================================================================
+
+                if (props.Level >= 7 &&
+                    EnsureClassicPreviewTextures())
                 {
+                    gd.BlendState =
+                        _classicPreviewBrightAdditive;
+
+                    gd.DepthStencilState =
+                        DepthStencilState.DepthRead;
+
+                    gd.RasterizerState =
+                        RasterizerState.CullNone;
+
+
+                    void DrawMaterialPass(
+                        int passMode,
+                        Texture2D materialTexture,
+                        Vector3 color)
+                    {
+                        if (materialTexture == null ||
+                            materialTexture.IsDisposed)
+                        {
+                            return;
+                        }
+
+
+                        effect.Parameters["PassMode"]
+                            ?.SetValue(passMode);
+
+                        effect.Parameters["MaterialTexture"]
+                            ?.SetValue(materialTexture);
+
+                        effect.Parameters["MaterialColor"]
+                            ?.SetValue(color);
+
+                        effect.Parameters["MaterialIntensity"]
+                            ?.SetValue(1.0f);
+
+
+                        pass.Apply();
+
+                        gd.DrawIndexedPrimitives(
+                            PrimitiveType.TriangleList,
+                            0,
+                            0,
+                            primitiveCount);
+                    }
+
+
+                    // En el preview usamos blanco como BodyLight.
+                    // Luego podemos compartir exactamente las tablas
+                    // PartObjectColor/PartObjectColor2 del renderer mundial.
+
+                    Vector3 primaryColor =
+                        Vector3.One;
+
+                    Vector3 secondaryColor =
+                        new Vector3(
+                            0.90f,
+                            0.90f,
+                            0.90f);
+
+
+                    if (props.Level <= 8)
+                    {
+                        // +7 / +8
+                        DrawMaterialPass(
+                            1,
+                            _previewChrome01,
+                            primaryColor);
+                    }
+                    else if (props.Level <= 10)
+                    {
+                        // +9 / +10
+                        DrawMaterialPass(
+                            1,
+                            _previewChrome01,
+                            primaryColor);
+
+                        DrawMaterialPass(
+                            4,
+                            _previewShiny01,
+                            primaryColor);
+                    }
+                    else if (props.Level <= 12)
+                    {
+                        // +11 / +12
+                        DrawMaterialPass(
+                            2,
+                            _previewChrome02,
+                            secondaryColor);
+
+                        DrawMaterialPass(
+                            4,
+                            _previewShiny01,
+                            primaryColor);
+
+                        DrawMaterialPass(
+                            1,
+                            _previewChrome01,
+                            primaryColor);
+                    }
+                    else
+                    {
+                        // +13 / +14 / +15
+                        DrawMaterialPass(
+                            3,
+                            _previewChrome02,
+                            secondaryColor);
+
+                        DrawMaterialPass(
+                            4,
+                            _previewShiny01,
+                            primaryColor);
+
+                        DrawMaterialPass(
+                            1,
+                            _previewChrome01,
+                            primaryColor);
+                    }
+                }
+
+
+                // ================================================================
+                // CLASSIC EXCELLENT PASS
+                // ================================================================
+
+                if (props.IsExcellent)
+                {
+                    gd.BlendState =
+                        _classicPreviewBrightAdditive;
+
+                    gd.DepthStencilState =
+                        DepthStencilState.DepthRead;
+
+                    gd.RasterizerState =
+                        RasterizerState.CullNone;
+
+
+                    float luminosity =
+                        MathF.Sin(
+                            shaderTime *
+                            2.0f)
+                        *
+                        0.5f
+                        +
+                        0.5f;
+
+
+                    Vector3 excellentColor =
+                        new Vector3(
+                            luminosity,
+
+                            luminosity *
+                            0.30f,
+
+                            1.0f -
+                            luminosity);
+
+
+                    effect.Parameters["PassMode"]
+                        ?.SetValue(5);
+
+                    effect.Parameters["DiffuseTexture"]
+                        ?.SetValue(diffuseTexture);
+
+                    effect.Parameters["MaterialColor"]
+                        ?.SetValue(excellentColor);
+
+                    effect.Parameters["MaterialIntensity"]
+                        ?.SetValue(1.0f);
+
+
                     pass.Apply();
-                    gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
+
+                    gd.DrawIndexedPrimitives(
+                        PrimitiveType.TriangleList,
+                        0,
+                        0,
+                        primitiveCount);
                 }
             }
             finally
             {
-                gd.BlendState = currentBlendState;
-                gd.RasterizerState = currentRasterizerState;
+                // ItemMaterialEffect is shared with the world renderer.
+                // Never leave CHROME/EXCELLENT state active.
+
+                effect.Parameters["PassMode"]
+                    ?.SetValue(0);
+
+                effect.Parameters["BaseLightScale"]
+                    ?.SetValue(1.0f);
+
+                effect.Parameters["MaterialColor"]
+                    ?.SetValue(Vector3.One);
+
+                effect.Parameters["MaterialIntensity"]
+                    ?.SetValue(1.0f);
+
+
+                gd.BlendState =
+                    oldBlend;
+
+                gd.RasterizerState =
+                    oldRasterizer;
+
+                gd.DepthStencilState =
+                    oldDepth;
             }
         }
 

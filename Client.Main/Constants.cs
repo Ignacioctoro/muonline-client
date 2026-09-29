@@ -239,7 +239,7 @@ namespace Client.Main
             ENABLE_WEAPON_TRAIL = true;
             ENABLE_BATCH_OPTIMIZED_SORTING = true;
             ENABLE_STATIC_CHUNK_CACHING = true;
-            ENABLE_ITEM_MATERIAL_ANIMATION = false;
+            ENABLE_ITEM_MATERIAL_ANIMATION = true;
             ENABLE_DYNAMIC_BUFFER_POOL = true;
             RENDER_SCALE = 1.0f;
             HIGH_QUALITY_TEXTURES = true;

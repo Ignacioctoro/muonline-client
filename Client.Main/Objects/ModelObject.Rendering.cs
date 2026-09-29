@@ -226,10 +226,11 @@ namespace Client.Main.Objects
 
             // Item material shader (for excellent/ancient/high level items)
             bool useItemMaterial =
-                Constants.ENABLE_ITEM_MATERIAL_SHADER &&
-                ItemLevel >= 7 &&
-                GraphicsManager.Instance.ItemMaterialEffect != null &&
-                ShouldApplyItemMaterial(mesh);
+            Constants.ENABLE_ITEM_MATERIAL_SHADER &&
+            (ItemLevel >= 7 ||
+            IsExcellentItem) &&
+            GraphicsManager.Instance.ItemMaterialEffect != null &&
+            ShouldApplyItemMaterial(mesh);
 
             // Monster material shader
             bool useMonsterMaterial = Constants.ENABLE_MONSTER_MATERIAL_SHADER &&

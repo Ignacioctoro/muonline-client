@@ -88,3 +88,9 @@
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
 /build:Grade15Effect.fx
+
+#begin WingS3.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:WingS3.fx

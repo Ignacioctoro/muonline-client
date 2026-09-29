@@ -25,7 +25,7 @@ namespace Client.Main.Objects.Wings
         public SpriteObject Effect { get; set; }
     }
 
-    public class WingObject : ModelObject, IVertexDeformer
+    public partial class WingObject : ModelObject, IVertexDeformer
     {
         public List<CustomEffect> _effects { get; set; } = new List<CustomEffect>();
 
@@ -302,6 +302,13 @@ namespace Client.Main.Objects.Wings
 
                 Model = resolvedModel;
             }
+            if (requestedItemIndex == 36)
+            {
+                await PrepareStormClassicAssetsAsync();
+
+                if (!IsCurrentChangeVersion(changeVersion))
+                    return;
+            }
 
             UpdateStatusAfterAsyncResolve(
                 resolvedModel != null);
@@ -557,6 +564,8 @@ namespace Client.Main.Objects.Wings
         public override void Draw(GameTime gameTime)
         {
             base.Draw(gameTime);
+
+            DrawStormClassicEffects(gameTime);
         }
     }
 }
