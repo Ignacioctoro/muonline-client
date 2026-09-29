@@ -225,10 +225,11 @@ namespace Client.Main.Objects
                 return new ShaderSelection(false, false, false);
 
             // Item material shader (for excellent/ancient/high level items)
-            bool useItemMaterial = Constants.ENABLE_ITEM_MATERIAL_SHADER &&
-                                   (ItemLevel >= 7 || IsExcellentItem || IsAncientItem) &&
-                                   GraphicsManager.Instance.ItemMaterialEffect != null &&
-                                   ShouldApplyItemMaterial(mesh);
+            bool useItemMaterial =
+                Constants.ENABLE_ITEM_MATERIAL_SHADER &&
+                ItemLevel >= 7 &&
+                GraphicsManager.Instance.ItemMaterialEffect != null &&
+                ShouldApplyItemMaterial(mesh);
 
             // Monster material shader
             bool useMonsterMaterial = Constants.ENABLE_MONSTER_MATERIAL_SHADER &&
@@ -635,113 +636,11 @@ namespace Client.Main.Objects
             }
         }
 
-        public virtual void DrawMeshWithItemMaterial(int mesh)
+        public virtual void DrawMeshWithItemMaterial(
+            int mesh)
         {
-            if (Model?.Meshes == null || mesh < 0 || mesh >= Model.Meshes.Length)
-                return;
-            if (_boneVertexBuffers?[mesh] == null ||
-                _boneIndexBuffers?[mesh] == null ||
-                _boneTextures?[mesh] == null ||
-                IsHiddenMesh(mesh))
-                return;
-
-            try
-            {
-                var gd = GraphicsDevice;
-                var effect = GraphicsManager.Instance.ItemMaterialEffect;
-
-                if (effect == null)
-                {
-                    DrawMesh(mesh);
-                    return;
-                }
-
-                effect.CurrentTechnique = effect.Techniques[0];
-                GraphicsManager.Instance.ShadowMapRenderer?.ApplyShadowParameters(effect);
-
-                var prevDepthState = gd.DepthStencilState;
-                bool depthStateChanged = false;
-
-                try
-                {
-                    bool isBlendMesh = IsBlendMesh(mesh);
-                    var vertexBuffer = _boneVertexBuffers[mesh];
-                    var indexBuffer = _boneIndexBuffers[mesh];
-                    var texture = _boneTextures[mesh];
-
-                    var prevCull = gd.RasterizerState;
-                    var prevBlend = gd.BlendState;
-
-                    // Get mesh rendering states using helper methods
-                    bool isTwoSided = IsMeshTwoSided(mesh, isBlendMesh);
-                    BlendState blendState = GetMeshBlendState(mesh, isBlendMesh);
-
-                    gd.RasterizerState = isTwoSided ? _cullNone : _cullClockwise;
-
-                    if (isBlendMesh)
-                    {
-                        gd.DepthStencilState = GraphicsManager.ReadOnlyDepth;
-                        depthStateChanged = true;
-                    }
-
-                    gd.BlendState = blendState;
-
-                    Vector3 sunDir = GraphicsManager.Instance.ShadowMapRenderer?.LightDirection ?? Constants.SUN_DIRECTION;
-                    if (sunDir.LengthSquared() < 0.0001f)
-                        sunDir = new Vector3(1f, 0f, -0.6f);
-                    sunDir = Vector3.Normalize(sunDir);
-                    bool worldAllowsSun = World is WorldControl wc ? wc.IsSunWorld : true;
-                    bool sunEnabled = Constants.SUN_ENABLED && worldAllowsSun && UseSunLight && !HasWalkerAncestor();
-
-                    // Set world view projection matrix
-                    Matrix worldViewProjection = WorldPosition * Camera.Instance.View * Camera.Instance.Projection;
-                    effect.Parameters["WorldViewProjection"]?.SetValue(worldViewProjection);
-                    effect.Parameters["World"]?.SetValue(WorldPosition);
-                    effect.Parameters["View"]?.SetValue(Camera.Instance.View);
-                    effect.Parameters["Projection"]?.SetValue(Camera.Instance.Projection);
-                    effect.Parameters["EyePosition"]?.SetValue(Camera.Instance.Position);
-                    effect.Parameters["LightDirection"]?.SetValue(sunDir);
-                    effect.Parameters["ShadowStrength"]?.SetValue(sunEnabled ? SunCycleManager.GetEffectiveShadowStrength() : 0f);
-
-                    // Set texture
-                    effect.Parameters["DiffuseTexture"]?.SetValue(texture);
-
-                    // Set item properties
-                    int itemOptions = ItemLevel & 0x0F;
-                    if (IsExcellentItem)
-                        itemOptions |= 0x10;
-
-                    effect.Parameters["ItemOptions"]?.SetValue(itemOptions);
-                    effect.Parameters["Time"]?.SetValue(GetShaderTimeSeconds());
-                    effect.Parameters["IsAncient"]?.SetValue(IsAncientItem);
-                    effect.Parameters["IsExcellent"]?.SetValue(IsExcellentItem);
-                    effect.Parameters["Alpha"]?.SetValue(TotalAlpha);
-
-                    gd.SetVertexBuffer(vertexBuffer);
-                    gd.Indices = indexBuffer;
-
-                    int primitiveCount = indexBuffer.IndexCount / 3;
-
-                    foreach (EffectPass pass in effect.CurrentTechnique.Passes)
-                    {
-                        pass.Apply();
-                        gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
-                    }
-
-                    gd.BlendState = prevBlend;
-                    gd.RasterizerState = prevCull;
-                }
-                finally
-                {
-                    if (depthStateChanged)
-                        gd.DepthStencilState = prevDepthState;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogDebug("Error in DrawMeshWithItemMaterial: {Message}", ex.Message);
-                DrawMesh(mesh);
-            }
+            DrawMeshWithClassicItemMaterial(
+                mesh);
         }
 
         public virtual void DrawMeshWithMonsterMaterial(int mesh)
