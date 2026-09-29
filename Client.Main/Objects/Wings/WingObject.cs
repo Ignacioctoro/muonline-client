@@ -309,6 +309,13 @@ namespace Client.Main.Objects.Wings
                 if (!IsCurrentChangeVersion(changeVersion))
                     return;
             }
+            else if (requestedItemIndex == 37)
+            {
+                await PrepareEternalClassicAssetsAsync();
+
+                if (!IsCurrentChangeVersion(changeVersion))
+                    return;
+            }
 
             UpdateStatusAfterAsyncResolve(
                 resolvedModel != null);
@@ -563,16 +570,22 @@ namespace Client.Main.Objects.Wings
 
         public override void Draw(GameTime gameTime)
         {
-            // Wing of Storm:
-            // actualizar el reloj ANTES de base.Draw(),
-            // porque base.Draw() termina llamando a DrawModel()
-            // -> TryDrawStormModel()
-            // -> mesh 1 animated UV.
-            UpdateStormRenderTime(gameTime);
+            // Storm necesita guardar el tiempo ANTES de base.Draw()
+            // para animar el mesh interno.
+            UpdateStormRenderTime(
+                gameTime);
 
-            base.Draw(gameTime);
 
-            DrawStormClassicEffects(gameTime);
+            base.Draw(
+                gameTime);
+
+
+            // Efectos externos clásicos.
+            DrawStormClassicEffects(
+                gameTime);
+
+            DrawEternalClassicEffects(
+                gameTime);
         }
     }
 }

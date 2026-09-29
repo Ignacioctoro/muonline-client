@@ -213,6 +213,9 @@ namespace Client.Main.Objects
 
             effect.Parameters["Alpha"]
                 ?.SetValue(TotalAlpha);
+            effect.Parameters["AlphaCutoff"]
+                ?.SetValue(
+                    GetDynamicLightingAlphaCutoff());
 
             effect.Parameters["TerrainDynamicIntensityScale"]
                 ?.SetValue(1.5f);

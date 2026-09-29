@@ -340,6 +340,10 @@ namespace Client.Main.Objects
         protected virtual bool AllowLightingUpdates => true;
         protected virtual bool AllowDynamicLightingShader => true;
         protected virtual bool FreezeDynamicBuffersAfterFirstBuild => false;
+        protected virtual float GetDynamicLightingAlphaCutoff()
+            {
+                return 0.01f;
+            }
 
         #endregion
 

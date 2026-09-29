@@ -36,6 +36,7 @@ sampler2D SamplerState0 = sampler_state
 // Lighting parameters  
 float3 AmbientLight = float3(0.8, 0.8, 0.8);
 float Alpha = 1.0;
+float AlphaCutoff = 0.01;
 float3 SunDirection = float3(1.0, 0.0, -0.6);
 float3 SunColor = float3(1.0, 0.95, 0.85);
 float SunStrength = 0.8;
@@ -403,7 +404,7 @@ float4 PS_Terrain(PixelInput input) : SV_Target
 {
     float4 texColor = tex2D(SamplerState0, input.TexCoord);
     float finalAlpha = texColor.a * Alpha * input.Color.a;
-    clip(finalAlpha - 0.01);
+    clip(finalAlpha - AlphaCutoff);
 
     float3 normal = PrepareNormal(input.Normal);
 
@@ -434,7 +435,7 @@ float4 PS_Objects(PixelInput input) : SV_Target
 {
     float4 texColor = tex2D(SamplerState0, input.TexCoord);
     float finalAlpha = texColor.a * Alpha * input.Color.a;
-    clip(finalAlpha - 0.01);
+    clip(finalAlpha - AlphaCutoff);
 
     float3 normal = PrepareNormal(input.Normal);
 

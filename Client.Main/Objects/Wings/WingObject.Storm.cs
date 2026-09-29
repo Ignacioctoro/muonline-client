@@ -370,34 +370,34 @@ namespace Client.Main.Objects.Wings
         public override void DrawModel(
             bool isAfterDraw)
         {
-            if (!IsStormWing)
+            // ============================================================
+            // WING OF STORM
+            // ============================================================
+
+            if (IsStormWing)
             {
-                base.DrawModel(
-                    isAfterDraw);
+                if (isAfterDraw)
+                {
+                    return;
+                }
+
+                if (!TryDrawStormModel())
+                {
+                    base.DrawModel(
+                        false);
+                }
 
                 return;
             }
 
 
-            // Everything required by Storm is drawn during the normal pass.
-            //
-            // Do not allow ModelObject.DrawAfter() to redraw bright meshes.
-            if (isAfterDraw)
-            {
-                return;
-            }
+            // ============================================================
+            // RESTO DE ALAS
+            // Eternal incluida: usa renderer normal de Neffis
+            // ============================================================
 
-
-            if (!TryDrawStormModel())
-            {
-                // Safety fallback.
-                //
-                // If the custom shader or one of the buffers isn't ready yet,
-                // render the normal Neffis model rather than making the wings
-                // disappear completely.
-                base.DrawModel(
-                    false);
-            }
+            base.DrawModel(
+                isAfterDraw);
         }
 
 
