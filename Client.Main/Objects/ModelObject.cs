@@ -298,9 +298,33 @@ namespace Client.Main.Objects
 
         protected ILogger _logger;
 
+        // ---------------------------------------------------------------------
+        // MU item identity / visual properties
+        //
+        // The original MU renderer does not decide item effects only by level.
+        // It also uses the exact item group and number to select colors,
+        // meshes and special rendering rules.
+        //
+        // -1 means that this ModelObject is not currently associated with
+        // a specific equippable MU item.
+        // ---------------------------------------------------------------------
+
+        public int ItemGroup { get; set; } = -1;
+        public int ItemNumber { get; set; } = -1;
+
         public int ItemLevel { get; set; } = 0;
+
         public bool IsExcellentItem { get; set; } = false;
         public bool IsAncientItem { get; set; } = false;
+
+        /// <summary>
+        /// True when this object represents a known MU item.
+        /// Groups 0..15 and item number 0 are valid, so -1 is used
+        /// as the "not assigned" value.
+        /// </summary>
+        public bool HasItemIdentity =>
+            ItemGroup >= 0 &&
+            ItemNumber >= 0;
 
         // Monster/NPC glow properties
         public Vector3 GlowColor { get; set; } = new Vector3(1.0f, 0.8f, 0.0f); // Default gold

@@ -1,4 +1,4 @@
-using Client.Data;
+﻿using Client.Data;
 using Client.Main;
 using Client.Main.Content;
 using Client.Main.Objects.Effects;
@@ -36,7 +36,6 @@ namespace Client.Main.Objects.Player
 
         public bool IsRightHand { get; set; }
         public string TexturePath { get; set; }
-        public byte ItemGroup { get; set; }
 
         public WeaponObject()
         {

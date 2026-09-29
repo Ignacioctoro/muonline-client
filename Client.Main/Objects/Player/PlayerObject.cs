@@ -4,6 +4,7 @@ using Client.Main.Data;
 using Client.Main.Models;
 
 using Client.Main.Objects;
+using Client.Main.Objects.Effects;
 using Client.Main.Objects.Wings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xna.Framework;
@@ -213,6 +214,11 @@ namespace Client.Main.Objects.Player
             Children.Add(GuildEmblem3D = new GuildEmblem3DObject());
             Children.Add(Vehicle);
 
+            // Classic MU +15 armor attachments (NextGradeObjectRender).
+            // They stay loaded once and toggle automatically according to each
+            // equipped body part's ItemLevel.
+            InitializeGrade15ArmorEffects();
+
             // Enable mouse hover interactions so the name is shown
             Interactive = true;
 
@@ -226,6 +232,101 @@ namespace Client.Main.Objects.Player
             _characterService = _networkManager?.GetCharacterService();
 
             Appearance = appearance;
+        }
+
+        /// <summary>
+        /// Creates the linked +15 armor effect models used by the classic MU client.
+        ///
+        /// Bone indices, local positions and local rotations are ported from
+        /// NextGradeObjectRender / RenderLinkObject in the classic client.
+        /// The effect objects themselves decide whether they should be visible,
+        /// so the same setup works for the local player and remote players.
+        /// </summary>
+        private void InitializeGrade15ArmorEffects()
+        {
+            // Helm: bone 20 -> class15_head
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Helm,
+                "Item/class15_head.bmd",
+                20,
+                new Vector3(28f, 20f, 0f),
+                new Vector3(180f, -90f, 0f));
+
+            // Armor: bones 35 / 26
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Armor,
+                "Item/class15_bodyleft.bmd",
+                35,
+                new Vector3(5f, -20f, 0f),
+                new Vector3(0f, -90f, 0f));
+
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Armor,
+                "Item/class15_bodyright.bmd",
+                26,
+                new Vector3(5f, -20f, 0f),
+                new Vector3(0f, -90f, 0f));
+
+            // Pants: bones 3 / 10
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Pants,
+                "Item/class15_pantleft.bmd",
+                3,
+                new Vector3(25f, 5f, -5f),
+                new Vector3(0f, 90f, 180f));
+
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Pants,
+                "Item/class15_pantright.bmd",
+                10,
+                new Vector3(25f, 5f, 5f),
+                new Vector3(0f, 90f, 180f));
+
+            // Gloves / arms: bones 36 / 27
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Gloves,
+                "Item/class15_armleft.bmd",
+                36,
+                new Vector3(30f, 0f, 20f),
+                new Vector3(0f, -90f, 0f));
+
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Gloves,
+                "Item/class15_armright.bmd",
+                27,
+                new Vector3(30f, 0f, -20f),
+                new Vector3(0f, -90f, 0f));
+
+            // Boots: bones 4 / 11
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Boots,
+                "Item/class15_bootleft.bmd",
+                4,
+                new Vector3(20f, 15f, -10f),
+                new Vector3(0f, 90f, 180f));
+
+            AddGrade15ArmorEffect(
+                Grade15BodyPart.Boots,
+                "Item/class15_bootright.bmd",
+                11,
+                new Vector3(20f, 15f, 10f),
+                new Vector3(0f, 90f, 180f));
+        }
+
+        private void AddGrade15ArmorEffect(
+            Grade15BodyPart bodyPart,
+            string modelPath,
+            int parentBone,
+            Vector3 localPosition,
+            Vector3 localRotationDegrees)
+        {
+            Children.Add(
+                new Grade15ArmorEffect(
+                    bodyPart,
+                    modelPath,
+                    parentBone,
+                    localPosition,
+                    localRotationDegrees));
         }
 
         // ───────────────────────────────── LOADING ─────────────────────────────────
@@ -718,7 +819,6 @@ namespace Client.Main.Objects.Player
             {
                 Weapon1.Model = await BMDLoader.Instance.Prepare(leftHandDef.TexturePath);
                 Weapon1.TexturePath = leftHandDef.TexturePath;
-                Weapon1.ItemGroup = ItemDatabase.GetItemGroup(inventory[InventoryConstants.LeftHandSlot]);
                 Weapon1.LinkParentAnimation = false;
                 SetItemProperties(Weapon1, inventory[InventoryConstants.LeftHandSlot]);
                 RefreshWeaponAttachment(Weapon1, isLeftHand: true);
@@ -727,6 +827,7 @@ namespace Client.Main.Objects.Player
             {
                 Weapon1.Model = null;
                 Weapon1.TexturePath = null;
+                ClearItemProperties(Weapon1);
             }
 
             // Right Hand
@@ -735,7 +836,6 @@ namespace Client.Main.Objects.Player
             {
                 Weapon2.Model = await BMDLoader.Instance.Prepare(rightHandDef.TexturePath);
                 Weapon2.TexturePath = rightHandDef.TexturePath;
-                Weapon2.ItemGroup = ItemDatabase.GetItemGroup(inventory[InventoryConstants.RightHandSlot]);
                 Weapon2.LinkParentAnimation = false;
                 SetItemProperties(Weapon2, inventory[InventoryConstants.RightHandSlot]);
                 RefreshWeaponAttachment(Weapon2, isLeftHand: false);
@@ -744,6 +844,7 @@ namespace Client.Main.Objects.Player
             {
                 Weapon2.Model = null;
                 Weapon2.TexturePath = null;
+                ClearItemProperties(Weapon2);
             }
 
             await EnsureHelmHeadVisibleAsync();
@@ -765,10 +866,14 @@ namespace Client.Main.Objects.Player
                     await LoadPartAsync(Helm, helmDef.TexturePath.Replace("Item/", "Player/"));
                 }
 
-                // Apply item properties for shader effects
-                Helm.ItemLevel = Appearance.HelmItemLevel;
-                Helm.IsExcellentItem = Appearance.HelmExcellent;
-                Helm.IsAncientItem = Appearance.HelmAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Helm,
+                    7,
+                    Appearance.HelmItemIndex,
+                    Appearance.HelmItemLevel,
+                    Appearance.HelmExcellent,
+                    Appearance.HelmAncient);
                 _helmItemEquipped = true;
             }
             else
@@ -784,10 +889,14 @@ namespace Client.Main.Objects.Player
                     await LoadPartAsync(Armor, armorDef.TexturePath.Replace("Item/", "Player/"));
                 }
 
-                // Apply item properties for shader effects
-                Armor.ItemLevel = Appearance.ArmorItemLevel;
-                Armor.IsExcellentItem = Appearance.ArmorExcellent;
-                Armor.IsAncientItem = Appearance.ArmorAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Armor,
+                    8,
+                    Appearance.ArmorItemIndex,
+                    Appearance.ArmorItemLevel,
+                    Appearance.ArmorExcellent,
+                    Appearance.ArmorAncient);
             }
 
             // Pants
@@ -799,10 +908,14 @@ namespace Client.Main.Objects.Player
                     await LoadPartAsync(Pants, pantsDef.TexturePath.Replace("Item/", "Player/"));
                 }
 
-                // Apply item properties for shader effects
-                Pants.ItemLevel = Appearance.PantsItemLevel;
-                Pants.IsExcellentItem = Appearance.PantsExcellent;
-                Pants.IsAncientItem = Appearance.PantsAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Pants,
+                    9,
+                    Appearance.PantsItemIndex,
+                    Appearance.PantsItemLevel,
+                    Appearance.PantsExcellent,
+                    Appearance.PantsAncient);
             }
 
             // Gloves
@@ -820,10 +933,14 @@ namespace Client.Main.Objects.Player
                     _logger?.LogWarning($"[PlayerObject] No gloves definition found for Group=10, ID={Appearance.GlovesItemIndex}");
                 }
 
-                // Apply item properties for shader effects
-                Gloves.ItemLevel = Appearance.GlovesItemLevel;
-                Gloves.IsExcellentItem = Appearance.GlovesExcellent;
-                Gloves.IsAncientItem = Appearance.GlovesAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Gloves,
+                    10,
+                    Appearance.GlovesItemIndex,
+                    Appearance.GlovesItemLevel,
+                    Appearance.GlovesExcellent,
+                    Appearance.GlovesAncient);
             }
 
             // Boots
@@ -841,10 +958,14 @@ namespace Client.Main.Objects.Player
                     _logger?.LogWarning($"[PlayerObject] No boots definition found for Group=11, ID={Appearance.BootsItemIndex}");
                 }
 
-                // Apply item properties for shader effects
-                Boots.ItemLevel = Appearance.BootsItemLevel;
-                Boots.IsExcellentItem = Appearance.BootsExcellent;
-                Boots.IsAncientItem = Appearance.BootsAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Boots,
+                    11,
+                    Appearance.BootsItemIndex,
+                    Appearance.BootsItemLevel,
+                    Appearance.BootsExcellent,
+                    Appearance.BootsAncient);
             }
 
             // Wings
@@ -885,22 +1006,29 @@ namespace Client.Main.Objects.Player
                     Weapon1.TexturePath = leftHandDef.TexturePath;
                     Weapon1.LinkParentAnimation = false;
 
-                    // Apply item properties for shader effects
-                    Weapon1.ItemLevel = Appearance.LeftHandItemLevel;
-                    Weapon1.IsExcellentItem = Appearance.LeftHandExcellent;
-                    Weapon1.IsAncientItem = Appearance.LeftHandAncient;
+                    // Preserve exact MU item identity for classic visual rules.
+                    SetItemProperties(
+                        Weapon1,
+                        Appearance.LeftHandItemGroup,
+                        leftHandNumber,
+                        Appearance.LeftHandItemLevel,
+                        Appearance.LeftHandExcellent,
+                        Appearance.LeftHandAncient);
+
                     RefreshWeaponAttachment(Weapon1, isLeftHand: true);
                 }
                 else
                 {
                     Weapon1.Model = null;
                     Weapon1.TexturePath = null;
+                    ClearItemProperties(Weapon1);
                 }
             }
             else
             {
                 Weapon1.Model = null;
                 Weapon1.TexturePath = null;
+                ClearItemProperties(Weapon1);
             }
 
             short rightHandNumber = Appearance.RightHandItemNumber;
@@ -913,22 +1041,29 @@ namespace Client.Main.Objects.Player
                     Weapon2.TexturePath = rightHandDef.TexturePath;
                     Weapon2.LinkParentAnimation = false;
 
-                    // Apply item properties for shader effects
-                    Weapon2.ItemLevel = Appearance.RightHandItemLevel;
-                    Weapon2.IsExcellentItem = Appearance.RightHandExcellent;
-                    Weapon2.IsAncientItem = Appearance.RightHandAncient;
+                    // Preserve exact MU item identity for classic visual rules.
+                    SetItemProperties(
+                        Weapon2,
+                        Appearance.RightHandItemGroup,
+                        rightHandNumber,
+                        Appearance.RightHandItemLevel,
+                        Appearance.RightHandExcellent,
+                        Appearance.RightHandAncient);
+
                     RefreshWeaponAttachment(Weapon2, isLeftHand: false);
                 }
                 else
                 {
                     Weapon2.Model = null;
                     Weapon2.TexturePath = null;
+                    ClearItemProperties(Weapon2);
                 }
             }
             else
             {
                 Weapon2.Model = null;
                 Weapon2.TexturePath = null;
+                ClearItemProperties(Weapon2);
             }
             await EnsureHelmHeadVisibleAsync();
         }
@@ -951,10 +1086,14 @@ namespace Client.Main.Objects.Player
                     await LoadPartAsync(Helm, helmTexturePath);
                 }
 
-                // Apply item properties for shader effects
-                Helm.ItemLevel = appearanceConfig.HelmItemLevel;
-                Helm.IsExcellentItem = appearanceConfig.HelmExcellent;
-                Helm.IsAncientItem = appearanceConfig.HelmAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Helm,
+                    7,
+                    appearanceConfig.HelmItemIndex,
+                    appearanceConfig.HelmItemLevel,
+                    appearanceConfig.HelmExcellent,
+                    appearanceConfig.HelmAncient);
                 _helmItemEquipped = true;
             }
             else
@@ -976,10 +1115,14 @@ namespace Client.Main.Objects.Player
                     await LoadPartAsync(Armor, armorTexturePath);
                 }
 
-                // Apply item properties for shader effects
-                Armor.ItemLevel = appearanceConfig.ArmorItemLevel;
-                Armor.IsExcellentItem = appearanceConfig.ArmorExcellent;
-                Armor.IsAncientItem = appearanceConfig.ArmorAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Armor,
+                    8,
+                    appearanceConfig.ArmorItemIndex,
+                    appearanceConfig.ArmorItemLevel,
+                    appearanceConfig.ArmorExcellent,
+                    appearanceConfig.ArmorAncient);
             }
 
             // Pants
@@ -997,10 +1140,14 @@ namespace Client.Main.Objects.Player
                     await LoadPartAsync(Pants, pantsTexturePath);
                 }
 
-                // Apply item properties for shader effects
-                Pants.ItemLevel = appearanceConfig.PantsItemLevel;
-                Pants.IsExcellentItem = appearanceConfig.PantsExcellent;
-                Pants.IsAncientItem = appearanceConfig.PantsAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Pants,
+                    9,
+                    appearanceConfig.PantsItemIndex,
+                    appearanceConfig.PantsItemLevel,
+                    appearanceConfig.PantsExcellent,
+                    appearanceConfig.PantsAncient);
             }
 
             // Gloves
@@ -1023,10 +1170,14 @@ namespace Client.Main.Objects.Player
                     _logger?.LogWarning($"[PlayerObject] No gloves definition found for Group=10, ID={appearanceConfig.GlovesItemIndex}");
                 }
 
-                // Apply item properties for shader effects
-                Gloves.ItemLevel = appearanceConfig.GlovesItemLevel;
-                Gloves.IsExcellentItem = appearanceConfig.GlovesExcellent;
-                Gloves.IsAncientItem = appearanceConfig.GlovesAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Gloves,
+                    10,
+                    appearanceConfig.GlovesItemIndex,
+                    appearanceConfig.GlovesItemLevel,
+                    appearanceConfig.GlovesExcellent,
+                    appearanceConfig.GlovesAncient);
             }
 
             // Boots
@@ -1049,10 +1200,14 @@ namespace Client.Main.Objects.Player
                     _logger?.LogWarning($"[PlayerObject] No boots definition found for Group=11, ID={appearanceConfig.BootsItemIndex}");
                 }
 
-                // Apply item properties for shader effects
-                Boots.ItemLevel = appearanceConfig.BootsItemLevel;
-                Boots.IsExcellentItem = appearanceConfig.BootsExcellent;
-                Boots.IsAncientItem = appearanceConfig.BootsAncient;
+                // Preserve exact MU item identity for classic visual rules.
+                SetItemProperties(
+                    Boots,
+                    11,
+                    appearanceConfig.BootsItemIndex,
+                    appearanceConfig.BootsItemLevel,
+                    appearanceConfig.BootsExcellent,
+                    appearanceConfig.BootsAncient);
             }
 
             // Wings
@@ -1090,22 +1245,29 @@ namespace Client.Main.Objects.Player
                     Weapon1.TexturePath = leftHandDef.TexturePath;
                     Weapon1.LinkParentAnimation = false;
 
-                    // Apply item properties for shader effects
-                    Weapon1.ItemLevel = appearanceConfig.LeftHandItemLevel;
-                    Weapon1.IsExcellentItem = appearanceConfig.LeftHandExcellent;
-                    Weapon1.IsAncientItem = appearanceConfig.LeftHandAncient;
+                    // Preserve exact MU item identity for classic visual rules.
+                    SetItemProperties(
+                        Weapon1,
+                        appearanceConfig.LeftHandItemGroup,
+                        appearanceConfig.LeftHandItemIndex,
+                        appearanceConfig.LeftHandItemLevel,
+                        appearanceConfig.LeftHandExcellent,
+                        appearanceConfig.LeftHandAncient);
+
                     RefreshWeaponAttachment(Weapon1, isLeftHand: true);
                 }
                 else
                 {
                     Weapon1.Model = null;
                     Weapon1.TexturePath = null;
+                    ClearItemProperties(Weapon1);
                 }
             }
             else
             {
                 Weapon1.Model = null;
                 Weapon1.TexturePath = null;
+                ClearItemProperties(Weapon1);
             }
 
             if (appearanceConfig.RightHandItemIndex != 255 && appearanceConfig.RightHandItemIndex != 0xFF)
@@ -1117,22 +1279,29 @@ namespace Client.Main.Objects.Player
                     Weapon2.TexturePath = rightHandDef.TexturePath;
                     Weapon2.LinkParentAnimation = false;
 
-                    // Apply item properties for shader effects
-                    Weapon2.ItemLevel = appearanceConfig.RightHandItemLevel;
-                    Weapon2.IsExcellentItem = appearanceConfig.RightHandExcellent;
-                    Weapon2.IsAncientItem = appearanceConfig.RightHandAncient;
+                    // Preserve exact MU item identity for classic visual rules.
+                    SetItemProperties(
+                        Weapon2,
+                        appearanceConfig.RightHandItemGroup,
+                        appearanceConfig.RightHandItemIndex,
+                        appearanceConfig.RightHandItemLevel,
+                        appearanceConfig.RightHandExcellent,
+                        appearanceConfig.RightHandAncient);
+
                     RefreshWeaponAttachment(Weapon2, isLeftHand: false);
                 }
                 else
                 {
                     Weapon2.Model = null;
                     Weapon2.TexturePath = null;
+                    ClearItemProperties(Weapon2);
                 }
             }
             else
             {
                 Weapon2.Model = null;
                 Weapon2.TexturePath = null;
+                ClearItemProperties(Weapon2);
             }
 
             await EnsureHelmHeadVisibleAsync();
@@ -4352,12 +4521,72 @@ namespace Client.Main.Objects.Player
 
         private void SetItemProperties(ModelObject part, byte[] itemData)
         {
-            if (part == null || itemData == null) return;
+            if (part == null || itemData == null)
+                return;
 
-            var itemDetails = ItemDatabase.ParseItemDetails(itemData);
-            part.ItemLevel = itemDetails.Level;
-            part.IsExcellentItem = itemDetails.IsExcellent;
-            part.IsAncientItem = itemDetails.IsAncient;
+            var itemDetails =
+                ItemDatabase.ParseItemDetails(itemData);
+
+            if (ItemDatabase.TryGetItemGroupAndNumber(
+                itemData,
+                out byte itemGroup,
+                out short itemNumber))
+            {
+                SetItemProperties(
+                    part,
+                    itemGroup,
+                    itemNumber,
+                    itemDetails.Level,
+                    itemDetails.IsExcellent,
+                    itemDetails.IsAncient);
+            }
+            else
+            {
+                // We still know the level/options, but not the exact item.
+                part.ItemGroup = -1;
+                part.ItemNumber = -1;
+
+                // WeaponObject still exposes a legacy byte ItemGroup property
+                // used by attachment/animation rules. Keep it in a neutral
+                // state when exact identity parsing fails.
+                if (part is WeaponObject weapon)
+                {
+                    weapon.ItemGroup = 0;
+                }
+
+                part.ItemLevel = itemDetails.Level;
+                part.IsExcellentItem = itemDetails.IsExcellent;
+                part.IsAncientItem = itemDetails.IsAncient;
+            }
+        }
+
+        private static void SetItemProperties(
+            ModelObject part,
+            int itemGroup,
+            int itemNumber,
+            int itemLevel,
+            bool isExcellent,
+            bool isAncient)
+        {
+            if (part == null)
+                return;
+
+            part.ItemGroup = itemGroup;
+            part.ItemNumber = itemNumber;
+
+            // WeaponObject currently has its own byte ItemGroup property which
+            // is used by weapon attachment/animation rules. Keep it synchronized
+            // with the generic ModelObject identity.
+            if (part is WeaponObject weapon &&
+                itemGroup >= byte.MinValue &&
+                itemGroup <= byte.MaxValue)
+            {
+                weapon.ItemGroup = (byte)itemGroup;
+            }
+
+            part.ItemLevel = itemLevel;
+            part.IsExcellentItem = isExcellent;
+            part.IsAncientItem = isAncient;
         }
 
         /// <summary>
@@ -4394,6 +4623,10 @@ namespace Client.Main.Objects.Player
 
                     case InventoryConstants.ArmorSlot: // 3 - Armor
                         await UpdateArmorSlotAsync(Armor, equipmentData, equipmentData.ItemGroup, equipmentData.ItemNumber);
+                        break;
+
+                    case InventoryConstants.PantsSlot: // 4 - Pants
+                        await UpdateArmorSlotAsync(Pants, equipmentData, equipmentData.ItemGroup, equipmentData.ItemNumber);
                         break;
 
                     case InventoryConstants.PetSlot: // 8 - Pet
@@ -4627,20 +4860,35 @@ namespace Client.Main.Objects.Player
             return Task.CompletedTask;
         }
 
-        private void SetItemPropertiesFromEquipmentData(ModelObject part, EquipmentSlotData equipmentData)
+        private void SetItemPropertiesFromEquipmentData(
+            ModelObject part,
+            EquipmentSlotData equipmentData)
         {
-            part.ItemLevel = equipmentData.ItemLevel;
-            part.IsExcellentItem = equipmentData.ExcellentFlags > 0;
-            part.IsAncientItem = equipmentData.AncientDiscriminator > 0;
+            if (part == null || equipmentData == null)
+                return;
+
+            SetItemProperties(part, equipmentData.ItemGroup, equipmentData.ItemNumber, equipmentData.ItemLevel,
+                (equipmentData.ExcellentFlags & 0x3F) != 0,
+                equipmentData.AncientDiscriminator > 0);
         }
 
         private void ClearItemProperties(ModelObject part)
         {
+            if (part == null)
+                return;
+
+            part.ItemGroup = -1;
+            part.ItemNumber = -1;
+
+            if (part is WeaponObject weapon)
+            {
+                weapon.ItemGroup = 0;
+            }
+
             part.ItemLevel = 0;
             part.IsExcellentItem = false;
             part.IsAncientItem = false;
 
-            // Force shader to update by invalidating buffers
             part.InvalidateBuffers();
         }
 

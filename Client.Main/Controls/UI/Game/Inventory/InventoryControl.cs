@@ -33,6 +33,12 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private const string LayoutJsonResource = "Client.Main.Controls.UI.Game.Layouts.InventoryLayout.json";
         private const string TextureRectJsonResource = "Client.Main.Controls.UI.Game.Layouts.InventoryRect.json";
         private const string LayoutTexturePath = "Interface/GFx/NpcShop_I3.ozd";
+
+        // Currency icons from Data_Broyal.
+        // coin.ozd = icono de Zen standalone.
+        // rud.ozd  = icono de Ruud standalone.
+        private const string ZenIconTexturePath = "Interface/GFx/coin.ozd";
+        private const string RuudIconTexturePath = "Interface/GFx/rud.ozd";
         private Texture2D _invenBg01;
         private Texture2D _invenBg02;
         private Texture2D _invenBg03;
@@ -233,6 +239,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private Texture2D _invenFrame01;
         private Texture2D _invenFrame02;
 
+        private Texture2D _zenCurrencyIcon;
+        private Texture2D _ruudCurrencyIcon;
+
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
 
@@ -240,6 +249,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private InventoryTextEntry _titleText;
         private InventoryTextEntry _subtitleText;
         private InventoryTextEntry _zenText;
+        private InventoryTextEntry _wCoinText;
 
         private readonly Dictionary<string, Texture2D> _itemTextureCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<(InventoryItem item, int width, int height, bool animated), Texture2D> _bmdPreviewCache = new();
@@ -260,8 +270,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private Rectangle _gridFrameRect;
         private Rectangle _footerRect;
         private Rectangle _zenFieldRect;
+        private Rectangle _wCoinFieldRect;
         private Rectangle _zenIconRect;
+        private Rectangle _wCoinIconRect;
         private Rectangle _closeButtonRect;
+
+        private Rectangle _storeButtonRect;
+        private Rectangle _extendedButtonRect;
+        private Rectangle _repairButtonRect;
+
+        // Legacy fields kept for old inactive renderer helpers.
         private Rectangle _footerLeftButtonRect;
         private Rectangle _footerRightButtonRect;
         // Item hotkeys clásicos de MU: Q / W / E / R.
@@ -293,8 +311,15 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private DateTime _lastClickTime = DateTime.MinValue;
 
         private long _zenAmount;
+        private long _wCoinAmount;
         private GameTime _currentGameTime;
         private bool _closeHovered;
+
+        private bool _storeButtonHovered;
+        private bool _extendedButtonHovered;
+        private bool _repairButtonHovered;
+
+        // Legacy hover flags kept for old inactive helpers.
         private bool _leftFooterHovered;
         private bool _rightFooterHovered;
 
@@ -630,7 +655,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
         }
 
         public IEnumerable<string> GetPreloadTexturePaths()
-            => s_inventoryTexturePaths.Append(LayoutTexturePath);
+            => s_inventoryTexturePaths
+                .Append(LayoutTexturePath)
+                .Append(ZenIconTexturePath)
+                .Append(RuudIconTexturePath);
 
         public long ZenAmount
         {
@@ -641,6 +669,19 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 {
                     _zenAmount = value;
                     UpdateZenText();
+                }
+            }
+        }
+
+        public long WCoinAmount
+        {
+            get => _wCoinAmount;
+            set
+            {
+                if (_wCoinAmount != value)
+                {
+                    _wCoinAmount = value;
+                    UpdateWCoinText();
                 }
             }
         }
@@ -668,6 +709,14 @@ namespace Client.Main.Controls.UI.Game.Inventory
             _layoutTexture = await tl.PrepareAndGetTexture(LayoutTexturePath);
             _slotTexture = _layoutTexture;
 
+            _zenCurrencyIcon =
+                await tl.PrepareAndGetTexture(
+                    ZenIconTexturePath);
+
+            _ruudCurrencyIcon =
+                await tl.PrepareAndGetTexture(
+                    RuudIconTexturePath);
+
             _equipBox001 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box001.ozd");
             _equipBox002 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box002.ozd");
             _equipBox003 = await tl.PrepareAndGetTexture("Interface/GFx/newinven_box003.ozd");
@@ -691,6 +740,11 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             UpdateZenFromNetwork();
             UpdateZenText();
+
+            // Placeholder visual until WCoinC is connected to OpenMU.
+            WCoinAmount = 0;
+            UpdateWCoinText();
+
             InvalidateStaticSurface();
         }
         private Texture2D GetEquipSlotBackground(byte slot)
@@ -742,7 +796,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
             Scene.FocusControl = this;
 
             _zenText.Visible = true;
+            _wCoinText.Visible = true;
+
             UpdateZenText();
+            UpdateWCoinText();
 
             _pickedItemRenderer.Visible = false;
 
@@ -794,6 +851,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             _zenText.Visible = false;
+            _wCoinText.Visible = false;
         }
 
         public void HookEvents()
@@ -1023,10 +1081,20 @@ namespace Client.Main.Controls.UI.Game.Inventory
             _subtitleText.Text = "[Set option]   [Socket option]";
 
             _zenText = CreateText(
-                new Vector2(_zenFieldRect.X + 8, _zenFieldRect.Y + _zenFieldRect.Height * 0.5f - 7f),
-                13f,
+                new Vector2(
+                    _zenFieldRect.X + 7,
+                    _zenFieldRect.Y + _zenFieldRect.Height * 0.5f - 6f),
+                11.5f,
                 new Color(235, 210, 120));
             _zenText.Visible = false;
+
+            _wCoinText = CreateText(
+                new Vector2(
+                    _wCoinFieldRect.X + 7,
+                    _wCoinFieldRect.Y + _wCoinFieldRect.Height * 0.5f - 6f),
+                11.5f,
+                new Color(220, 190, 100));
+            _wCoinText.Visible = false;
         }
 
         private InventoryTextEntry CreateText(Vector2 basePosition, float fontSize, Color color, TextAlignment alignment = TextAlignment.Left)
@@ -1052,7 +1120,15 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             if (_zenText != null)
             {
-                _zenText.Text = ZenAmount.ToString();
+                _zenText.Text = $"ZEN   {ZenAmount}";
+            }
+        }
+
+        private void UpdateWCoinText()
+        {
+            if (_wCoinText != null)
+            {
+                _wCoinText.Text = $"WCOIN   {WCoinAmount}";
             }
         }
 
@@ -1160,35 +1236,88 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 WINDOW_WIDTH - 20,
                 FOOTER_HEIGHT);
 
-            int buttonY = _footerRect.Bottom - FOOTER_BUTTON_SIZE - 4;
+            // [ ZEN ...................... ] [S] [E] [R]
+            // [ WCOIN .................... ]
+            const int footerSidePadding = 10;
+            const int buttonSize = 28;
+            const int buttonGap = 4;
+            const int fieldHeight = 18;
+            const int fieldGap = 4;
 
-            _footerLeftButtonRect = new Rectangle(
-                _footerRect.X + 14,
+            int buttonY =
+                _footerRect.Y +
+                (_footerRect.Height - buttonSize) / 2;
+
+            _repairButtonRect = new Rectangle(
+                _footerRect.Right - footerSidePadding - buttonSize,
                 buttonY,
-                FOOTER_BUTTON_SIZE,
-                FOOTER_BUTTON_SIZE);
+                buttonSize,
+                buttonSize);
 
-            _footerRightButtonRect = new Rectangle(
-                _footerRect.Right - FOOTER_BUTTON_SIZE - 14,
+            _extendedButtonRect = new Rectangle(
+                _repairButtonRect.X - buttonGap - buttonSize,
                 buttonY,
-                FOOTER_BUTTON_SIZE,
-                FOOTER_BUTTON_SIZE);
+                buttonSize,
+                buttonSize);
 
-            _zenIconRect = new Rectangle(
-                _footerLeftButtonRect.Right + 10,
-                _footerRect.Y + 10,
-                18,
-                18);
+            _storeButtonRect = new Rectangle(
+                _extendedButtonRect.X - buttonGap - buttonSize,
+                buttonY,
+                buttonSize,
+                buttonSize);
 
-            int zenFieldX = _zenIconRect.Right + 6;
-            int zenFieldRightLimit = _footerRightButtonRect.X - 16;
-            int zenFieldWidth = Math.Max(110, zenFieldRightLimit - zenFieldX);
+            // Alineamos las barras con el inicio de la grilla.
+            // Esto las corre a la derecha respecto de la versión anterior
+            // y evita que nazcan pegadas al borde izquierdo del inventario.
+            int fieldX = _gridRect.X;
+
+            int fieldRight =
+                _storeButtonRect.X - 10;
+
+            int fieldWidth =
+                Math.Max(
+                    100,
+                    fieldRight - fieldX);
+
+            int firstFieldY =
+                _footerRect.Y + 3;
 
             _zenFieldRect = new Rectangle(
-                zenFieldX,
-                _footerRect.Y + 8,
-                zenFieldWidth,
-                FOOTER_BUTTON_SIZE - 6);
+                fieldX,
+                firstFieldY,
+                fieldWidth,
+                fieldHeight);
+
+            _wCoinFieldRect = new Rectangle(
+                fieldX,
+                _zenFieldRect.Bottom + fieldGap,
+                fieldWidth,
+                fieldHeight);
+
+            // Iconos 18x18, inmediatamente a la izquierda
+            // de cada barra.
+            const int currencyIconSize = 18;
+            const int currencyIconGap = 6;
+
+            int currencyIconX =
+                fieldX -
+                currencyIconGap -
+                currencyIconSize;
+
+            _zenIconRect = new Rectangle(
+                currencyIconX,
+                _zenFieldRect.Y,
+                currencyIconSize,
+                currencyIconSize);
+
+            _wCoinIconRect = new Rectangle(
+                currencyIconX,
+                _wCoinFieldRect.Y,
+                currencyIconSize,
+                currencyIconSize);
+
+            _footerLeftButtonRect = Rectangle.Empty;
+            _footerRightButtonRect = Rectangle.Empty;
 
             _closeButtonRect = new Rectangle(
                 _headerRect.Right - 34,
@@ -1585,15 +1714,40 @@ namespace Client.Main.Controls.UI.Game.Inventory
             SpriteBatch spriteBatch,
             Texture2D pixel)
         {
-            // Pre-redesign renderer only drew the Zen field here.
-            // Current repair/close button behavior is intentionally preserved.
             DrawInsetPanel(
                 spriteBatch,
                 _zenFieldRect,
                 new Color(12, 12, 12, 230),
                 new Color(80, 80, 80, 180),
                 new Color(0, 0, 0, 210));
+
+            DrawInsetPanel(
+                spriteBatch,
+                _wCoinFieldRect,
+                new Color(12, 12, 12, 230),
+                new Color(80, 80, 80, 180),
+                new Color(0, 0, 0, 210));
+
+            if (_zenCurrencyIcon != null)
+            {
+                spriteBatch.Draw(
+                    _zenCurrencyIcon,
+                    _zenIconRect,
+                    Color.White);
+            }
+
+            // TEMPORAL:
+            // usamos el icono Ruud para la segunda moneda mientras
+            // WCoin sigue siendo sólo un placeholder visual.
+            if (_ruudCurrencyIcon != null)
+            {
+                spriteBatch.Draw(
+                    _ruudCurrencyIcon,
+                    _wCoinIconRect,
+                    Color.White);
+            }
         }
+
 
         private static void DrawBevel(
             SpriteBatch spriteBatch,
@@ -2012,13 +2166,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private void UpdateChromeHover(Point mousePos)
         {
             var closeRect = Translate(_closeButtonRect);
-            var leftRect = Translate(_footerLeftButtonRect);
-            var rightRect = Translate(_footerRightButtonRect);
+            var storeRect = Translate(_storeButtonRect);
+            var extendedRect = Translate(_extendedButtonRect);
+            var repairRect = Translate(_repairButtonRect);
 
             _closeHovered = closeRect.Contains(mousePos);
-            _leftFooterHovered = leftRect.Contains(mousePos);
-            _rightFooterHovered = rightRect.Contains(mousePos);
+            _storeButtonHovered = storeRect.Contains(mousePos);
+            _extendedButtonHovered = extendedRect.Contains(mousePos);
+            _repairButtonHovered = repairRect.Contains(mousePos);
         }
+
 
         private bool HandleChromeClick()
         {
@@ -2028,13 +2185,19 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return true;
             }
 
-            if (_leftFooterHovered)
+            if (_storeButtonHovered)
             {
-                Hide();
+                // TODO: Open Personal Store.
                 return true;
             }
 
-            if (_rightFooterHovered)
+            if (_extendedButtonHovered)
+            {
+                // TODO: Open Extended Inventory.
+                return true;
+            }
+
+            if (_repairButtonHovered)
             {
                 ToggleRepairMode();
                 return true;
@@ -2042,6 +2205,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             return false;
         }
+
 
         private void HandleInventoryInteraction(Point mousePos, bool leftJustPressed, bool leftJustReleased)
         {
@@ -3162,10 +3326,33 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             DrawCloseButton(spriteBatch);
-            DrawFooterButton(spriteBatch, _footerLeftButtonRect, "X", _leftFooterHovered);
-            string buttonText = (_networkManager?.GetCharacterState()?.Level >= _repairEnableLevel) ? "R" : "+";
-            DrawFooterButton(spriteBatch, _footerRightButtonRect, buttonText, _rightFooterHovered);
+
+            DrawFooterButton(
+                spriteBatch,
+                _storeButtonRect,
+                "S",
+                _storeButtonHovered);
+
+            DrawFooterButton(
+                spriteBatch,
+                _extendedButtonRect,
+                "E",
+                _extendedButtonHovered);
+
+            string repairText =
+                (_networkManager?
+                    .GetCharacterState()?
+                    .Level >= _repairEnableLevel)
+                        ? "R"
+                        : "+";
+
+            DrawFooterButton(
+                spriteBatch,
+                _repairButtonRect,
+                repairText,
+                _repairButtonHovered);
         }
+
 
         private void DrawCloseButton(SpriteBatch spriteBatch)
         {

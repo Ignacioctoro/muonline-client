@@ -209,6 +209,39 @@ namespace Client.Main.Content
                 p.X * m.M13 + p.Y * m.M23 + p.Z * m.M33 + m.M43);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector3 FastTransformNormal(
+            in Matrix m,
+            in System.Numerics.Vector3 n)
+        {
+            // Las normales son direcciones, no posiciones.
+            // No se aplica la traslación M41/M42/M43.
+            Vector3 result = new Vector3(
+                n.X * m.M11 + n.Y * m.M21 + n.Z * m.M31,
+                n.X * m.M12 + n.Y * m.M22 + n.Z * m.M32,
+                n.X * m.M13 + n.Y * m.M23 + n.Z * m.M33);
+
+            float lengthSq = result.LengthSquared();
+
+            if (lengthSq > 1e-12f)
+            {
+                result *= 1.0f / MathF.Sqrt(lengthSq);
+            }
+            else
+            {
+                result = new Vector3(
+                    n.X,
+                    n.Y,
+                    n.Z);
+
+                if (result.LengthSquared() > 1e-12f)
+                {
+                    result.Normalize();
+                }
+            }
+
+            return result;
+        }
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryResolveNormalBoneIndex(
             BMDTextureMesh mesh,
             int normalIndex,
@@ -391,18 +424,58 @@ namespace Client.Main.Content
 
             // Calculate bone matrix hash for cache validation
             // Build or get the set of bones used by this mesh (distinct node indices)
-            if (!_meshUsedBones.TryGetValue(cacheKey, out short[] usedBones))
+            if (!_meshUsedBones.TryGetValue(
+                    cacheKey,
+                    out short[] usedBones))
             {
-                var verts = mesh.Vertices;
-                // Use HashSet to gather distinct nodes, then convert to array
-                var set = new HashSet<short>();
-                for (int i = 0; i < verts.Length; i++)
+                var verts =
+                    mesh.Vertices;
+
+                var set =
+                    new HashSet<short>();
+
+                // Huesos utilizados por las posiciones.
+                for (int i = 0;
+                    i < verts.Length;
+                    i++)
                 {
-                    short node = verts[i].Node;
-                    if (node >= 0) set.Add(node);
+                    short node =
+                        verts[i].Node;
+
+                    if (node >= 0)
+                    {
+                        set.Add(node);
+                    }
                 }
-                usedBones = set.Count > 0 ? set.ToArray() : Array.Empty<short>();
-                _meshUsedBones[cacheKey] = usedBones;
+
+                // En BMD una normal puede pertenecer a un hueso
+                // diferente al vértice de posición.
+                if (mesh.Normals != null)
+                {
+                    for (int i = 0;
+                        i < mesh.Normals.Length;
+                        i++)
+                    {
+                        if (TryResolveNormalBoneIndex(
+                                mesh,
+                                i,
+                                out int normalBoneIndex) &&
+                            normalBoneIndex >= 0 &&
+                            normalBoneIndex <= short.MaxValue)
+                        {
+                            set.Add(
+                                (short)normalBoneIndex);
+                        }
+                    }
+                }
+
+                usedBones =
+                    set.Count > 0
+                        ? set.ToArray()
+                        : Array.Empty<short>();
+
+                _meshUsedBones[cacheKey] =
+                    usedBones;
             }
 
             // Calculate a hash over only the bones influencing this mesh
@@ -470,7 +543,12 @@ namespace Client.Main.Content
             VertexPositionColorNormalTexture[] vertices = null;
             Vector3[] posCache = null;
             bool[] visited = null;
-            ITexCoordDeformer texCoordDeformer = vertexDeformer as ITexCoordDeformer;
+
+            Vector3[] normalCache = null;
+            bool[] normalVisited = null;
+
+            ITexCoordDeformer texCoordDeformer =
+                vertexDeformer as ITexCoordDeformer;
 
             try
             {
@@ -478,6 +556,20 @@ namespace Client.Main.Content
                 posCache = ArrayPool<Vector3>.Shared.Rent(mesh.Vertices.Length);
                 visited = ArrayPool<bool>.Shared.Rent(mesh.Vertices.Length);
                 Array.Clear(visited, 0, mesh.Vertices.Length);
+                normalCache =
+                ArrayPool<Vector3>
+                    .Shared
+                    .Rent(mesh.Normals.Length);
+
+            normalVisited =
+                ArrayPool<bool>
+                    .Shared
+                    .Rent(mesh.Normals.Length);
+
+            Array.Clear(
+                normalVisited,
+                0,
+                mesh.Normals.Length);
 
                 int v = 0;
                 int uniqueTransformed = 0;
@@ -507,8 +599,51 @@ namespace Client.Main.Content
                             }
                         }
 
-                        int ni = tri.NormalIndex[j];
-                        var normal = mesh.Normals[ni].Normal; // keep as-is (object space path)
+                        int ni =
+                            tri.NormalIndex[j];
+
+                        if (!normalVisited[ni])
+                        {
+                            normalVisited[ni] =
+                                true;
+
+                            var sourceNormal =
+                                mesh.Normals[ni].Normal;
+
+                            if (TryResolveNormalBoneIndex(
+                                    mesh,
+                                    ni,
+                                    out int normalBoneIndex) &&
+                                normalBoneIndex >= 0 &&
+                                normalBoneIndex < boneMatrix.Length)
+                            {
+                                normalCache[ni] =
+                                    FastTransformNormal(
+                                        in boneMatrix[
+                                            normalBoneIndex],
+                                        in sourceNormal);
+                            }
+                            else
+                            {
+                                Vector3 fallbackNormal =
+                                    new Vector3(
+                                        sourceNormal.X,
+                                        sourceNormal.Y,
+                                        sourceNormal.Z);
+
+                                if (fallbackNormal.LengthSquared() >
+                                    1e-12f)
+                                {
+                                    fallbackNormal.Normalize();
+                                }
+
+                                normalCache[ni] =
+                                    fallbackNormal;
+                            }
+                        }
+
+                        Vector3 normal =
+                            normalCache[ni];
 
                         int ti = tri.TexCoordIndex[j];
                         var uv = mesh.TexCoords[ti];
@@ -574,19 +709,20 @@ namespace Client.Main.Content
             }
             finally
             {
-                if (vertices != null)
+                if (normalCache != null)
                 {
-                    ArrayPool<VertexPositionColorNormalTexture>.Shared.Return(vertices);
+                    ArrayPool<Vector3>
+                        .Shared
+                        .Return(normalCache);
                 }
 
-                if (posCache != null)
+                if (normalVisited != null)
                 {
-                    ArrayPool<Vector3>.Shared.Return(posCache);
-                }
-
-                if (visited != null)
-                {
-                    ArrayPool<bool>.Shared.Return(visited, clearArray: true);
+                    ArrayPool<bool>
+                        .Shared
+                        .Return(
+                            normalVisited,
+                            clearArray: true);
                 }
             }
         }
