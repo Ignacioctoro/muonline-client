@@ -316,6 +316,13 @@ namespace Client.Main.Objects.Wings
                 if (!IsCurrentChangeVersion(changeVersion))
                     return;
             }
+            else if (requestedItemIndex == 39)
+            {
+                await PrepareRuinClassicAssetsAsync();
+
+                if (!IsCurrentChangeVersion(changeVersion))
+                    return;
+            }
 
             UpdateStatusAfterAsyncResolve(
                 resolvedModel != null);
@@ -585,6 +592,8 @@ namespace Client.Main.Objects.Wings
                 gameTime);
 
             DrawEternalClassicEffects(
+                gameTime);
+            DrawRuinClassicEffects(
                 gameTime);
         }
     }

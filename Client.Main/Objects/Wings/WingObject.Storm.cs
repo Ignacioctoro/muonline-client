@@ -247,7 +247,8 @@ namespace Client.Main.Objects.Wings
         /// keeps the classic CPU-rendered buffers available to our renderer.
         /// </summary>
         protected override bool AllowDynamicLightingShader =>
-            !IsStormWing;
+            !IsStormWing &&
+            !IsRuinWing;
 
 
         // ================================================================
@@ -371,7 +372,7 @@ namespace Client.Main.Objects.Wings
             bool isAfterDraw)
         {
             // ============================================================
-            // WING OF STORM
+            // WING OF STORM - 12,36
             // ============================================================
 
             if (IsStormWing)
@@ -392,8 +393,29 @@ namespace Client.Main.Objects.Wings
 
 
             // ============================================================
-            // RESTO DE ALAS
-            // Eternal incluida: usa renderer normal de Neffis
+            // WING OF RUIN - 12,39
+            // ============================================================
+
+            if (IsRuinWing)
+            {
+                if (isAfterDraw)
+                {
+                    return;
+                }
+
+                if (!TryDrawRuinModel())
+                {
+                    base.DrawModel(
+                        false);
+                }
+
+                return;
+            }
+
+
+            // ============================================================
+            // RESTO DE MODELOS
+            // Eternal sigue usando el renderer normal de Neffis.
             // ============================================================
 
             base.DrawModel(
