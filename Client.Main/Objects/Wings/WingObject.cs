@@ -316,6 +316,13 @@ namespace Client.Main.Objects.Wings
                 if (!IsCurrentChangeVersion(changeVersion))
                     return;
             }
+            else if (requestedItemIndex == 38)
+            {
+                await PrepareIllusionClassicAssetsAsync();
+
+                if (!IsCurrentChangeVersion(changeVersion))
+                    return;
+            }
             else if (requestedItemIndex == 39)
             {
                 await PrepareRuinClassicAssetsAsync();
@@ -593,6 +600,10 @@ namespace Client.Main.Objects.Wings
 
             DrawEternalClassicEffects(
                 gameTime);
+
+            DrawIllusionClassicEffects(
+                gameTime);
+
             DrawRuinClassicEffects(
                 gameTime);
         }
