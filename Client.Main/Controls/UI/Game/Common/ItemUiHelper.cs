@@ -287,9 +287,29 @@ namespace Client.Main.Controls.UI.Game.Common
             }
 
             if (details.OptionLevel > 0)
-                lines.Add(($"Additional Option : +{details.OptionLevel * 4}", new Color(80, 255, 80)));
+            {
+                lines.Add(
+                    (
+                        $"Additional Option : " +
+                        $"+{details.OptionLevel * 4}",
+                        new Color(127, 178, 255)
+                    ));
+            }
 
-            if (details.HasLuck) lines.Add(("+Luck  (Crit +5 %, Jewel +25 %)", Color.CornflowerBlue));
+            if (details.HasLuck)
+            {
+                lines.Add(
+                    (
+                        "Luck (success rate of Jewel of Soul +25%)",
+                        new Color(127, 178, 255)
+                    ));
+
+                lines.Add(
+                    (
+                        "Luck (critical damage rate +5%)",
+                        new Color(127, 178, 255)
+                    ));
+            }
             if (details.HasSkill) lines.Add(("+Skill (Right mouse click - skill)", Color.CornflowerBlue));
 
             if (details.IsExcellent)
