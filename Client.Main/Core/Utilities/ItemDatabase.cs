@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Client.Main.Core.Items.Tooltips;
 using Client.Data.BMD;
 using Client.Main.Controls.UI.Game.Inventory;
 using Microsoft.Extensions.Logging;
@@ -38,6 +39,12 @@ namespace Client.Main.Core.Utilities
 
             try
             {
+                // Load original MU tooltip data.
+                await ItemTooltipDataRepository
+                    .LoadAsync()
+                    .ConfigureAwait(false);
+
+
                 var reader = new ItemBMDReader();
 
                 var itemsPath = Path.Combine(Constants.DataPath, "Local", "item.bmd");
@@ -76,31 +83,48 @@ namespace Client.Main.Core.Utilities
                     }
 
                     var definition = new ItemDefinition(
-                        id: item.ItemSubIndex,
-                        name: itemName,
-                        width: width,
-                        height: height,
-                        texturePath: texturePath)
+                        item.ItemSubIndex,
+                        itemName,
+                        width,
+                        height,
+                        texturePath)
                     {
                         DamageMin = item.DamageMin,
                         DamageMax = item.DamageMax,
+
                         MagicPower = item.MagicPower,
+                        SkillIndex = item.SkillIndex,
+
                         AttackSpeed = item.AttackSpeed,
+
                         Defense = item.Defense,
                         DefenseRate = item.DefenseRate,
+                        MagicResistance = item.MagicResistance,
+
                         BaseDurability = item.Durability,
                         MagicDurability = item.MagicDur,
+
                         WalkSpeed = item.WalkSpeed,
+
                         DropLevel = item.DropLevel,
+
                         RequiredStrength = item.ReqStr,
                         RequiredDexterity = item.ReqDex,
+                        RequiredVitality = item.ReqVit,
                         RequiredEnergy = item.ReqEne,
+                        RequiredCommand = item.ReqCmd,
                         RequiredLevel = item.ReqLvl,
+
+                        // IMPORTANT:
+                        // These properties already existed and must not be removed.
                         TwoHanded = item.TwoHands != 0,
                         Group = item.ItemSubGroup,
+
                         AllowedClasses = BuildAllowedClasses(item),
+
                         IsExpensive = item.Expensive != 0,
                         CanSellToNpc = item.SellNpc != 0,
+
                         Money = item.Money,
                         ItemValue = item.ItemValue
                     };

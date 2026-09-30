@@ -14,16 +14,42 @@ namespace Client.Main.Controls.UI.Game.Inventory
         // Additional stats loaded from items.json for richer tooltips
         public int DamageMin { get; set; }
         public int DamageMax { get; set; }
-        public int MagicPower { get; set; }  // Wizard damage for staffs
+
+        public int MagicPower { get; set; }
+
+        /// <summary>
+        /// Skill assigned to this item in item.bmd.
+        /// 0 means that the item doesn't define a skill.
+        /// </summary>
+        public int SkillIndex { get; set; }
+
         public int AttackSpeed { get; set; }
+
         public int Defense { get; set; }
+
+        /// <summary>
+        /// Successful blocking / defense rate.
+        /// Used mostly by shields.
+        /// </summary>
         public int DefenseRate { get; set; }
+
+        /// <summary>
+        /// Magic resistance / magic defense value from item.bmd.
+        /// </summary>
+        public int MagicResistance { get; set; }
         public int BaseDurability { get; set; }
         public int MagicDurability { get; set; }  // Max durability for staffs (uses MagicDur instead of Durability)
         public int WalkSpeed { get; set; }
         public int RequiredStrength { get; set; }
         public int RequiredDexterity { get; set; }
+        public int RequiredVitality { get; set; }
         public int RequiredEnergy { get; set; }
+
+        /// <summary>
+        /// Dark Lord Command/Leadership requirement.
+        /// </summary>
+        public int RequiredCommand { get; set; }
+
         public int RequiredLevel { get; set; }
         public bool TwoHanded { get; set; }
         public int Group { get; set; }
