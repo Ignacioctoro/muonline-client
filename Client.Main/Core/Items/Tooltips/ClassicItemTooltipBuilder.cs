@@ -1,0 +1,1424 @@
+using System;
+using System.Collections.Generic;
+using Client.Data.BMD.Tooltip;
+using Client.Main.Controls.UI.Game;
+using Client.Main.Controls.UI.Game.Common;
+using Client.Main.Controls.UI.Game.Inventory;
+using Client.Main.Core.Utilities;
+using Microsoft.Xna.Framework;
+
+namespace Client.Main.Core.Items.Tooltips
+{
+    /// <summary>
+    /// Builds item tooltip lines following the original MU itemtooltip.bmd
+    /// and itemtooltiptext.bmd definitions.
+    ///
+    /// First implementation:
+    /// - Core equipment groups 0..11.
+    /// - Original BMD controls which base lines are displayed and their order.
+    /// - Excellent/Skill/Luck/normal-option text still uses the old compatibility
+    ///   logic until their original BMD tables are implemented.
+    ///
+    /// Wings, Ancient and miscellaneous items currently fall back to
+    /// ItemUiHelper.BuildTooltipLines.
+    /// </summary>
+    public static class ClassicItemTooltipBuilder
+    {
+        public static List<(string text, Color color)> Build(
+            InventoryItem item)
+        {
+            if (item?.Definition == null)
+            {
+                return new List<(string, Color)>();
+            }
+
+            var def = item.Definition;
+            var details = item.Details;
+
+            // ---------------------------------------------------------
+            // FIRST MIGRATION STAGE
+            //
+            // Keep wings, consumables, ancient items and newer item
+            // categories on the existing implementation until their
+            // specific BMD option systems are ported.
+            // ---------------------------------------------------------
+
+            if (def.Group < 0 ||
+                def.Group > 11 ||
+                details.IsAncient)
+            {
+                return ItemUiHelper.BuildTooltipLines(item);
+            }
+
+            if (!ItemTooltipDataRepository.IsLoaded)
+            {
+                return ItemUiHelper.BuildTooltipLines(item);
+            }
+
+            var tooltip =
+                ItemTooltipDataRepository.GetItem(
+                    (byte)def.Group,
+                    (ushort)def.Id);
+
+            if (tooltip == null)
+            {
+                return ItemUiHelper.BuildTooltipLines(item);
+            }
+
+            var result =
+                new List<(string text, Color color)>();
+
+            var values =
+                CalculateValues(item);
+
+            // ---------------------------------------------------------
+            // ITEM NAME
+            // ---------------------------------------------------------
+
+            string name = def.Name ?? string.Empty;
+
+            if (details.IsExcellent)
+            {
+                name = $"Excellent {name}";
+            }
+
+            if (details.Level > 0 &&
+                tooltip.RenderLevel)
+            {
+                name += $" +{details.Level}";
+            }
+
+            result.Add(
+                (
+                    name,
+                    ResolveMuColor(tooltip.NameColor)
+                ));
+
+            // ---------------------------------------------------------
+            // BASE TOOLTIP LINES
+            //
+            // IMPORTANT:
+            // The BMD decides WHICH properties are shown and in
+            // which order.
+            // ---------------------------------------------------------
+
+            foreach (var line in tooltip.Lines)
+            {
+                if (line == null ||
+                    !line.HasText)
+                {
+                    continue;
+                }
+
+                var textDefinition =
+                    ItemTooltipDataRepository.GetText(
+                        (ushort)line.TextId);
+
+                if (textDefinition == null)
+                {
+                    continue;
+                }
+
+                if (TryBuildLine(
+                    textDefinition.Type,
+                    item,
+                    values,
+                    line.Color,
+                    out string text,
+                    out Color color))
+                {
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        result.Add((text, color));
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------
+            // EQUIPPABLE CLASSES
+            //
+            // Still uses ItemDefinition until the original class part
+            // of the tooltip renderer is migrated.
+            // ---------------------------------------------------------
+
+            AppendAllowedClasses(
+                result,
+                def);
+
+            // ---------------------------------------------------------
+            // TEMPORARY COMPATIBILITY OPTIONS
+            //
+            // Do not remove these yet.
+            // They will be replaced later by:
+            //
+            // excellentcommonoption.bmd
+            // excellentwingoption.bmd
+            // itemset*.bmd
+            // jewelofharmonyoption.bmd
+            // socketitem.bmd
+            // ---------------------------------------------------------
+
+            AppendLegacyOptions(
+                result,
+                item);
+
+            AppendExcellentCommonOptions(
+                result,
+                item);
+
+            // Preserve NPC repair information used by the inventory.
+            AppendNpcRepairInformation(
+                result,
+                item,
+                values.MaxDurability);
+
+            return result;
+        }
+
+        private static bool TryBuildLine(
+            short type,
+            InventoryItem item,
+            CalculatedValues values,
+            byte originalColor,
+            out string text,
+            out Color color)
+        {
+            text = string.Empty;
+            color = ResolveMuColor(originalColor);
+
+            var def = item.Definition;
+            var character =
+                MuGame.Network?.GetCharacterState();
+
+            switch (type)
+            {
+                // -----------------------------------------------------
+                // Type 0
+                // Physical damage min / max
+                // -----------------------------------------------------
+                case 0:
+                {
+                    if (values.DamageMin <= 0 &&
+                        values.DamageMax <= 0)
+                    {
+                        return false;
+                    }
+
+                    string damageType =
+                        def.TwoHanded
+                            ? "Two-hand Damage"
+                            : "One-hand Damage";
+
+                    text =
+                        $"{damageType} : " +
+                        $"{values.DamageMin} ~ {values.DamageMax}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 1
+                // Simple durability
+                // -----------------------------------------------------
+                case 1:
+                {
+                    text =
+                        $"Durability : {item.Durability}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 2
+                // Defense
+                // -----------------------------------------------------
+                case 2:
+                {
+                    if (values.Defense <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Defense : {values.Defense}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 3
+                // Magic defense
+                // -----------------------------------------------------
+                case 3:
+                {
+                    if (values.MagicDefense <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Magic Defense : {values.MagicDefense}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 4
+                // Current / maximum durability
+                // -----------------------------------------------------
+                case 4:
+                {
+                    if (values.MaxDurability <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Durability : " +
+                        $"[{item.Durability}/{values.MaxDurability}]";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 5
+                // Required level
+                // -----------------------------------------------------
+                case 5:
+                {
+                    if (values.RequiredLevel <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Required Level : " +
+                        $"{values.RequiredLevel}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 6
+                // Required Strength
+                // -----------------------------------------------------
+                case 6:
+                {
+                    if (values.RequiredStrength <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Required Strength : " +
+                        $"{values.RequiredStrength}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 7
+                // Required Dexterity
+                // -----------------------------------------------------
+                case 7:
+                {
+                    if (values.RequiredDexterity <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Required Agility : " +
+                        $"{values.RequiredDexterity}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 8
+                // Required Vitality
+                // -----------------------------------------------------
+                case 8:
+                {
+                    if (values.RequiredVitality <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Required Vitality : " +
+                        $"{values.RequiredVitality}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 9
+                // Required Energy
+                // -----------------------------------------------------
+                case 9:
+                {
+                    if (values.RequiredEnergy <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Required Energy : " +
+                        $"{values.RequiredEnergy}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 10
+                // Required Command / Leadership
+                // -----------------------------------------------------
+                case 10:
+                {
+                    if (values.RequiredCommand <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Required Command : " +
+                        $"{values.RequiredCommand}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 11
+                // Magic / Wizardry power
+                // -----------------------------------------------------
+                case 11:
+                {
+                    if (values.MagicPower <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Wizardry Damage : " +
+                        $"{values.MagicPower}%";
+
+                    return true;
+                }
+
+                // Type 12 = skill damage.
+                //
+                // We deliberately don't implement it yet because
+                // it depends on SkillAttribute data and varies
+                // depending on item type.
+                case 12:
+                    return false;
+
+                // Type 13 currently represents conditional static
+                // descriptions in the original client.
+                case 13:
+                    return false;
+
+                // Item level + 1 style information.
+                case 14:
+                {
+                    text =
+                        $"Item Level : " +
+                        $"{item.Details.Level + 1}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 15
+                // Successful blocking / defense rate
+                // -----------------------------------------------------
+                case 15:
+                {
+                    if (values.DefenseRate <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Defense Rate : " +
+                        $"{values.DefenseRate}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 101
+                // Attack speed
+                // -----------------------------------------------------
+                case 101:
+                {
+                    if (def.AttackSpeed <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Attack Speed : " +
+                        $"{def.AttackSpeed}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // Type 102
+                // Walk speed
+                // -----------------------------------------------------
+                case 102:
+                {
+                    if (def.WalkSpeed <= 0)
+                    {
+                        return false;
+                    }
+
+                    text =
+                        $"Movement Speed : " +
+                        $"{def.WalkSpeed}";
+
+                    return true;
+                }
+
+                // -----------------------------------------------------
+                // 201..206:
+                // Original MU only shows these when the player does
+                // NOT satisfy the corresponding requirement.
+                // -----------------------------------------------------
+
+                case 201:
+                {
+                    if (character == null ||
+                        values.RequiredLevel <= 0 ||
+                        character.Level >= values.RequiredLevel)
+                    {
+                        return false;
+                    }
+
+                    int missing =
+                        values.RequiredLevel -
+                        character.Level;
+
+                    text =
+                        $"({missing} more Level required)";
+
+                    color = ResolveMuColor(2);
+                    return true;
+                }
+
+                case 202:
+                {
+                    if (character == null ||
+                        values.RequiredStrength <= 0 ||
+                        character.TotalStrength >=
+                        values.RequiredStrength)
+                    {
+                        return false;
+                    }
+
+                    int missing =
+                        values.RequiredStrength -
+                        character.TotalStrength;
+
+                    text =
+                        $"({missing} more Strength required)";
+
+                    color = ResolveMuColor(2);
+                    return true;
+                }
+
+                case 203:
+                {
+                    if (character == null ||
+                        values.RequiredDexterity <= 0 ||
+                        character.TotalAgility >=
+                        values.RequiredDexterity)
+                    {
+                        return false;
+                    }
+
+                    int missing =
+                        values.RequiredDexterity -
+                        character.TotalAgility;
+
+                    text =
+                        $"({missing} more Agility required)";
+
+                    color = ResolveMuColor(2);
+                    return true;
+                }
+
+                case 204:
+                {
+                    if (character == null ||
+                        values.RequiredVitality <= 0 ||
+                        character.TotalVitality >=
+                        values.RequiredVitality)
+                    {
+                        return false;
+                    }
+
+                    int missing =
+                        values.RequiredVitality -
+                        character.TotalVitality;
+
+                    text =
+                        $"({missing} more Vitality required)";
+
+                    color = ResolveMuColor(2);
+                    return true;
+                }
+
+                case 205:
+                {
+                    if (character == null ||
+                        values.RequiredEnergy <= 0 ||
+                        character.TotalEnergy >=
+                        values.RequiredEnergy)
+                    {
+                        return false;
+                    }
+
+                    int missing =
+                        values.RequiredEnergy -
+                        character.TotalEnergy;
+
+                    text =
+                        $"({missing} more Energy required)";
+
+                    color = ResolveMuColor(2);
+                    return true;
+                }
+
+                case 206:
+                {
+                    if (character == null ||
+                        values.RequiredCommand <= 0 ||
+                        character.TotalLeadership >=
+                        values.RequiredCommand)
+                    {
+                        return false;
+                    }
+
+                    int missing =
+                        values.RequiredCommand -
+                        character.TotalLeadership;
+
+                    text =
+                        $"({missing} more Command required)";
+
+                    color = ResolveMuColor(2);
+                    return true;
+                }
+
+                default:
+                    return false;
+            }
+        }
+
+        private static CalculatedValues CalculateValues(
+            InventoryItem item)
+        {
+            var def = item.Definition;
+            var details = item.Details;
+
+            int level =
+                Math.Clamp(details.Level, 0, 15);
+
+            bool excellent =
+                details.IsExcellent;
+
+            int levelStatBonus =
+                CalculateClassicLevelBonus(level);
+
+            // ---------------------------------------------------------
+            // DAMAGE
+            // ---------------------------------------------------------
+
+            int damageMin = def.DamageMin;
+            int damageMax = def.DamageMax;
+
+            if (damageMin > 0)
+            {
+                if (excellent &&
+                    def.DropLevel > 0)
+                {
+                    damageMin +=
+                        (def.DamageMin * 25 /
+                         def.DropLevel) + 5;
+                }
+
+                damageMin +=
+                    levelStatBonus;
+            }
+
+            if (damageMax > 0)
+            {
+                if (excellent &&
+                    def.DropLevel > 0)
+                {
+                    // Original client intentionally uses DamageMin
+                    // for the Excellent bonus calculation here.
+                    damageMax +=
+                        (def.DamageMin * 25 /
+                         def.DropLevel) + 5;
+                }
+
+                damageMax +=
+                    levelStatBonus;
+            }
+
+            // ---------------------------------------------------------
+            // MAGIC POWER
+            // ---------------------------------------------------------
+
+            int magicPower =
+                def.MagicPower;
+
+            if (magicPower > 0)
+            {
+                if (excellent &&
+                    def.DropLevel > 0)
+                {
+                    magicPower +=
+                        (def.MagicPower * 25 /
+                         def.DropLevel) + 5;
+                }
+
+                magicPower +=
+                    levelStatBonus;
+
+                magicPower /= 2;
+
+                if (!IsScepter(def))
+                {
+                    magicPower +=
+                        level * 2;
+                }
+            }
+
+            // ---------------------------------------------------------
+            // SUCCESSFUL BLOCKING / DEFENSE RATE
+            // ---------------------------------------------------------
+
+            int defenseRate =
+                def.DefenseRate;
+
+            if (defenseRate > 0)
+            {
+                if (excellent &&
+                    def.DropLevel > 0)
+                {
+                    defenseRate +=
+                        (def.DefenseRate * 25 /
+                         def.DropLevel) + 5;
+                }
+
+                defenseRate +=
+                    levelStatBonus;
+            }
+
+            // ---------------------------------------------------------
+            // DEFENSE
+            // ---------------------------------------------------------
+
+            int defense =
+                def.Defense;
+
+            if (defense > 0)
+            {
+                bool shield =
+                    def.Group == 6;
+
+                if (shield)
+                {
+                    defense += level;
+                }
+                else
+                {
+                    if (excellent &&
+                        def.DropLevel > 0)
+                    {
+                        defense +=
+                            def.Defense * 12 /
+                            def.DropLevel +
+                            def.DropLevel / 5 +
+                            4;
+                    }
+
+                    defense +=
+                        levelStatBonus;
+                }
+            }
+
+            // ---------------------------------------------------------
+            // MAGIC DEFENSE
+            // ---------------------------------------------------------
+
+            int magicDefense =
+                def.MagicResistance;
+
+            if (magicDefense > 0)
+            {
+                magicDefense +=
+                    levelStatBonus;
+            }
+
+            // ---------------------------------------------------------
+            // REQUIREMENTS
+            // ---------------------------------------------------------
+
+            int requirementItemLevel =
+                def.DropLevel;
+
+            if (excellent)
+            {
+                requirementItemLevel += 25;
+            }
+
+            int requiredStrength =
+                CalculatePhysicalRequirement(
+                    def.RequiredStrength,
+                    requirementItemLevel,
+                    def.DropLevel,
+                    level,
+                    excellent);
+
+            int requiredDexterity =
+                CalculatePhysicalRequirement(
+                    def.RequiredDexterity,
+                    requirementItemLevel,
+                    def.DropLevel,
+                    level,
+                    excellent);
+
+            int requiredVitality =
+                CalculatePhysicalRequirement(
+                    def.RequiredVitality,
+                    requirementItemLevel,
+                    def.DropLevel,
+                    level,
+                    excellent);
+
+            int requiredEnergy =
+                CalculateEnergyRequirement(
+                    def.RequiredEnergy,
+                    requirementItemLevel,
+                    def.DropLevel,
+                    level,
+                    excellent);
+
+            int requiredCommand =
+                CalculateCommandRequirement(
+                    def.RequiredCommand,
+                    requirementItemLevel,
+                    level);
+
+            int requiredLevel =
+                def.RequiredLevel;
+
+            // For core equipment the original client adds 20 levels
+            // to the requirement of Excellent items.
+            if (excellent &&
+                requiredLevel > 0)
+            {
+                requiredLevel += 20;
+            }
+
+            int maxDurability =
+                ItemUiHelper.CalculateMaxDurability(
+                    def,
+                    details,
+                    def.Group == 5);
+
+            return new CalculatedValues
+            {
+                DamageMin = damageMin,
+                DamageMax = damageMax,
+
+                Defense = defense,
+                DefenseRate = defenseRate,
+                MagicDefense = magicDefense,
+                MagicPower = magicPower,
+
+                RequiredLevel = requiredLevel,
+                RequiredStrength = requiredStrength,
+                RequiredDexterity = requiredDexterity,
+                RequiredVitality = requiredVitality,
+                RequiredEnergy = requiredEnergy,
+                RequiredCommand = requiredCommand,
+
+                MaxDurability = maxDurability
+            };
+        }
+
+        /// <summary>
+        /// Classic +0..+15 stat increase.
+        ///
+        /// +0..+9:
+        ///     level * 3
+        ///
+        /// +10:
+        ///     27 + 4
+        ///
+        /// +11:
+        ///     27 + 4 + 5
+        ///
+        /// ...
+        ///
+        /// +15:
+        ///     27 + 4 + 5 + 6 + 7 + 8 + 9
+        /// </summary>
+        private static int CalculateClassicLevelBonus(
+            int level)
+        {
+            if (level <= 0)
+            {
+                return 0;
+            }
+
+            int bonus =
+                Math.Min(level, 9) * 3;
+
+            for (int current = 10;
+                 current <= level;
+                 current++)
+            {
+                bonus +=
+                    current - 6;
+            }
+
+            return bonus;
+        }
+
+        private static int CalculatePhysicalRequirement(
+            int baseRequirement,
+            int calculatedItemLevel,
+            int originalDropLevel,
+            int level,
+            bool excellent)
+        {
+            if (baseRequirement <= 0)
+            {
+                return 0;
+            }
+
+            // Modern high-level items use another formula in the
+            // original client.
+            if (originalDropLevel >= 220)
+            {
+                if (excellent)
+                {
+                    return (int)(
+                        baseRequirement +
+                        baseRequirement * 0.75f +
+                        baseRequirement * 0.02f * level);
+                }
+
+                return (int)(
+                    baseRequirement +
+                    baseRequirement * 0.02f * level);
+            }
+
+            return
+                20 +
+                baseRequirement *
+                (calculatedItemLevel + level * 3) *
+                3 / 100;
+        }
+
+        private static int CalculateEnergyRequirement(
+            int baseRequirement,
+            int calculatedItemLevel,
+            int originalDropLevel,
+            int level,
+            bool excellent)
+        {
+            if (baseRequirement <= 0)
+            {
+                return 0;
+            }
+
+            if (originalDropLevel >= 220)
+            {
+                if (excellent)
+                {
+                    return (int)(
+                        baseRequirement * 2 +
+                        baseRequirement * 0.035f * level);
+                }
+
+                return (int)(
+                    baseRequirement +
+                    baseRequirement * 0.035f * level);
+            }
+
+            // Generic equipment formula.
+            //
+            // Books and skill scrolls have additional special cases,
+            // but groups > 11 currently use the legacy tooltip,
+            // so they don't reach this code yet.
+            return
+                20 +
+                baseRequirement *
+                (calculatedItemLevel + level * 3) *
+                4 / 100;
+        }
+
+        private static int CalculateCommandRequirement(
+            int baseRequirement,
+            int calculatedItemLevel,
+            int level)
+        {
+            if (baseRequirement <= 0)
+            {
+                return 0;
+            }
+
+            return
+                20 +
+                baseRequirement *
+                (calculatedItemLevel + level * 3) *
+                3 / 100;
+        }
+
+        private static bool IsScepter(
+            ItemDefinition def)
+        {
+            if (def.Group != 2)
+            {
+                return false;
+            }
+
+            return
+                (def.Id >= 8 &&
+                 def.Id <= 15) ||
+                def.Id == 17 ||
+                def.Id == 18;
+        }
+
+        private static void AppendAllowedClasses(
+            List<(string text, Color color)> lines,
+            ItemDefinition def)
+        {
+            if (def.AllowedClasses == null ||
+                def.AllowedClasses.Count == 0)
+            {
+                return;
+            }
+
+            foreach (string className in
+                     def.AllowedClasses)
+            {
+                lines.Add(
+                    (
+                        $"Can be equipped by {className}",
+                        Color.LightGray
+                    ));
+            }
+
+            var character =
+                MuGame.Network?.GetCharacterState();
+
+            if (character == null)
+            {
+                return;
+            }
+
+            string currentClass =
+                CharacterClassDatabase.GetClassName(
+                    character.Class);
+
+            string baseClass =
+                CharacterClassDatabase.GetBaseClassName(
+                    character.Class);
+
+            if (!def.AllowedClasses.Contains(
+                    baseClass))
+            {
+                lines.Add(
+                    (
+                        $"This item cannot be equipped by {currentClass}",
+                        Color.Red
+                    ));
+            }
+        }
+
+        private static void AppendLegacyOptions(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            var details =
+                item.Details;
+
+            if (details.OptionLevel > 0)
+            {
+                lines.Add(
+                    (
+                        $"Additional Option : " +
+                        $"+{details.OptionLevel * 4}",
+                        new Color(80, 255, 80)
+                    ));
+            }
+
+            if (details.HasLuck)
+            {
+                lines.Add(
+                    (
+                        "+Luck  (Crit +5 %, Jewel +25 %)",
+                        Color.CornflowerBlue
+                    ));
+            }
+
+            if (details.HasSkill)
+            {
+                lines.Add(
+                    (
+                        "+Skill (Right mouse click - skill)",
+                        Color.CornflowerBlue
+                    ));
+            }
+        }
+        private static void AppendExcellentCommonOptions(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            byte flags =
+                (byte)(
+                    item.Details.ExcellentFlags &
+                    0x3F);
+
+            if (flags == 0)
+            {
+                return;
+            }
+
+            var def =
+                item.Definition;
+
+            byte category;
+
+            // Original MU CalcExcellentOptions:
+            //
+            // Category 1:
+            // Weapons / offensive items.
+            //
+            // Category 2:
+            // Shields / armor / defensive items.
+            if (def.Group >= 0 &&
+                def.Group <= 5)
+            {
+                category = 1;
+            }
+            else if (def.Group >= 6 &&
+                    def.Group <= 11)
+            {
+                category = 2;
+            }
+            else
+            {
+                // Wings/rings/pendants are handled later.
+                return;
+            }
+
+            // Original MU reads Excellent bits from bit 5 down to bit 0.
+            //
+            // bit 5 -> option 0
+            // bit 4 -> option 1
+            // ...
+            // bit 0 -> option 5
+            for (int bit = 5;
+                bit >= 0;
+                bit--)
+            {
+                byte mask =
+                    (byte)(1 << bit);
+
+                if ((flags & mask) == 0)
+                {
+                    continue;
+                }
+
+                byte optionNumber =
+                    (byte)(5 - bit);
+
+                var option =
+                    ItemTooltipDataRepository
+                        .GetExcellentCommonOption(
+                            category,
+                            optionNumber);
+
+                if (option == null)
+                {
+                    continue;
+                }
+
+                string text =
+                    BuildExcellentCommonText(
+                        def,
+                        option);
+
+                if (string.IsNullOrWhiteSpace(
+                        text))
+                {
+                    continue;
+                }
+
+                lines.Add(
+                (
+                    text,
+                    ResolveMuColor(1)
+                ));
+            }
+        }
+
+        private static string BuildExcellentCommonText(
+                ItemDefinition def,
+                ExcellentOptionBMD option)
+        {
+            // ---------------------------------------------------------
+            // OFFENSIVE EXCELLENT OPTIONS
+            // Category 1
+            // ---------------------------------------------------------
+
+            if (option.Category == 1)
+            {
+                bool magicWeapon =
+                    def.Group == 5;
+
+                string powerName =
+                    magicWeapon
+                        ? "Wizardry Damage"
+                        : "Damage";
+
+                return option.Number switch
+                {
+                    // Excellent Damage Rate +10%
+                    0 =>
+                        $"Excellent Damage Rate " +
+                        $"+{option.Value}%",
+
+                    // Damage/Wizardry Damage +1 per 20 levels
+                    1 =>
+                        $"{powerName} " +
+                        $"+{option.Value} " +
+                        $"per 20 levels",
+
+                    // Damage/Wizardry Damage +2%
+                    2 =>
+                        $"{powerName} " +
+                        $"+{option.Value}%",
+
+                    // Attack/Wizardry Speed +7
+                    3 =>
+                        magicWeapon
+                            ? $"Wizardry Speed +{option.Value}"
+                            : $"Attack Speed +{option.Value}",
+
+                    // Life / 8 after killing a monster
+                    4 =>
+                        $"Life after monster " +
+                        $"+Life/{option.Value}",
+
+                    // Mana / 8 after killing a monster
+                    5 =>
+                        $"Mana after monster " +
+                        $"+Mana/{option.Value}",
+
+                    _ =>
+                        string.Empty
+                };
+            }
+
+            // ---------------------------------------------------------
+            // DEFENSIVE EXCELLENT OPTIONS
+            // Category 2
+            // ---------------------------------------------------------
+
+            if (option.Category == 2)
+            {
+                return option.Number switch
+                {
+                    // Max Life +4%
+                    0 =>
+                        $"Max Life +{option.Value}%",
+
+                    // Max Mana +4%
+                    1 =>
+                        $"Max Mana +{option.Value}%",
+
+                    // Damage Decrease +4%
+                    2 =>
+                        $"Damage Decrease +{option.Value}%",
+
+                    // Reflect Damage +5%
+                    3 =>
+                        $"Reflect Damage +{option.Value}%",
+
+                    // Defense Success Rate +10%
+                    4 =>
+                        $"Defense Success Rate " +
+                        $"+{option.Value}%",
+
+                    // Zen after hunt +30%
+                    5 =>
+                        $"Zen after hunt +{option.Value}%",
+
+                    _ =>
+                        string.Empty
+                };
+            }
+
+            return string.Empty;
+        }
+
+        private static void AppendNpcRepairInformation(
+            List<(string text, Color color)> lines,
+            InventoryItem item,
+            int maxDurability)
+        {
+            var npcShop =
+                NpcShopControl.Instance;
+
+            if (npcShop == null ||
+                !npcShop.Visible ||
+                !npcShop.IsRepairMode)
+            {
+                return;
+            }
+
+            if (ItemPriceCalculator.IsRepairable(item))
+            {
+                int repairCost =
+                    ItemPriceCalculator.CalculateRepairPrice(
+                        item,
+                        npcDiscount: true);
+
+                if (repairCost > 0 &&
+                    item.Durability < maxDurability)
+                {
+                    lines.Add(
+                        (
+                            $"Repair Cost: {repairCost} Zen",
+                            new Color(212, 175, 85)
+                        ));
+                }
+            }
+            else
+            {
+                lines.Add(
+                    (
+                        "Cannot be repaired",
+                        new Color(255, 100, 100)
+                    ));
+            }
+        }
+
+        /// <summary>
+        /// MU's classic tooltip color indexes.
+        ///
+        /// The first values were confirmed against the original
+        /// ZzzInventory tooltip renderer.
+        /// </summary>
+        private static Color ResolveMuColor(
+            byte color)
+        {
+            return color switch
+            {
+                0 => Color.White,
+
+                1 => new Color(
+                    127,
+                    178,
+                    255),
+
+                2 => new Color(
+                    255,
+                    51,
+                    25),
+
+                3 => new Color(
+                    255,
+                    204,
+                    25),
+
+                4 => new Color(
+                    25,
+                    200,
+                    28),
+
+                5 => new Color(
+                    160,
+                    0,
+                    0),
+
+                6 => new Color(
+                    255,
+                    25,
+                    255),
+
+                7 => new Color(
+                    0,
+                    0,
+                    160),
+
+                8 => new Color(
+                    160,
+                    102,
+                    0),
+
+                9 => new Color(
+                    0,
+                    255,
+                    0),
+
+                10 => new Color(
+                    102,
+                    102,
+                    102),
+
+                11 => new Color(
+                    204,
+                    128,
+                    204),
+
+                12 => new Color(
+                    179,
+                    102,
+                    255),
+
+                13 => new Color(
+                    230,
+                    107,
+                    10),
+
+                _ => Color.White
+            };
+        }
+
+        private sealed class CalculatedValues
+        {
+            public int DamageMin { get; init; }
+            public int DamageMax { get; init; }
+
+            public int Defense { get; init; }
+            public int DefenseRate { get; init; }
+
+            public int MagicDefense { get; init; }
+            public int MagicPower { get; init; }
+
+            public int RequiredLevel { get; init; }
+
+            public int RequiredStrength { get; init; }
+            public int RequiredDexterity { get; init; }
+            public int RequiredVitality { get; init; }
+            public int RequiredEnergy { get; init; }
+            public int RequiredCommand { get; init; }
+
+            public int MaxDurability { get; init; }
+        }
+    }
+}

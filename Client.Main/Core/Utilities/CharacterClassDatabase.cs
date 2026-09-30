@@ -154,5 +154,48 @@ namespace Client.Main.Core.Utilities
                 _ => CharacterClassNumber.DarkWizard    // Default fallback
             };
         }
+        /// <summary>
+        /// Returns the base MU class family for an evolved character class.
+        /// Item.bmd class restrictions are stored using the base class.
+        /// </summary>
+        public static string GetBaseClassName(CharacterClassNumber classNumber)
+        {
+            return classNumber switch
+            {
+                CharacterClassNumber.DarkWizard
+                    or CharacterClassNumber.SoulMaster
+                    or CharacterClassNumber.GrandMaster
+                        => "Dark Wizard",
+
+                CharacterClassNumber.DarkKnight
+                    or CharacterClassNumber.BladeKnight
+                    or CharacterClassNumber.BladeMaster
+                        => "Dark Knight",
+
+                CharacterClassNumber.FairyElf
+                    or CharacterClassNumber.MuseElf
+                    or CharacterClassNumber.HighElf
+                        => "Fairy Elf",
+
+                CharacterClassNumber.MagicGladiator
+                    or CharacterClassNumber.DuelMaster
+                        => "Magic Gladiator",
+
+                CharacterClassNumber.DarkLord
+                    or CharacterClassNumber.LordEmperor
+                        => "Dark Lord",
+
+                CharacterClassNumber.Summoner
+                    or CharacterClassNumber.BloodySummoner
+                    or CharacterClassNumber.DimensionMaster
+                        => "Summoner",
+
+                CharacterClassNumber.RageFighter
+                    or CharacterClassNumber.FistMaster
+                        => "Rage Fighter",
+
+                _ => GetClassName(classNumber)
+            };
+        }
     }
 }

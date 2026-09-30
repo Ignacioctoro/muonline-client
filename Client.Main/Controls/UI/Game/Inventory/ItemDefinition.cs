@@ -53,6 +53,18 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public int RequiredLevel { get; set; }
         public bool TwoHanded { get; set; }
         public int Group { get; set; }
+        /// <summary>
+        /// Original item classification from item.bmd.
+        /// Used by option tables such as excellentwingoption.bmd.
+        /// </summary>
+        public byte KindA { get; set; }
+
+        public byte KindB { get; set; }
+
+        /// <summary>
+        /// Original item Type field from item.bmd.
+        /// </summary>
+        public byte ItemType { get; set; }
         public bool IsExpensive { get; set; }
         public bool CanSellToNpc { get; set; }
         public int Money { get; set; } // Base buy price (iZen) from Item.bmd, can be 0

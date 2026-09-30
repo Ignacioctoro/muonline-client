@@ -24,6 +24,12 @@ namespace Client.Main.Core.Items.Tooltips
 
         private static Dictionary<int, ItemTooltipBMD> _items =
             new();
+        private static Dictionary<int, ExcellentOptionBMD>
+            _excellentCommonOptions =
+                new();
+        private static Dictionary<int, ExcellentOptionBMD>
+            _excellentWingOptions =
+                new();
 
         private static Dictionary<ushort, ItemTooltipTextBMD> _texts =
             new();
@@ -66,11 +72,25 @@ namespace Client.Main.Core.Items.Tooltips
                     "Local",
                     "itemtooltiptext.bmd");
 
+            string excellentCommonPath =
+            Path.Combine(
+                Constants.DataPath,
+                "Local",
+                "excellentcommonoption.bmd");
+            string excellentWingPath =
+            Path.Combine(
+                Constants.DataPath,
+                "Local",
+                "excellentwingoption.bmd");
+
             var itemReader =
                 new ItemTooltipBMDReader();
 
             var textReader =
                 new ItemTooltipTextBMDReader();
+
+            var excellentReader =
+                new ExcellentOptionBMDReader();
 
             var itemEntries =
                 await itemReader
@@ -80,6 +100,16 @@ namespace Client.Main.Core.Items.Tooltips
             var textEntries =
                 await textReader
                     .Load(itemTooltipTextPath)
+                    .ConfigureAwait(false);
+
+            var excellentEntries =
+                await excellentReader
+                    .Load(excellentCommonPath)
+                    .ConfigureAwait(false);
+
+            var excellentWingEntries =
+                await excellentReader
+                    .Load(excellentWingPath)
                     .ConfigureAwait(false);
 
             var itemDictionary =
@@ -103,6 +133,35 @@ namespace Client.Main.Core.Items.Tooltips
                     key,
                     item);
             }
+            var excellentDictionary =
+                new Dictionary<int, ExcellentOptionBMD>();
+
+            foreach (var option in excellentEntries)
+            {
+                int key =
+                    MakeExcellentOptionKey(
+                        option.Category,
+                        option.Number);
+
+                excellentDictionary.TryAdd(
+                    key,
+                    option);
+            }
+        
+            var excellentWingDictionary =
+                new Dictionary<int, ExcellentOptionBMD>();
+
+            foreach (var option in excellentWingEntries)
+            {
+                int key =
+                    MakeExcellentOptionKey(
+                        option.Category,
+                        option.Number);
+
+                excellentWingDictionary.TryAdd(
+                    key,
+                    option);
+            }
 
             var textDictionary =
                 new Dictionary<ushort, ItemTooltipTextBMD>();
@@ -120,12 +179,20 @@ namespace Client.Main.Core.Items.Tooltips
             _texts =
                 textDictionary;
 
+            _excellentCommonOptions =
+                excellentDictionary;
+
+            _excellentWingOptions =
+                excellentWingDictionary;
+
             IsLoaded = true;
 
             Console.WriteLine(
-                $"[ItemTooltipData] Loaded " +
-                $"{_items.Count} item definitions and " +
-                $"{_texts.Count} text definitions.");
+            $"[ItemTooltipData] Loaded " +
+            $"{_items.Count} item definitions, " +
+            $"{_texts.Count} text definitions, " +
+            $"{_excellentCommonOptions.Count} common excellent options and " +
+            $"{_excellentWingOptions.Count} wing excellent options.");
         }
 
         /// <summary>
@@ -212,6 +279,60 @@ namespace Client.Main.Core.Items.Tooltips
                 item.Category != 0 ||
                 item.Index != 0 ||
                 !string.IsNullOrEmpty(item.Name);
+        }
+        public static ExcellentOptionBMD?
+            GetExcellentCommonOption(
+                byte category,
+                byte number)
+        {
+            EnsureLoaded();
+
+            _excellentCommonOptions.TryGetValue(
+                MakeExcellentOptionKey(
+                    category,
+                    number),
+                out var result);
+
+            return result;
+        }
+
+        public static bool TryGetExcellentCommonOption(
+            byte category,
+            byte number,
+            out ExcellentOptionBMD? option)
+        {
+            EnsureLoaded();
+
+            return
+                _excellentCommonOptions.TryGetValue(
+                    MakeExcellentOptionKey(
+                        category,
+                        number),
+                    out option);
+        }
+        public static ExcellentOptionBMD?
+            GetExcellentWingOption(
+                byte category,
+                byte number)
+        {
+            EnsureLoaded();
+
+            _excellentWingOptions.TryGetValue(
+                MakeExcellentOptionKey(
+                    category,
+                    number),
+                out var result);
+
+            return result;
+        }
+
+        private static int MakeExcellentOptionKey(
+            byte category,
+            byte number)
+        {
+            return
+                (category << 8) |
+                number;
         }
 
         private static void EnsureLoaded()

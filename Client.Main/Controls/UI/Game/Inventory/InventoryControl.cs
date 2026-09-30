@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Client.Main.Core.Items.Tooltips;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -3446,7 +3447,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             if (_pickedItem_renderer_item() != null || _hoveredItem == null || _font == null)
                 return;
 
-            var lines = ItemUiHelper.BuildTooltipLines(_hoveredItem);
+            var lines = ClassicItemTooltipBuilder.Build(_hoveredItem);
             if (NpcShopControl.IsOpen)
             {
                 int sellPrice = ItemPriceCalculator.CalculateSellPrice(_hoveredItem);

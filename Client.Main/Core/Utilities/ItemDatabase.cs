@@ -118,7 +118,12 @@ namespace Client.Main.Core.Utilities
                         // IMPORTANT:
                         // These properties already existed and must not be removed.
                         TwoHanded = item.TwoHands != 0,
+
                         Group = item.ItemSubGroup,
+
+                        KindA = item.KindA,
+                        KindB = item.KindB,
+                        ItemType = item.Type,
 
                         AllowedClasses = BuildAllowedClasses(item),
 
