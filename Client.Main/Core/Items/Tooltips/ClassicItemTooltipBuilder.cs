@@ -194,17 +194,23 @@ namespace Client.Main.Core.Items.Tooltips
                 def.Group == 13 &&
                 details.IsAncient;
 
-            bool isGroup14 =
-                def.Group == 14;
+            // ---------------------------------------------------------
+            // CLASSIC TOOLTIP COVERAGE
+            //
+            // Groups 0..14 now use the original BMD tooltip pipeline.
+            //
+            // Group 13 is heterogeneous (pets, cloaks, rings, pendants,
+            // mounts, misc items), but itemtooltip.bmd is still the
+            // authoritative source for their base tooltip lines.
+            //
+            // Special option rendering remains restricted below where
+            // needed, so enabling Group 13 here does not automatically
+            // treat pets/misc items as normal equipment.
+            // ---------------------------------------------------------
 
             bool supportedGroup =
                 def.Group >= 0 &&
-                (
-                    def.Group <= 12 ||
-                    isGroup13Accessory ||
-                    isGroup13Ancient ||
-                    isGroup14
-                );
+                def.Group <= 14;
 
             if (!supportedGroup)
             {
@@ -300,6 +306,10 @@ namespace Client.Main.Core.Items.Tooltips
                         (ushort)line.TextId);
 
                 if (textDefinition == null)
+                {
+                    continue;
+                }
+
                 if (def.Group == 14)
                 {
                     string logKey =
@@ -323,10 +333,6 @@ namespace Client.Main.Core.Items.Tooltips
                             $"Text='{textDefinition.Text}'");
                     }
                 }
-                {
-                    continue;
-                }
-
                 if (TryBuildLine(
                     textDefinition.Type,
                     textDefinition.Text,
@@ -398,8 +404,12 @@ namespace Client.Main.Core.Items.Tooltips
             // ---------------------------------------------------------
 
             bool canHaveEquipmentOptions =
+            (
                 def.Group >= 0 &&
-                def.Group <= 13;
+                def.Group <= 12
+            ) ||
+            isGroup13Accessory ||
+            isGroup13Ancient;
 
             bool hasBlueOptions =
                 canHaveEquipmentOptions &&
