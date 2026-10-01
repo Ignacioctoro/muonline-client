@@ -7,7 +7,7 @@ using Client.Data.BMD.Tooltip;
 namespace Client.Main.Core.Items.Tooltips
 {
     /// <summary>
-    /// Central access point for the original MU item tooltip data.
+    /// Central access point for original MU tooltip data.
     ///
     /// Loads:
     ///
@@ -19,6 +19,7 @@ namespace Client.Main.Core.Items.Tooltips
     /// Data/Local/jewelofharmonyoption.bmd
     /// Data/Local/itemsettype.bmd
     /// Data/Local/itemsetoption.bmd
+    /// Data/Local/itemsetoptiontext.bmd
     ///
     /// Data is loaded once and cached in dictionaries.
     /// </summary>
@@ -61,6 +62,10 @@ namespace Client.Main.Core.Items.Tooltips
             _itemSetOptions =
                 new();
 
+        private static Dictionary<byte, ItemSetOptionTextBMD>
+            _itemSetOptionTexts =
+                new();
+
         public static bool IsLoaded
         {
             get;
@@ -91,9 +96,13 @@ namespace Client.Main.Core.Items.Tooltips
         public static int ItemSetOptionCount =>
             _itemSetOptions.Count;
 
-        /// <summary>
-        /// Loads all original MU tooltip-related BMD files once.
-        /// </summary>
+        public static int ItemSetOptionTextCount =>
+            _itemSetOptionTexts.Count;
+
+        // -------------------------------------------------------------
+        // LOAD
+        // -------------------------------------------------------------
+
         public static Task LoadAsync()
         {
             lock (_syncRoot)
@@ -159,6 +168,12 @@ namespace Client.Main.Core.Items.Tooltips
                     "Local",
                     "itemsetoption.bmd");
 
+            string itemSetOptionTextPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "itemsetoptiontext.bmd");
+
             // ---------------------------------------------------------
             // READERS
             // ---------------------------------------------------------
@@ -183,6 +198,9 @@ namespace Client.Main.Core.Items.Tooltips
 
             var itemSetOptionReader =
                 new ItemSetOptionBMDReader();
+
+            var itemSetOptionTextReader =
+                new ItemSetOptionTextBMDReader();
 
             // ---------------------------------------------------------
             // LOAD FILES
@@ -226,6 +244,11 @@ namespace Client.Main.Core.Items.Tooltips
             var itemSetOptionEntries =
                 await itemSetOptionReader
                     .Load(itemSetOptionPath)
+                    .ConfigureAwait(false);
+
+            var itemSetOptionTextEntries =
+                await itemSetOptionTextReader
+                    .Load(itemSetOptionTextPath)
                     .ConfigureAwait(false);
 
             // ---------------------------------------------------------
@@ -376,6 +399,20 @@ namespace Client.Main.Core.Items.Tooltips
             }
 
             // ---------------------------------------------------------
+            // ANCIENT OPTION TEXTS
+            // ---------------------------------------------------------
+
+            var itemSetOptionTextDictionary =
+                new Dictionary<byte, ItemSetOptionTextBMD>();
+
+            foreach (var optionText in itemSetOptionTextEntries)
+            {
+                itemSetOptionTextDictionary.TryAdd(
+                    optionText.Id,
+                    optionText);
+            }
+
+            // ---------------------------------------------------------
             // PUBLISH
             // ---------------------------------------------------------
 
@@ -403,43 +440,10 @@ namespace Client.Main.Core.Items.Tooltips
             _itemSetOptions =
                 itemSetOptionDictionary;
 
+            _itemSetOptionTexts =
+                itemSetOptionTextDictionary;
+
             IsLoaded = true;
-
-            // ---------------------------------------------------------
-            // TEMPORARY ANCIENT DEBUG
-            // ---------------------------------------------------------
-
-            Console.WriteLine(
-                "[AncientDebug] Known Group 13 entries:");
-
-            DumpItemSetType(13, 8);   // Ring of Ice
-            DumpItemSetType(13, 9);   // Ring of Poison
-            DumpItemSetType(13, 12);  // Pendant of Lightning
-            DumpItemSetType(13, 13);  // Pendant of Fire
-            DumpItemSetType(13, 21);  // Ring of Fire
-            DumpItemSetType(13, 22);  // Ring of Earth
-            DumpItemSetType(13, 23);  // Ring of Wind
-            DumpItemSetType(13, 24);  // Ring of Magic
-            DumpItemSetType(13, 25);  // Pendant of Ice
-            DumpItemSetType(13, 26);  // Pendant of Wind
-
-            Console.WriteLine(
-                "[AncientDebug] Known item -> set mapping:");
-
-            DumpAncientSet(13, 8, 1);
-            DumpAncientSet(13, 8, 2);
-
-            DumpAncientSet(13, 12, 1);
-
-            DumpAncientSet(13, 22, 1);
-            DumpAncientSet(13, 22, 2);
-            Console.WriteLine(
-                "[AncientDebug] Raw set option data:");
-
-            DumpAncientOptionData(1);
-            DumpAncientOptionData(5);
-            DumpAncientOptionData(9);
-            DumpAncientOptionData(21);
 
             // ---------------------------------------------------------
             // LOAD SUMMARY
@@ -453,8 +457,9 @@ namespace Client.Main.Core.Items.Tooltips
                 $"{_excellentWingOptions.Count} wing excellent options, " +
                 $"{_socketOptions.Count} socket entries, " +
                 $"{_harmonyOptions.Count} harmony entries, " +
-                $"{_itemSetTypes.Count} ancient item set entries and " +
-                $"{_itemSetOptions.Count} ancient set option entries.");
+                $"{_itemSetTypes.Count} ancient item set entries, " +
+                $"{_itemSetOptions.Count} ancient set option entries and " +
+                $"{_itemSetOptionTexts.Count} ancient option texts.");
         }
 
         // -------------------------------------------------------------
@@ -631,17 +636,6 @@ namespace Client.Main.Core.Items.Tooltips
         // HARMONY OPTIONS
         // -------------------------------------------------------------
 
-        /// <summary>
-        /// Gets one Jewel of Harmony option.
-        ///
-        /// Table:
-        /// 0 = physical weapons
-        /// 1 = staff / wizardry
-        /// 2 = defensive equipment
-        ///
-        /// optionNumber corresponds directly to the Harmony
-        /// option number encoded by OpenMU.
-        /// </summary>
         public static HarmonyOptionBMD?
             GetHarmonyOption(
                 int table,
@@ -738,6 +732,49 @@ namespace Client.Main.Core.Items.Tooltips
         }
 
         // -------------------------------------------------------------
+        // ANCIENT OPTION TEXTS
+        // -------------------------------------------------------------
+
+        public static ItemSetOptionTextBMD?
+            GetItemSetOptionText(
+                int id)
+        {
+            EnsureLoaded();
+
+            if (id < 0 ||
+                id > byte.MaxValue)
+            {
+                return null;
+            }
+
+            _itemSetOptionTexts.TryGetValue(
+                (byte)id,
+                out var result);
+
+            return result;
+        }
+
+        public static bool TryGetItemSetOptionText(
+            int id,
+            out ItemSetOptionTextBMD? optionText)
+        {
+            EnsureLoaded();
+
+            optionText = null;
+
+            if (id < 0 ||
+                id > byte.MaxValue)
+            {
+                return false;
+            }
+
+            return
+                _itemSetOptionTexts.TryGetValue(
+                    (byte)id,
+                    out optionText);
+        }
+
+        // -------------------------------------------------------------
         // KEYS
         // -------------------------------------------------------------
 
@@ -790,148 +827,6 @@ namespace Client.Main.Core.Items.Tooltips
                 item.Index != 0 ||
                 !string.IsNullOrEmpty(
                     item.Name);
-        }
-
-        // -------------------------------------------------------------
-        // TEMPORARY ANCIENT DEBUG HELPERS
-        // -------------------------------------------------------------
-
-        private static void DumpItemSetType(
-            byte group,
-            ushort index)
-        {
-            int key =
-                MakeItemKey(
-                    group,
-                    index);
-
-            if (!_itemSetTypes.TryGetValue(
-                    key,
-                    out var setType))
-            {
-                Console.WriteLine(
-                    $"[AncientDebug] " +
-                    $"{group},{index} -> no entry");
-
-                return;
-            }
-
-            Console.WriteLine(
-                $"[AncientDebug] " +
-                $"{group},{index} -> " +
-                $"Tier1={setType.Tier1}, " +
-                $"Tier2={setType.Tier2}, " +
-                $"Tier3={setType.Tier3}, " +
-                $"Tier4={setType.Tier4}, " +
-                $"Tier5={setType.Tier5}");
-        }
-
-        private static void DumpAncientSet(
-            byte group,
-            ushort index,
-            byte discriminator)
-        {
-            int itemKey =
-                MakeItemKey(
-                    group,
-                    index);
-
-            if (!_itemSetTypes.TryGetValue(
-                    itemKey,
-                    out var setType))
-            {
-                Console.WriteLine(
-                    $"[AncientDebug] " +
-                    $"{group},{index} D={discriminator} -> " +
-                    $"no ItemSetType");
-
-                return;
-            }
-
-            ushort setId =
-                setType.GetSetId(
-                    discriminator);
-
-            if (setId == 0)
-            {
-                Console.WriteLine(
-                    $"[AncientDebug] " +
-                    $"{group},{index} D={discriminator} -> " +
-                    $"SetId=0");
-
-                return;
-            }
-
-            if (!_itemSetOptions.TryGetValue(
-                    setId,
-                    out var setOption))
-            {
-                Console.WriteLine(
-                    $"[AncientDebug] " +
-                    $"{group},{index} D={discriminator} -> " +
-                    $"SetId={setId}, " +
-                    $"no ItemSetOption");
-
-                return;
-            }
-
-            Console.WriteLine(
-                $"[AncientDebug] " +
-                $"{group},{index} D={discriminator} -> " +
-                $"SetId={setId}, " +
-                $"Name1='{setOption.Name1}', " +
-                $"Name2='{setOption.Name2}'");
-        }
-        private static void DumpAncientOptionData(
-            int setId)
-        {
-            if (!_itemSetOptions.TryGetValue(
-                    setId,
-                    out var setOption))
-            {
-                Console.WriteLine(
-                    $"[AncientRaw] Set {setId} not found.");
-
-                return;
-            }
-
-            byte[] data =
-                setOption.OptionData;
-
-            Console.WriteLine(
-                $"[AncientRaw] Set={setId}, " +
-                $"Name1='{setOption.Name1}', " +
-                $"Name2='{setOption.Name2}'");
-
-            // The old MU structures store most Ancient
-            // option fields as 32-bit integers.
-            //
-            // Print the first 64 ints after the names so
-            // we can identify the modern layout.
-            int count =
-                Math.Min(
-                    64,
-                    data.Length / 4);
-
-            for (int i = 0;
-                i < count;
-                i++)
-            {
-                int offset =
-                    i * 4;
-
-                int value =
-                    BitConverter.ToInt32(
-                        data,
-                        offset);
-
-                Console.WriteLine(
-                    $"[AncientRaw] " +
-                    $"Set={setId} " +
-                    $"Int[{i:D2}] " +
-                    $"Offset={128 + offset:D4} " +
-                    $"Value={value}");
-            }
         }
 
         private static void EnsureLoaded()

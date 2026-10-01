@@ -5,24 +5,15 @@ using System.IO;
 namespace Client.Data.BMD.Tooltip
 {
     /// <summary>
-    /// Reader for:
+    /// Reader for Data/Local/itemsetoption.bmd.
     ///
-    /// Data/Local/itemsetoption.bmd
-    ///
-    /// Data_Broyal modern layout:
+    /// Data_Broyal:
     ///
     /// 250 records
     /// 1504 bytes per record
-    /// 4-byte trailing CRC
+    /// 4 byte trailing CRC
     ///
-    /// Total:
-    ///
-    /// (250 * 1504) + 4
-    /// = 376004 bytes
-    ///
-    /// Every record resets the MU XOR3 sequence:
-    ///
-    /// FC CF AB
+    /// (250 * 1504) + 4 = 376004
     /// </summary>
     public sealed class ItemSetOptionBMDReader
         : BaseReader<List<ItemSetOptionBMD>>
@@ -34,6 +25,12 @@ namespace Client.Data.BMD.Tooltip
         public const int NameSize = 64;
 
         public const int ChecksumSize = 4;
+
+        private const int NormalOptionCount = 12;
+
+        private const int FullOptionCount = 9;
+
+        private const int ClassCount = 11;
 
         public const int ExpectedFileSize =
             (RecordCount * RecordSize) +
@@ -85,6 +82,7 @@ namespace Client.Data.BMD.Tooltip
                         $"itemsetoption record {id}.");
                 }
 
+                // Each record resets the FC CF AB XOR sequence.
                 byte[] record =
                     BuxCryptor.Convert(
                         encrypted);
@@ -99,75 +97,188 @@ namespace Client.Data.BMD.Tooltip
                         recordStream);
 
                 // -----------------------------------------------------
-                // NAME 1
+                // NAMES
                 // -----------------------------------------------------
-
-                byte[] name1Bytes =
-                    recordReader.ReadBytes(
-                        NameSize);
 
                 string name1 =
                     MuTooltipEncoding
                         .DecodeNullTerminated(
-                            name1Bytes);
-
-                // -----------------------------------------------------
-                // NAME 2
-                // -----------------------------------------------------
-
-                byte[] name2Bytes =
-                    recordReader.ReadBytes(
-                        NameSize);
+                            recordReader.ReadBytes(
+                                NameSize));
 
                 string name2 =
                     MuTooltipEncoding
                         .DecodeNullTerminated(
-                            name2Bytes);
+                            recordReader.ReadBytes(
+                                NameSize));
 
                 // -----------------------------------------------------
-                // REMAINING DATA
+                // NORMAL ANCIENT OPTION INDEXES
+                // -----------------------------------------------------
+
+                var optionIndexes =
+                    new int[NormalOptionCount];
+
+                for (int i = 0;
+                     i < NormalOptionCount;
+                     i++)
+                {
+                    optionIndexes[i] =
+                        recordReader.ReadInt32();
+                }
+
+                // -----------------------------------------------------
+                // NORMAL ANCIENT OPTION VALUES
+                // -----------------------------------------------------
+
+                var optionValues =
+                    new int[NormalOptionCount];
+
+                for (int i = 0;
+                     i < NormalOptionCount;
+                     i++)
+                {
+                    optionValues[i] =
+                        recordReader.ReadInt32();
+                }
+
+                // -----------------------------------------------------
+                // EXTRA OPTIONS
+                // -----------------------------------------------------
+
+                int firstExtraOptionIndex =
+                    recordReader.ReadInt32();
+
+                int secondExtraOptionIndex =
+                    recordReader.ReadInt32();
+
+                int firstExtraOptionValue =
+                    recordReader.ReadInt32();
+
+                int secondExtraOptionValue =
+                    recordReader.ReadInt32();
+
+                // -----------------------------------------------------
+                // FLAG
+                // -----------------------------------------------------
+
+                int flag =
+                    recordReader.ReadInt32();
+
+                // -----------------------------------------------------
+                // FULL SET OPTION INDEXES
+                // -----------------------------------------------------
+
+                var fullOptionIndexes =
+                    new int[FullOptionCount];
+
+                for (int i = 0;
+                     i < FullOptionCount;
+                     i++)
+                {
+                    fullOptionIndexes[i] =
+                        recordReader.ReadInt32();
+                }
+
+                // -----------------------------------------------------
+                // FULL SET OPTION VALUES
+                // -----------------------------------------------------
+
+                var fullOptionValues =
+                    new int[FullOptionCount];
+
+                for (int i = 0;
+                     i < FullOptionCount;
+                     i++)
+                {
+                    fullOptionValues[i] =
+                        recordReader.ReadInt32();
+                }
+
+                // -----------------------------------------------------
+                // CLASS FLAGS
+                // -----------------------------------------------------
+
+                var classFlags =
+                    new int[ClassCount];
+
+                for (int i = 0;
+                     i < ClassCount;
+                     i++)
+                {
+                    classFlags[i] =
+                        recordReader.ReadInt32();
+                }
+
+                // -----------------------------------------------------
+                // MODERN DATA
                 // -----------------------------------------------------
                 //
-                // We intentionally don't interpret this yet.
+                // Everything after the classic 360-byte structure
+                // belongs to later MU versions.
                 //
-                // 1504 - 128 = 1376 bytes still contain the actual
-                // set option definitions.
-                //
-                // Skipping them is safe because the whole record has
-                // already been decrypted independently.
+                // We deliberately ignore it for our Season 6 tooltip.
                 // -----------------------------------------------------
 
                 int remaining =
                     RecordSize -
-                    (NameSize * 2);
+                    (int)recordReader.BaseStream.Position;
 
-                byte[] remainingData =
+                if (remaining < 0)
+                {
+                    throw new InvalidDataException(
+                        $"ItemSetOption record {id} " +
+                        $"exceeded its expected size.");
+                }
+
+                if (remaining > 0)
+                {
                     recordReader.ReadBytes(
                         remaining);
-
-                if (remainingData.Length !=
-                    remaining)
-                {
-                    throw new EndOfStreamException(
-                        $"ItemSetOption record {id} " +
-                        $"is incomplete.");
                 }
 
                 result.Add(
-                new ItemSetOptionBMD
-                {
-                    Id =
-                        id,
+                    new ItemSetOptionBMD
+                    {
+                        Id =
+                            id,
 
-                    Name1 =
-                        name1,
+                        Name1 =
+                            name1,
 
-                    Name2 =
-                        name2,
+                        Name2 =
+                            name2,
 
-                    OptionData =
-                        remainingData
-                });
+                        OptionIndexes =
+                            optionIndexes,
+
+                        OptionValues =
+                            optionValues,
+
+                        FirstExtraOptionIndex =
+                            firstExtraOptionIndex,
+
+                        SecondExtraOptionIndex =
+                            secondExtraOptionIndex,
+
+                        FirstExtraOptionValue =
+                            firstExtraOptionValue,
+
+                        SecondExtraOptionValue =
+                            secondExtraOptionValue,
+
+                        Flag =
+                            flag,
+
+                        FullOptionIndexes =
+                            fullOptionIndexes,
+
+                        FullOptionValues =
+                            fullOptionValues,
+
+                        ClassFlags =
+                            classFlags
+                    });
             }
 
             byte[] checksum =
