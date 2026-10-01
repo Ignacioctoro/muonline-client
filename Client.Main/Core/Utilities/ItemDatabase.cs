@@ -320,8 +320,34 @@ namespace Client.Main.Core.Utilities
 
             public bool IsExcellent;
             public bool IsAncient;
+            public bool HasAncientBonus =>
+                IsAncient &&
+                AncientBonusOption > 0;
 
             public byte ExcellentFlags;
+
+            // ---------------------------------------------------------
+            // ANCIENT / SET ITEM DATA
+            // ---------------------------------------------------------
+
+            /// <summary>
+            /// Ancient set discriminator received from OpenMU.
+            ///
+            /// 0 = not an Ancient set item
+            /// 1 = Set A
+            /// 2 = Set B
+            ///
+            /// This corresponds to the low nibble of the Ancient byte.
+            /// </summary>
+            public byte AncientDiscriminator;
+
+            /// <summary>
+            /// Ancient bonus option level received from OpenMU.
+            ///
+            /// Stored in the high nibble of the Ancient byte.
+            /// Some Ancient items don't have this bonus.
+            /// </summary>
+            public byte AncientBonusOption;
 
             public byte Durability;
             public bool HasHarmony;
@@ -400,6 +426,12 @@ namespace Client.Main.Core.Utilities
                     ext.HasAncient &&
                     ext.AncientDiscriminator > 0;
 
+                d.AncientDiscriminator =
+                    ext.AncientDiscriminator;
+
+                d.AncientBonusOption =
+                    ext.AncientBonusOption;
+
                 d.ExcellentFlags =
                     ext.ExcellentFlags;
 
@@ -477,6 +509,16 @@ namespace Client.Main.Core.Utilities
 
             d.IsAncient =
                 (ancientByte & 0x0F) > 0;
+
+            d.AncientDiscriminator =
+                (byte)(
+                    ancientByte &
+                    0x0F);
+
+            d.AncientBonusOption =
+                (byte)(
+                    (ancientByte >> 4) &
+                    0x0F);
 
             d.ExcellentFlags =
                 excByte;

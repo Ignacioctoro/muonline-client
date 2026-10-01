@@ -50,7 +50,12 @@ namespace Client.Main.Core.Items.Tooltips
         private static Dictionary<int, HarmonyOptionBMD>
             _harmonyOptions =
                 new();
-
+        private static Dictionary<int, ItemSetTypeBMD>
+            _itemSetTypes =
+                new();
+        private static Dictionary<int, ItemSetOptionBMD>
+            _itemSetOptions =
+                new();
         public static bool IsLoaded
         {
             get;
@@ -75,6 +80,11 @@ namespace Client.Main.Core.Items.Tooltips
         public static int HarmonyOptionCount =>
             _harmonyOptions.Count;
 
+        public static int ItemSetTypeCount =>
+            _itemSetTypes.Count;
+
+        public static int ItemSetOptionCount =>
+            _itemSetOptions.Count;
         /// <summary>
         /// Loads all original MU tooltip-related BMD files once.
         /// </summary>
@@ -130,6 +140,16 @@ namespace Client.Main.Core.Items.Tooltips
                     Constants.DataPath,
                     "Local",
                     "jewelofharmonyoption.bmd");
+            string itemSetTypePath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "itemsettype.bmd");
+            string itemSetOptionPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "itemsetoption.bmd");
 
             // ---------------------------------------------------------
             // READERS
@@ -149,6 +169,12 @@ namespace Client.Main.Core.Items.Tooltips
 
             var harmonyReader =
                 new HarmonyOptionBMDReader();
+
+            var itemSetTypeReader =
+                new ItemSetTypeBMDReader();
+
+            var itemSetOptionReader =
+                new ItemSetOptionBMDReader();
 
             // ---------------------------------------------------------
             // LOAD FILES
@@ -182,6 +208,16 @@ namespace Client.Main.Core.Items.Tooltips
             var harmonyEntries =
                 await harmonyReader
                     .Load(harmonyOptionPath)
+                    .ConfigureAwait(false);
+
+            var itemSetTypeEntries =
+                await itemSetTypeReader
+                    .Load(itemSetTypePath)
+                    .ConfigureAwait(false);
+
+            var itemSetOptionEntries =
+                await itemSetOptionReader
+                    .Load(itemSetOptionPath)
                     .ConfigureAwait(false);
 
             // ---------------------------------------------------------
@@ -297,6 +333,37 @@ namespace Client.Main.Core.Items.Tooltips
                     key,
                     harmony);
             }
+            // ---------------------------------------------------------
+            // ANCIENT ITEM SET TYPES
+            // ---------------------------------------------------------
+
+            var itemSetTypeDictionary =
+                new Dictionary<int, ItemSetTypeBMD>();
+
+            foreach (var setType in itemSetTypeEntries)
+            {
+                int key =
+                    MakeItemKey(
+                        (byte)setType.Group,
+                        (ushort)setType.Index);
+
+                itemSetTypeDictionary.TryAdd(
+                    key,
+                    setType);
+            }
+            // ---------------------------------------------------------
+            // ANCIENT SET OPTIONS
+            // ---------------------------------------------------------
+
+            var itemSetOptionDictionary =
+                new Dictionary<int, ItemSetOptionBMD>();
+
+            foreach (var setOption in itemSetOptionEntries)
+            {
+                itemSetOptionDictionary.TryAdd(
+                    setOption.Id,
+                    setOption);
+            }
 
             // ---------------------------------------------------------
             // PUBLISH
@@ -320,6 +387,25 @@ namespace Client.Main.Core.Items.Tooltips
             _harmonyOptions =
                 harmonyDictionary;
 
+            _itemSetTypes =
+                itemSetTypeDictionary;
+            _itemSetOptions =
+                itemSetOptionDictionary;
+
+            Console.WriteLine(
+                "[AncientDebug] Known Group 13 entries:");
+
+            DumpItemSetType(13, 8);   // Ring of Ice
+            DumpItemSetType(13, 9);   // Ring of Poison
+            DumpItemSetType(13, 12);  // Pendant of Lightning
+            DumpItemSetType(13, 13);  // Pendant of Fire
+            DumpItemSetType(13, 21);  // Ring of Fire
+            DumpItemSetType(13, 22);  // Ring of Earth
+            DumpItemSetType(13, 23);  // Ring of Wind
+            DumpItemSetType(13, 24);  // Ring of Magic
+            DumpItemSetType(13, 25);  // Pendant of Ice
+            DumpItemSetType(13, 26);  // Pendant of Wind
+
             IsLoaded = true;
 
             Console.WriteLine(
@@ -328,8 +414,9 @@ namespace Client.Main.Core.Items.Tooltips
                 $"{_texts.Count} text definitions, " +
                 $"{_excellentCommonOptions.Count} common excellent options, " +
                 $"{_excellentWingOptions.Count} wing excellent options, " +
-                $"{_socketOptions.Count} socket entries and " +
-                $"{_harmonyOptions.Count} harmony entries.");
+                $"{_socketOptions.Count} socket entries, " +
+                $"{_harmonyOptions.Count} harmony entries and " +
+                $"{_itemSetTypes.Count} ancient item set entries.");
         }
 
         // -------------------------------------------------------------
@@ -545,6 +632,68 @@ namespace Client.Main.Core.Items.Tooltips
                         optionNumber),
                     out option);
         }
+        // -------------------------------------------------------------
+        // ANCIENT ITEM SET TYPES
+        // -------------------------------------------------------------
+
+        public static ItemSetTypeBMD?
+            GetItemSetType(
+                byte group,
+                ushort index)
+        {
+            EnsureLoaded();
+
+            _itemSetTypes.TryGetValue(
+                MakeItemKey(
+                    group,
+                    index),
+                out var result);
+
+            return result;
+        }
+
+        public static bool TryGetItemSetType(
+            byte group,
+            ushort index,
+            out ItemSetTypeBMD? setType)
+        {
+            EnsureLoaded();
+
+            return
+                _itemSetTypes.TryGetValue(
+                    MakeItemKey(
+                        group,
+                        index),
+                    out setType);
+        }
+        // -------------------------------------------------------------
+        // ANCIENT SET OPTIONS
+        // -------------------------------------------------------------
+
+        public static ItemSetOptionBMD?
+            GetItemSetOption(
+                int id)
+        {
+            EnsureLoaded();
+
+            _itemSetOptions.TryGetValue(
+                id,
+                out var result);
+
+            return result;
+        }
+
+        public static bool TryGetItemSetOption(
+            int id,
+            out ItemSetOptionBMD? option)
+        {
+            EnsureLoaded();
+
+            return
+                _itemSetOptions.TryGetValue(
+                    id,
+                    out option);
+        }
 
         // -------------------------------------------------------------
         // KEYS
@@ -600,6 +749,45 @@ namespace Client.Main.Core.Items.Tooltips
                 !string.IsNullOrEmpty(
                     item.Name);
         }
+        private static void DumpItemSetType(
+            byte group,
+            ushort index)
+        {
+            int key =
+                MakeItemKey(
+                    group,
+                    index);
+
+            if (!_itemSetTypes.TryGetValue(
+                    key,
+                    out var setType))
+            {
+                Console.WriteLine(
+                    $"[AncientDebug] " +
+                    $"{group},{index} -> no entry");
+
+                return;
+            }
+            Console.WriteLine(
+                "[AncientDebug] Known item -> set mapping:");
+
+            DumpAncientSet(13, 8, 1);
+            DumpAncientSet(13, 8, 2);
+
+            DumpAncientSet(13, 12, 1);
+
+            DumpAncientSet(13, 22, 1);
+            DumpAncientSet(13, 22, 2);
+
+            Console.WriteLine(
+            $"[AncientDebug] " +
+            $"{group},{index} -> " +
+            $"Tier1={setType.Tier1}, " +
+            $"Tier2={setType.Tier2}, " +
+            $"Tier3={setType.Tier3}, " +
+            $"Tier4={setType.Tier4}, " +
+            $"Tier5={setType.Tier5}");
+        }
 
         private static void EnsureLoaded()
         {
@@ -609,6 +797,61 @@ namespace Client.Main.Core.Items.Tooltips
                     "ItemTooltipDataRepository has not been loaded. " +
                     "Call ItemTooltipDataRepository.LoadAsync() first.");
             }
+        }
+        private static void DumpAncientSet(
+            byte group,
+            ushort index,
+            byte discriminator)
+        {
+            int itemKey =
+                MakeItemKey(
+                    group,
+                    index);
+
+            if (!_itemSetTypes.TryGetValue(
+                    itemKey,
+                    out var setType))
+            {
+                Console.WriteLine(
+                    $"[AncientDebug] " +
+                    $"{group},{index} D={discriminator} -> " +
+                    $"no ItemSetType");
+
+                return;
+            }
+
+            ushort setId =
+                setType.GetSetId(
+                    discriminator);
+
+            if (setId == 0)
+            {
+                Console.WriteLine(
+                    $"[AncientDebug] " +
+                    $"{group},{index} D={discriminator} -> " +
+                    $"SetId=0");
+
+                return;
+            }
+
+            if (!_itemSetOptions.TryGetValue(
+                    setId,
+                    out var setOption))
+            {
+                Console.WriteLine(
+                    $"[AncientDebug] " +
+                    $"{group},{index} D={discriminator} -> " +
+                    $"SetId={setId}, no ItemSetOption");
+
+                return;
+            }
+
+            Console.WriteLine(
+                $"[AncientDebug] " +
+                $"{group},{index} D={discriminator} -> " +
+                $"SetId={setId}, " +
+                $"Name1='{setOption.Name1}', " +
+                $"Name2='{setOption.Name2}'");
         }
     }
 }
