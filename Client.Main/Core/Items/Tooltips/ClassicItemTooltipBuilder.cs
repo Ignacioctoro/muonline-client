@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 
 namespace Client.Main.Core.Items.Tooltips
 {
+    
     /// <summary>
     /// Builds item tooltip lines following the original MU itemtooltip.bmd
     /// and itemtooltiptext.bmd definitions.
@@ -24,6 +25,9 @@ namespace Client.Main.Core.Items.Tooltips
     /// </summary>
     public static class ClassicItemTooltipBuilder
     {   
+        private static readonly HashSet<string>
+        s_loggedMiscTooltipLines =
+            new();
         private static void AppendExcellentWingOptions(
             List<(string text, Color color)> lines,
             InventoryItem item)
@@ -296,6 +300,29 @@ namespace Client.Main.Core.Items.Tooltips
                         (ushort)line.TextId);
 
                 if (textDefinition == null)
+                if (def.Group == 14)
+                {
+                    string logKey =
+                        $"{def.Group}:{def.Id}:{line.TextId}";
+
+                    if (s_loggedMiscTooltipLines.Add(
+                            logKey))
+                    {
+                        bool hasLegacyText =
+                            ItemTooltipDataRepository
+                                .HasLegacyLocalizedText(
+                                    (ushort)line.TextId);
+
+                        Console.WriteLine(
+                            $"[MiscTooltip] " +
+                            $"Item={def.Group}:{def.Id} " +
+                            $"'{def.Name}', " +
+                            $"TextId={line.TextId}, " +
+                            $"Type={textDefinition.Type}, " +
+                            $"Legacy={hasLegacyText}, " +
+                            $"Text='{textDefinition.Text}'");
+                    }
+                }
                 {
                     continue;
                 }
@@ -317,47 +344,20 @@ namespace Client.Main.Core.Items.Tooltips
             }
 
             // ---------------------------------------------------------
-            // EQUIPPABLE CLASSES
-            //
-            // Rings and pendants are universal accessories.
-            // Modern item.bmd marks many/all classes as compatible,
-            // but the original MU tooltip doesn't print the whole class
-            // list for these accessory slots.
-            // ---------------------------------------------------------
-
-            bool isAccessory =
-                def.Group == 13 &&
-                (
-                    def.EquipmentSlot == 9 ||
-                    def.EquipmentSlot == 10 ||
-                    def.EquipmentSlot == 11
-                );
-
-            // ---------------------------------------------------------
             // EQUIPPABLE CLASS RESTRICTIONS
             //
-            // Only actual wearable equipment should print class
-            // restrictions.
+            // Only regular equipment groups show class restrictions.
             //
-            // Miscellaneous items such as:
-            // - jewels
-            // - potions
-            // - invitations
-            // - seeds
-            // - spheres
-            // - quest/event items
-            //
-            // may contain broad class flags in item.bmd, but the
-            // original client does not print them as equipment rules.
+            // Group 13 accessories are universal and miscellaneous
+            // Group 13/14 items must not print the broad class flags
+            // stored in modern item.bmd.
             // ---------------------------------------------------------
 
             bool shouldShowAllowedClasses =
-                def.EquipmentSlot >= 0 &&
-                def.EquipmentSlot <= 8 &&
-                def.Group <= 12;
+                def.Group >= 0 &&
+                def.Group <= 11;
 
-            if (shouldShowAllowedClasses &&
-                !isAccessory)
+            if (shouldShowAllowedClasses)
             {
                 AppendAllowedClasses(
                     result,

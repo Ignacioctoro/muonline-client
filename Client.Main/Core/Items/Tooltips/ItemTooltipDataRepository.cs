@@ -618,6 +618,18 @@ namespace Client.Main.Core.Items.Tooltips
             return
                 text != null;
         }
+        public static bool HasLegacyLocalizedText(
+            ushort id)
+        {
+            EnsureLoaded();
+
+            return
+                _legacyLocalizedTexts.TryGetValue(
+                    id,
+                    out var text) &&
+                !string.IsNullOrWhiteSpace(
+                    text.Text);
+        }
 
         // -------------------------------------------------------------
         // COMMON EXCELLENT
