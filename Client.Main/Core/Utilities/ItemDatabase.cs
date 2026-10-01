@@ -121,6 +121,8 @@ namespace Client.Main.Core.Utilities
 
                         Group = item.ItemSubGroup,
 
+                        EquipmentSlot = item.Slot,
+
                         KindA = item.KindA,
                         KindB = item.KindB,
                         ItemType = item.Type,

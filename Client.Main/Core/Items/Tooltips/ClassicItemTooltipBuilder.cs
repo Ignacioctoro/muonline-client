@@ -176,7 +176,6 @@ namespace Client.Main.Core.Items.Tooltips
             // Also heterogeneous. Contains jewels, potions, event items,
             // boxes and other consumables.
             //
-            // For now only jewels enter the classic builder.
             // ---------------------------------------------------------
 
             bool isGroup13Accessory =
@@ -191,8 +190,8 @@ namespace Client.Main.Core.Items.Tooltips
                 def.Group == 13 &&
                 details.IsAncient;
 
-            bool isJewel =
-                def.IsJewel();
+            bool isGroup14 =
+                def.Group == 14;
 
             bool supportedGroup =
                 def.Group >= 0 &&
@@ -200,7 +199,7 @@ namespace Client.Main.Core.Items.Tooltips
                     def.Group <= 12 ||
                     isGroup13Accessory ||
                     isGroup13Ancient ||
-                    isJewel
+                    isGroup14
                 );
 
             if (!supportedGroup)
@@ -296,17 +295,6 @@ namespace Client.Main.Core.Items.Tooltips
                     ItemTooltipDataRepository.GetText(
                         (ushort)line.TextId);
 
-                if (def.Group == 14 &&
-                    def.IsJewel())
-                {
-                    string unicodeDump =
-                        string.Join(
-                            " ",
-                            textDefinition.Text.Select(
-                                c => $"U+{(int)c:X4}"));
-
-                }
-
                 if (textDefinition == null)
                 {
                     continue;
@@ -345,8 +333,31 @@ namespace Client.Main.Core.Items.Tooltips
                     def.EquipmentSlot == 11
                 );
 
-            if (!isAccessory &&
-                !def.IsJewel())
+            // ---------------------------------------------------------
+            // EQUIPPABLE CLASS RESTRICTIONS
+            //
+            // Only actual wearable equipment should print class
+            // restrictions.
+            //
+            // Miscellaneous items such as:
+            // - jewels
+            // - potions
+            // - invitations
+            // - seeds
+            // - spheres
+            // - quest/event items
+            //
+            // may contain broad class flags in item.bmd, but the
+            // original client does not print them as equipment rules.
+            // ---------------------------------------------------------
+
+            bool shouldShowAllowedClasses =
+                def.EquipmentSlot >= 0 &&
+                def.EquipmentSlot <= 8 &&
+                def.Group <= 12;
+
+            if (shouldShowAllowedClasses &&
+                !isAccessory)
             {
                 AppendAllowedClasses(
                     result,
@@ -386,11 +397,18 @@ namespace Client.Main.Core.Items.Tooltips
             // NORMAL / LUCK / SKILL / EXCELLENT
             // ---------------------------------------------------------
 
+            bool canHaveEquipmentOptions =
+                def.Group >= 0 &&
+                def.Group <= 13;
+
             bool hasBlueOptions =
-                details.OptionLevel > 0 ||
-                details.HasLuck ||
-                details.HasSkill ||
-                details.IsExcellent;
+                canHaveEquipmentOptions &&
+                (
+                    details.OptionLevel > 0 ||
+                    details.HasLuck ||
+                    details.HasSkill ||
+                    details.IsExcellent
+                );
 
             if (hasBlueOptions)
             {

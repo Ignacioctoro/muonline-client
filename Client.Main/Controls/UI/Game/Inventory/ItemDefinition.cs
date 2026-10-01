@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 
 namespace Client.Main.Controls.UI.Game.Inventory
 {
@@ -54,6 +55,27 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public bool TwoHanded { get; set; }
         public int Group { get; set; }
         /// <summary>
+        /// Original equipment slot from item.bmd.
+        ///
+        /// Classic MU slots:
+        /// 0  = Right hand
+        /// 1  = Left hand
+        /// 2  = Helm
+        /// 3  = Armor
+        /// 4  = Pants
+        /// 5  = Gloves
+        /// 6  = Boots
+        /// 7  = Wings
+        /// 8  = Pet / mount
+        /// 9  = Pendant
+        /// 10 = Ring
+        /// 11 = Secondary ring / compatible accessory slot
+        ///
+        /// Keeping the raw value is important because Group 13 contains
+        /// several unrelated item families.
+        /// </summary>
+        public int EquipmentSlot { get; set; }
+        /// <summary>
         /// Original item classification from item.bmd.
         /// Used by option tables such as excellentwingoption.bmd.
         /// </summary>
@@ -97,14 +119,51 @@ namespace Client.Main.Controls.UI.Game.Inventory
         /// Determines if the item is a jewel (non-consumable items in group 14/12).
         /// Jewels should not show "Right-click to use" even though they're in consumable groups.
         /// </summary>
+        /// <summary>
+        /// Determines whether this definition represents a jewel.
+        ///
+        /// Group 14 contains jewels together with potions, event items,
+        /// boxes and several miscellaneous consumables, so the group alone
+        /// is not enough.
+        ///
+        /// The name check makes this compatible with newer item.bmd versions
+        /// without having to hardcode every Jewel introduced after Season 6.
+        /// </summary>
         public bool IsJewel()
         {
-            // Group 14 jewels: Bless (13), Soul (14), Life (16), Creation (22), Guardian (31), etc.
-            // Group 12 jewels: Chaos (15), etc.
-            if (Group == 14 && (Id == 13 || Id == 14 || Id == 16 || Id == 22 || Id == 31))
+            // Classic Jewel of Chaos.
+            if (Group == 12 &&
+                Id == 15)
+            {
                 return true;
-            if (Group == 12 && Id == 15)
+            }
+
+            if (Group != 14)
+            {
+                return false;
+            }
+
+            // Keep the known classic ids as a compatibility fast path.
+            if (Id == 13 || // Bless
+                Id == 14 || // Soul
+                Id == 16 || // Life
+                Id == 22 || // Creation
+                Id == 31)   // Guardian
+            {
                 return true;
+            }
+
+            // Modern MU versions contain additional jewels.
+            // Let item.bmd identify them through their canonical name instead
+            // of maintaining a growing Season-specific ID table.
+            if (!string.IsNullOrWhiteSpace(Name) &&
+                Name.StartsWith(
+                    "Jewel of ",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             return false;
         }
 
