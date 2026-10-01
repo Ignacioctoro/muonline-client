@@ -154,25 +154,53 @@ namespace Client.Main.Core.Items.Tooltips
 
             var def = item.Definition;
             var details = item.Details;
-
             // ---------------------------------------------------------
-            // FIRST MIGRATION STAGE
+            // CLASSIC TOOLTIP COVERAGE
             //
-            // Keep wings, consumables, ancient items and newer item
-            // categories on the existing implementation until their
-            // specific BMD option systems are ported.
+            // Groups 0..12:
+            // Already handled by the classic BMD tooltip pipeline.
+            //
+            // Group 13:
+            // This group is heterogeneous in modern MU data. It contains
+            // pets, mounts, rings, pendants and several special items.
+            //
+            // We only migrate:
+            // - Ancient Group 13 items already supported.
+            // - Pendant equipment slot.
+            // - Ring equipment slots.
+            //
+            // Pets/mounts remain on the legacy tooltip until their
+            // dedicated rules are implemented.
+            //
+            // Group 14:
+            // Also heterogeneous. Contains jewels, potions, event items,
+            // boxes and other consumables.
+            //
+            // For now only jewels enter the classic builder.
             // ---------------------------------------------------------
 
+            bool isGroup13Accessory =
+                def.Group == 13 &&
+                (
+                    def.EquipmentSlot == 9 ||
+                    def.EquipmentSlot == 10 ||
+                    def.EquipmentSlot == 11
+                );
 
+            bool isGroup13Ancient =
+                def.Group == 13 &&
+                details.IsAncient;
+
+            bool isJewel =
+                def.IsJewel();
 
             bool supportedGroup =
                 def.Group >= 0 &&
                 (
                     def.Group <= 12 ||
-                    (
-                        details.IsAncient &&
-                        def.Group == 13
-                    )
+                    isGroup13Accessory ||
+                    isGroup13Ancient ||
+                    isJewel
                 );
 
             if (!supportedGroup)
@@ -268,6 +296,17 @@ namespace Client.Main.Core.Items.Tooltips
                     ItemTooltipDataRepository.GetText(
                         (ushort)line.TextId);
 
+                if (def.Group == 14 &&
+                    def.IsJewel())
+                {
+                    string unicodeDump =
+                        string.Join(
+                            " ",
+                            textDefinition.Text.Select(
+                                c => $"U+{(int)c:X4}"));
+
+                }
+
                 if (textDefinition == null)
                 {
                     continue;
@@ -275,6 +314,7 @@ namespace Client.Main.Core.Items.Tooltips
 
                 if (TryBuildLine(
                     textDefinition.Type,
+                    textDefinition.Text,
                     item,
                     values,
                     line.Color,
@@ -290,11 +330,28 @@ namespace Client.Main.Core.Items.Tooltips
 
             // ---------------------------------------------------------
             // EQUIPPABLE CLASSES
+            //
+            // Rings and pendants are universal accessories.
+            // Modern item.bmd marks many/all classes as compatible,
+            // but the original MU tooltip doesn't print the whole class
+            // list for these accessory slots.
             // ---------------------------------------------------------
 
-            AppendAllowedClasses(
-                result,
-                def);
+            bool isAccessory =
+                def.Group == 13 &&
+                (
+                    def.EquipmentSlot == 9 ||
+                    def.EquipmentSlot == 10 ||
+                    def.EquipmentSlot == 11
+                );
+
+            if (!isAccessory &&
+                !def.IsJewel())
+            {
+                AppendAllowedClasses(
+                    result,
+                    def);
+            }
             // ---------------------------------------------------------
             // GUARDIAN / LEVEL 380
             // ---------------------------------------------------------
@@ -403,6 +460,7 @@ namespace Client.Main.Core.Items.Tooltips
 
         private static bool TryBuildLine(
             short type,
+            string sourceText,
             InventoryItem item,
             CalculatedValues values,
             byte originalColor,
@@ -418,6 +476,26 @@ namespace Client.Main.Core.Items.Tooltips
 
             switch (type)
             {
+                // -----------------------------------------------------
+                // Type -1
+                // Static description.
+                //
+                // Legacy MU tooltip data uses Type -1 for text which
+                // should be displayed directly without calculation.
+                // -----------------------------------------------------
+                case -1:
+                {
+                    if (string.IsNullOrWhiteSpace(
+                            sourceText))
+                    {
+                        return false;
+                    }
+
+                    text =
+                        sourceText;
+
+                    return true;
+                }
                 // -----------------------------------------------------
                 // Type 0
                 // Physical damage min / max
@@ -640,10 +718,32 @@ namespace Client.Main.Core.Items.Tooltips
                 case 12:
                     return false;
 
-                // Type 13 currently represents conditional static
-                // descriptions in the original client.
+                // -----------------------------------------------------
+                // Type 13
+                // Static / descriptive tooltip text.
+                //
+                // Jewels in Group 14 use descriptive strings directly
+                // from itemtooltiptext.bmd.
+                //
+                // Keep this limited to jewels for now because other
+                // modern item categories may attach additional conditions
+                // to Type 13.
+                // -----------------------------------------------------
                 case 13:
-                    return false;
+                {
+                    if (!def.IsJewel())
+                    {
+                        return false;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(sourceText))
+                    {
+                        return false;
+                    }
+
+                    text = sourceText;
+                    return true;
+                }
 
                 // Item level + 1 style information.
                 case 14:
@@ -2262,8 +2362,6 @@ namespace Client.Main.Core.Items.Tooltips
             var def =
                 item.Definition;
 
-            byte category;
-
             // Original MU CalcExcellentOptions:
             //
             // Category 1:
@@ -2271,19 +2369,59 @@ namespace Client.Main.Core.Items.Tooltips
             //
             // Category 2:
             // Shields / armor / defensive items.
+            byte category;
+
+            // ---------------------------------------------------------
+            // EXCELLENT OPTION CATEGORY
+            //
+            // Original MU / OpenMU:
+            //
+            // Category 1:
+            // - Weapons
+            // - Offensive items
+            // - Pendants
+            //
+            // Category 2:
+            // - Armor
+            // - Shields
+            // - Rings
+            //
+            // Group 13 is heterogeneous, so EquipmentSlot is used
+            // instead of treating the whole group the same way.
+            // ---------------------------------------------------------
+
             if (def.Group >= 0 &&
                 def.Group <= 5)
             {
+                // Weapons / offensive equipment.
                 category = 1;
             }
             else if (def.Group >= 6 &&
                     def.Group <= 11)
             {
+                // Shields / defensive equipment.
+                category = 2;
+            }
+            else if (def.Group == 13 &&
+                    def.EquipmentSlot == 9)
+            {
+                // Pendants use offensive Excellent options.
+                category = 1;
+            }
+            else if (def.Group == 13 &&
+                    (
+                        def.EquipmentSlot == 10 ||
+                        def.EquipmentSlot == 11
+                    ))
+            {
+                // Rings use defensive Excellent options.
                 category = 2;
             }
             else
             {
-                // Wings/rings/pendants are handled later.
+                // Wings are handled by AppendExcellentWingOptions().
+                // Pets, mounts and other special Group 13 items are
+                // intentionally not interpreted here.
                 return;
             }
 

@@ -37,6 +37,9 @@ namespace Client.Main.Core.Items.Tooltips
         private static Dictionary<ushort, ItemTooltipTextBMD>
             _texts =
                 new();
+        private static Dictionary<ushort, ItemTooltipTextBMD>
+            _legacyLocalizedTexts =
+                new();
 
         private static Dictionary<int, ExcellentOptionBMD>
             _excellentCommonOptions =
@@ -105,6 +108,8 @@ namespace Client.Main.Core.Items.Tooltips
 
         public static int TextCount =>
             _texts.Count;
+        public static int LegacyLocalizedTextCount =>
+            _legacyLocalizedTexts.Count;
 
         public static int ExcellentCommonOptionCount =>
             _excellentCommonOptions.Count;
@@ -159,6 +164,11 @@ namespace Client.Main.Core.Items.Tooltips
                     Constants.DataPath,
                     "Local",
                     "itemtooltiptext.bmd");
+            string legacyItemTooltipTextPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "ItemTooltipText_eng.bmd");
 
             string excellentCommonPath =
                 Path.Combine(
@@ -211,6 +221,8 @@ namespace Client.Main.Core.Items.Tooltips
 
             var textReader =
                 new ItemTooltipTextBMDReader();
+            var legacyTextReader =
+                new LegacyItemTooltipTextBMDReader();
 
             var excellentReader =
                 new ExcellentOptionBMDReader();
@@ -242,6 +254,11 @@ namespace Client.Main.Core.Items.Tooltips
             var textEntries =
                 await textReader
                     .Load(itemTooltipTextPath)
+                    .ConfigureAwait(false);
+
+            var legacyTextEntries =
+                await legacyTextReader
+                    .Load(legacyItemTooltipTextPath)
                     .ConfigureAwait(false);
 
             var excellentEntries =
@@ -313,6 +330,15 @@ namespace Client.Main.Core.Items.Tooltips
             foreach (var text in textEntries)
             {
                 textDictionary.TryAdd(
+                    text.Id,
+                    text);
+            }
+            var legacyLocalizedTextDictionary =
+                new Dictionary<ushort, ItemTooltipTextBMD>();
+
+            foreach (var text in legacyTextEntries)
+            {
+                legacyLocalizedTextDictionary.TryAdd(
                     text.Id,
                     text);
             }
@@ -449,6 +475,9 @@ namespace Client.Main.Core.Items.Tooltips
 
             _texts =
                 textDictionary;
+            
+            _legacyLocalizedTexts =
+                legacyLocalizedTextDictionary;
 
             _excellentCommonOptions =
                 excellentDictionary;
@@ -480,7 +509,8 @@ namespace Client.Main.Core.Items.Tooltips
             Console.WriteLine(
                 $"[ItemTooltipData] Loaded " +
                 $"{_items.Count} item definitions, " +
-                $"{_texts.Count} text definitions, " +
+                $"{_texts.Count} modern text definitions, " +
+                $"{_legacyLocalizedTexts.Count} legacy localized texts, " +
                 $"{_excellentCommonOptions.Count} common excellent options, " +
                 $"{_excellentWingOptions.Count} wing excellent options, " +
                 $"{_socketOptions.Count} socket entries, " +
@@ -536,23 +566,57 @@ namespace Client.Main.Core.Items.Tooltips
         {
             EnsureLoaded();
 
-            _texts.TryGetValue(
-                id,
-                out var result);
+            if (!_texts.TryGetValue(
+                    id,
+                    out var modernText))
+            {
+                return null;
+            }
 
-            return result;
+            // ---------------------------------------------------------
+            // LEGACY LOCALIZATION OVERRIDE
+            //
+            // The modern Data_Broyal ItemTooltipText is Korean.
+            //
+            // For TextIds available in the Season 6 English language
+            // file, use its localized string while preserving the
+            // Type from the modern BMD.
+            //
+            // This is important because the modern tooltip structure
+            // remains authoritative, while the legacy file is used
+            // only as a localization source.
+            // ---------------------------------------------------------
+
+            if (_legacyLocalizedTexts.TryGetValue(
+                    id,
+                    out var localizedText) &&
+                !string.IsNullOrWhiteSpace(
+                    localizedText.Text))
+            {
+                return new ItemTooltipTextBMD
+                {
+                    Id = modernText.Id,
+
+                    Text =
+                        localizedText.Text,
+
+                    Type =
+                        modernText.Type
+                };
+            }
+
+            return modernText;
         }
 
         public static bool TryGetText(
             ushort id,
             out ItemTooltipTextBMD? text)
         {
-            EnsureLoaded();
+            text =
+                GetText(id);
 
             return
-                _texts.TryGetValue(
-                    id,
-                    out text);
+                text != null;
         }
 
         // -------------------------------------------------------------
