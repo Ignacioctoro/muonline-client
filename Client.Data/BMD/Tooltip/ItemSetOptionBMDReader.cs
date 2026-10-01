@@ -154,17 +154,20 @@ namespace Client.Data.BMD.Tooltip
                 }
 
                 result.Add(
-                    new ItemSetOptionBMD
-                    {
-                        Id =
-                            id,
+                new ItemSetOptionBMD
+                {
+                    Id =
+                        id,
 
-                        Name1 =
-                            name1,
+                    Name1 =
+                        name1,
 
-                        Name2 =
-                            name2
-                    });
+                    Name2 =
+                        name2,
+
+                    OptionData =
+                        remainingData
+                });
             }
 
             byte[] checksum =

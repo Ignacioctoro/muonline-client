@@ -17,8 +17,10 @@ namespace Client.Main.Core.Items.Tooltips
     /// Data/Local/excellentwingoption.bmd
     /// Data/Local/socketitem.bmd
     /// Data/Local/jewelofharmonyoption.bmd
+    /// Data/Local/itemsettype.bmd
+    /// Data/Local/itemsetoption.bmd
     ///
-    /// Data is loaded once and then cached in dictionaries.
+    /// Data is loaded once and cached in dictionaries.
     /// </summary>
     public static class ItemTooltipDataRepository
     {
@@ -50,12 +52,15 @@ namespace Client.Main.Core.Items.Tooltips
         private static Dictionary<int, HarmonyOptionBMD>
             _harmonyOptions =
                 new();
+
         private static Dictionary<int, ItemSetTypeBMD>
             _itemSetTypes =
                 new();
+
         private static Dictionary<int, ItemSetOptionBMD>
             _itemSetOptions =
                 new();
+
         public static bool IsLoaded
         {
             get;
@@ -85,6 +90,7 @@ namespace Client.Main.Core.Items.Tooltips
 
         public static int ItemSetOptionCount =>
             _itemSetOptions.Count;
+
         /// <summary>
         /// Loads all original MU tooltip-related BMD files once.
         /// </summary>
@@ -140,11 +146,13 @@ namespace Client.Main.Core.Items.Tooltips
                     Constants.DataPath,
                     "Local",
                     "jewelofharmonyoption.bmd");
+
             string itemSetTypePath =
                 Path.Combine(
                     Constants.DataPath,
                     "Local",
                     "itemsettype.bmd");
+
             string itemSetOptionPath =
                 Path.Combine(
                     Constants.DataPath,
@@ -333,6 +341,7 @@ namespace Client.Main.Core.Items.Tooltips
                     key,
                     harmony);
             }
+
             // ---------------------------------------------------------
             // ANCIENT ITEM SET TYPES
             // ---------------------------------------------------------
@@ -351,6 +360,7 @@ namespace Client.Main.Core.Items.Tooltips
                     key,
                     setType);
             }
+
             // ---------------------------------------------------------
             // ANCIENT SET OPTIONS
             // ---------------------------------------------------------
@@ -389,8 +399,15 @@ namespace Client.Main.Core.Items.Tooltips
 
             _itemSetTypes =
                 itemSetTypeDictionary;
+
             _itemSetOptions =
                 itemSetOptionDictionary;
+
+            IsLoaded = true;
+
+            // ---------------------------------------------------------
+            // TEMPORARY ANCIENT DEBUG
+            // ---------------------------------------------------------
 
             Console.WriteLine(
                 "[AncientDebug] Known Group 13 entries:");
@@ -406,7 +423,27 @@ namespace Client.Main.Core.Items.Tooltips
             DumpItemSetType(13, 25);  // Pendant of Ice
             DumpItemSetType(13, 26);  // Pendant of Wind
 
-            IsLoaded = true;
+            Console.WriteLine(
+                "[AncientDebug] Known item -> set mapping:");
+
+            DumpAncientSet(13, 8, 1);
+            DumpAncientSet(13, 8, 2);
+
+            DumpAncientSet(13, 12, 1);
+
+            DumpAncientSet(13, 22, 1);
+            DumpAncientSet(13, 22, 2);
+            Console.WriteLine(
+                "[AncientDebug] Raw set option data:");
+
+            DumpAncientOptionData(1);
+            DumpAncientOptionData(5);
+            DumpAncientOptionData(9);
+            DumpAncientOptionData(21);
+
+            // ---------------------------------------------------------
+            // LOAD SUMMARY
+            // ---------------------------------------------------------
 
             Console.WriteLine(
                 $"[ItemTooltipData] Loaded " +
@@ -415,8 +452,9 @@ namespace Client.Main.Core.Items.Tooltips
                 $"{_excellentCommonOptions.Count} common excellent options, " +
                 $"{_excellentWingOptions.Count} wing excellent options, " +
                 $"{_socketOptions.Count} socket entries, " +
-                $"{_harmonyOptions.Count} harmony entries and " +
-                $"{_itemSetTypes.Count} ancient item set entries.");
+                $"{_harmonyOptions.Count} harmony entries, " +
+                $"{_itemSetTypes.Count} ancient item set entries and " +
+                $"{_itemSetOptions.Count} ancient set option entries.");
         }
 
         // -------------------------------------------------------------
@@ -448,11 +486,12 @@ namespace Client.Main.Core.Items.Tooltips
         {
             EnsureLoaded();
 
-            return _items.TryGetValue(
-                MakeItemKey(
-                    group,
-                    index),
-                out item);
+            return
+                _items.TryGetValue(
+                    MakeItemKey(
+                        group,
+                        index),
+                    out item);
         }
 
         // -------------------------------------------------------------
@@ -477,9 +516,10 @@ namespace Client.Main.Core.Items.Tooltips
         {
             EnsureLoaded();
 
-            return _texts.TryGetValue(
-                id,
-                out text);
+            return
+                _texts.TryGetValue(
+                    id,
+                    out text);
         }
 
         // -------------------------------------------------------------
@@ -632,6 +672,7 @@ namespace Client.Main.Core.Items.Tooltips
                         optionNumber),
                     out option);
         }
+
         // -------------------------------------------------------------
         // ANCIENT ITEM SET TYPES
         // -------------------------------------------------------------
@@ -666,6 +707,7 @@ namespace Client.Main.Core.Items.Tooltips
                         index),
                     out setType);
         }
+
         // -------------------------------------------------------------
         // ANCIENT SET OPTIONS
         // -------------------------------------------------------------
@@ -749,6 +791,11 @@ namespace Client.Main.Core.Items.Tooltips
                 !string.IsNullOrEmpty(
                     item.Name);
         }
+
+        // -------------------------------------------------------------
+        // TEMPORARY ANCIENT DEBUG HELPERS
+        // -------------------------------------------------------------
+
         private static void DumpItemSetType(
             byte group,
             ushort index)
@@ -768,36 +815,17 @@ namespace Client.Main.Core.Items.Tooltips
 
                 return;
             }
-            Console.WriteLine(
-                "[AncientDebug] Known item -> set mapping:");
-
-            DumpAncientSet(13, 8, 1);
-            DumpAncientSet(13, 8, 2);
-
-            DumpAncientSet(13, 12, 1);
-
-            DumpAncientSet(13, 22, 1);
-            DumpAncientSet(13, 22, 2);
 
             Console.WriteLine(
-            $"[AncientDebug] " +
-            $"{group},{index} -> " +
-            $"Tier1={setType.Tier1}, " +
-            $"Tier2={setType.Tier2}, " +
-            $"Tier3={setType.Tier3}, " +
-            $"Tier4={setType.Tier4}, " +
-            $"Tier5={setType.Tier5}");
+                $"[AncientDebug] " +
+                $"{group},{index} -> " +
+                $"Tier1={setType.Tier1}, " +
+                $"Tier2={setType.Tier2}, " +
+                $"Tier3={setType.Tier3}, " +
+                $"Tier4={setType.Tier4}, " +
+                $"Tier5={setType.Tier5}");
         }
 
-        private static void EnsureLoaded()
-        {
-            if (!IsLoaded)
-            {
-                throw new InvalidOperationException(
-                    "ItemTooltipDataRepository has not been loaded. " +
-                    "Call ItemTooltipDataRepository.LoadAsync() first.");
-            }
-        }
         private static void DumpAncientSet(
             byte group,
             ushort index,
@@ -841,7 +869,8 @@ namespace Client.Main.Core.Items.Tooltips
                 Console.WriteLine(
                     $"[AncientDebug] " +
                     $"{group},{index} D={discriminator} -> " +
-                    $"SetId={setId}, no ItemSetOption");
+                    $"SetId={setId}, " +
+                    $"no ItemSetOption");
 
                 return;
             }
@@ -852,6 +881,67 @@ namespace Client.Main.Core.Items.Tooltips
                 $"SetId={setId}, " +
                 $"Name1='{setOption.Name1}', " +
                 $"Name2='{setOption.Name2}'");
+        }
+        private static void DumpAncientOptionData(
+            int setId)
+        {
+            if (!_itemSetOptions.TryGetValue(
+                    setId,
+                    out var setOption))
+            {
+                Console.WriteLine(
+                    $"[AncientRaw] Set {setId} not found.");
+
+                return;
+            }
+
+            byte[] data =
+                setOption.OptionData;
+
+            Console.WriteLine(
+                $"[AncientRaw] Set={setId}, " +
+                $"Name1='{setOption.Name1}', " +
+                $"Name2='{setOption.Name2}'");
+
+            // The old MU structures store most Ancient
+            // option fields as 32-bit integers.
+            //
+            // Print the first 64 ints after the names so
+            // we can identify the modern layout.
+            int count =
+                Math.Min(
+                    64,
+                    data.Length / 4);
+
+            for (int i = 0;
+                i < count;
+                i++)
+            {
+                int offset =
+                    i * 4;
+
+                int value =
+                    BitConverter.ToInt32(
+                        data,
+                        offset);
+
+                Console.WriteLine(
+                    $"[AncientRaw] " +
+                    $"Set={setId} " +
+                    $"Int[{i:D2}] " +
+                    $"Offset={128 + offset:D4} " +
+                    $"Value={value}");
+            }
+        }
+
+        private static void EnsureLoaded()
+        {
+            if (!IsLoaded)
+            {
+                throw new InvalidOperationException(
+                    "ItemTooltipDataRepository has not been loaded. " +
+                    "Call ItemTooltipDataRepository.LoadAsync() first.");
+            }
         }
     }
 }
