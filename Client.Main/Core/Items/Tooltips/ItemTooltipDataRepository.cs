@@ -34,6 +34,10 @@ namespace Client.Main.Core.Items.Tooltips
             _items =
                 new();
 
+        private static Dictionary<int, ItemTooltipBMD>
+            _legacyItems =
+                new();
+
         private static Dictionary<ushort, ItemTooltipTextBMD>
             _texts =
                 new();
@@ -105,6 +109,9 @@ namespace Client.Main.Core.Items.Tooltips
 
         public static int ItemCount =>
             _items.Count;
+        
+        public static int LegacyItemCount =>
+            _legacyItems.Count;
 
         public static int TextCount =>
             _texts.Count;
@@ -158,6 +165,12 @@ namespace Client.Main.Core.Items.Tooltips
                     Constants.DataPath,
                     "Local",
                     "itemtooltip.bmd");
+            
+            string legacyItemTooltipPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "ItemTooltip_s6.bmd");
 
             string itemTooltipTextPath =
                 Path.Combine(
@@ -218,6 +231,9 @@ namespace Client.Main.Core.Items.Tooltips
 
             var itemReader =
                 new ItemTooltipBMDReader();
+            
+            var legacyItemReader =
+                new LegacyItemTooltipBMDReader();
 
             var textReader =
                 new ItemTooltipTextBMDReader();
@@ -249,6 +265,11 @@ namespace Client.Main.Core.Items.Tooltips
             var itemEntries =
                 await itemReader
                     .Load(itemTooltipPath)
+                    .ConfigureAwait(false);
+
+            var legacyItemEntries =
+                await legacyItemReader
+                    .Load(legacyItemTooltipPath)
                     .ConfigureAwait(false);
 
             var textEntries =
@@ -316,6 +337,26 @@ namespace Client.Main.Core.Items.Tooltips
                         item.Index);
 
                 itemDictionary.TryAdd(
+                    key,
+                    item);
+            }
+
+            var legacyItemDictionary =
+                new Dictionary<int, ItemTooltipBMD>();
+
+            foreach (var item in legacyItemEntries)
+            {
+                if (!IsActive(item))
+                {
+                    continue;
+                }
+
+                int key =
+                    MakeItemKey(
+                        item.Category,
+                        item.Index);
+
+                legacyItemDictionary.TryAdd(
                     key,
                     item);
             }
@@ -472,6 +513,9 @@ namespace Client.Main.Core.Items.Tooltips
 
             _items =
                 itemDictionary;
+            
+            _legacyItems =
+                legacyItemDictionary;
 
             _texts =
                 textDictionary;
@@ -542,6 +586,21 @@ namespace Client.Main.Core.Items.Tooltips
             return result;
         }
 
+        public static ItemTooltipBMD? GetLegacyItem(
+            byte group,
+            ushort index)
+        {
+            EnsureLoaded();
+
+            _legacyItems.TryGetValue(
+                MakeItemKey(
+                    group,
+                    index),
+                out var result);
+
+            return result;
+        }
+
         public static bool TryGetItem(
             byte group,
             ushort index,
@@ -606,6 +665,24 @@ namespace Client.Main.Core.Items.Tooltips
             }
 
             return modernText;
+        }
+        public static ItemTooltipTextBMD? GetText(
+            ushort id,
+            bool preferLegacy)
+        {
+            EnsureLoaded();
+
+            if (preferLegacy &&
+                _legacyLocalizedTexts.TryGetValue(
+                    id,
+                    out var legacyText) &&
+                !string.IsNullOrWhiteSpace(
+                    legacyText.Text))
+            {
+                return legacyText;
+            }
+
+            return GetText(id);
         }
 
         public static bool TryGetText(

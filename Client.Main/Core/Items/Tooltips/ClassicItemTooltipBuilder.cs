@@ -221,7 +221,16 @@ namespace Client.Main.Core.Items.Tooltips
                 return ItemUiHelper.BuildTooltipLines(item);
             }
 
+            var legacyTooltip =
+                ItemTooltipDataRepository.GetLegacyItem(
+                    (byte)def.Group,
+                    (ushort)def.Id);
+
+            bool useLegacyTooltip =
+                legacyTooltip != null;
+
             var tooltip =
+                legacyTooltip ??
                 ItemTooltipDataRepository.GetItem(
                     (byte)def.Group,
                     (ushort)def.Id);
@@ -301,38 +310,45 @@ namespace Client.Main.Core.Items.Tooltips
                     continue;
                 }
 
-                var textDefinition =
-                    ItemTooltipDataRepository.GetText(
-                        (ushort)line.TextId);
+                ushort textId =
+                (ushort)line.TextId;
 
-                if (textDefinition == null)
+            var textDefinition =
+                ItemTooltipDataRepository.GetText(
+                    textId);
+
+            // ---------------------------------------------------------
+            // TEMPORARY MISC TOOLTIP DIAGNOSTIC
+            //
+            // Log groups 12..14 because Seeds, Spheres, Cloaks,
+            // invitations and jewels are distributed across these
+            // heterogeneous groups.
+            // ---------------------------------------------------------
+
+            if (def.Group >= 12 &&
+                def.Group <= 14)
+            {
+                string logKey =
+                    $"{def.Group}:{def.Id}:{textId}";
+
+                if (s_loggedMiscTooltipLines.Add(
+                        logKey))
                 {
-                    continue;
+                    Console.WriteLine(
+                        $"[MiscTooltip] " +
+                        $"Item={def.Group}:{def.Id} " +
+                        $"'{def.Name}', " +
+                        $"Source={(useLegacyTooltip ? "S6" : "Modern")}, " +
+                        $"TextId={textId}, " +
+                        $"Type={textDefinition?.Type ?? -999}, " +
+                        $"Text='{textDefinition?.Text ?? "<NULL>"}'");
                 }
+            }
 
-                if (def.Group == 14)
-                {
-                    string logKey =
-                        $"{def.Group}:{def.Id}:{line.TextId}";
-
-                    if (s_loggedMiscTooltipLines.Add(
-                            logKey))
-                    {
-                        bool hasLegacyText =
-                            ItemTooltipDataRepository
-                                .HasLegacyLocalizedText(
-                                    (ushort)line.TextId);
-
-                        Console.WriteLine(
-                            $"[MiscTooltip] " +
-                            $"Item={def.Group}:{def.Id} " +
-                            $"'{def.Name}', " +
-                            $"TextId={line.TextId}, " +
-                            $"Type={textDefinition.Type}, " +
-                            $"Legacy={hasLegacyText}, " +
-                            $"Text='{textDefinition.Text}'");
-                    }
-                }
+            if (textDefinition == null)
+            {
+                continue;
+            }
                 if (TryBuildLine(
                     textDefinition.Type,
                     textDefinition.Text,
