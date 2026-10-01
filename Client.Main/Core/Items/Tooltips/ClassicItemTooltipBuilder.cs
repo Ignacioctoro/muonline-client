@@ -221,21 +221,15 @@ namespace Client.Main.Core.Items.Tooltips
                 if (!string.IsNullOrWhiteSpace(
                         ancientSetName))
                 {
-                    // Original MU:
-                    //
-                    // <SetName> <ItemName>
-                    //
-                    // Example:
-                    // Hyon Dragon Helm
                     name =
                         $"{ancientSetName} {name}";
                 }
 
-                // Ancient / Set items use green naming.
                 nameColor =
                     ResolveMuColor(4);
             }
-            else if (details.IsExcellent)
+
+            if (details.IsExcellent)
             {
                 name =
                     $"Excellent {name}";
@@ -1269,6 +1263,18 @@ namespace Client.Main.Core.Items.Tooltips
                 return null;
             }
 
+            // Season 6 English set names.
+            string? season6Name =
+                GetSeason6AncientSetName(
+                    setId);
+
+            if (!string.IsNullOrWhiteSpace(
+                    season6Name))
+            {
+                return season6Name;
+            }
+
+            // Fallback only for sets outside our Season 6 table.
             var setOption =
                 ItemTooltipDataRepository
                     .GetItemSetOption(
@@ -1292,6 +1298,51 @@ namespace Client.Main.Core.Items.Tooltips
             }
 
             return null;
+        }
+        private static string?
+            GetSeason6AncientSetName(
+                int setId)
+        {
+            return setId switch
+            {
+                1 => "Warrior",
+                2 => "Anonymous",
+                3 => "Hyperion",
+                4 => "Mist",
+                5 => "Eplete",
+                6 => "Berserker",
+                7 => "Garuda",
+                8 => "Cloud",
+                9 => "Kantata",
+                10 => "Rave",
+                11 => "Hyon",
+                12 => "Vicious",
+                13 => "Apollo",
+                14 => "Barnake",
+                15 => "Evis",
+                16 => "Sylion",
+                17 => "Heras",
+                18 => "Minet",
+                19 => "Anubis",
+                20 => "Enis",
+                21 => "Ceto",
+                22 => "Drake",
+                23 => "Gaia",
+                24 => "Fase",
+                25 => "Odin",
+                26 => "Elvian",
+                27 => "Argo",
+                28 => "Karis",
+                29 => "Gywen",
+                30 => "Aruan",
+                31 => "Gaion",
+                32 => "Muren",
+                33 => "Agnis",
+                34 => "Broy",
+                35 => "Chrono",
+                36 => "Semeden",
+                _ => null
+            };
         }
 
         private static ItemSetOptionBMD?
@@ -1335,6 +1386,142 @@ namespace Client.Main.Core.Items.Tooltips
                     .GetItemSetOption(
                         setId);
         }
+        private static int GetAncientSetId(
+            InventoryItem item)
+        {
+            var details =
+                item.Details;
+
+            var def =
+                item.Definition;
+
+            if (!details.IsAncient ||
+                details.AncientDiscriminator == 0)
+            {
+                return 0;
+            }
+
+            var setType =
+                ItemTooltipDataRepository
+                    .GetItemSetType(
+                        (byte)def.Group,
+                        (ushort)def.Id);
+
+            if (setType == null)
+            {
+                return 0;
+            }
+
+            return
+                setType.GetSetId(
+                    details.AncientDiscriminator);
+        }
+
+        private static int CountEquippedAncientSetItems(
+            int targetSetId)
+        {
+            if (targetSetId <= 0)
+            {
+                return 0;
+            }
+
+            var inventory =
+                InventoryControl.Instance;
+
+            if (inventory == null)
+            {
+                return 0;
+            }
+
+            var countedItems =
+                new HashSet<int>();
+
+            int count =
+                0;
+
+            foreach (var pair in
+                    inventory.EquippedItems)
+            {
+                byte equipmentSlot =
+                    pair.Key;
+
+                InventoryItem equippedItem =
+                    pair.Value;
+
+                // Original MU excludes wings and helper/pet.
+                if (equipmentSlot == 7 ||
+                    equipmentSlot == 8)
+                {
+                    continue;
+                }
+
+                if (equippedItem?.Definition == null ||
+                    !equippedItem.Details.IsAncient ||
+                    equippedItem.Details
+                        .AncientDiscriminator == 0 ||
+                    equippedItem.Durability <= 0)
+                {
+                    continue;
+                }
+
+                int setId =
+                    GetAncientSetId(
+                        equippedItem);
+
+                if (setId !=
+                    targetSetId)
+                {
+                    continue;
+                }
+
+                // Original MU does not count two identical set items
+                // twice, e.g. identical rings in both ring slots.
+                int uniqueItemKey =
+                    ItemTooltipDataRepository
+                        .MakeItemKey(
+                            (byte)equippedItem
+                                .Definition.Group,
+                            (ushort)equippedItem
+                                .Definition.Id);
+
+                if (!countedItems.Add(
+                        uniqueItemKey))
+                {
+                    continue;
+                }
+
+                count++;
+            }
+
+            return count;
+        }
+
+        private static Color GetAncientOptionColor(
+            bool isActive,
+            bool isFullOption,
+            bool isExtraOption)
+        {
+            if (!isActive)
+            {
+                // Original MU TEXT_COLOR_GRAY.
+                return ResolveMuColor(10);
+            }
+
+            if (isFullOption)
+            {
+                // Full-set option.
+                return ResolveMuColor(3);
+            }
+
+            if (isExtraOption)
+            {
+                // Extended set option.
+                return ResolveMuColor(4);
+            }
+
+            // Standard active option.
+            return ResolveMuColor(1);
+        }
 
         private static void AppendAncientOptions(
             List<(string text, Color color)> lines,
@@ -1349,20 +1536,69 @@ namespace Client.Main.Core.Items.Tooltips
                 return;
             }
 
-            // Original MU displays a Set Item Option Info header.
+            int setId =
+                GetAncientSetId(
+                    item);
+
+            if (setId <= 0)
+            {
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // TITLE
+            // ---------------------------------------------------------
+
             lines.Add(
                 (
-                    "Set Item Option Info",
+                    "Ancient Options",
                     ResolveMuColor(3)
                 ));
 
+            // Original MU leaves visual space between the title
+            // and the option list.
+            AppendSectionSeparator(
+                lines);
+
             // ---------------------------------------------------------
-            // STANDARD SET OPTIONS
+            // CURRENT SET STATE
+            // ---------------------------------------------------------
+
+            int equippedSetItemCount =
+                CountEquippedAncientSetItems(
+                    setId);
+
+            int completeSetItemCount =
+                ItemTooltipDataRepository
+                    .GetAncientSetItemCount(
+                        setId);
+
+            bool isCompleteSet =
+                completeSetItemCount > 0 &&
+                equippedSetItemCount >=
+                    completeSetItemCount;
+
+            bool isHoveredItemEquipped =
+                InventoryControl.Instance
+                    .IsEquippedItem(
+                        item);
+
+            // The original client doesn't activate Ancient options
+            // until at least two pieces of the same set are equipped.
+            bool hasSetActivation =
+                equippedSetItemCount >= 2;
+
+            // ---------------------------------------------------------
+            // STANDARD OPTIONS
+            //
+            // Six stages, with up to two options per stage.
             //
             // Original:
-            // blue
             //
-            // Six stages with up to two options per stage.
+            // stage 0 activates with 2 pieces
+            // stage 1 activates with 3 pieces
+            // stage 2 activates with 4 pieces
+            // ...
             // ---------------------------------------------------------
 
             int standardCount =
@@ -1374,37 +1610,85 @@ namespace Client.Main.Core.Items.Tooltips
                 i < standardCount;
                 i++)
             {
+                int optionId =
+                    setOption.OptionIndexes[i];
+
+                int value =
+                    setOption.OptionValues[i];
+
+                if (optionId < 0 ||
+                    value <= 0)
+                {
+                    continue;
+                }
+
+                // Two option slots belong to one activation stage:
+                //
+                // [0],[1] => stage 0
+                // [2],[3] => stage 1
+                // ...
+                int optionStage =
+                    i / 2;
+
+                bool isActive =
+                    hasSetActivation &&
+                    (
+                        isCompleteSet ||
+                        optionStage <
+                            equippedSetItemCount - 1
+                    );
+
                 AppendAncientOptionLine(
                     lines,
-                    setOption.OptionIndexes[i],
-                    setOption.OptionValues[i],
-                    ResolveMuColor(1));
+                    optionId,
+                    value,
+                    GetAncientOptionColor(
+                        isHoveredItemEquipped &&
+                            isActive,
+                        isFullOption: false,
+                        isExtraOption: false));
             }
 
             // ---------------------------------------------------------
-            // EXTRA SET OPTIONS
+            // EXTRA OPTIONS
             //
-            // Original:
-            // green
+            // Original MU passes stage 0 for these.
+            // Therefore they're active when at least two set pieces
+            // are equipped.
             // ---------------------------------------------------------
+
+            bool extraActive =
+                hasSetActivation &&
+                (
+                    isCompleteSet ||
+                    0 < equippedSetItemCount - 1
+                );
 
             AppendAncientOptionLine(
                 lines,
                 setOption.FirstExtraOptionIndex,
                 setOption.FirstExtraOptionValue,
-                ResolveMuColor(4));
+                GetAncientOptionColor(
+                    isHoveredItemEquipped &&
+                        extraActive,
+                    isFullOption: false,
+                    isExtraOption: true));
 
             AppendAncientOptionLine(
                 lines,
                 setOption.SecondExtraOptionIndex,
                 setOption.SecondExtraOptionValue,
-                ResolveMuColor(4));
+                GetAncientOptionColor(
+                    isHoveredItemEquipped &&
+                        extraActive,
+                    isFullOption: false,
+                    isExtraOption: true));
 
             // ---------------------------------------------------------
             // FULL SET OPTIONS
             //
-            // Original:
-            // yellow
+            // Only active when every distinct piece of the set is
+            // equipped.
             // ---------------------------------------------------------
 
             int fullCount =
@@ -1420,7 +1704,11 @@ namespace Client.Main.Core.Items.Tooltips
                     lines,
                     setOption.FullOptionIndexes[i],
                     setOption.FullOptionValues[i],
-                    ResolveMuColor(3));
+                    GetAncientOptionColor(
+                        isHoveredItemEquipped &&
+                            isCompleteSet,
+                        isFullOption: true,
+                        isExtraOption: false));
             }
         }
 
@@ -1459,6 +1747,146 @@ namespace Client.Main.Core.Items.Tooltips
             int optionId,
             int value)
         {
+            // Season 6 Ancient option IDs.
+            //
+            // itemsetoption.bmd stores these as zero-based
+            // indexes relative to AT_SET_OPTION_IMPROVE_STRENGTH.
+
+            string text =
+                optionId switch
+                {
+                    0 =>
+                        $"Increase Strength +{value}",
+
+                    1 =>
+                        $"Increase Agility +{value}",
+
+                    2 =>
+                        $"Increase Energy +{value}",
+
+                    3 =>
+                        $"Increase Stamina +{value}",
+
+                    4 =>
+                        $"Increase Command +{value}",
+
+                    5 =>
+                        $"Increase Minimum Attack Damage +{value}",
+
+                    6 =>
+                        $"Increase Maximum Attack Damage +{value}",
+
+                    7 =>
+                        $"Increase Wizardry Damage +{value}",
+
+                    8 =>
+                        $"Increase Damage +{value}",
+
+                    9 =>
+                        $"Increase Attack Success Rate +{value}",
+
+                    10 =>
+                        $"Increase Defense +{value}",
+
+                    11 =>
+                        $"Increase Max Life +{value}",
+
+                    12 =>
+                        $"Increase Max Mana +{value}",
+
+                    13 =>
+                        $"Increase Max AG +{value}",
+
+                    14 =>
+                        $"Increase AG Recovery +{value}",
+
+                    15 =>
+                        $"Increase Critical Damage Rate +{value}%",
+
+                    16 =>
+                        $"Increase Critical Damage +{value}",
+
+                    17 =>
+                        $"Increase Excellent Damage Rate +{value}%",
+
+                    18 =>
+                        $"Increase Excellent Damage +{value}",
+
+                    19 =>
+                        $"Increase Skill Attacking Rate +{value}",
+
+                    20 =>
+                        $"Increase Double Damage Rate +{value}%",
+
+                    21 =>
+                        $"Ignore Enemy Defense +{value}%",
+
+                    22 =>
+                        $"Increase Shield Defense +{value}%",
+
+                    23 =>
+                        $"Increase Two-Handed Weapon Damage +{value}%",
+
+                    24 =>
+                        $"Increase Attack Damage by Strength +{value}",
+
+                    25 =>
+                        $"Increase Attack Damage by Agility +{value}",
+
+                    26 =>
+                        $"Increase Defense by Agility +{value}",
+
+                    27 =>
+                        $"Increase Defense by Stamina +{value}",
+
+                    28 =>
+                        $"Increase Wizardry Damage by Energy +{value}",
+
+                    29 =>
+                        $"Ice Mastery +{value}%",
+
+                    30 =>
+                        $"Poison Mastery +{value}%",
+
+                    31 =>
+                        $"Lightning Mastery +{value}%",
+
+                    32 =>
+                        $"Fire Mastery +{value}%",
+
+                    33 =>
+                        $"Earth Mastery +{value}%",
+
+                    34 =>
+                        $"Wind Mastery +{value}%",
+
+                    35 =>
+                        $"Water Mastery +{value}%",
+
+                    36 =>
+                        $"Increase Strength +{value}",
+
+                    37 =>
+                        $"Increase Agility +{value}",
+
+                    38 =>
+                        $"Increase Energy +{value}",
+
+                    39 =>
+                        $"Increase Stamina +{value}",
+
+                    _ =>
+                        string.Empty
+                };
+
+            if (!string.IsNullOrWhiteSpace(
+                    text))
+            {
+                return text;
+            }
+
+            // Fallback for newer option IDs which aren't part of
+            // the Season 6 table.
             var optionText =
                 ItemTooltipDataRepository
                     .GetItemSetOptionText(
@@ -1467,15 +1895,24 @@ namespace Client.Main.Core.Items.Tooltips
             if (optionText == null ||
                 !optionText.HasText)
             {
-                // Don't expose internal IDs in the normal tooltip.
                 return string.Empty;
             }
 
-            string text =
+            string fallback =
                 optionText.Text.Trim();
 
+            // The current Data_Broyal localization is Korean.
+            // Don't send unsupported CP949 glyphs to the tooltip font.
+            foreach (char character in fallback)
+            {
+                if (character > 127)
+                {
+                    return string.Empty;
+                }
+            }
+
             return FormatAncientOptionText(
-                text,
+                fallback,
                 value);
         }
 

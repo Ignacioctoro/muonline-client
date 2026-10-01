@@ -654,6 +654,29 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return _instance;
             }
         }
+        public IReadOnlyDictionary<byte, InventoryItem> EquippedItems => _equippedItems;
+
+        public bool IsEquippedItem(
+            InventoryItem item)
+        {
+            if (item == null)
+            {
+                return false;
+            }
+
+            foreach (var equipped in
+                    _equippedItems.Values)
+            {
+                if (ReferenceEquals(
+                        equipped,
+                        item))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         public IEnumerable<string> GetPreloadTexturePaths()
             => s_inventoryTexturePaths
@@ -3551,110 +3574,60 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // Drop shadow
             var shadowRect = new Rectangle(tooltipRect.X + 4, tooltipRect.Y + 4, tooltipRect.Width, tooltipRect.Height);
             spriteBatch.Draw(pixel, shadowRect, Color.Black * 0.5f);
-
+            
             // Main background
             UiDrawHelper.DrawVerticalGradient(spriteBatch, tooltipRect, new Color(20, 24, 32, 252), new Color(12, 14, 18, 254));
+
             // =========================================================
-            // ANCIENT OPTION BACKGROUND
+            // ANCIENT ITEM NAME BACKGROUND
             //
-            // The original MU client highlights the Ancient option
-            // section with a dark blue panel.
+            // Original MU highlights the item name row, not the Ancient
+            // option list.
             // =========================================================
 
-            int ancientHeaderIndex =
-                lines.FindIndex(
-                    x =>
-                        x.text ==
-                        "Ancient Options");
+            bool isAncient =
+                _hoveredItem.Details.IsAncient;
 
-            if (ancientHeaderIndex >= 0)
+            if (isAncient &&
+                lines.Count > 0)
             {
-                int currentY =
-                    tooltipRect.Y +
-                    paddingY;
+                Vector2 firstLineSize =
+                    _font.MeasureString(
+                        lines[0].text) *
+                    scale;
 
-                bool firstLine =
-                    true;
+                int titleHeight =
+                    (int)MathF.Ceiling(
+                        firstLineSize.Y) + 6;
 
-                int ancientTop =
-                    -1;
+                Rectangle ancientTitleRect =
+                    new(
+                        tooltipRect.X + 2,
+                        tooltipRect.Y + 5,
+                        tooltipRect.Width - 4,
+                        titleHeight);
 
-                int ancientBottom =
-                    -1;
-
-                for (int i = 0;
-                    i < lines.Count;
-                    i++)
-                {
-                    var line =
-                        lines[i];
-
-                    Vector2 lineSize =
-                        _font.MeasureString(
-                            line.text) *
-                        scale;
-
-                    int lineHeight =
-                        (int)MathF.Ceiling(
-                            lineSize.Y);
-
-                    if (i ==
-                        ancientHeaderIndex)
-                    {
-                        ancientTop =
-                            currentY - 3;
-                    }
-
-                    currentY +=
-                        lineHeight +
-                        lineSpacing;
-
-                    if (firstLine)
-                    {
-                        currentY += 6;
-                        firstLine = false;
-                    }
-
-                    if (i >=
-                        ancientHeaderIndex)
-                    {
-                        ancientBottom =
-                            currentY;
-                    }
-                }
-
-                if (ancientTop >= 0 &&
-                    ancientBottom >
-                        ancientTop)
-                {
-                    Rectangle ancientRect =
-                        new(
-                            tooltipRect.X + 5,
-                            ancientTop,
-                            tooltipRect.Width - 10,
-                            ancientBottom -
-                                ancientTop + 2);
-
-                    UiDrawHelper.DrawVerticalGradient(
-                        spriteBatch,
-                        ancientRect,
-                        new Color(
-                            18,
-                            38,
-                            92,
-                            220),
-                        new Color(
-                            8,
-                            20,
-                            55,
-                            230));
-                }
+                UiDrawHelper.DrawVerticalGradient(
+                    spriteBatch,
+                    ancientTitleRect,
+                    new Color(
+                        32,
+                        70,
+                        155,
+                        235),
+                    new Color(
+                        14,
+                        38,
+                        105,
+                        235));
             }
 
             // Border color based on item rarity
-            bool isExcellent = _hoveredItem.Details.IsExcellent;
-            bool isAncient = _hoveredItem.Details.IsAncient;
-            bool isHighLevel = _hoveredItem.Details.Level >= 7;
+            bool isExcellent =
+                _hoveredItem.Details.IsExcellent;
+
+            bool isHighLevel =
+                _hoveredItem.Details.Level >= 7;
 
             Color borderColor = isExcellent ? Theme.GlowExcellent :
                                 isAncient ? Theme.GlowAncient :

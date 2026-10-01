@@ -71,6 +71,34 @@ namespace Client.Main.Core.Items.Tooltips
             get;
             private set;
         }
+        public static int GetAncientSetItemCount(
+            int setId)
+        {
+            EnsureLoaded();
+
+            if (setId <= 0)
+            {
+                return 0;
+            }
+
+            int count =
+                0;
+
+            foreach (var setType in
+                    _itemSetTypes.Values)
+            {
+                if (setType.Tier1 == setId ||
+                    setType.Tier2 == setId ||
+                    setType.Tier3 == setId ||
+                    setType.Tier4 == setId ||
+                    setType.Tier5 == setId)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
 
         public static int ItemCount =>
             _items.Count;
