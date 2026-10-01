@@ -13,28 +13,49 @@ namespace Client.Main.Core.Items.Tooltips
     ///
     /// Data/Local/itemtooltip.bmd
     /// Data/Local/itemtooltiptext.bmd
+    /// Data/Local/excellentcommonoption.bmd
+    /// Data/Local/excellentwingoption.bmd
+    /// Data/Local/socketitem.bmd
+    /// Data/Local/jewelofharmonyoption.bmd
     ///
     /// Data is loaded once and then cached in dictionaries.
     /// </summary>
     public static class ItemTooltipDataRepository
     {
-        private static readonly object _syncRoot = new();
+        private static readonly object _syncRoot =
+            new();
 
         private static Task? _loadTask;
 
-        private static Dictionary<int, ItemTooltipBMD> _items =
-            new();
+        private static Dictionary<int, ItemTooltipBMD>
+            _items =
+                new();
+
+        private static Dictionary<ushort, ItemTooltipTextBMD>
+            _texts =
+                new();
+
         private static Dictionary<int, ExcellentOptionBMD>
             _excellentCommonOptions =
                 new();
+
         private static Dictionary<int, ExcellentOptionBMD>
             _excellentWingOptions =
                 new();
 
-        private static Dictionary<ushort, ItemTooltipTextBMD> _texts =
-            new();
+        private static Dictionary<int, SocketItemBMD>
+            _socketOptions =
+                new();
 
-        public static bool IsLoaded { get; private set; }
+        private static Dictionary<int, HarmonyOptionBMD>
+            _harmonyOptions =
+                new();
+
+        public static bool IsLoaded
+        {
+            get;
+            private set;
+        }
 
         public static int ItemCount =>
             _items.Count;
@@ -42,10 +63,20 @@ namespace Client.Main.Core.Items.Tooltips
         public static int TextCount =>
             _texts.Count;
 
+        public static int ExcellentCommonOptionCount =>
+            _excellentCommonOptions.Count;
+
+        public static int ExcellentWingOptionCount =>
+            _excellentWingOptions.Count;
+
+        public static int SocketOptionCount =>
+            _socketOptions.Count;
+
+        public static int HarmonyOptionCount =>
+            _harmonyOptions.Count;
+
         /// <summary>
-        /// Loads the tooltip BMD files once.
-        ///
-        /// Calling this multiple times is safe.
+        /// Loads all original MU tooltip-related BMD files once.
         /// </summary>
         public static Task LoadAsync()
         {
@@ -60,6 +91,10 @@ namespace Client.Main.Core.Items.Tooltips
 
         private static async Task LoadInternalAsync()
         {
+            // ---------------------------------------------------------
+            // PATHS
+            // ---------------------------------------------------------
+
             string itemTooltipPath =
                 Path.Combine(
                     Constants.DataPath,
@@ -73,15 +108,32 @@ namespace Client.Main.Core.Items.Tooltips
                     "itemtooltiptext.bmd");
 
             string excellentCommonPath =
-            Path.Combine(
-                Constants.DataPath,
-                "Local",
-                "excellentcommonoption.bmd");
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "excellentcommonoption.bmd");
+
             string excellentWingPath =
-            Path.Combine(
-                Constants.DataPath,
-                "Local",
-                "excellentwingoption.bmd");
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "excellentwingoption.bmd");
+
+            string socketItemPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "socketitem.bmd");
+
+            string harmonyOptionPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "jewelofharmonyoption.bmd");
+
+            // ---------------------------------------------------------
+            // READERS
+            // ---------------------------------------------------------
 
             var itemReader =
                 new ItemTooltipBMDReader();
@@ -91,6 +143,16 @@ namespace Client.Main.Core.Items.Tooltips
 
             var excellentReader =
                 new ExcellentOptionBMDReader();
+
+            var socketReader =
+                new SocketItemBMDReader();
+
+            var harmonyReader =
+                new HarmonyOptionBMDReader();
+
+            // ---------------------------------------------------------
+            // LOAD FILES
+            // ---------------------------------------------------------
 
             var itemEntries =
                 await itemReader
@@ -112,6 +174,20 @@ namespace Client.Main.Core.Items.Tooltips
                     .Load(excellentWingPath)
                     .ConfigureAwait(false);
 
+            var socketEntries =
+                await socketReader
+                    .Load(socketItemPath)
+                    .ConfigureAwait(false);
+
+            var harmonyEntries =
+                await harmonyReader
+                    .Load(harmonyOptionPath)
+                    .ConfigureAwait(false);
+
+            // ---------------------------------------------------------
+            // ITEM TOOLTIP DEFINITIONS
+            // ---------------------------------------------------------
+
             var itemDictionary =
                 new Dictionary<int, ItemTooltipBMD>();
 
@@ -127,12 +203,29 @@ namespace Client.Main.Core.Items.Tooltips
                         item.Category,
                         item.Index);
 
-                // Keep the first valid entry if malformed data ever
-                // contains a duplicate.
                 itemDictionary.TryAdd(
                     key,
                     item);
             }
+
+            // ---------------------------------------------------------
+            // ITEM TOOLTIP TEXT
+            // ---------------------------------------------------------
+
+            var textDictionary =
+                new Dictionary<ushort, ItemTooltipTextBMD>();
+
+            foreach (var text in textEntries)
+            {
+                textDictionary.TryAdd(
+                    text.Id,
+                    text);
+            }
+
+            // ---------------------------------------------------------
+            // COMMON EXCELLENT OPTIONS
+            // ---------------------------------------------------------
+
             var excellentDictionary =
                 new Dictionary<int, ExcellentOptionBMD>();
 
@@ -147,7 +240,11 @@ namespace Client.Main.Core.Items.Tooltips
                     key,
                     option);
             }
-        
+
+            // ---------------------------------------------------------
+            // WING EXCELLENT OPTIONS
+            // ---------------------------------------------------------
+
             var excellentWingDictionary =
                 new Dictionary<int, ExcellentOptionBMD>();
 
@@ -163,15 +260,47 @@ namespace Client.Main.Core.Items.Tooltips
                     option);
             }
 
-            var textDictionary =
-                new Dictionary<ushort, ItemTooltipTextBMD>();
+            // ---------------------------------------------------------
+            // SOCKET OPTIONS
+            // ---------------------------------------------------------
 
-            foreach (var text in textEntries)
+            var socketDictionary =
+                new Dictionary<int, SocketItemBMD>();
+
+            foreach (var socket in socketEntries)
             {
-                textDictionary.TryAdd(
-                    text.Id,
-                    text);
+                int key =
+                    MakeSocketOptionKey(
+                        socket.Table,
+                        socket.Id);
+
+                socketDictionary.TryAdd(
+                    key,
+                    socket);
             }
+
+            // ---------------------------------------------------------
+            // HARMONY OPTIONS
+            // ---------------------------------------------------------
+
+            var harmonyDictionary =
+                new Dictionary<int, HarmonyOptionBMD>();
+
+            foreach (var harmony in harmonyEntries)
+            {
+                int key =
+                    MakeHarmonyOptionKey(
+                        harmony.Table,
+                        harmony.Index);
+
+                harmonyDictionary.TryAdd(
+                    key,
+                    harmony);
+            }
+
+            // ---------------------------------------------------------
+            // PUBLISH
+            // ---------------------------------------------------------
 
             _items =
                 itemDictionary;
@@ -185,19 +314,28 @@ namespace Client.Main.Core.Items.Tooltips
             _excellentWingOptions =
                 excellentWingDictionary;
 
+            _socketOptions =
+                socketDictionary;
+
+            _harmonyOptions =
+                harmonyDictionary;
+
             IsLoaded = true;
 
             Console.WriteLine(
-            $"[ItemTooltipData] Loaded " +
-            $"{_items.Count} item definitions, " +
-            $"{_texts.Count} text definitions, " +
-            $"{_excellentCommonOptions.Count} common excellent options and " +
-            $"{_excellentWingOptions.Count} wing excellent options.");
+                $"[ItemTooltipData] Loaded " +
+                $"{_items.Count} item definitions, " +
+                $"{_texts.Count} text definitions, " +
+                $"{_excellentCommonOptions.Count} common excellent options, " +
+                $"{_excellentWingOptions.Count} wing excellent options, " +
+                $"{_socketOptions.Count} socket entries and " +
+                $"{_harmonyOptions.Count} harmony entries.");
         }
 
-        /// <summary>
-        /// Finds the tooltip definition for a MU item.
-        /// </summary>
+        // -------------------------------------------------------------
+        // ITEM TOOLTIP
+        // -------------------------------------------------------------
+
         public static ItemTooltipBMD? GetItem(
             byte group,
             ushort index)
@@ -216,9 +354,6 @@ namespace Client.Main.Core.Items.Tooltips
             return result;
         }
 
-        /// <summary>
-        /// Tries to find a tooltip definition.
-        /// </summary>
         public static bool TryGetItem(
             byte group,
             ushort index,
@@ -227,13 +362,16 @@ namespace Client.Main.Core.Items.Tooltips
             EnsureLoaded();
 
             return _items.TryGetValue(
-                MakeItemKey(group, index),
+                MakeItemKey(
+                    group,
+                    index),
                 out item);
         }
 
-        /// <summary>
-        /// Finds one text template from itemtooltiptext.bmd.
-        /// </summary>
+        // -------------------------------------------------------------
+        // ITEM TOOLTIP TEXT
+        // -------------------------------------------------------------
+
         public static ItemTooltipTextBMD? GetText(
             ushort id)
         {
@@ -257,29 +395,10 @@ namespace Client.Main.Core.Items.Tooltips
                 out text);
         }
 
-        /// <summary>
-        /// MU item key:
-        ///
-        /// Group * 512 + Index
-        /// </summary>
-        public static int MakeItemKey(
-            byte group,
-            ushort index)
-        {
-            return
-                (group *
-                 ItemTooltipBMDReader.ItemsPerCategory)
-                + index;
-        }
+        // -------------------------------------------------------------
+        // COMMON EXCELLENT
+        // -------------------------------------------------------------
 
-        private static bool IsActive(
-            ItemTooltipBMD item)
-        {
-            return
-                item.Category != 0 ||
-                item.Index != 0 ||
-                !string.IsNullOrEmpty(item.Name);
-        }
         public static ExcellentOptionBMD?
             GetExcellentCommonOption(
                 byte category,
@@ -310,6 +429,11 @@ namespace Client.Main.Core.Items.Tooltips
                         number),
                     out option);
         }
+
+        // -------------------------------------------------------------
+        // WING EXCELLENT
+        // -------------------------------------------------------------
+
         public static ExcellentOptionBMD?
             GetExcellentWingOption(
                 byte category,
@@ -326,6 +450,116 @@ namespace Client.Main.Core.Items.Tooltips
             return result;
         }
 
+        public static bool TryGetExcellentWingOption(
+            byte category,
+            byte number,
+            out ExcellentOptionBMD? option)
+        {
+            EnsureLoaded();
+
+            return
+                _excellentWingOptions.TryGetValue(
+                    MakeExcellentOptionKey(
+                        category,
+                        number),
+                    out option);
+        }
+
+        // -------------------------------------------------------------
+        // SOCKET OPTIONS
+        // -------------------------------------------------------------
+
+        public static SocketItemBMD?
+            GetSocketOption(
+                int table,
+                int id)
+        {
+            EnsureLoaded();
+
+            _socketOptions.TryGetValue(
+                MakeSocketOptionKey(
+                    table,
+                    id),
+                out var result);
+
+            return result;
+        }
+
+        public static bool TryGetSocketOption(
+            int table,
+            int id,
+            out SocketItemBMD? option)
+        {
+            EnsureLoaded();
+
+            return
+                _socketOptions.TryGetValue(
+                    MakeSocketOptionKey(
+                        table,
+                        id),
+                    out option);
+        }
+
+        // -------------------------------------------------------------
+        // HARMONY OPTIONS
+        // -------------------------------------------------------------
+
+        /// <summary>
+        /// Gets one Jewel of Harmony option.
+        ///
+        /// Table:
+        /// 0 = physical weapons
+        /// 1 = staff / wizardry
+        /// 2 = defensive equipment
+        ///
+        /// optionNumber corresponds directly to the Harmony
+        /// option number encoded by OpenMU.
+        /// </summary>
+        public static HarmonyOptionBMD?
+            GetHarmonyOption(
+                int table,
+                int optionNumber)
+        {
+            EnsureLoaded();
+
+            _harmonyOptions.TryGetValue(
+                MakeHarmonyOptionKey(
+                    table,
+                    optionNumber),
+                out var result);
+
+            return result;
+        }
+
+        public static bool TryGetHarmonyOption(
+            int table,
+            int optionNumber,
+            out HarmonyOptionBMD? option)
+        {
+            EnsureLoaded();
+
+            return
+                _harmonyOptions.TryGetValue(
+                    MakeHarmonyOptionKey(
+                        table,
+                        optionNumber),
+                    out option);
+        }
+
+        // -------------------------------------------------------------
+        // KEYS
+        // -------------------------------------------------------------
+
+        public static int MakeItemKey(
+            byte group,
+            ushort index)
+        {
+            return
+                (group *
+                 ItemTooltipBMDReader.ItemsPerCategory)
+                + index;
+        }
+
         private static int MakeExcellentOptionKey(
             byte category,
             byte number)
@@ -333,6 +567,38 @@ namespace Client.Main.Core.Items.Tooltips
             return
                 (category << 8) |
                 number;
+        }
+
+        private static int MakeSocketOptionKey(
+            int table,
+            int id)
+        {
+            return
+                (table << 8) |
+                (id & 0xFF);
+        }
+
+        private static int MakeHarmonyOptionKey(
+            int table,
+            int optionNumber)
+        {
+            return
+                (table << 16) |
+                (optionNumber & 0xFFFF);
+        }
+
+        // -------------------------------------------------------------
+        // HELPERS
+        // -------------------------------------------------------------
+
+        private static bool IsActive(
+            ItemTooltipBMD item)
+        {
+            return
+                item.Category != 0 ||
+                item.Index != 0 ||
+                !string.IsNullOrEmpty(
+                    item.Name);
         }
 
         private static void EnsureLoaded()

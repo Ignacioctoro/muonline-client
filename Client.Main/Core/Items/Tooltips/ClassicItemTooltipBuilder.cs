@@ -257,9 +257,6 @@ namespace Client.Main.Core.Items.Tooltips
 
             // ---------------------------------------------------------
             // EQUIPPABLE CLASSES
-            //
-            // Still uses ItemDefinition until the original class part
-            // of the tooltip renderer is migrated.
             // ---------------------------------------------------------
 
             AppendAllowedClasses(
@@ -267,36 +264,87 @@ namespace Client.Main.Core.Items.Tooltips
                 def);
 
             // ---------------------------------------------------------
-            // TEMPORARY COMPATIBILITY OPTIONS
-            //
-            // Do not remove these yet.
-            // They will be replaced later by:
-            //
-            // excellentcommonoption.bmd
-            // excellentwingoption.bmd
-            // itemset*.bmd
-            // jewelofharmonyoption.bmd
-            // socketitem.bmd
+            // GUARDIAN / LEVEL 380
             // ---------------------------------------------------------
 
-            AppendLegacyOptions(
-                result,
-                item);
+            if (details.HasGuardian &&
+                HasGuardianOptionsForGroup(def.Group))
+            {
+                AppendSectionSeparator(
+                    result);
 
-            if (def.Group == 12)
-            {
-                AppendExcellentWingOptions(
-                    result,
-                    item);
-            }
-            else
-            {
-                AppendExcellentCommonOptions(
+                AppendGuardianOptions(
                     result,
                     item);
             }
 
-            // Preserve NPC repair information used by the inventory.
+            // ---------------------------------------------------------
+            // HARMONY
+            // ---------------------------------------------------------
+
+            if (details.HasHarmony &&
+                details.HarmonyOption != 0)
+            {
+                AppendSectionSeparator(
+                    result);
+
+                AppendHarmonyOption(
+                    result,
+                    item);
+            }
+
+            // ---------------------------------------------------------
+            // NORMAL / LUCK / SKILL / EXCELLENT
+            // ---------------------------------------------------------
+
+            bool hasBlueOptions =
+                details.OptionLevel > 0 ||
+                details.HasLuck ||
+                details.HasSkill ||
+                details.IsExcellent;
+
+            if (hasBlueOptions)
+            {
+                AppendSectionSeparator(
+                    result);
+
+                AppendLegacyOptions(
+                    result,
+                    item);
+
+                if (def.Group == 12)
+                {
+                    AppendExcellentWingOptions(
+                        result,
+                        item);
+                }
+                else
+                {
+                    AppendExcellentCommonOptions(
+                        result,
+                        item);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // SOCKET OPTIONS
+            // ---------------------------------------------------------
+
+            if (details.HasSockets &&
+                details.SocketCount > 0)
+            {
+                AppendSectionSeparator(
+                    result);
+
+                AppendSocketOptions(
+                    result,
+                    item);
+            }
+
+            // ---------------------------------------------------------
+            // NPC REPAIR INFO
+            // ---------------------------------------------------------
+
             AppendNpcRepairInformation(
                 result,
                 item,
@@ -1131,6 +1179,182 @@ namespace Client.Main.Core.Items.Tooltips
                 def.Id == 17 ||
                 def.Id == 18;
         }
+        private static void AppendSectionSeparator(
+            List<(string text, Color color)> lines)
+        {
+            if (lines.Count == 0)
+            {
+                return;
+            }
+
+            // Keep exactly one visual separator between option groups.
+            //
+            // A single space is intentional. Some tooltip rendering paths
+            // ignore an empty string completely.
+            if (lines[^1].text == " ")
+            {
+                return;
+            }
+
+            lines.Add(
+                (
+                    " ",
+                    Color.Transparent
+                ));
+        }
+
+        private static bool HasGuardianOptionsForGroup(
+            int group)
+        {
+            return
+                (group >= 0 && group <= 5) ||
+                group == 7 ||
+                group == 8 ||
+                group == 9 ||
+                group == 10 ||
+                group == 11;
+        }
+
+        private static void AppendGuardianOptions(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            if (!item.Details.HasGuardian)
+            {
+                return;
+            }
+
+            int group =
+                item.Definition.Group;
+
+            Color guardianColor =
+                ResolveMuColor(11);
+
+            // OpenMU Season 6 Guardian / level 380 configuration:
+            //
+            // Weapons:
+            //   PvP Attack Success Rate +10
+            //   PvP Attack Damage +200
+            //
+            // Helm:
+            //   PvP Defense Success Rate +10
+            //   SD Recovery Rate +20
+            //
+            // Armor:
+            //   PvP Defense Success Rate +10
+            //   SD Auto Recovery
+            //
+            // Pants:
+            //   PvP Defense Success Rate +10
+            //   PvP Defense +100
+            //
+            // Gloves:
+            //   PvP Defense Success Rate +10
+            //   Max HP +200
+            //
+            // Boots:
+            //   PvP Defense Success Rate +10
+            //   Max SD +200
+            //
+            // Group 6 (shield) has no Guardian option definition
+            // in the current OpenMU Season 6 configuration.
+
+            if (group >= 0 &&
+                group <= 5)
+            {
+                lines.Add(
+                    (
+                        "PvP Attack Success Rate +10",
+                        guardianColor
+                    ));
+
+                lines.Add(
+                    (
+                        "PvP Attack Damage +200",
+                        guardianColor
+                    ));
+
+                return;
+            }
+
+            switch (group)
+            {
+                // Helm
+                case 7:
+                    lines.Add(
+                        (
+                            "PvP Defense Success Rate +10",
+                            guardianColor
+                        ));
+
+                    lines.Add(
+                        (
+                            "SD Recovery Rate +20",
+                            guardianColor
+                        ));
+                    break;
+
+                // Armor
+                case 8:
+                    lines.Add(
+                        (
+                            "PvP Defense Success Rate +10",
+                            guardianColor
+                        ));
+
+                    lines.Add(
+                        (
+                            "SD Auto Recovery",
+                            guardianColor
+                        ));
+                    break;
+
+                // Pants
+                case 9:
+                    lines.Add(
+                        (
+                            "PvP Defense Success Rate +10",
+                            guardianColor
+                        ));
+
+                    lines.Add(
+                        (
+                            "PvP Defense +100",
+                            guardianColor
+                        ));
+                    break;
+
+                // Gloves
+                case 10:
+                    lines.Add(
+                        (
+                            "PvP Defense Success Rate +10",
+                            guardianColor
+                        ));
+
+                    lines.Add(
+                        (
+                            "Max HP +200",
+                            guardianColor
+                        ));
+                    break;
+
+                // Boots
+                case 11:
+                    lines.Add(
+                        (
+                            "PvP Defense Success Rate +10",
+                            guardianColor
+                        ));
+
+                    lines.Add(
+                        (
+                            "Max SD +200",
+                            guardianColor
+                        ));
+                    break;
+            }
+        }
 
         private static void AppendAllowedClasses(
             List<(string text, Color color)> lines,
@@ -1411,6 +1635,447 @@ namespace Client.Main.Core.Items.Tooltips
             }
 
             return string.Empty;
+        }
+        private static string GetHarmonyOptionDisplayName(
+            int table,
+            int optionNumber,
+            string bmdName)
+        {
+            return table switch
+            {
+                // -----------------------------------------------------
+                // PHYSICAL WEAPONS
+                // -----------------------------------------------------
+                0 => optionNumber switch
+                {
+                    1 => "Minimum Attack Power Increase",
+                    2 => "Maximum Attack Power Increase",
+                    3 => "Required Strength Decrease",
+                    4 => "Required Agility Decrease",
+                    5 => "Attack Power Increase",
+                    6 => "Critical Damage Increase",
+                    7 => "Skill Attack Power Increase",
+                    8 => "PvP Attack Success Rate Increase",
+                    9 => "SD Decrease Rate Increase",
+                    10 => "SD Ignore Rate Increase",
+                    _ => bmdName
+                },
+
+                // -----------------------------------------------------
+                // STAFF / WIZARDRY
+                // -----------------------------------------------------
+                1 => optionNumber switch
+                {
+                    1 => "Wizardry Damage Increase",
+                    2 => "Required Strength Decrease",
+                    3 => "Required Agility Decrease",
+                    4 => "Skill Attack Power Increase",
+                    5 => "Critical Damage Increase",
+                    6 => "SD Decrease Rate Increase",
+                    7 => "PvP Attack Success Rate Increase",
+                    8 => "SD Ignore Rate Increase",
+                    _ => bmdName
+                },
+
+                // -----------------------------------------------------
+                // DEFENSIVE EQUIPMENT
+                // -----------------------------------------------------
+                2 => optionNumber switch
+                {
+                    1 => "Defense Increase",
+                    2 => "Maximum AG Increase",
+                    3 => "Maximum HP Increase",
+                    4 => "HP Auto Recovery Increase",
+                    5 => "MP Auto Recovery Increase",
+                    6 => "PvP Defense Success Rate Increase",
+                    7 => "Damage Decrease",
+                    8 => "SD Ratio Increase",
+                    _ => bmdName
+                },
+
+                _ => bmdName
+            };
+        }
+        private static void AppendHarmonyOption(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            var details =
+                item.Details;
+
+            if (!details.HasHarmony ||
+                details.HarmonyOption == 0)
+            {
+                return;
+            }
+
+            var def =
+                item.Definition;
+
+            // The original client doesn't render Harmony options
+            // on socket items.
+            if (details.HasSockets &&
+                details.SocketCount > 0)
+            {
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // OPENMU / ORIGINAL MU HARMONY BYTE
+            //
+            // High nibble = Harmony option number
+            // Low nibble  = Harmony option level
+            // ---------------------------------------------------------
+
+            int optionNumber =
+                (details.HarmonyOption >> 4) &
+                0x0F;
+
+            int optionLevel =
+                details.HarmonyOption &
+                0x0F;
+
+            if (optionNumber <= 0)
+            {
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // ORIGINAL MU HARMONY TABLE
+            //
+            // 0 = Physical weapons
+            // 1 = Staff / Wizardry
+            // 2 = Defensive equipment
+            // ---------------------------------------------------------
+
+            int table;
+
+            if (def.Group >= 0 &&
+                def.Group <= 4)
+            {
+                table = 0;
+            }
+            else if (def.Group == 5)
+            {
+                table = 1;
+            }
+            else if (def.Group >= 6 &&
+                    def.Group <= 11)
+            {
+                table = 2;
+            }
+            else
+            {
+                return;
+            }
+
+            var harmony =
+                ItemTooltipDataRepository
+                    .GetHarmonyOption(
+                        table,
+                        optionNumber);
+
+            if (harmony == null)
+            {
+                return;
+            }
+
+            if (optionLevel < 0 ||
+                optionLevel >= harmony.Values.Length)
+            {
+                return;
+            }
+
+            int value =
+                harmony.Values[optionLevel];
+
+            if (string.IsNullOrWhiteSpace(
+                    harmony.Name))
+            {
+                return;
+            }
+
+            // Original MU special case:
+            //
+            // Defense Harmony option 7
+            // (Damage Decrease) is rendered as a percentage.
+            string displayName =
+                GetHarmonyOptionDisplayName(
+                    table,
+                    optionNumber,
+                    harmony.Name);
+
+            string text;
+
+            if (table == 2 &&
+                optionNumber == 7)
+            {
+                text =
+                    $"{displayName} +{value}%";
+            }
+            else
+            {
+                text =
+                    $"{displayName} +{value}";
+            }
+
+            // Original client:
+            //
+            // Yellow when the item level is high enough
+            // for the Harmony level.
+            // Gray otherwise.
+            Color color =
+                details.Level >= optionLevel
+                    ? ResolveMuColor(3)
+                    : ResolveMuColor(10);
+
+            lines.Add(
+                (
+                    text,
+                    color
+                ));
+        }
+        private static void AppendSocketOptions(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            var details =
+                item.Details;
+
+            if (!details.HasSockets ||
+                details.SocketCount == 0 ||
+                details.SocketOptions == null ||
+                details.SocketOptions.Length == 0)
+            {
+                return;
+            }
+
+            // Classic MU socket section header.
+            lines.Add(
+                (
+                    "Socket Option",
+                    new Color(180, 120, 255)
+                ));
+
+            int count =
+                Math.Min(
+                    details.SocketCount,
+                    (byte)details.SocketOptions.Length);
+
+            for (int i = 0;
+                i < count;
+                i++)
+            {
+                byte socketByte =
+                    details.SocketOptions[i];
+
+                // ---------------------------------------------------------
+                // EMPTY SOCKET
+                // ---------------------------------------------------------
+
+                if (socketByte == 0xFE)
+                {
+                    lines.Add(
+                        (
+                            "Empty Socket",
+                            Color.Gray
+                        ));
+
+                    continue;
+                }
+
+                // 0xFF means this slot does not exist.
+                if (socketByte == 0xFF)
+                {
+                    continue;
+                }
+
+                // ---------------------------------------------------------
+                // OPENMU / ORIGINAL MU SOCKET ENCODING
+                //
+                // byte =
+                //     ((sphereLevel - 1) * 50)
+                //     + optionIndex
+                // ---------------------------------------------------------
+
+                int sphereLevel =
+                    (socketByte / 50) + 1;
+
+                int optionIndex =
+                    socketByte % 50;
+
+                var socket =
+                    ItemTooltipDataRepository
+                        .GetSocketOption(
+                            0,
+                            optionIndex);
+
+                if (socket == null)
+                {
+                    continue;
+                }
+
+                if (sphereLevel < 1 ||
+                    sphereLevel > socket.Values.Length)
+                {
+                    continue;
+                }
+
+                int value =
+                    socket.Values[
+                        sphereLevel - 1];
+
+                string text =
+                    BuildSocketOptionText(
+                        socket,
+                        sphereLevel,
+                        value);
+
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                lines.Add(
+                    (
+                        text,
+                        new Color(180, 120, 255)
+                    ));
+            }
+        }
+        private static string BuildSocketOptionText(
+            SocketItemBMD socket,
+            int sphereLevel,
+            int value)
+        {
+            string element =
+                socket.ElementType switch
+                {
+                    1 => "Fire",
+                    2 => "Water",
+                    3 => "Ice",
+                    4 => "Wind",
+                    5 => "Lightning",
+                    6 => "Earth",
+                    _ => "Socket"
+                };
+
+            string optionText =
+                socket.Id switch
+                {
+                    // -----------------------------------------------------
+                    // FIRE
+                    // -----------------------------------------------------
+
+                    0 =>
+                        $"Increase Damage/Wizardry per 20 Levels +{value}",
+
+                    1 =>
+                        $"Increase Attack/Wizardry Speed +{value}",
+
+                    2 =>
+                        $"Increase Maximum Damage/Wizardry +{value}",
+
+                    3 =>
+                        $"Increase Minimum Damage/Wizardry +{value}",
+
+                    4 =>
+                        $"Increase Damage/Wizardry +{value}",
+
+                    5 =>
+                        $"Decrease AG Consumption +{value}%",
+
+                    // -----------------------------------------------------
+                    // WATER
+                    // -----------------------------------------------------
+
+                    10 =>
+                        $"Increase Defense Success Rate +{value}%",
+
+                    11 =>
+                        $"Increase Defense +{value}",
+
+                    12 =>
+                        $"Increase Shield Defense +{value}%",
+
+                    13 =>
+                        $"Damage Decrease +{value}%",
+
+                    14 =>
+                        $"Reflect Damage +{value}%",
+
+                    // -----------------------------------------------------
+                    // ICE
+                    // -----------------------------------------------------
+
+                    16 =>
+                        $"Monster Destruction for Life +{value}",
+
+                    17 =>
+                        $"Monster Destruction for Mana +{value}",
+
+                    18 =>
+                        $"Increase Skill Attack +{value}",
+
+                    19 =>
+                        $"Increase Attack Success Rate +{value}",
+
+                    20 =>
+                        $"Increase Item Durability +{value}%",
+
+                    // -----------------------------------------------------
+                    // WIND
+                    // -----------------------------------------------------
+
+                    21 =>
+                        $"Increase Automatic Life Recovery +{value}",
+
+                    22 =>
+                        $"Increase Maximum Life +{value}",
+
+                    23 =>
+                        $"Increase Maximum Mana +{value}",
+
+                    24 =>
+                        $"Increase Automatic Mana Recovery +{value}",
+
+                    25 =>
+                        $"Increase Maximum AG +{value}",
+
+                    26 =>
+                        $"Increase AG Recovery +{value}",
+
+                    // -----------------------------------------------------
+                    // LIGHTNING
+                    // -----------------------------------------------------
+
+                    29 =>
+                        $"Increase Excellent Damage +{value}",
+
+                    30 =>
+                        $"Increase Excellent Damage Rate +{value}%",
+
+                    31 =>
+                        $"Increase Critical Damage +{value}",
+
+                    32 =>
+                        $"Increase Critical Damage Rate +{value}%",
+
+                    // -----------------------------------------------------
+                    // EARTH
+                    // -----------------------------------------------------
+
+                    36 =>
+                        $"Increase Health +{value}",
+
+                    _ =>
+                        $"Socket Option {socket.Id} +{value}"
+                };
+
+            return
+                $"{element} " +
+                $"(Sphere Lv{sphereLevel}) : " +
+                optionText;
         }
 
         private static void AppendNpcRepairInformation(

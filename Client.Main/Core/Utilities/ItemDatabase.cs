@@ -312,53 +312,189 @@ namespace Client.Main.Core.Utilities
         public struct ItemDetails
         {
             public int Level;
+
             public bool HasSkill;
             public bool HasLuck;
+
             public int OptionLevel;
+
             public bool IsExcellent;
             public bool IsAncient;
+
             public byte ExcellentFlags;
+
             public byte Durability;
+            public bool HasHarmony;
+            public byte HarmonyOption;
+
+            public bool HasGuardian;
+
+            // ---------------------------------------------------------
+            // SOCKET DATA
+            // ---------------------------------------------------------
+
+            public bool HasSockets;
+
             public byte SocketCount;
 
-            public bool HasBlueOptions => HasSkill || HasLuck || OptionLevel > 0;
+            /// <summary>
+            /// Socket bonus option stored in the high nibble
+            /// of the socket information byte.
+            /// </summary>
+            public byte SocketBonusOption;
+
+            /// <summary>
+            /// Raw socket option bytes received from OpenMU.
+            /// Each entry corresponds to one socket slot.
+            /// Interpretation against socketitem.bmd is done later.
+            /// </summary>
+            public byte[] SocketOptions;
+
+            public bool HasBlueOptions =>
+                HasSkill ||
+                HasLuck ||
+                OptionLevel > 0;
         }
 
-        public static ItemDetails ParseItemDetails(ReadOnlySpan<byte> itemData)
+        public static ItemDetails ParseItemDetails(
+            ReadOnlySpan<byte> itemData)
         {
-            var d = new ItemDetails();
-            if (itemData.IsEmpty || itemData.Length < 3) return d;
+            var d =
+                new ItemDetails
+                {
+                    SocketOptions =
+                        Array.Empty<byte>()
+                };
 
-            if (ItemDataParser.TryParseExtendedItemData(itemData, out var ext) && ext.Length <= itemData.Length)
+            if (itemData.IsEmpty ||
+                itemData.Length < 3)
             {
-                d.Level = ext.Level;
-                d.HasSkill = ext.HasSkill;
-                d.HasLuck = ext.HasLuck;
-                d.OptionLevel = ext.OptionLevel;
-                d.IsExcellent = (ext.ExcellentFlags & 0x3F) != 0;
-                d.IsAncient = ext.HasAncient && ext.AncientDiscriminator > 0;
-                d.ExcellentFlags = ext.ExcellentFlags;
-                d.Durability = ext.Durability;
-                d.SocketCount = ext.SocketCount;
                 return d;
             }
 
-            byte optByte = itemData[1];
-            byte excByte = itemData.Length > 3 ? itemData[3] : (byte)0;
-            byte ancientByte = itemData.Length > 4 ? itemData[4] : (byte)0;
+            // ---------------------------------------------------------
+            // EXTENDED OPENMU / NEFFIS ITEM FORMAT
+            // ---------------------------------------------------------
 
-            d.Level = (optByte & 0x78) >> 3;
-            d.HasSkill = (optByte & 0x80) != 0;
-            d.HasLuck = (optByte & 0x04) != 0;
+            if (ItemDataParser.TryParseExtendedItemData(
+                    itemData,
+                    out var ext) &&
+                ext.Length <= itemData.Length)
+            {
+                d.Level =
+                    ext.Level;
 
-            int optionLevel = optByte & 0x03;
-            if ((excByte & 0x40) != 0) optionLevel |= 0b100;
-            d.OptionLevel = optionLevel;
+                d.HasSkill =
+                    ext.HasSkill;
 
-            d.IsExcellent = (excByte & 0x3F) != 0;
-            d.IsAncient = (ancientByte & 0x0F) > 0;
-            d.ExcellentFlags = excByte;
-            d.Durability = itemData.Length > 2 ? itemData[2] : (byte)0;
+                d.HasLuck =
+                    ext.HasLuck;
+
+                d.OptionLevel =
+                    ext.OptionLevel;
+
+                d.IsExcellent =
+                    (ext.ExcellentFlags & 0x3F) != 0;
+
+                d.IsAncient =
+                    ext.HasAncient &&
+                    ext.AncientDiscriminator > 0;
+
+                d.ExcellentFlags =
+                    ext.ExcellentFlags;
+
+                d.Durability =
+                    ext.Durability;
+                d.HasHarmony =
+                    ext.HasHarmony;
+
+                d.HarmonyOption =
+                    ext.HarmonyOption;
+
+                d.HasGuardian =
+                    ext.HasGuardian;
+
+                // -----------------------------------------------------
+                // SOCKETS
+                // -----------------------------------------------------
+
+                d.HasSockets =
+                    ext.HasSockets;
+
+                d.SocketCount =
+                    ext.SocketCount;
+
+                d.SocketBonusOption =
+                    ext.SocketBonusOption;
+
+                d.SocketOptions =
+                    ext.SocketOptions ??
+                    Array.Empty<byte>();
+
+                return d;
+            }
+
+            // ---------------------------------------------------------
+            // LEGACY ITEM FORMAT
+            // ---------------------------------------------------------
+
+            byte optByte =
+                itemData[1];
+
+            byte excByte =
+                itemData.Length > 3
+                    ? itemData[3]
+                    : (byte)0;
+
+            byte ancientByte =
+                itemData.Length > 4
+                    ? itemData[4]
+                    : (byte)0;
+
+            d.Level =
+                (optByte & 0x78) >> 3;
+
+            d.HasSkill =
+                (optByte & 0x80) != 0;
+
+            d.HasLuck =
+                (optByte & 0x04) != 0;
+
+            int optionLevel =
+                optByte & 0x03;
+
+            if ((excByte & 0x40) != 0)
+            {
+                optionLevel |=
+                    0b100;
+            }
+
+            d.OptionLevel =
+                optionLevel;
+
+            d.IsExcellent =
+                (excByte & 0x3F) != 0;
+
+            d.IsAncient =
+                (ancientByte & 0x0F) > 0;
+
+            d.ExcellentFlags =
+                excByte;
+
+            d.Durability =
+                itemData.Length > 2
+                    ? itemData[2]
+                    : (byte)0;
+
+            // Legacy format currently doesn't expose socket data.
+            d.HasSockets = false;
+            d.SocketCount = 0;
+            d.SocketBonusOption = 0;
+            d.SocketOptions =
+                Array.Empty<byte>();
+            d.HasHarmony = false;
+            d.HarmonyOption = 0;
+            d.HasGuardian = false;
 
             return d;
         }
