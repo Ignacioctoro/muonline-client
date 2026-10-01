@@ -2162,8 +2162,13 @@ namespace Client.Main.Core.Items.Tooltips
                 return;
             }
 
+            // Visual separator between base item stats/requirements
+            // and the class restrictions.
+            AppendSectionSeparator(
+                lines);
+
             foreach (string className in
-                     def.AllowedClasses)
+                    def.AllowedClasses)
             {
                 lines.Add(
                     (

@@ -3494,7 +3494,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     lines.Add(("Cannot be repaired", new Color(255, 100, 100)));
                 }
             }
-            const float scale = 0.44f;
+            const float titleScale = 0.44f;
+            const float bodyScale = 0.40f;
             const int lineSpacing = 4;
             const int paddingX = 14;
             const int paddingY = 12;
@@ -3503,11 +3504,27 @@ namespace Client.Main.Controls.UI.Game.Inventory
             int maxWidth = 0;
             int totalHeight = 0;
 
-            foreach (var (text, _) in lines)
+            for (int i = 0; i < lines.Count; i++)
             {
-                Vector2 sz = _font.MeasureString(text) * scale;
-                maxWidth = Math.Max(maxWidth, (int)MathF.Ceiling(sz.X));
-                totalHeight += (int)MathF.Ceiling(sz.Y) + lineSpacing;
+                var (text, _) = lines[i];
+
+                float lineScale =
+                    i == 0
+                        ? titleScale
+                        : bodyScale;
+
+                Vector2 sz =
+                    _font.MeasureString(text) *
+                    lineScale;
+
+                maxWidth =
+                    Math.Max(
+                        maxWidth,
+                        (int)MathF.Ceiling(sz.X));
+
+                totalHeight +=
+                    (int)MathF.Ceiling(sz.Y) +
+                    lineSpacing;
             }
 
             // Add separator after the first line
@@ -3574,7 +3591,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // Drop shadow
             var shadowRect = new Rectangle(tooltipRect.X + 4, tooltipRect.Y + 4, tooltipRect.Width, tooltipRect.Height);
             spriteBatch.Draw(pixel, shadowRect, Color.Black * 0.5f);
-            
+
             // Main background
             UiDrawHelper.DrawVerticalGradient(spriteBatch, tooltipRect, new Color(20, 24, 32, 252), new Color(12, 14, 18, 254));
 
@@ -3594,7 +3611,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Vector2 firstLineSize =
                     _font.MeasureString(
                         lines[0].text) *
-                    scale;
+                    titleScale;
 
                 int titleHeight =
                     (int)MathF.Ceiling(
@@ -3645,31 +3662,89 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // TOOLTIP TEXT
             // ═══════════════════════════════════════════════════════════
 
-            int textY = tooltipRect.Y + paddingY;
-            bool isFirstLine = true;
+            int textY =
+                tooltipRect.Y +
+                paddingY;
 
-            foreach (var (text, color) in lines)
+            bool isFirstLine =
+                true;
+
+            for (int i = 0; i < lines.Count; i++)
             {
-                Vector2 textSize = _font.MeasureString(text) * scale;
-                int textX = tooltipRect.X + (tooltipRect.Width - (int)textSize.X) / 2;
+                var (text, color) =
+                    lines[i];
+
+                float lineScale =
+                    i == 0
+                        ? titleScale
+                        : bodyScale;
+
+                Vector2 textSize =
+                    _font.MeasureString(text) *
+                    lineScale;
+
+                int textX =
+                    tooltipRect.X +
+                    (
+                        tooltipRect.Width -
+                        (int)textSize.X
+                    ) / 2;
 
                 // Shadow
-                spriteBatch.DrawString(_font, text, new Vector2(textX + 1, textY + 1), Color.Black * 0.7f,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                // Text
-                Color lineColor = isFirstLine ? borderColor : color;
-                spriteBatch.DrawString(_font, text, new Vector2(textX, textY), lineColor,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                spriteBatch.DrawString(
+                    _font,
+                    text,
+                    new Vector2(
+                        textX + 1,
+                        textY + 1),
+                    Color.Black * 0.7f,
+                    0f,
+                    Vector2.Zero,
+                    lineScale,
+                    SpriteEffects.None,
+                    0f);
 
-                textY += (int)textSize.Y + lineSpacing;
+                // Text
+                Color lineColor =
+                    isFirstLine
+                        ? borderColor
+                        : color;
+
+                spriteBatch.DrawString(
+                    _font,
+                    text,
+                    new Vector2(
+                        textX,
+                        textY),
+                    lineColor,
+                    0f,
+                    Vector2.Zero,
+                    lineScale,
+                    SpriteEffects.None,
+                    0f);
+
+                textY +=
+                    (int)textSize.Y +
+                    lineSpacing;
 
                 // Separator after item name
                 if (isFirstLine)
                 {
                     textY += 2;
-                    spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X + 8, textY, tooltipRect.Width - 16, 1), borderColor * 0.3f);
+
+                    spriteBatch.Draw(
+                        pixel,
+                        new Rectangle(
+                            tooltipRect.X + 8,
+                            textY,
+                            tooltipRect.Width - 16,
+                            1),
+                        borderColor * 0.3f);
+
                     textY += 4;
-                    isFirstLine = false;
+
+                    isFirstLine =
+                        false;
                 }
             }
         }
