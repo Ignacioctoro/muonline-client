@@ -165,9 +165,17 @@ namespace Client.Main.Core.Items.Tooltips
 
 
 
-            if (def.Group < 0 ||
-                def.Group > 12 ||
-                details.IsAncient)
+            bool supportedGroup =
+                def.Group >= 0 &&
+                (
+                    def.Group <= 12 ||
+                    (
+                        details.IsAncient &&
+                        def.Group == 13
+                    )
+                );
+
+            if (!supportedGroup)
             {
                 return ItemUiHelper.BuildTooltipLines(item);
             }
@@ -196,23 +204,54 @@ namespace Client.Main.Core.Items.Tooltips
             // ITEM NAME
             // ---------------------------------------------------------
 
-            string name = def.Name ?? string.Empty;
+            string name =
+                def.Name ??
+                string.Empty;
 
-            if (details.IsExcellent)
+            Color nameColor =
+                ResolveMuColor(
+                    tooltip.NameColor);
+
+            if (details.IsAncient)
             {
-                name = $"Excellent {name}";
+                string? ancientSetName =
+                    GetAncientSetName(
+                        item);
+
+                if (!string.IsNullOrWhiteSpace(
+                        ancientSetName))
+                {
+                    // Original MU:
+                    //
+                    // <SetName> <ItemName>
+                    //
+                    // Example:
+                    // Hyon Dragon Helm
+                    name =
+                        $"{ancientSetName} {name}";
+                }
+
+                // Ancient / Set items use green naming.
+                nameColor =
+                    ResolveMuColor(4);
+            }
+            else if (details.IsExcellent)
+            {
+                name =
+                    $"Excellent {name}";
             }
 
             if (details.Level > 0 &&
                 tooltip.RenderLevel)
             {
-                name += $" +{details.Level}";
+                name +=
+                    $" +{details.Level}";
             }
 
             result.Add(
                 (
                     name,
-                    ResolveMuColor(tooltip.NameColor)
+                    nameColor
                 ));
 
             // ---------------------------------------------------------
@@ -262,6 +301,19 @@ namespace Client.Main.Core.Items.Tooltips
             AppendAllowedClasses(
                 result,
                 def);
+            // ---------------------------------------------------------
+            // ANCIENT / SET OPTIONS
+            // ---------------------------------------------------------
+
+            if (details.IsAncient)
+            {
+                AppendSectionSeparator(
+                    result);
+
+                AppendAncientOptions(
+                    result,
+                    item);
+            }
 
             // ---------------------------------------------------------
             // GUARDIAN / LEVEL 380
@@ -1178,6 +1230,311 @@ namespace Client.Main.Core.Items.Tooltips
                  def.Id <= 15) ||
                 def.Id == 17 ||
                 def.Id == 18;
+        }
+        private static string?
+            GetAncientSetName(
+                InventoryItem item)
+        {
+            var details =
+                item.Details;
+
+            var def =
+                item.Definition;
+
+            if (!details.IsAncient ||
+                details.AncientDiscriminator == 0)
+            {
+                return null;
+            }
+
+            var setType =
+                ItemTooltipDataRepository
+                    .GetItemSetType(
+                        (byte)def.Group,
+                        (ushort)def.Id);
+
+            if (setType == null)
+            {
+                return null;
+            }
+
+            ushort setId =
+                setType.GetSetId(
+                    details.AncientDiscriminator);
+
+            if (setId == 0)
+            {
+                return null;
+            }
+
+            var setOption =
+                ItemTooltipDataRepository
+                    .GetItemSetOption(
+                        setId);
+
+            if (setOption == null)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(
+                    setOption.Name1))
+            {
+                return setOption.Name1.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(
+                    setOption.Name2))
+            {
+                return setOption.Name2.Trim();
+            }
+
+            return null;
+        }
+
+        private static ItemSetOptionBMD?
+            GetAncientSetOption(
+                InventoryItem item)
+        {
+            var details =
+                item.Details;
+
+            var def =
+                item.Definition;
+
+            if (!details.IsAncient ||
+                details.AncientDiscriminator == 0)
+            {
+                return null;
+            }
+
+            var setType =
+                ItemTooltipDataRepository
+                    .GetItemSetType(
+                        (byte)def.Group,
+                        (ushort)def.Id);
+
+            if (setType == null)
+            {
+                return null;
+            }
+
+            ushort setId =
+                setType.GetSetId(
+                    details.AncientDiscriminator);
+
+            if (setId == 0)
+            {
+                return null;
+            }
+
+            return
+                ItemTooltipDataRepository
+                    .GetItemSetOption(
+                        setId);
+        }
+
+        private static void AppendAncientOptions(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            var setOption =
+                GetAncientSetOption(
+                    item);
+
+            if (setOption == null)
+            {
+                return;
+            }
+
+            // Original MU displays a Set Item Option Info header.
+            lines.Add(
+                (
+                    "Set Item Option Info",
+                    ResolveMuColor(3)
+                ));
+
+            // ---------------------------------------------------------
+            // STANDARD SET OPTIONS
+            //
+            // Original:
+            // blue
+            //
+            // Six stages with up to two options per stage.
+            // ---------------------------------------------------------
+
+            int standardCount =
+                Math.Min(
+                    setOption.OptionIndexes.Length,
+                    setOption.OptionValues.Length);
+
+            for (int i = 0;
+                i < standardCount;
+                i++)
+            {
+                AppendAncientOptionLine(
+                    lines,
+                    setOption.OptionIndexes[i],
+                    setOption.OptionValues[i],
+                    ResolveMuColor(1));
+            }
+
+            // ---------------------------------------------------------
+            // EXTRA SET OPTIONS
+            //
+            // Original:
+            // green
+            // ---------------------------------------------------------
+
+            AppendAncientOptionLine(
+                lines,
+                setOption.FirstExtraOptionIndex,
+                setOption.FirstExtraOptionValue,
+                ResolveMuColor(4));
+
+            AppendAncientOptionLine(
+                lines,
+                setOption.SecondExtraOptionIndex,
+                setOption.SecondExtraOptionValue,
+                ResolveMuColor(4));
+
+            // ---------------------------------------------------------
+            // FULL SET OPTIONS
+            //
+            // Original:
+            // yellow
+            // ---------------------------------------------------------
+
+            int fullCount =
+                Math.Min(
+                    setOption.FullOptionIndexes.Length,
+                    setOption.FullOptionValues.Length);
+
+            for (int i = 0;
+                i < fullCount;
+                i++)
+            {
+                AppendAncientOptionLine(
+                    lines,
+                    setOption.FullOptionIndexes[i],
+                    setOption.FullOptionValues[i],
+                    ResolveMuColor(3));
+            }
+        }
+
+        private static void AppendAncientOptionLine(
+            List<(string text, Color color)> lines,
+            int optionId,
+            int value,
+            Color color)
+        {
+            // -1 means unused in the original table.
+            if (optionId < 0 ||
+                value <= 0)
+            {
+                return;
+            }
+
+            string text =
+                BuildAncientOptionText(
+                    optionId,
+                    value);
+
+            if (string.IsNullOrWhiteSpace(
+                    text))
+            {
+                return;
+            }
+
+            lines.Add(
+                (
+                    text,
+                    color
+                ));
+        }
+
+        private static string BuildAncientOptionText(
+            int optionId,
+            int value)
+        {
+            var optionText =
+                ItemTooltipDataRepository
+                    .GetItemSetOptionText(
+                        optionId);
+
+            if (optionText == null ||
+                !optionText.HasText)
+            {
+                // Don't expose internal IDs in the normal tooltip.
+                return string.Empty;
+            }
+
+            string text =
+                optionText.Text.Trim();
+
+            return FormatAncientOptionText(
+                text,
+                value);
+        }
+
+        private static string FormatAncientOptionText(
+            string template,
+            int value)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    template))
+            {
+                return string.Empty;
+            }
+
+            string valueText =
+                value.ToString();
+
+            // Handle percentage printf patterns first.
+            //
+            // Example:
+            // "Increase damage +%d%%"
+            //
+            // must become:
+            // "Increase damage +10%"
+            string result =
+                template
+                    .Replace(
+                        "%d%%",
+                        $"{value}%")
+                    .Replace(
+                        "%i%%",
+                        $"{value}%")
+                    .Replace(
+                        "%u%%",
+                        $"{value}%");
+
+            // Standard printf placeholders.
+            result =
+                result
+                    .Replace(
+                        "%d",
+                        valueText)
+                    .Replace(
+                        "%i",
+                        valueText)
+                    .Replace(
+                        "%u",
+                        valueText)
+                    .Replace(
+                        "%ld",
+                        valueText)
+                    .Replace(
+                        "%lu",
+                        valueText);
+
+            // Some converted tables can use .NET-style placeholders.
+            result =
+                result.Replace(
+                    "{0}",
+                    valueText);
+
+            return result.Trim();
         }
         private static void AppendSectionSeparator(
             List<(string text, Color color)> lines)
