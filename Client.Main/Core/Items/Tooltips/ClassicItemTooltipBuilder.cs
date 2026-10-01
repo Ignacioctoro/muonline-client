@@ -302,20 +302,6 @@ namespace Client.Main.Core.Items.Tooltips
                 result,
                 def);
             // ---------------------------------------------------------
-            // ANCIENT / SET OPTIONS
-            // ---------------------------------------------------------
-
-            if (details.IsAncient)
-            {
-                AppendSectionSeparator(
-                    result);
-
-                AppendAncientOptions(
-                    result,
-                    item);
-            }
-
-            // ---------------------------------------------------------
             // GUARDIAN / LEVEL 380
             // ---------------------------------------------------------
 
@@ -389,6 +375,22 @@ namespace Client.Main.Core.Items.Tooltips
                     result);
 
                 AppendSocketOptions(
+                    result,
+                    item);
+            }
+            // ---------------------------------------------------------
+            // ANCIENT / SET OPTIONS
+            //
+            // Original MU places the Ancient set information after the
+            // regular item options.
+            // ---------------------------------------------------------
+
+            if (details.IsAncient)
+            {
+                AppendSectionSeparator(
+                    result);
+
+                AppendAncientOptions(
                     result,
                     item);
             }

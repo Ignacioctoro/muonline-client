@@ -3554,6 +3554,102 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             // Main background
             UiDrawHelper.DrawVerticalGradient(spriteBatch, tooltipRect, new Color(20, 24, 32, 252), new Color(12, 14, 18, 254));
+            // =========================================================
+            // ANCIENT OPTION BACKGROUND
+            //
+            // The original MU client highlights the Ancient option
+            // section with a dark blue panel.
+            // =========================================================
+
+            int ancientHeaderIndex =
+                lines.FindIndex(
+                    x =>
+                        x.text ==
+                        "Ancient Options");
+
+            if (ancientHeaderIndex >= 0)
+            {
+                int currentY =
+                    tooltipRect.Y +
+                    paddingY;
+
+                bool firstLine =
+                    true;
+
+                int ancientTop =
+                    -1;
+
+                int ancientBottom =
+                    -1;
+
+                for (int i = 0;
+                    i < lines.Count;
+                    i++)
+                {
+                    var line =
+                        lines[i];
+
+                    Vector2 lineSize =
+                        _font.MeasureString(
+                            line.text) *
+                        scale;
+
+                    int lineHeight =
+                        (int)MathF.Ceiling(
+                            lineSize.Y);
+
+                    if (i ==
+                        ancientHeaderIndex)
+                    {
+                        ancientTop =
+                            currentY - 3;
+                    }
+
+                    currentY +=
+                        lineHeight +
+                        lineSpacing;
+
+                    if (firstLine)
+                    {
+                        currentY += 6;
+                        firstLine = false;
+                    }
+
+                    if (i >=
+                        ancientHeaderIndex)
+                    {
+                        ancientBottom =
+                            currentY;
+                    }
+                }
+
+                if (ancientTop >= 0 &&
+                    ancientBottom >
+                        ancientTop)
+                {
+                    Rectangle ancientRect =
+                        new(
+                            tooltipRect.X + 5,
+                            ancientTop,
+                            tooltipRect.Width - 10,
+                            ancientBottom -
+                                ancientTop + 2);
+
+                    UiDrawHelper.DrawVerticalGradient(
+                        spriteBatch,
+                        ancientRect,
+                        new Color(
+                            18,
+                            38,
+                            92,
+                            220),
+                        new Color(
+                            8,
+                            20,
+                            55,
+                            230));
+                }
+            }
 
             // Border color based on item rarity
             bool isExcellent = _hoveredItem.Details.IsExcellent;
