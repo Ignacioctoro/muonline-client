@@ -123,9 +123,40 @@ public class VehicleObject : ModelObject
     /// the global animation throttle. Distant/low-quality vehicles keep the
     /// normal optimized animation path.
     /// </summary>
-    protected override bool UseRealtimeAnimationSampling =>
-        !LowQuality &&
-        (_activeDefinition?.ClassicChromeMeshes?.Length ?? 0) > 0;
+    protected override bool UseRealtimeAnimationSampling
+    {
+        get
+        {
+            if (LowQuality ||
+                _activeDefinition == null)
+            {
+                return false;
+            }
+
+
+            //
+            // Permanent Chrome, e.g. Fenrir Gold.
+            //
+            if ((_activeDefinition
+                    .ClassicChromeMeshes
+                    ?.Length ?? 0) > 0)
+            {
+                return true;
+            }
+
+
+            //
+            // Skill-only Chrome, e.g. Black / Blue / Red Fenrir.
+            //
+            return
+                CurrentAction ==
+                    skillActionIndex
+                &&
+                (_activeDefinition
+                    .ClassicSkillChromeMeshes
+                    ?.Length ?? 0) > 0;
+        }
+    }
 
     public short ItemIndex
     {
@@ -1445,6 +1476,7 @@ public class VehicleObject : ModelObject
         VehicleDefinition definition =
             _activeDefinition;
 
+
         if (definition == null ||
             Model?.Meshes == null ||
             Hidden)
@@ -1453,23 +1485,93 @@ public class VehicleObject : ModelObject
         }
 
 
-        int[] chromeMeshes =
+        // ================================================================
+        // PERMANENT CLASSIC CHROME
+        // ================================================================
+        //
+        // Season 6:
+        //
+        // Fenrir Gold:
+        //
+        //     RenderMesh(
+        //         0,
+        //         RENDER_TEXTURE |
+        //         RENDER_BRIGHT |
+        //         RENDER_CHROME);
+        //
+        // ================================================================
+
+        int[] permanentChromeMeshes =
             definition.ClassicChromeMeshes;
 
 
-        if (chromeMeshes == null ||
-            chromeMeshes.Length == 0)
+        if (permanentChromeMeshes != null)
+        {
+            for (int i = 0;
+                i < permanentChromeMeshes.Length;
+                i++)
+            {
+                int mesh =
+                    permanentChromeMeshes[i];
+
+
+                if (mesh < 0 ||
+                    mesh >= Model.Meshes.Length)
+                {
+                    continue;
+                }
+
+
+                DrawClassicChromePass(
+                    mesh,
+                    definition.ClassicChromeColor,
+                    definition.ClassicChromeIntensity);
+            }
+        }
+
+
+        // ================================================================
+        // SKILL-ONLY CLASSIC CHROME
+        // ================================================================
+        //
+        // Season 6:
+        //
+        // Black / Blue / Red Fenrir:
+        //
+        //     if (CurrentAction == FENRIR_ATTACK_SKILL)
+        //     {
+        //         RenderMesh(
+        //             1,
+        //             RENDER_TEXTURE |
+        //             RENDER_BRIGHT |
+        //             RENDER_CHROME);
+        //     }
+        //
+        // ================================================================
+
+        if (CurrentAction !=
+            skillActionIndex)
+        {
+            return;
+        }
+
+
+        int[] skillChromeMeshes =
+            definition.ClassicSkillChromeMeshes;
+
+
+        if (skillChromeMeshes == null)
         {
             return;
         }
 
 
         for (int i = 0;
-            i < chromeMeshes.Length;
+            i < skillChromeMeshes.Length;
             i++)
         {
             int mesh =
-                chromeMeshes[i];
+                skillChromeMeshes[i];
 
 
             if (mesh < 0 ||

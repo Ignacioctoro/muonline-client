@@ -157,7 +157,7 @@ public static class VehicleDatabase
                 11,
                 "Fenril Black",
                 "fenril_black.bmd",
-                chromeMesh: 1,
+                isGold: false,
                 thunderColor:
                     new Vector3(
                         1.0f,
@@ -170,7 +170,7 @@ public static class VehicleDatabase
                 12,
                 "Fenril Blue",
                 "fenril_blue.bmd",
-                chromeMesh: 1,
+                isGold: false,
                 thunderColor:
                     new Vector3(
                         0.1f,
@@ -183,7 +183,7 @@ public static class VehicleDatabase
                 13,
                 "Fenril Gold",
                 "fenril_gold.bmd",
-                chromeMesh: 0,
+                isGold: true,
                 thunderColor:
                     new Vector3(
                         0.8f,
@@ -196,7 +196,7 @@ public static class VehicleDatabase
                 14,
                 "Fenril Red",
                 "fenril_red.bmd",
-                chromeMesh: 1,
+                isGold: false,
                 thunderColor:
                     new Vector3(
                         0.8f,
@@ -209,7 +209,7 @@ public static class VehicleDatabase
                 15,
                 "Fenrir Black",
                 "fenrir_black.bmd",
-                chromeMesh: 1,
+                isGold: false,
                 thunderColor:
                     new Vector3(
                         1.0f,
@@ -222,7 +222,7 @@ public static class VehicleDatabase
                 16,
                 "Fenrir Blue",
                 "fenrir_blue.bmd",
-                chromeMesh: 1,
+                isGold: false,
                 thunderColor:
                     new Vector3(
                         0.1f,
@@ -235,7 +235,7 @@ public static class VehicleDatabase
                 17,
                 "Fenrir Gold",
                 "fenrir_gold.bmd",
-                chromeMesh: 0,
+                isGold: true,
                 thunderColor:
                     new Vector3(
                         0.8f,
@@ -248,7 +248,7 @@ public static class VehicleDatabase
                 18,
                 "Fenrir Red",
                 "fenrir_red.bmd",
-                chromeMesh: 1,
+                isGold: false,
                 thunderColor:
                     new Vector3(
                         0.8f,
@@ -436,7 +436,7 @@ public static class VehicleDatabase
             int id,
             string name,
             string texturePath,
-            int chromeMesh,
+            bool isGold,
             Vector3 thunderColor)
         {
             return new VehicleDefinition
@@ -468,19 +468,38 @@ public static class VehicleDatabase
                     },
 
 
+                // Season 6:
                 //
                 // Gold:
-                //     mesh 0
+                //     permanent Chrome on mesh 0.
                 //
-                // Red / Blue / Black:
-                //     mesh 1
+                // Black / Blue / Red:
+                //     no permanent Chrome.
                 //
                 ClassicChromeMeshes =
-                    new[]
-                    {
-                        chromeMesh
-                    },
+                    isGold
+                        ? new[]
+                        {
+                            0
+                        }
+                        : Array.Empty<int>(),
 
+
+                //
+                // Season 6:
+                //
+                // Black / Blue / Red receive Chrome on mesh 1 only
+                // while FENRIR_ATTACK_SKILL is playing.
+                //
+                // Gold already has its permanent mesh-0 Chrome.
+                //
+                ClassicSkillChromeMeshes =
+                    !isGold
+                        ? new[]
+                        {
+                            1
+                        }
+                        : Array.Empty<int>(),
                 ClassicChromeColor =
                     Vector3.One,
 

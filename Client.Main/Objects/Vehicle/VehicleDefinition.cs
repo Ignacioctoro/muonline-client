@@ -96,6 +96,19 @@ public class VehicleDefinition
     /// </summary>
     public int[] ClassicChromeMeshes { get; set; } =
         Array.Empty<int>();
+    /// <summary>
+    /// Classic Chrome meshes which are rendered only while the vehicle
+    /// is executing its configured SkillActionIndex.
+    ///
+    /// Season 6 Fenrir:
+    ///
+    /// Black / Blue / Red:
+    ///     mesh 1 only during FENRIR_ATTACK_SKILL.
+    ///
+    /// Gold does not use this because its Chrome is permanent.
+    /// </summary>
+    public int[] ClassicSkillChromeMeshes { get; set; } =
+        Array.Empty<int>();
 
 
     /// <summary>
