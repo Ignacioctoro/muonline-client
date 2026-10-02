@@ -240,6 +240,15 @@ namespace Client.Main.Core.Items.Tooltips
                 return ItemUiHelper.BuildTooltipLines(item);
             }
 
+            // Fenrir needs its dedicated original-client tooltip path,
+            // but only after the tooltip definition has been resolved.
+            if (IsFenrir(item))
+            {
+                return BuildFenrirTooltip(
+                    item,
+                    tooltip);
+            }
+
             var result =
                 new List<(string text, Color color)>();
 
@@ -365,18 +374,6 @@ namespace Client.Main.Core.Items.Tooltips
                         result.Add((text, color));
                     }
                 }
-            }
-            bool hasFenrirTooltip =
-                details.IsFenrir;
-
-            if (hasFenrirTooltip)
-            {
-                AppendSectionSeparator(
-                    result);
-
-                AppendFenrirOptions(
-                    result,
-                    item);
             }
             // ---------------------------------------------------------
             // EQUIPPABLE CLASS RESTRICTIONS
@@ -522,110 +519,287 @@ namespace Client.Main.Core.Items.Tooltips
                 item.Definition.Group == 13 &&
                 item.Definition.Id == 37;
         }
-
-        private static void AppendFenrirOptions(
-            List<(string text, Color color)> lines,
-            InventoryItem item)
+        private static List<(string text, Color color)> BuildFenrirTooltip(
+            InventoryItem item,
+            ItemTooltipBMD tooltip)
         {
-            if (!IsFenrir(item))
-            {
-                return;
-            }
+            var result =
+                new List<(string text, Color color)>();
 
             var details =
                 item.Details;
 
+            var def =
+                item.Definition;
+
+            Color blue =
+                ResolveMuColor(1);
+
+            Color white =
+                ResolveMuColor(0);
+
+            Color yellow =
+                ResolveMuColor(3);
+
+            Color green =
+                ResolveMuColor(4);
+
             // ---------------------------------------------------------
-            // SEASON 6 FENRIR TOOLTIP
+            // NAME
             //
-            // Text comes from ItemTooltipText_eng.bmd.
-            // No human-readable tooltip strings are hardcoded here.
+            // Base name comes from ItemTooltip_s6.bmd.
+            // Variant suffix comes from text.bmd.
             // ---------------------------------------------------------
 
-            // Plasma Storm (Mana:50)
-            AppendLegacyTooltipText(
-                lines,
-                329);
+            string name =
+                !string.IsNullOrWhiteSpace(
+                    tooltip.Name)
+                    ? tooltip.Name.Trim()
+                    : def.Name ?? string.Empty;
+
+            string suffix =
+                string.Empty;
 
             if (details.IsFenrirDestroy)
             {
-                // Increases final damage by 10%%
-                AppendLegacyTooltipText(
-                    lines,
-                    332);
-
-                // Increases Movement Speed
-                AppendLegacyTooltipText(
-                    lines,
-                    25);
+                suffix =
+                    ItemTooltipDataRepository
+                        .GetGlobalText(1863);
             }
             else if (details.IsFenrirProtect)
             {
-                // Absorbs 10%% of final damage
-                AppendLegacyTooltipText(
-                    lines,
-                    350);
-
-                // Increases Movement Speed
-                AppendLegacyTooltipText(
-                    lines,
-                    25);
+                suffix =
+                    ItemTooltipDataRepository
+                        .GetGlobalText(1864);
             }
             else if (details.IsFenrirGolden)
             {
-                AppendGoldenFenrirOptions(
-                    lines);
+                suffix =
+                    ItemTooltipDataRepository
+                        .GetGlobalText(1866);
             }
 
-            // With this equipped, you can summons Fenrir.
-            AppendLegacyTooltipText(
-                lines,
-                330);
-        }
-        private static void AppendGoldenFenrirOptions(
-            List<(string text, Color color)> lines)
-        {
-            var character =
-                MuGame.Network?.GetCharacterState();
-
-            if (character != null)
+            if (!string.IsNullOrWhiteSpace(
+                    suffix))
             {
-                int level =
-                    character.Level;
-
-                // Same relationships used by OpenMU for Gold Fenrir.
-                int hpIncrease =
-                    level / 2;
-
-                int manaIncrease =
-                    level / 2;
-
-                int attackIncrease =
-                    level / 12;
-
-                int wizardryIncrease =
-                    level / 25;
-
-                // "%d HP increase#%d Mana increase"
-                AppendLegacyTooltipText(
-                    lines,
-                    334,
-                    hpIncrease,
-                    manaIncrease);
-
-                // "%d attack power increase# %d wizardry increase"
-                AppendLegacyTooltipText(
-                    lines,
-                    335,
-                    attackIncrease,
-                    wizardryIncrease);
+                name =
+                    $"{name} {suffix.Trim()}";
             }
 
-            // This is specially designed for heroes who have
-            // triumphed in the Illusion Temple.
-            AppendLegacyTooltipText(
-                lines,
-                336);
+            result.Add(
+                (
+                    name,
+                    blue
+                ));
+
+            // ---------------------------------------------------------
+            // LIFE
+            //
+            // Original MU uses item Durability as Fenrir Life.
+            //
+            // text.bmd:
+            // 70 = "Life: %d"
+            // ---------------------------------------------------------
+
+            AppendGlobalText(
+                result,
+                70,
+                white,
+                item.Durability);
+
+            // ---------------------------------------------------------
+            // PLASMA STORM
+            //
+            // text.bmd:
+            // 1928 = "Plasma storm skill (Mana:%d)"
+            // ---------------------------------------------------------
+
+            int mana =
+                SkillDatabase.GetSkillManaCost(
+                    def.SkillIndex);
+
+            if (mana > 0)
+            {
+                AppendGlobalText(
+                    result,
+                    1928,
+                    blue,
+                    mana);
+            }
+            else
+            {
+                // Data-driven fallback from
+                // ItemTooltipText_eng.bmd.
+                AppendLegacyTooltipText(
+                    result,
+                    329);
+            }
+
+            // ---------------------------------------------------------
+            // DESTROY
+            // ---------------------------------------------------------
+
+            if (details.IsFenrirDestroy)
+            {
+                // text.bmd:
+                // 1860 = Increase final damage %d%%
+                AppendGlobalText(
+                    result,
+                    1860,
+                    blue,
+                    10);
+
+                // ItemTooltipText_eng.bmd:
+                // 25 = Increases Movement Speed
+                AppendLegacyTooltipText(
+                    result,
+                    25);
+            }
+
+            // ---------------------------------------------------------
+            // PROTECT
+            // ---------------------------------------------------------
+
+            else if (details.IsFenrirProtect)
+            {
+                // text.bmd:
+                // 1861 = Absorb final damage %d%%
+                AppendGlobalText(
+                    result,
+                    1861,
+                    blue,
+                    10);
+
+                AppendLegacyTooltipText(
+                    result,
+                    25);
+            }
+
+            // ---------------------------------------------------------
+            // ILLUSION / GOLDEN
+            // ---------------------------------------------------------
+
+            else if (details.IsFenrirGolden)
+            {
+                var character =
+                    MuGame.Network?
+                        .GetCharacterState();
+
+                if (character != null)
+                {
+                    int level =
+                        character.Level;
+
+                    AppendGlobalText(
+                        result,
+                        1867,
+                        blue,
+                        level / 2);
+
+                    AppendGlobalText(
+                        result,
+                        1868,
+                        blue,
+                        level / 2);
+
+                    AppendGlobalText(
+                        result,
+                        1869,
+                        blue,
+                        level / 12);
+
+                    AppendGlobalText(
+                        result,
+                        1870,
+                        blue,
+                        level / 25);
+                }
+
+                AppendSectionSeparator(
+                    result);
+
+                AppendGlobalText(
+                    result,
+                    1871,
+                    green);
+
+                AppendGlobalText(
+                    result,
+                    1872,
+                    green);
+            }
+
+            // ---------------------------------------------------------
+            // FOOTER
+            // ---------------------------------------------------------
+
+            AppendSectionSeparator(
+                result);
+
+            // text.bmd:
+            // 1920 = Can summon the Fenrir when equipped.
+            AppendGlobalText(
+                result,
+                1920,
+                yellow);
+
+            // Only normal/red Fenrir displays this.
+            if (details.FenrirFlags == 0)
+            {
+                // text.bmd:
+                // 1929 = Skills will improve through upgrading.
+                AppendGlobalText(
+                    result,
+                    1929,
+                    yellow);
+            }
+
+            return result;
+        }
+
+        private static void AppendGlobalText(
+            List<(string text, Color color)> lines,
+            int textId,
+            Color color,
+            params int[] values)
+        {
+            string source =
+                ItemTooltipDataRepository
+                    .GetGlobalText(
+                        textId);
+
+            if (string.IsNullOrWhiteSpace(
+                    source))
+            {
+                return;
+            }
+
+            string formatted =
+                FormatLegacyTooltipText(
+                    source,
+                    values);
+
+            string[] parts =
+                formatted.Split(
+                    '#',
+                    StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string part in parts)
+            {
+                string text =
+                    part.Trim();
+
+                if (text.Length == 0)
+                {
+                    continue;
+                }
+
+                lines.Add(
+                    (
+                        text,
+                        color
+                    ));
+            }
         }
 
         private static void AppendLegacyTooltipText(
