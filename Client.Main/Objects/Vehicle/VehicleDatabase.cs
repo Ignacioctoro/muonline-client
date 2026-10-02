@@ -1,4 +1,4 @@
-
+using Microsoft.Xna.Framework;
 namespace Client.Main.Objects.Vehicle;
 
 public static class VehicleDatabase
@@ -151,174 +151,109 @@ public static class VehicleDatabase
                 AnimationSpeedMultiplier = 1.0f,
             }
         },
-        {
-            11, new VehicleDefinition
-            {
-                Id = 11,
-                Name = "Fenril Black",
-                TexturePath = "fenril_black.bmd",
-                RiderHeightOffset = 0f, // Fenrir variants - rider too low
-                // SourceMain5.2 (_define.h): FENRIR_STAND=0, WALK=1, RUN=2, ATTACK=3, ATTACK_SKILL=4, DAMAGE=5
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
                 {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            11,
+            CreateFenrirDefinition(
+                11,
+                "Fenril Black",
+                "fenril_black.bmd",
+                chromeMesh: 1,
+                thunderColor:
+                    new Vector3(
+                        1.0f,
+                        1.0f,
+                        0.2f))
         },
         {
-            12, new VehicleDefinition
-            {
-                Id = 12,
-                Name = "Fenril Blue",
-                TexturePath = "fenril_blue.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            12,
+            CreateFenrirDefinition(
+                12,
+                "Fenril Blue",
+                "fenril_blue.bmd",
+                chromeMesh: 1,
+                thunderColor:
+                    new Vector3(
+                        0.1f,
+                        0.1f,
+                        0.8f))
         },
         {
-            13, new VehicleDefinition
-            {
-                Id = 13,
-                Name = "Fenril Gold",
-                TexturePath = "fenril_gold.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            13,
+            CreateFenrirDefinition(
+                13,
+                "Fenril Gold",
+                "fenril_gold.bmd",
+                chromeMesh: 0,
+                thunderColor:
+                    new Vector3(
+                        0.8f,
+                        0.8f,
+                        0.1f))
         },
         {
-            14, new VehicleDefinition
-            {
-                Id = 14,
-                Name = "Fenril Red",
-                TexturePath = "fenril_red.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            14,
+            CreateFenrirDefinition(
+                14,
+                "Fenril Red",
+                "fenril_red.bmd",
+                chromeMesh: 1,
+                thunderColor:
+                    new Vector3(
+                        0.8f,
+                        0.0f,
+                        0.0f))
         },
         {
-            15, new VehicleDefinition
-            {
-                Id = 15,
-                Name = "Fenrir Black",
-                TexturePath = "fenrir_black.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            15,
+            CreateFenrirDefinition(
+                15,
+                "Fenrir Black",
+                "fenrir_black.bmd",
+                chromeMesh: 1,
+                thunderColor:
+                    new Vector3(
+                        1.0f,
+                        1.0f,
+                        0.2f))
         },
         {
-            16, new VehicleDefinition
-            {
-                Id = 16,
-                Name = "Fenrir Blue",
-                TexturePath = "fenrir_blue.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            16,
+            CreateFenrirDefinition(
+                16,
+                "Fenrir Blue",
+                "fenrir_blue.bmd",
+                chromeMesh: 1,
+                thunderColor:
+                    new Vector3(
+                        0.1f,
+                        0.1f,
+                        0.8f))
         },
         {
-            17, new VehicleDefinition
-            {
-                Id = 17,
-                Name = "Fenrir Gold",
-                TexturePath = "fenrir_gold.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            17,
+            CreateFenrirDefinition(
+                17,
+                "Fenrir Gold",
+                "fenrir_gold.bmd",
+                chromeMesh: 0,
+                thunderColor:
+                    new Vector3(
+                        0.8f,
+                        0.8f,
+                        0.1f))
         },
         {
-            18, new VehicleDefinition
-            {
-                Id = 18,
-                Name = "Fenrir Red",
-                TexturePath = "fenrir_red.bmd",
-                RiderHeightOffset = 0f,
-                IdleActionIndex = 0,
-                RunActionIndex = 2,
-                SkillActionIndex = 4,
-                ActionPlaySpeedOverrides = new Dictionary<int, float>
-                {
-                    [0] = 0.4f,
-                    [1] = 1.0f,
-                    [2] = 0.6f,
-                    [3] = 0.4f,
-                    [4] = 0.4f,
-                    [5] = 0.4f,
-                },
-            }
+            18,
+            CreateFenrirDefinition(
+                18,
+                "Fenrir Red",
+                "fenrir_red.bmd",
+                chromeMesh: 1,
+                thunderColor:
+                    new Vector3(
+                        0.8f,
+                        0.0f,
+                        0.0f))
         },
         {
             19, new VehicleDefinition
@@ -481,6 +416,93 @@ public static class VehicleDatabase
             }
         },
     };
+
+        /// <summary>
+        /// Creates one of the classic MU Fenrir definitions.
+        ///
+        /// SourceMain behavior:
+        ///
+        /// FENRIR_STAND        = 0
+        /// FENRIR_WALK         = 1
+        /// FENRIR_RUN          = 2
+        /// FENRIR_ATTACK       = 3
+        /// FENRIR_ATTACK_SKILL = 4
+        /// FENRIR_DAMAGE       = 5
+        ///
+        /// The original renderer keeps the Fenrir body at full brightness
+        /// and adds one Chrome01 pass over the variant-specific color mesh.
+        /// </summary>
+        private static VehicleDefinition CreateFenrirDefinition(
+            int id,
+            string name,
+            string texturePath,
+            int chromeMesh,
+            Vector3 thunderColor)
+        {
+            return new VehicleDefinition
+            {
+                Id = id,
+
+                Name = name,
+
+                TexturePath = texturePath,
+
+                RiderHeightOffset = 0f,
+
+                IdleActionIndex = 0,
+
+                RunActionIndex = 2,
+
+                SkillActionIndex = 4,
+
+
+                //
+                // Original ZzzObject.cpp:
+                //
+                // b->BodyLight = (1,1,1)
+                //
+                FullBrightMeshes =
+                    new[]
+                    {
+                        0
+                    },
+
+
+                //
+                // Gold:
+                //     mesh 0
+                //
+                // Red / Blue / Black:
+                //     mesh 1
+                //
+                ClassicChromeMeshes =
+                    new[]
+                    {
+                        chromeMesh
+                    },
+
+                ClassicChromeColor =
+                    Vector3.One,
+
+                ClassicChromeIntensity =
+                    1.0f,
+
+                FenrirThunderColor =
+                    thunderColor,
+
+
+                ActionPlaySpeedOverrides =
+                    new Dictionary<int, float>
+                    {
+                        [0] = 0.4f,
+                        [1] = 1.0f,
+                        [2] = 0.6f,
+                        [3] = 0.4f,
+                        [4] = 0.4f,
+                        [5] = 0.4f,
+                    },
+            };
+        }
 
     public static VehicleDefinition GetVehicleDefinition(int index)
     {

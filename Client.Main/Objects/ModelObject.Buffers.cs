@@ -14,6 +14,18 @@ namespace Client.Main.Objects
 {
     public abstract partial class ModelObject
     {
+        /// <summary>
+        /// Allows individual meshes to reproduce the original MU StreamMesh
+        /// lighting behaviour.
+        ///
+        /// Stream meshes bypass normal body/terrain lighting.
+        /// </summary>
+        protected virtual bool UseFullBrightLightingForMesh(
+            int meshIndex)
+        {
+            return false;
+        }
+
         // Per-mesh buffer cache
         private struct MeshBufferCache
         {
@@ -200,10 +212,45 @@ namespace Client.Main.Objects
                             continue;
 
                         // Calculate mesh-specific lighting
-                        bool isBlend = IsBlendMesh(meshIndex);
-                        Vector3 meshLight = needLightCalculation
-                            ? (isBlend ? baseLight * blendMeshLight : baseLight * totalAlpha)
-                            : cache.CachedLight;
+                        bool isBlend =
+                            IsBlendMesh(
+                                meshIndex);
+
+
+                        Vector3 meshLight;
+
+
+                        if (needLightCalculation)
+                        {
+                            //
+                            // Original MU StreamMesh behaviour:
+                            //
+                            // if (i == StreamMesh)
+                            //     EnableLight = false;
+                            //
+                            // Fenrir sets StreamMesh = 0.
+                            //
+                            if (UseFullBrightLightingForMesh(
+                                    meshIndex))
+                            {
+                                meshLight =
+                                    Vector3.One;
+                            }
+                            else
+                            {
+                                meshLight =
+                                    isBlend
+                                        ? baseLight *
+                                        blendMeshLight
+                                        : baseLight *
+                                        totalAlpha;
+                            }
+                        }
+                        else
+                        {
+                            meshLight =
+                                cache.CachedLight;
+                        }
 
                         // Check if this specific mesh needs update - only on real changes
                         bool meshNeedsUpdate = !cache.IsValid ||

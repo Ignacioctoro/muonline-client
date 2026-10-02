@@ -1,50 +1,121 @@
+using Microsoft.Xna.Framework;
 
 namespace Client.Main.Objects.Vehicle;
 
 public class VehicleDefinition
 {
     public int Id { get; set; }
+
     public string Name { get; set; }
+
     public string TexturePath { get; set; }
 
-    /// <summary>
-    /// Base animation speed for this vehicle (multiplies action PlaySpeed).
-    /// Default is 25f to match player/vehicle baseline.
-    /// </summary>
-    public float AnimationSpeed { get; set; } = 25f;
 
     /// <summary>
-    /// Action indices for this vehicle model (as in SourceMain5.2 mount SetAction indices).
+    /// Base animation speed for this vehicle.
+    /// Multiplies the action PlaySpeed.
     /// </summary>
-    public int IdleActionIndex { get; set; } = 0;
-    public int RunActionIndex { get; set; } = 2;
-    public int SkillActionIndex { get; set; } = 4;
+    public float AnimationSpeed { get; set; } =
+        25f;
+
 
     /// <summary>
-    /// Vertical offset (Z-axis) applied to the rider when mounted on this vehicle.
-    /// Positive values raise the rider, negative values lower them.
-    /// Default is 0 (no offset).
+    /// Action indices used by this vehicle model.
     /// </summary>
-    public float RiderHeightOffset { get; set; } = 0f;
+    public int IdleActionIndex { get; set; } =
+        0;
+
+    public int RunActionIndex { get; set; } =
+        2;
+
+    public int SkillActionIndex { get; set; } =
+        4;
+
 
     /// <summary>
-    /// Multiplier for the vehicle's animation speed.
-    /// Values greater than 1.0 speed up the animation, less than 1.0 slow it down.
-    /// Default is 1.0 (normal speed).
+    /// Vertical offset applied to the rider.
     /// </summary>
-    public float AnimationSpeedMultiplier { get; set; } = 1.0f;
+    public float RiderHeightOffset { get; set; } =
+        0f;
+
 
     /// <summary>
-    /// Per-action animation speed multipliers for idle/run/skill actions.
-    /// These multiply AnimationSpeedMultiplier for the specific action index.
+    /// Global animation speed multiplier.
     /// </summary>
-    public float IdleAnimationSpeedMultiplier { get; set; } = 1.0f;
-    public float RunAnimationSpeedMultiplier { get; set; } = 1.0f;
-    public float SkillAnimationSpeedMultiplier { get; set; } = 1.0f;
+    public float AnimationSpeedMultiplier { get; set; } =
+        1.0f;
+
+
+    public float IdleAnimationSpeedMultiplier { get; set; } =
+        1.0f;
+
+    public float RunAnimationSpeedMultiplier { get; set; } =
+        1.0f;
+
+    public float SkillAnimationSpeedMultiplier { get; set; } =
+        1.0f;
+
 
     /// <summary>
-    /// Absolute PlaySpeed overrides per action index (mirrors SourceMain5.2 mount "Velocity" values).
-    /// When provided, overrides take precedence over multipliers.
+    /// Absolute PlaySpeed overrides per animation/action.
     /// </summary>
     public Dictionary<int, float> ActionPlaySpeedOverrides { get; set; }
+
+
+    // ================================================================
+    // CLASSIC MU VEHICLE MATERIALS
+    // ================================================================
+
+
+    /// <summary>
+    /// Meshes which reproduce the original MU StreamMesh behaviour.
+    ///
+    /// These meshes bypass normal terrain/body lighting and render with
+    /// BodyLight = (1,1,1).
+    ///
+    /// Original Fenrir:
+    ///
+    ///     b->StreamMesh = 0;
+    ///
+    /// Therefore mesh 0 is fullbright while mesh 1 keeps normal lighting.
+    /// </summary>
+    public int[] FullBrightMeshes { get; set; } =
+        Array.Empty<int>();
+
+
+    /// <summary>
+    /// Meshes which receive the classic RENDER_CHROME overlay.
+    ///
+    /// Original Fenrir:
+    ///
+    /// Gold:
+    ///     mesh 0
+    ///
+    /// Black / Blue / Red:
+    ///     mesh 1
+    /// </summary>
+    public int[] ClassicChromeMeshes { get; set; } =
+        Array.Empty<int>();
+
+
+    /// <summary>
+    /// BodyLight/color used by the Chrome pass.
+    /// </summary>
+    public Vector3 ClassicChromeColor { get; set; } =
+        Vector3.One;
+
+
+    /// <summary>
+    /// Strength of the Chrome overlay.
+    /// 1.0 reproduces the normal classic additive pass.
+    /// </summary>
+    public float ClassicChromeIntensity { get; set; } =
+        1.0f;
+
+
+    /// <summary>
+    /// Color used by the Fenrir thunder/electrical effects.
+    /// </summary>
+    public Vector3 FenrirThunderColor { get; set; } =
+        Vector3.One;
 }

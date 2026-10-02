@@ -63,8 +63,69 @@ public class VehicleObject : ModelObject
         31, // Rippen Ride
     };
 
-    private short itemIndex = -1;
+        private short itemIndex = -1;
+
     private int _itemIndexChangeVersion;
+
+    //
+    // Configuration of the vehicle which is currently loaded.
+    //
+    // Rendering differences such as Fenrir Gold using Chrome on mesh 0
+    // belong to VehicleDatabase instead of being hardcoded here.
+    //
+    private VehicleDefinition _activeDefinition;
+
+
+    /// <summary>
+    /// Classic Fenrir rendering uses BodyLight=(1,1,1) and therefore must
+    /// bypass Neffis dynamic terrain lighting.
+    /// </summary>
+    protected override bool AllowDynamicLightingShader =>
+        (_activeDefinition?.FullBrightMeshes?.Length ?? 0) == 0;
+    
+    protected override bool UseFullBrightLightingForMesh(
+        int meshIndex)
+    {
+        int[] fullBrightMeshes =
+            _activeDefinition
+                ?.FullBrightMeshes;
+
+
+        if (fullBrightMeshes == null)
+        {
+            return false;
+        }
+
+
+        for (int i = 0;
+            i < fullBrightMeshes.Length;
+            i++)
+        {
+            if (fullBrightMeshes[i] ==
+                meshIndex)
+            {
+                return true;
+            }
+        }
+
+
+        return false;
+    }
+    
+    /// <summary>
+    /// Classic Chrome01 derives its UV coordinates from the animated normals.
+    ///
+    /// If the Fenrir skeleton is updated only at ANIMATION_UPDATE_FPS while
+    /// rendering runs faster, the chrome reflection visibly jumps between
+    /// poses.
+    ///
+    /// Only nearby vehicles which actually use the classic chrome pass bypass
+    /// the global animation throttle. Distant/low-quality vehicles keep the
+    /// normal optimized animation path.
+    /// </summary>
+    protected override bool UseRealtimeAnimationSampling =>
+        !LowQuality &&
+        (_activeDefinition?.ClassicChromeMeshes?.Length ?? 0) > 0;
 
     public short ItemIndex
     {
@@ -208,23 +269,55 @@ public class VehicleObject : ModelObject
         if (!IsCurrentItemIndex(requestedIndex, version))
             return;
 
-        // No vehicle.
+                // No vehicle.
         if (requestedIndex < 0)
         {
-            Model = null;
+            //
+            // Reset rendering behavior before replacing the model.
+            //
+            _activeDefinition =
+                null;
 
-            RiderHeightOffset = 0f;
+            LightEnabled =
+                true;
 
-            AnimationSpeedMultiplier = 1.0f;
-            idleAnimationSpeedMultiplier = 1.0f;
-            runAnimationSpeedMultiplier = 1.0f;
-            skillAnimationSpeedMultiplier = 1.0f;
+            Light =
+                Vector3.Zero;
 
-            idleActionIndex = DefaultAnimationIdle;
-            runActionIndex = DefaultAnimationRun;
-            skillActionIndex = DefaultAnimationSkill;
 
-            actionPlaySpeedOverrides = null;
+            Model =
+                null;
+
+
+            RiderHeightOffset =
+                0f;
+
+            AnimationSpeedMultiplier =
+                1.0f;
+
+            idleAnimationSpeedMultiplier =
+                1.0f;
+
+            runAnimationSpeedMultiplier =
+                1.0f;
+
+            skillAnimationSpeedMultiplier =
+                1.0f;
+
+
+            idleActionIndex =
+                DefaultAnimationIdle;
+
+            runActionIndex =
+                DefaultAnimationRun;
+
+            skillActionIndex =
+                DefaultAnimationSkill;
+
+
+            actionPlaySpeedOverrides =
+                null;
+
 
             return;
         }
@@ -276,12 +369,37 @@ public class VehicleObject : ModelObject
         skillActionIndex =
             riderDefinition.SkillActionIndex;
 
-        actionPlaySpeedOverrides =
+                actionPlaySpeedOverrides =
             riderDefinition.ActionPlaySpeedOverrides;
+
+
+        // =============================================================
+        // CLASSIC VEHICLE MATERIAL CONFIGURATION
+        // =============================================================
+        //
+        // This must be applied BEFORE assigning Model.
+        //
+        // Model's setter calls LoadContent(), and LoadContent() builds the
+        // vertex buffers. Fenrir must therefore already be configured as
+        // full-bright before those buffers are generated.
+        // =============================================================
+
+        _activeDefinition =
+            riderDefinition;
+
+        // The vehicle remains normally lit as a whole.
+        // StreamMesh/fullbright behavior is handled per mesh.
+        LightEnabled =
+            true;
+
+        Light =
+            Vector3.Zero;
+
 
         // Only the most recent ItemIndex request is allowed
         // to replace the current model.
-        Model = newModel;
+        Model =
+            newModel;
 
         if (Model == null)
         {
@@ -417,43 +535,14 @@ public class VehicleObject : ModelObject
                     // 15-18 = fenrir_*
                     return itemIndex >= 11 && itemIndex <= 18;
                 }
-                private Vector3 GetFenrirThunderColor()
-        {
-            //
-            // VehicleDatabase:
-            //
-            // 11 / 15 = Black
-            // 12 / 16 = Blue
-            // 13 / 17 = Gold
-            // 14 / 18 = Red
-            //
 
-            return itemIndex switch
-            {
-                12 or 16 =>
-                    new Vector3(
-                        0.1f,
-                        0.1f,
-                        0.8f),
-
-                13 or 17 =>
-                    new Vector3(
-                        0.8f,
-                        0.8f,
-                        0.1f),
-
-                14 or 18 =>
-                    new Vector3(
-                        0.8f,
-                        0.0f,
-                        0.0f),
-
-                _ =>
-                    new Vector3(
-                        1.0f,
-                        1.0f,
-                        0.2f)
-            };
+    private Vector3 GetFenrirThunderColor()
+    {
+        return
+            _activeDefinition
+            ?.FenrirThunderColor
+            ??
+            Vector3.One;
         }
 
         private float GetFenrirAnimationFrame()
@@ -1314,60 +1403,93 @@ public class VehicleObject : ModelObject
     {
         base.Draw(gameTime);
     }
-    private void DrawFenrirBodyGlow()
+        /// <summary>
+    /// Keep the classic vehicle material pass attached to the model render
+    /// itself instead of postponing it to the global DrawAfter stage.
+    ///
+    /// Original MU renders the Fenrir Chrome immediately together with
+    /// the vehicle meshes.
+    /// </summary>
+    public override void DrawModel(
+        bool isAfterDraw)
     {
-        if (!IsFenrir())
-            return;
+        base.DrawModel(
+            isAfterDraw);
 
-        if (Model == null ||
-            Hidden ||
-            Model.Meshes == null ||
-            Model.Meshes.Length <= 1)
+
+        //
+        // Only render Chrome after the solid vehicle pass.
+        //
+        // DrawModel(true) is the later RGBA/blend pass and must not
+        // render Chrome a second time.
+        //
+        if (!isAfterDraw)
+        {
+            DrawVehicleClassicChrome();
+        }
+    }
+        /// <summary>
+    /// Draws the optional classic MU Chrome01 layer configured for
+    /// the currently loaded vehicle.
+    ///
+    /// Fenrir:
+    ///
+    /// Gold               -> mesh 0
+    /// Red / Blue / Black -> mesh 1
+    ///
+    /// The actual RENDER_CHROME implementation lives in ModelObject so
+    /// other mounts can reuse it later.
+    /// </summary>
+    private void DrawVehicleClassicChrome()
+    {
+        VehicleDefinition definition =
+            _activeDefinition;
+
+        if (definition == null ||
+            Model?.Meshes == null ||
+            Hidden)
         {
             return;
         }
 
-        //
-        // Classic MU:
-        //
-        // Fenrir normal:
-        //
-        // RenderMesh(
-        //     1,
-        //     RENDER_TEXTURE |
-        //     RENDER_BRIGHT |
-        //     RENDER_CHROME);
-        //
-        //
-        // Our client does not yet have RENDER_CHROME,
-        // so we reproduce the bright additive second pass.
-        //
 
-        Vector3 glowColor =
-            GetFenrirThunderColor();
+        int[] chromeMeshes =
+            definition.ClassicChromeMeshes;
 
-        //
-        // Make the overlay softer than the lightning.
-        //
-        glowColor =
-            Vector3.Lerp(
-                glowColor,
-                Vector3.One,
-                0.35f);
 
-        Matrix glowMatrix =
-            WorldPosition;
+        if (chromeMeshes == null ||
+            chromeMeshes.Length == 0)
+        {
+            return;
+        }
 
-        DrawMeshHighlight(
-            1,
-            glowMatrix,
-            glowColor);
+
+        for (int i = 0;
+            i < chromeMeshes.Length;
+            i++)
+        {
+            int mesh =
+                chromeMeshes[i];
+
+
+            if (mesh < 0 ||
+                mesh >= Model.Meshes.Length)
+            {
+                continue;
+            }
+
+
+            DrawClassicChromePass(
+                mesh,
+                definition.ClassicChromeColor,
+                definition.ClassicChromeIntensity);
+        }
     }
 
-    public override void DrawAfter(GameTime gameTime)
+        public override void DrawAfter(
+        GameTime gameTime)
     {
-        base.DrawAfter(gameTime);
-
-        DrawFenrirBodyGlow();
+        base.DrawAfter(
+            gameTime);
     }
 }

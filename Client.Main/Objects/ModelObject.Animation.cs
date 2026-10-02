@@ -13,6 +13,19 @@ namespace Client.Main.Objects
 {
     public abstract partial class ModelObject
     {
+        /// <summary>
+        /// Allows specific animated models to bypass the global skeletal
+        /// animation update throttle.
+        ///
+        /// Most models should keep this disabled for performance.
+        ///
+        /// It is useful for effects such as classic RENDER_CHROME whose
+        /// generated UVs depend directly on the animated vertex normals.
+        /// Updating those normals at a lower frequency than rendering causes
+        /// the reflection to visibly jump between poses.
+        /// </summary>
+        protected virtual bool UseRealtimeAnimationSampling =>
+            false;
         // Local animation optimization - per object only
         private struct LocalAnimationState : IEquatable<LocalAnimationState>
         {
@@ -326,11 +339,20 @@ namespace Client.Main.Objects
             }
 
             // An action change must be applied immediately.
-            // Otherwise attacks / movement transitions could feel delayed.
-            if (forceStep)
+            //
+            // Models which require render-frequency skeletal sampling also
+            // bypass the global animation throttle. This is especially
+            // important for classic RENDER_CHROME because its generated UVs
+            // depend directly on the animated normals.
+            if (forceStep ||
+                UseRealtimeAnimationSampling)
             {
-                _animationStepAccumulatorSeconds = 0f;
-                animationDelta = frameDelta;
+                _animationStepAccumulatorSeconds =
+                    0f;
+
+                animationDelta =
+                    frameDelta;
+
                 return true;
             }
 
