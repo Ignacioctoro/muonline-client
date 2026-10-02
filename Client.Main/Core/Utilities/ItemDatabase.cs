@@ -327,6 +327,38 @@ namespace Client.Main.Core.Utilities
                 AncientBonusOption > 0;
 
             public byte ExcellentFlags;
+            // ---------------------------------------------------------
+            // FENRIR SPECIAL OPTIONS
+            // ---------------------------------------------------------
+
+            /// <summary>
+            /// True when this item is Group 13, Index 37 (Horn of Fenrir).
+            /// Fenrir uses bits from the Excellent byte for its own
+            /// variant flags, so these bits must not be interpreted as
+            /// regular Excellent options.
+            /// </summary>
+            public bool IsFenrir;
+
+            /// <summary>
+            /// Raw Fenrir flags stored in the Excellent-option byte.
+            ///
+            /// 0x01 = Destroy / Black Fenrir
+            /// 0x02 = Protect / Blue Fenrir
+            /// 0x04 = Golden Fenrir
+            /// </summary>
+            public byte FenrirFlags;
+
+            public bool IsFenrirDestroy =>
+                IsFenrir &&
+                (FenrirFlags & 0x01) != 0;
+
+            public bool IsFenrirProtect =>
+                IsFenrir &&
+                (FenrirFlags & 0x02) != 0;
+
+            public bool IsFenrirGolden =>
+                IsFenrir &&
+                (FenrirFlags & 0x04) != 0;
 
             // ---------------------------------------------------------
             // ANCIENT / SET ITEM DATA
@@ -421,7 +453,23 @@ namespace Client.Main.Core.Utilities
                 d.OptionLevel =
                     ext.OptionLevel;
 
+                bool isExtendedFenrir =
+                    ext.Group == 13 &&
+                    ext.Number == 37;
+
+                d.IsFenrir =
+                    isExtendedFenrir;
+
+                d.FenrirFlags =
+                    isExtendedFenrir
+                        ? (byte)(ext.ExcellentFlags & 0x07)
+                        : (byte)0;
+
+                // IMPORTANT:
+                // Fenrir variant flags share the same serialized byte as
+                // Excellent options, but they are NOT regular Excellent options.
                 d.IsExcellent =
+                    !isExtendedFenrir &&
                     (ext.ExcellentFlags & 0x3F) != 0;
 
                 d.IsAncient =
@@ -506,7 +554,28 @@ namespace Client.Main.Core.Utilities
             d.OptionLevel =
                 optionLevel;
 
+            byte legacyGroup =
+                itemData.Length > 5
+                    ? (byte)(itemData[5] >> 4)
+                    : (byte)0;
+
+            short legacyNumber =
+                itemData[0];
+
+            bool isLegacyFenrir =
+                legacyGroup == 13 &&
+                legacyNumber == 37;
+
+            d.IsFenrir =
+                isLegacyFenrir;
+
+            d.FenrirFlags =
+                isLegacyFenrir
+                    ? (byte)(excByte & 0x07)
+                    : (byte)0;
+
             d.IsExcellent =
+                !isLegacyFenrir &&
                 (excByte & 0x3F) != 0;
 
             d.IsAncient =

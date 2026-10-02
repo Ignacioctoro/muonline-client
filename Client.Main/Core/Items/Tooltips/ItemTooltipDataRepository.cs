@@ -41,8 +41,13 @@ namespace Client.Main.Core.Items.Tooltips
         private static Dictionary<ushort, ItemTooltipTextBMD>
             _texts =
                 new();
+
         private static Dictionary<ushort, ItemTooltipTextBMD>
             _legacyLocalizedTexts =
+                new();
+
+        private static Dictionary<int, string>
+            _globalTexts =
                 new();
 
         private static Dictionary<int, ExcellentOptionBMD>
@@ -118,6 +123,9 @@ namespace Client.Main.Core.Items.Tooltips
         public static int LegacyLocalizedTextCount =>
             _legacyLocalizedTexts.Count;
 
+        public static int GlobalTextCount =>
+            _globalTexts.Count;
+
         public static int ExcellentCommonOptionCount =>
             _excellentCommonOptions.Count;
 
@@ -177,6 +185,12 @@ namespace Client.Main.Core.Items.Tooltips
                     Constants.DataPath,
                     "Local",
                     "itemtooltiptext.bmd");
+            string globalTextPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "text.bmd");
+                            
             string legacyItemTooltipTextPath =
                 Path.Combine(
                     Constants.DataPath,
@@ -237,8 +251,12 @@ namespace Client.Main.Core.Items.Tooltips
 
             var textReader =
                 new ItemTooltipTextBMDReader();
+
             var legacyTextReader =
                 new LegacyItemTooltipTextBMDReader();
+
+            var globalTextReader =
+                new LegacyGlobalTextBMDReader();
 
             var excellentReader =
                 new ExcellentOptionBMDReader();
@@ -280,6 +298,11 @@ namespace Client.Main.Core.Items.Tooltips
             var legacyTextEntries =
                 await legacyTextReader
                     .Load(legacyItemTooltipTextPath)
+                    .ConfigureAwait(false);
+
+            var globalTextEntries =
+                await globalTextReader
+                    .Load(globalTextPath)
                     .ConfigureAwait(false);
 
             var excellentEntries =
@@ -523,6 +546,9 @@ namespace Client.Main.Core.Items.Tooltips
             _legacyLocalizedTexts =
                 legacyLocalizedTextDictionary;
 
+            _globalTexts =
+                globalTextEntries;
+
             _excellentCommonOptions =
                 excellentDictionary;
 
@@ -558,6 +584,7 @@ namespace Client.Main.Core.Items.Tooltips
                 $"{_excellentCommonOptions.Count} common excellent options, " +
                 $"{_excellentWingOptions.Count} wing excellent options, " +
                 $"{_socketOptions.Count} socket entries, " +
+                $"{_globalTexts.Count} global texts, " +
                 $"{_harmonyOptions.Count} harmony entries, " +
                 $"{_itemSetTypes.Count} ancient item set entries, " +
                 $"{_itemSetOptions.Count} ancient set option entries and " +
@@ -706,6 +733,27 @@ namespace Client.Main.Core.Items.Tooltips
                     out var text) &&
                 !string.IsNullOrWhiteSpace(
                     text.Text);
+        }
+
+        // -------------------------------------------------------------
+        // GLOBAL TEXT
+        //
+        // Original MU Data/Local/text.bmd.
+        // Used for global/localized strings which don't belong to
+        // ItemTooltipText, such as the special Fenrir strings.
+        // -------------------------------------------------------------
+
+        public static string GetGlobalText(
+            int id)
+        {
+            EnsureLoaded();
+
+            return
+                _globalTexts.TryGetValue(
+                    id,
+                    out var text)
+                    ? text
+                    : string.Empty;
         }
 
         // -------------------------------------------------------------

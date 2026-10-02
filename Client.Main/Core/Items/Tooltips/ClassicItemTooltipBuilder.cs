@@ -251,8 +251,10 @@ namespace Client.Main.Core.Items.Tooltips
             // ---------------------------------------------------------
 
             string name =
-                def.Name ??
-                string.Empty;
+            !string.IsNullOrWhiteSpace(
+                tooltip.Name)
+                ? tooltip.Name.Trim()
+                : def.Name ?? string.Empty;
 
             Color nameColor =
                 ResolveMuColor(
@@ -364,7 +366,18 @@ namespace Client.Main.Core.Items.Tooltips
                     }
                 }
             }
+            bool hasFenrirTooltip =
+                details.IsFenrir;
 
+            if (hasFenrirTooltip)
+            {
+                AppendSectionSeparator(
+                    result);
+
+                AppendFenrirOptions(
+                    result,
+                    item);
+            }
             // ---------------------------------------------------------
             // EQUIPPABLE CLASS RESTRICTIONS
             //
@@ -498,6 +511,214 @@ namespace Client.Main.Core.Items.Tooltips
                 result,
                 item,
                 values.MaxDurability);
+
+            return result;
+        }
+        private static bool IsFenrir(
+            InventoryItem item)
+        {
+            return
+                item?.Definition != null &&
+                item.Definition.Group == 13 &&
+                item.Definition.Id == 37;
+        }
+
+        private static void AppendFenrirOptions(
+            List<(string text, Color color)> lines,
+            InventoryItem item)
+        {
+            if (!IsFenrir(item))
+            {
+                return;
+            }
+
+            var details =
+                item.Details;
+
+            // ---------------------------------------------------------
+            // SEASON 6 FENRIR TOOLTIP
+            //
+            // Text comes from ItemTooltipText_eng.bmd.
+            // No human-readable tooltip strings are hardcoded here.
+            // ---------------------------------------------------------
+
+            // Plasma Storm (Mana:50)
+            AppendLegacyTooltipText(
+                lines,
+                329);
+
+            if (details.IsFenrirDestroy)
+            {
+                // Increases final damage by 10%%
+                AppendLegacyTooltipText(
+                    lines,
+                    332);
+
+                // Increases Movement Speed
+                AppendLegacyTooltipText(
+                    lines,
+                    25);
+            }
+            else if (details.IsFenrirProtect)
+            {
+                // Absorbs 10%% of final damage
+                AppendLegacyTooltipText(
+                    lines,
+                    350);
+
+                // Increases Movement Speed
+                AppendLegacyTooltipText(
+                    lines,
+                    25);
+            }
+            else if (details.IsFenrirGolden)
+            {
+                AppendGoldenFenrirOptions(
+                    lines);
+            }
+
+            // With this equipped, you can summons Fenrir.
+            AppendLegacyTooltipText(
+                lines,
+                330);
+        }
+        private static void AppendGoldenFenrirOptions(
+            List<(string text, Color color)> lines)
+        {
+            var character =
+                MuGame.Network?.GetCharacterState();
+
+            if (character != null)
+            {
+                int level =
+                    character.Level;
+
+                // Same relationships used by OpenMU for Gold Fenrir.
+                int hpIncrease =
+                    level / 2;
+
+                int manaIncrease =
+                    level / 2;
+
+                int attackIncrease =
+                    level / 12;
+
+                int wizardryIncrease =
+                    level / 25;
+
+                // "%d HP increase#%d Mana increase"
+                AppendLegacyTooltipText(
+                    lines,
+                    334,
+                    hpIncrease,
+                    manaIncrease);
+
+                // "%d attack power increase# %d wizardry increase"
+                AppendLegacyTooltipText(
+                    lines,
+                    335,
+                    attackIncrease,
+                    wizardryIncrease);
+            }
+
+            // This is specially designed for heroes who have
+            // triumphed in the Illusion Temple.
+            AppendLegacyTooltipText(
+                lines,
+                336);
+        }
+
+        private static void AppendLegacyTooltipText(
+            List<(string text, Color color)> lines,
+            ushort textId,
+            params int[] values)
+        {
+            var textDefinition =
+                ItemTooltipDataRepository.GetText(
+                    textId,
+                    preferLegacy: true);
+
+            if (textDefinition == null ||
+                string.IsNullOrWhiteSpace(
+                    textDefinition.Text))
+            {
+                return;
+            }
+
+            string text =
+                FormatLegacyTooltipText(
+                    textDefinition.Text,
+                    values);
+
+            // MU legacy tooltip strings use '#' to separate
+            // multiple visual lines inside one TextId.
+            string[] parts =
+                text.Split(
+                    '#',
+                    StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string part in parts)
+            {
+                string line =
+                    part.Trim();
+
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+
+                lines.Add(
+                    (
+                        line,
+                        ResolveMuColor(1)
+                    ));
+            }
+        }
+
+        private static string FormatLegacyTooltipText(
+            string source,
+            params int[] values)
+        {
+            if (string.IsNullOrEmpty(source))
+            {
+                return string.Empty;
+            }
+
+            string result =
+                source;
+
+            // Legacy MU uses printf-style %% for a literal percent.
+            result =
+                result.Replace(
+                    "%%",
+                    "%");
+
+            if (values == null ||
+                values.Length == 0)
+            {
+                return result;
+            }
+
+            foreach (int value in values)
+            {
+                int index =
+                    result.IndexOf(
+                        "%d",
+                        StringComparison.Ordinal);
+
+                if (index < 0)
+                {
+                    break;
+                }
+
+                result =
+                    result.Remove(
+                        index,
+                        2)
+                    .Insert(
+                        index,
+                        value.ToString());
+            }
 
             return result;
         }

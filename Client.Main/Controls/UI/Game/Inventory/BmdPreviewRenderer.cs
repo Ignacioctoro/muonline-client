@@ -89,11 +89,38 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             var details = item.Details;
-            int level = Math.Max(details.Level, item.Level);
-            bool isExcellent = details.IsExcellent;
-            bool isAncient = details.IsAncient;
 
-            return new ItemRenderProperties(level, isExcellent, isAncient);
+            int level =
+                Math.Max(
+                    details.Level,
+                    item.Level);
+
+            // ---------------------------------------------------------
+            // VISUAL EXCELLENT PASS
+            //
+            // Upgraded Fenrir variants use the same visual/material
+            // pipeline which this renderer previously activated through
+            // IsExcellent.
+            //
+            // Keep that rendering behavior WITHOUT treating Fenrir as
+            // regular Excellent equipment in the tooltip system.
+            // ---------------------------------------------------------
+
+            bool useExcellentVisualPass =
+                details.IsExcellent ||
+                (
+                    details.IsFenrir &&
+                    details.FenrirFlags != 0
+                );
+
+            bool isAncient =
+                details.IsAncient;
+
+            return new ItemRenderProperties(
+                level,
+                useExcellentVisualPass,
+                isAncient);
+                
         }
 
         private static string BuildCacheKey(ItemDefinition definition, int width, int height, float rotationAngle, in ItemRenderProperties props)

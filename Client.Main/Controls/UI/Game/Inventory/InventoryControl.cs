@@ -3639,17 +3639,47 @@ namespace Client.Main.Controls.UI.Game.Inventory
                         235));
             }
 
-            // Border color based on item rarity
+            // Border color based on item rarity.
+            //
+            // Fenrir is a special original-client case:
+            // - Normal red Fenrir keeps a white tooltip border.
+            // - Destroy / Protect / Illusion use the Fenrir title blue.
+            // - Fenrir must not inherit the generic Excellent border.
             bool isExcellent =
                 _hoveredItem.Details.IsExcellent;
 
             bool isHighLevel =
                 _hoveredItem.Details.Level >= 7;
 
-            Color borderColor = isExcellent ? Theme.GlowExcellent :
-                                isAncient ? Theme.GlowAncient :
-                                isHighLevel ? Theme.Accent :
-                                Theme.TextWhite;
+            bool isFenrir =
+                _hoveredItem.Definition != null &&
+                _hoveredItem.Definition.Group == 13 &&
+                _hoveredItem.Definition.Id == 37;
+
+            byte fenrirVariant =
+                (byte)(
+                    _hoveredItem.Details.FenrirFlags &
+                    0x3F);
+
+            Color borderColor;
+
+            if (isFenrir)
+            {
+                borderColor =
+                    fenrirVariant == 0x00
+                        ? Theme.TextWhite
+                        : lines.Count > 0
+                            ? lines[0].color
+                            : Theme.SecondaryBright;
+            }
+            else
+            {
+                borderColor =
+                    isExcellent ? Theme.GlowExcellent :
+                    isAncient ? Theme.GlowAncient :
+                    isHighLevel ? Theme.Accent :
+                    Theme.TextWhite;
+            }
 
             // Uniform border all around
             const int borderThickness = 2;
@@ -3705,8 +3735,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     0f);
 
                 // Text
+                //
+                // Generic items continue using the tooltip border color
+                // for the title. Fenrir keeps the original blue title
+                // independently from its border (the red Fenrir border
+                // is white, while its title is still blue).
                 Color lineColor =
-                    isFirstLine
+                    isFirstLine && !isFenrir
                         ? borderColor
                         : color;
 

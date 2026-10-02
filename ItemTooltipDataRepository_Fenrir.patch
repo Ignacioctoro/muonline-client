@@ -1,0 +1,115 @@
+diff --git a/Client.Main/Core/Items/Tooltips/ItemTooltipDataRepository.cs b/Client.Main/Core/Items/Tooltips/ItemTooltipDataRepository.cs
+--- a/Client.Main/Core/Items/Tooltips/ItemTooltipDataRepository.cs
++++ b/Client.Main/Core/Items/Tooltips/ItemTooltipDataRepository.cs
+@@
+         private static Dictionary<ushort, ItemTooltipTextBMD>
+             _legacyLocalizedTexts =
+                 new();
+
++        private static Dictionary<int, string>
++            _globalTexts =
++                new();
++
+         private static Dictionary<int, ExcellentOptionBMD>
+             _excellentCommonOptions =
+                 new();
+@@
+         public static int LegacyLocalizedTextCount =>
+             _legacyLocalizedTexts.Count;
+
++        public static int GlobalTextCount =>
++            _globalTexts.Count;
++
+         public static int ExcellentCommonOptionCount =>
+             _excellentCommonOptions.Count;
+@@
+             string legacyItemTooltipTextPath =
+                 Path.Combine(
+                     Constants.DataPath,
+                     "Local",
+                     "ItemTooltipText_eng.bmd");
+
++            string globalTextPath =
++                Path.Combine(
++                    Constants.DataPath,
++                    "Local",
++                    "text.bmd");
++
+             string excellentCommonPath =
+                 Path.Combine(
+                     Constants.DataPath,
+@@
+             var textReader =
+                 new ItemTooltipTextBMDReader();
+             var legacyTextReader =
+                 new LegacyItemTooltipTextBMDReader();
+
++            var globalTextReader =
++                new LegacyGlobalTextBMDReader();
++
+             var excellentReader =
+                 new ExcellentOptionBMDReader();
+@@
+             var legacyTextEntries =
+                 await legacyTextReader
+                     .Load(legacyItemTooltipTextPath)
+                     .ConfigureAwait(false);
+
++            var globalTextEntries =
++                await globalTextReader
++                    .Load(globalTextPath)
++                    .ConfigureAwait(false);
++
+             var excellentEntries =
+                 await excellentReader
+                     .Load(excellentCommonPath)
+@@
+             _legacyLocalizedTexts =
+                 legacyLocalizedTextDictionary;
+
++            _globalTexts =
++                globalTextEntries;
++
+             _excellentCommonOptions =
+                 excellentDictionary;
+@@
+                 $"{_items.Count} item definitions, " +
+                 $"{_texts.Count} modern text definitions, " +
+                 $"{_legacyLocalizedTexts.Count} legacy localized texts, " +
++                $"{_globalTexts.Count} global texts, " +
+                 $"{_excellentCommonOptions.Count} common excellent options, " +
+                 $"{_excellentWingOptions.Count} wing excellent options, " +
+@@
+         public static bool HasLegacyLocalizedText(
+             ushort id)
+         {
+             EnsureLoaded();
+
+             return
+                 _legacyLocalizedTexts.TryGetValue(
+                     id,
+                     out var text) &&
+                 !string.IsNullOrWhiteSpace(
+                     text.Text);
+         }
+
++        // -------------------------------------------------------------
++        // GLOBAL TEXT (Data/Local/text.bmd)
++        // -------------------------------------------------------------
++
++        public static string GetGlobalText(
++            int id)
++        {
++            EnsureLoaded();
++
++            return
++                _globalTexts.TryGetValue(
++                    id,
++                    out var text)
++                    ? text
++                    : string.Empty;
++        }
++
+         // -------------------------------------------------------------
+         // COMMON EXCELLENT
+         // -------------------------------------------------------------
