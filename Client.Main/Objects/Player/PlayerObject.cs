@@ -1674,13 +1674,99 @@ namespace Client.Main.Objects.Player
             return EquippedWings.Type > 0 ? EquippedWings.Type : (short)-1;
         }
 
-        public PlayerAction GetSkillAction(ushort skillId, bool isInSafeZone)
+        public PlayerAction GetSkillAction(
+            ushort skillId,
+            bool isInSafeZone)
         {
-            int animationId = SkillDatabase.GetSkillAnimation(skillId);
-            if (animationId > 0 && (Model?.Actions == null || animationId < Model.Actions.Length))
-                return (PlayerAction)animationId;
+            if (Season6SkillActionDatabase.TryGet(
+                    skillId,
+                    out var route))
+            {
+                switch (route.AnimationMode)
+                {
+                    case Season6SkillAnimationMode.Explicit:
+                    {
+                        if (route.ExplicitAction.HasValue)
+                        {
+                            int actionIndex =
+                                (int)route.ExplicitAction.Value;
 
-            return GetDefaultSkillAction(isInSafeZone);
+                            if (Model?.Actions == null ||
+                                (
+                                    actionIndex >= 0 &&
+                                    actionIndex <
+                                    Model.Actions.Length
+                                ))
+                            {
+                                return route
+                                    .ExplicitAction
+                                    .Value;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    case Season6SkillAnimationMode.WeaponAttack:
+                    {
+                        var weapons =
+                            GetWeaponContext();
+
+                        return GetAttackAction(
+                            weapons,
+                            isInSafeZone);
+                    }
+
+                    case Season6SkillAnimationMode.ElfMultiShot:
+                    {
+                        return GetElfMultiShotSkillAction(
+                            isInSafeZone);
+                    }
+
+                    case Season6SkillAnimationMode.KeepCurrent:
+                    {
+                        return CurrentAction;
+                    }
+
+                    case Season6SkillAnimationMode.DefaultMagic:
+                    default:
+                        break;
+                }
+            }
+
+            return GetDefaultSkillAction(
+                isInSafeZone);
+        }
+
+        private PlayerAction GetElfMultiShotSkillAction(
+            bool isInSafeZone)
+        {
+            var weapons =
+                GetWeaponContext();
+
+            bool flying =
+                HasEquippedWings &&
+                !isInSafeZone;
+
+            if (weapons.PrimaryKind ==
+                WeaponKind.Crossbow)
+            {
+                return flying
+                    ? PlayerAction.PlayerSkillMultishotCrossbowFlying
+                    : PlayerAction.PlayerSkillMultishotCrossbowStand;
+            }
+
+            if (weapons.PrimaryKind ==
+                WeaponKind.Bow)
+            {
+                return flying
+                    ? PlayerAction.PlayerSkillMultishotBowFlying
+                    : PlayerAction.PlayerSkillMultishotBowStand;
+            }
+
+            // Invalid equipment for Multi-Shot.
+            // Keep a safe classic Elf magic fallback.
+            return PlayerAction.PlayerSkillElf1;
         }
 
         private PlayerAction GetDefaultSkillAction(bool isInSafeZone)

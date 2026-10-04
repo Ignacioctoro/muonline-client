@@ -122,6 +122,12 @@ namespace Client.Main.Scenes
             {
                 return false;
             }
+            if (SkillDatabase.IsSelfSkill(
+                    skill.SkillId))
+            {
+                return UseSelfSkill(
+                    skill);
+            }
 
             // No permitir skills desde SafeZone.
             var terrainFlags = walkableWorld.Terrain.RequestTerrainFlag(
@@ -207,6 +213,14 @@ namespace Client.Main.Scenes
                 _scene.World is not WalkableWorldControl walkableWorld)
             {
                 return false;
+            }
+            // Self buffs must never require the monster which happened
+            // to be selected when the player pressed the skill button.
+            if (SkillDatabase.IsSelfSkill(
+                    skill.SkillId))
+            {
+                return UseSelfSkill(
+                    skill);
             }
 
             // No permitir skills desde SafeZone.
@@ -356,6 +370,23 @@ namespace Client.Main.Scenes
             if (skill.SkillId == NovaSkillId)
             {
                 TryStartNovaCharge(skill, hero, walkableForSkills, rightJustPressed);
+                return;
+            }
+            // ------------------------------------------------------------
+            // SELF-CAST SKILLS
+            // ------------------------------------------------------------
+            //
+            // Neffis previously ignored SkillType.Self here, causing buffs
+            // such as Swell Life, Greater Damage and Greater Defense to fall
+            // through into the TARGET branch and require an enemy.
+            //
+            if (SkillDatabase.IsSelfSkill(skill.SkillId))
+            {
+                if (UseSelfSkill(skill))
+                {
+                    _scene.SetMouseInputConsumed();
+                }
+
                 return;
             }
 
@@ -1017,6 +1048,63 @@ namespace Client.Main.Scenes
                 targetLocation,
                 sendToServer: true,
                 usePathfinding: usePathfinding);
+        }
+
+        private bool UseSelfSkill(
+            Core.Client.SkillEntryState skill)
+        {
+            var hero =
+                _scene.Hero;
+
+            if (skill == null ||
+                hero == null ||
+                hero.IsDead)
+            {
+                return false;
+            }
+
+            ushort targetId =
+                hero.NetworkId;
+
+            if (targetId == 0)
+            {
+                var characterState =
+                    MuGame.Network?
+                        .GetCharacterState();
+
+                targetId =
+                    characterState?.Id ?? 0;
+            }
+
+            if (targetId == 0)
+            {
+                _logger?.LogWarning(
+                    "Unable to cast self skill {SkillId}: local player ID is unknown.",
+                    skill.SkillId);
+
+                return false;
+            }
+
+            if (!TryBeginSkillCast(
+                    skill,
+                    hero))
+            {
+                return false;
+            }
+
+            _logger?.LogInformation(
+                "Using self skill {SkillId} (Level {Level}) on local player {TargetId}",
+                skill.SkillId,
+                skill.SkillLevel,
+                targetId);
+
+            _ = MuGame.Network
+                .GetCharacterService()
+                .SendSkillRequestAsync(
+                    skill.SkillId,
+                    targetId);
+
+            return true;
         }
 
         private bool UseSkillOnTarget(
