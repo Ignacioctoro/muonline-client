@@ -122,7 +122,7 @@ namespace Client.Main.Scenes
             {
                 return false;
             }
-            
+
             if (SkillDatabase.IsSelfSkill(
                     skill.SkillId))
             {
@@ -244,9 +244,15 @@ namespace Client.Main.Scenes
             {
                 return false;
             }
-            // Self buffs must never require the monster which happened
-            // to be selected when the player pressed the skill button.
+            // Self / friendly buffs must never require the monster
+            // which happened to be selected when the player pressed
+            // the skill button.
+            //
+            // Friendly skills fall back to self when no valid player
+            // target is explicitly requested.
             if (SkillDatabase.IsSelfSkill(
+                    skill.SkillId) ||
+                SkillDatabase.IsFriendlySkill(
                     skill.SkillId))
             {
                 return UseSelfSkill(
@@ -416,6 +422,90 @@ namespace Client.Main.Scenes
                 {
                     _scene.SetMouseInputConsumed();
                 }
+
+                return;
+            }
+
+            // ------------------------------------------------------------
+            // FRIENDLY SKILLS
+            // ------------------------------------------------------------
+            //
+            // Comportamiento B Royal:
+            //
+            // SIN CTRL:
+            //     el buff se lanza sobre uno mismo.
+            //
+            // CTRL + jugador:
+            //     el buff se lanza sobre ese jugador.
+            //
+            // CTRL + monstruo / suelo:
+            //     vuelve a self.
+            //
+            // Esta rama ocurre ANTES de la comprobación de SafeZone,
+            // porque los buffs amistosos no son ataques.
+            //
+            if (SkillDatabase.IsFriendlySkill(
+                    skill.SkillId))
+            {
+                var keyboard =
+                    Keyboard.GetState();
+
+                bool ctrlPressed =
+                    keyboard.IsKeyDown(
+                        Keys.LeftControl) ||
+                    keyboard.IsKeyDown(
+                        Keys.RightControl);
+
+                PlayerObject friendlyTarget =
+                    ctrlPressed
+                        ? GetHoveredFriendlyPlayer()
+                        : null;
+
+                // Sin CTRL o sin jugador válido:
+                // cast sobre uno mismo.
+                if (friendlyTarget == null)
+                {
+                    if (UseSelfSkill(
+                            skill))
+                    {
+                        _scene.SetMouseInputConsumed();
+                    }
+
+                    return;
+                }
+
+                ClearPendingSkill();
+
+                uint friendlyRange =
+                    SkillDatabase.GetSkillRange(
+                        skill.SkillId);
+
+                // Ya estamos suficientemente cerca.
+                if (IsInSkillRange(
+                        friendlyTarget.Location,
+                        friendlyRange))
+                {
+                    if (UseSkillOnPlayerTarget(
+                            skill,
+                            friendlyTarget,
+                            allowNonDuelTarget: true))
+                    {
+                        _scene.SetMouseInputConsumed();
+                    }
+
+                    return;
+                }
+
+                // Jugador válido pero fuera de rango:
+                // caminar hacia él y lanzar el buff al entrar en rango.
+                QueueSkillCast(
+                    skill,
+                    friendlyTarget,
+                    friendlyRange,
+                    isAreaSkill: false,
+                    allowNonDuelPlayer: true);
+
+                _scene.SetMouseInputConsumed();
 
                 return;
             }
@@ -927,14 +1017,24 @@ namespace Client.Main.Scenes
             }
 
             var terrainFlags = walkableWorld.Terrain.RequestTerrainFlag(
-                (int)hero.Location.X,
-                (int)hero.Location.Y);
+            (int)hero.Location.X,
+            (int)hero.Location.Y);
 
-            if (terrainFlags.HasFlag(TWFlags.SafeZone))
-            {
-                ClearPendingSkill();
-                return;
-            }
+        // Los ataques siguen bloqueados en SafeZone.
+        //
+        // Los skills Friendly son buffs/heals y pueden continuar
+        // caminando hacia su objetivo y ejecutarse normalmente.
+        bool pendingFriendly =
+            SkillDatabase.IsFriendlySkill(
+                _pendingSkill.SkillId);
+
+        if (!pendingFriendly &&
+            terrainFlags.HasFlag(
+                TWFlags.SafeZone))
+        {
+            ClearPendingSkill();
+            return;
+        }
 
             if (_pendingSkillHasLocation)
             {
