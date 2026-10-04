@@ -2761,12 +2761,37 @@ namespace Client.Main.Objects.Player
         /// Triggers the vehicle skill animation when the player uses a skill while riding.
         /// Should be called when a skill animation is played.
         /// </summary>
-        public void TriggerVehicleSkillAnimation()
+        public void TriggerVehicleSkillAnimation(ushort skillId)
         {
-            if (_isRiding && Vehicle != null && !Vehicle.Hidden)
+            if (!_isRiding || Vehicle == null || Vehicle.Hidden)
             {
-                Vehicle.SetRiderAnimation(isMoving: false, isUsingSkill: true);
+                return;
             }
+
+
+            //
+            // Classic MU Fenrir behavior:
+            //
+            // The Fenrir itself only plays FENRIR_ATTACK_SKILL
+            // when Plasma Storm is used.
+            //
+            // AT_SKILL_PLASMA_STORM_FENRIR = 76
+            //
+            // Normal character skills animate only the rider.
+            //
+            bool isFenrir =
+                Vehicle.ItemIndex >= 11 &&
+                Vehicle.ItemIndex <= 18;
+
+
+            if (isFenrir && skillId != 76)
+            {
+                return;
+            }
+            
+            Vehicle.SetRiderAnimation(
+                isMoving: false,
+                isUsingSkill: true);
         }
 
         /// <summary>

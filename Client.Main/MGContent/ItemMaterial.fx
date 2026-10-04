@@ -160,6 +160,10 @@ float Time = 0.0;
 
 float Alpha = 1.0;
 
+// UV offset for special direct-texture animated passes
+float2 DiffuseUVOffset =
+    float2(0.0, 0.0);
+
 
 // ============================================================================
 // SHADOW MAP
@@ -770,6 +774,40 @@ float4 MainPS(
 
         return excellent;
     }
+        // ========================================================================
+        // PASS 6
+        // DIRECT DIFFUSE ADDITIVE WITH ANIMATED UV
+        //
+        // Used for classic special meshes such as Flamberge flame layer.
+        // ========================================================================
+
+        if (PassMode == 6)
+        {
+            float2 animatedUV =
+                input.TextureCoordinate
+                +
+                DiffuseUVOffset;
+
+            float4 flame =
+                tex2D(
+                    DiffuseSampler,
+                    animatedUV);
+
+            if (flame.a < 0.1)
+            {
+                discard;
+            }
+
+            flame.rgb *=
+                MaterialColor *
+                MaterialIntensity *
+                Alpha;
+
+            flame.a *=
+                Alpha;
+
+            return flame;
+        }
 
 
     // ========================================================================

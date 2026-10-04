@@ -1241,7 +1241,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         }
 
                         // Trigger vehicle skill animation if riding
-                        activeScene.Hero.TriggerVehicleSkillAnimation();
+                        activeScene.Hero.TriggerVehicleSkillAnimation(skillId);
 
                         if (animationId > 0)
                         {
@@ -1344,7 +1344,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         // This switches the remote Fenrir itself to
                         // FENRIR_ATTACK_SKILL.
                         //
-                        remotePlayer.TriggerVehicleSkillAnimation();
+                        remotePlayer.TriggerVehicleSkillAnimation(skillId);
 
 
                         // =====================================================
@@ -1497,8 +1497,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                     soundPath);
                         }
 
-                        activeScene.Hero
-                            .TriggerVehicleSkillAnimation();
+                        activeScene.Hero.TriggerVehicleSkillAnimation(skillId);
 
                         if (animationId > 0)
                         {
@@ -1577,8 +1576,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     remotePlayer.PlayAction(
                         (ushort)remoteAction);
 
-                    remotePlayer
-                        .TriggerVehicleSkillAnimation();
+                    remotePlayer.TriggerVehicleSkillAnimation(skillId);
 
 
                     var remoteEffectContext =

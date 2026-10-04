@@ -582,9 +582,15 @@ namespace Client.Main.Scenes
             _novaCharging = true;
             ClearPendingSkill();
 
-            var startAction = hero.GetSkillAction(NovaStartSkillId, isInSafeZone: false);
-            hero.PlayAction((ushort)startAction);
-            hero.TriggerVehicleSkillAnimation();
+            var startAction = hero.GetSkillAction(
+                NovaStartSkillId,
+                isInSafeZone: false);
+
+            hero.PlayAction(
+                (ushort)startAction);
+
+            hero.TriggerVehicleSkillAnimation(
+                NovaStartSkillId);
 
             ushort targetId = hero.NetworkId != 0 ? hero.NetworkId : (ushort)_scene.Hero.NetworkId;
             _ = MuGame.Network.GetCharacterService().SendSkillRequestAsync(NovaStartSkillId, targetId);
@@ -605,10 +611,16 @@ namespace Client.Main.Scenes
             if (hero == null || hero.IsDead || world == null)
                 return;
 
-            var releaseAction = hero.GetSkillAction(NovaSkillId, isInSafeZone: false);
-            hero.PlayAction((ushort)releaseAction);
-            hero.TriggerVehicleSkillAnimation();
+            var releaseAction =
+                hero.GetSkillAction(
+                    NovaSkillId,
+                    isInSafeZone: false);
 
+            hero.PlayAction(
+                (ushort)releaseAction);
+
+            hero.TriggerVehicleSkillAnimation(
+                NovaSkillId);
             ushort targetId = ResolveNovaReleaseTargetId(hero);
             _ = MuGame.Network.GetCharacterService().SendSkillRequestAsync(NovaSkillId, targetId);
 
@@ -1413,7 +1425,8 @@ namespace Client.Main.Scenes
             hero.PlayAction(
                 (ushort)action);
 
-            hero.TriggerVehicleSkillAnimation();
+            hero.TriggerVehicleSkillAnimation(
+                skill.SkillId);
 
             return true;
         }

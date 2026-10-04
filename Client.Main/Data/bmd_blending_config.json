@@ -121,6 +121,15 @@
     "Item/CrossBow17.bmd": {
     "0": "Additive",
     "1": "Additive"
+  },
+  "comment_28": "Flamberge - classic MU special meshes",
+  "Item/Sword_27.bmd": {
+    "0": "Opaque",
+    "1": "Additive",
+    "2": "Opaque",
+    "3": "Additive",
+    "4": "Additive",
+    "5": "Additive"
   }
 }
  

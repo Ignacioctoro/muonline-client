@@ -51,7 +51,7 @@ namespace Client.Main.Objects
         // because its source blend normally uses SourceAlpha.
         // --------------------------------------------------------------------
 
-        private static readonly BlendState
+        protected static readonly BlendState
             _classicItemBrightAdditive =
                 new BlendState
                 {
@@ -112,6 +112,218 @@ namespace Client.Main.Objects
 
         private static bool
             _classicItemTextureLoadAttempted;
+        
+                /// <summary>
+        /// Draws one mesh using the classic MU:
+        ///
+        /// RENDER_TEXTURE | RENDER_BRIGHT
+        /// +
+        /// RENDER_TEXTURE | RENDER_BRIGHT | RENDER_CHROME
+        ///
+        /// Used by special classic item models such as Flamberge.
+        /// </summary>
+        protected void DrawClassicBrightDiffuseWithChrome(
+            int mesh,
+            Vector3 brightColor)
+        {
+            if (Model?.Meshes == null ||
+                mesh < 0 ||
+                mesh >= Model.Meshes.Length ||
+                _boneVertexBuffers == null ||
+                _boneIndexBuffers == null ||
+                _boneTextures == null ||
+                mesh >= _boneVertexBuffers.Length ||
+                mesh >= _boneIndexBuffers.Length ||
+                mesh >= _boneTextures.Length ||
+                _boneVertexBuffers[mesh] == null ||
+                _boneIndexBuffers[mesh] == null ||
+                _boneTextures[mesh] == null ||
+                IsHiddenMesh(mesh))
+            {
+                return;
+            }
+
+            if (!EnsureClassicItemTextures())
+            {
+                // If Chrome01 cannot be loaded, keep at least the existing
+                // generic mesh instead of crashing the renderer.
+                return;
+            }
+
+            Effect effect =
+                GraphicsManager.Instance.ItemMaterialEffect;
+
+            if (effect == null)
+            {
+                return;
+            }
+
+            GraphicsDevice gd =
+                GraphicsDevice;
+
+            VertexBuffer vertexBuffer =
+                _boneVertexBuffers[mesh];
+
+            IndexBuffer indexBuffer =
+                _boneIndexBuffers[mesh];
+
+            Texture2D diffuseTexture =
+                _boneTextures[mesh];
+
+            RasterizerState previousRasterizer =
+                gd.RasterizerState;
+
+            BlendState previousBlend =
+                gd.BlendState;
+
+            DepthStencilState previousDepth =
+                gd.DepthStencilState;
+
+            try
+            {
+                effect.CurrentTechnique =
+                    effect.Techniques[0];
+
+                GraphicsManager.Instance
+                    .ShadowMapRenderer
+                    ?.ApplyShadowParameters(effect);
+
+                effect.Parameters["World"]
+                    ?.SetValue(WorldPosition);
+
+                effect.Parameters["View"]
+                    ?.SetValue(Camera.Instance.View);
+
+                effect.Parameters["Projection"]
+                    ?.SetValue(Camera.Instance.Projection);
+
+                effect.Parameters["DiffuseTexture"]
+                    ?.SetValue(diffuseTexture);
+
+                effect.Parameters["Time"]
+                    ?.SetValue(GetShaderTimeSeconds());
+
+                effect.Parameters["Alpha"]
+                    ?.SetValue(TotalAlpha);
+
+                effect.Parameters["BaseLightScale"]
+                    ?.SetValue(1.0f);
+
+                // These are luminous passes in the original client.
+                effect.Parameters["ShadowStrength"]
+                    ?.SetValue(0.0f);
+
+                // Important if you already added this for the animated
+                // Flamberge mesh 5.
+                effect.Parameters["DiffuseUVOffset"]
+                    ?.SetValue(Vector2.Zero);
+
+                gd.SetVertexBuffer(vertexBuffer);
+                gd.Indices = indexBuffer;
+
+                int primitiveCount =
+                    indexBuffer.IndexCount / 3;
+
+                // Original EnableAlphaBlend():
+                //
+                // glBlendFunc(GL_ONE, GL_ONE)
+                gd.BlendState =
+                    _classicItemBrightAdditive;
+
+                gd.DepthStencilState =
+                    GraphicsManager.ReadOnlyDepth;
+
+                gd.RasterizerState =
+                    _cullNone;
+
+                EffectPass pass =
+                    effect.CurrentTechnique.Passes[0];
+
+                // ============================================================
+                // PASS 1
+                //
+                // Vector(1.f, 0.f, 0.2f, BodyLight);
+                //
+                // RenderMesh(
+                //     1,
+                //     RENDER_TEXTURE | RENDER_BRIGHT,
+                //     ...);
+                // ============================================================
+
+                effect.Parameters["PassMode"]
+                    ?.SetValue(5);
+
+                effect.Parameters["MaterialColor"]
+                    ?.SetValue(brightColor);
+
+                effect.Parameters["MaterialIntensity"]
+                    ?.SetValue(1.0f);
+
+                pass.Apply();
+
+                gd.DrawIndexedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    primitiveCount);
+
+                // ============================================================
+                // PASS 2
+                //
+                // Vector(1.f, 1.f, 1.f, BodyLight);
+                //
+                // RenderMesh(
+                //     1,
+                //     RENDER_TEXTURE |
+                //     RENDER_BRIGHT |
+                //     RENDER_CHROME,
+                //     ...);
+                // ============================================================
+
+                effect.Parameters["PassMode"]
+                    ?.SetValue(1);
+
+                effect.Parameters["MaterialTexture"]
+                    ?.SetValue(_classicChrome01);
+
+                effect.Parameters["MaterialColor"]
+                    ?.SetValue(Vector3.One);
+
+                effect.Parameters["MaterialIntensity"]
+                    ?.SetValue(1.0f);
+
+                pass.Apply();
+
+                gd.DrawIndexedPrimitives(
+                    PrimitiveType.TriangleList,
+                    0,
+                    0,
+                    primitiveCount);
+            }
+            finally
+            {
+                effect.Parameters["PassMode"]
+                    ?.SetValue(0);
+
+                effect.Parameters["MaterialColor"]
+                    ?.SetValue(Vector3.One);
+
+                effect.Parameters["MaterialIntensity"]
+                    ?.SetValue(1.0f);
+
+                effect.Parameters["DiffuseUVOffset"]
+                    ?.SetValue(Vector2.Zero);
+
+                gd.RasterizerState =
+                    previousRasterizer;
+
+                gd.BlendState =
+                    previousBlend;
+
+                gd.DepthStencilState =
+                    previousDepth;
+            }
+        }
 
 
         // ====================================================================
@@ -155,6 +367,7 @@ namespace Client.Main.Objects
             {
                 return null;
             }
+        
         }
 
 

@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../../../BroyalMU"
+		},
+		{
+			"name": "Client.Main",
+			"path": "../.."
+		}
+	],
+	"settings": {}
+}
