@@ -28,7 +28,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         private readonly CharacterState _characterState;
         private readonly NetworkManager _networkManager;
         private readonly TargetProtocolVersion _targetVersion;
-        private readonly ElfBuffEffectManager _elfBuffEffectManager;
+        private readonly BuffVisualManager _buffVisualManager;
 
         // ───────────────────────── Constructors ─────────────────────────
         public CharacterDataHandler(
@@ -41,7 +41,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             _characterState = characterState;
             _networkManager = networkManager;
             _targetVersion = targetVersion;
-            _elfBuffEffectManager = new ElfBuffEffectManager();
+            _buffVisualManager = BuffVisualManager.Instance;
         }
 
         // ───────────────────────── Packet Handlers ─────────────────────────
@@ -82,7 +82,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     _characterState.DeactivateBuff(effectId, playerId);
                 }
 
-                HandleElfBuffVisual(effectId, playerId, isActive);
+                HandleBuffVisual(effectId, playerId, isActive);
 
                 return Task.CompletedTask;
             }
@@ -105,12 +105,34 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 _logger.LogDebug("MagicEffectCancelled received: Skill ID: {SkillId}, Target ID: {TargetId}",
                     skillId, targetId);
 
-                // Map skill ID to effect ID and deactivate
-                // For now, we'll use the lower byte of skill ID as effect ID
-                // This mapping may need to be adjusted based on actual game data
-                byte effectId = (byte)(skillId & 0xFF);
-                _characterState.DeactivateBuff(effectId, targetId);
-                HandleElfBuffVisual(effectId, targetId, false);
+                byte effectId;
+
+                if (!Season6BuffMapping.TryGetEffectIdFromSkillId(
+                        skillId,
+                        out effectId))
+                {
+                    // Compatibility fallback for an effect which isn't in our
+                    // Season 6 table yet. Keep the previous behavior instead
+                    // of silently leaving a client-side state stuck forever.
+                    effectId =
+                        (byte)(
+                            skillId &
+                            0xFF);
+
+                    _logger.LogDebug(
+                        "No explicit Season 6 magic-effect mapping for Skill ID {SkillId}. Falling back to Effect ID {EffectId}.",
+                        skillId,
+                        effectId);
+                }
+
+                _characterState.DeactivateBuff(
+                    effectId,
+                    targetId);
+
+                HandleBuffVisual(
+                    effectId,
+                    targetId,
+                    false);
 
                 return Task.CompletedTask;
             }
@@ -1623,7 +1645,13 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-        private void HandleElfBuffVisual(byte effectId, ushort playerId, bool isActive) =>
-            _elfBuffEffectManager.HandleBuff(effectId, playerId, isActive);
+        private void HandleBuffVisual(
+        byte effectId,
+        ushort playerId,
+        bool isActive) =>
+        _buffVisualManager.HandleBuff(
+            effectId,
+            playerId,
+            isActive);
     }
 }

@@ -241,7 +241,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         byte effectId = appearanceAndEffects[28 + e];
 
                         _characterState.ActivateBuff(effectId, raw);
-                        ElfBuffEffectManager.Instance?.HandleBuff(effectId, raw, true);
+                        BuffVisualManager.Instance.HandleBuff(effectId, raw, true);
                     }
 
                     _scopeManager.AddOrUpdatePlayerInScope(
@@ -317,7 +317,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             byte effectId = c[e].Id;
 
                             _characterState.ActivateBuff(effectId, raw);
-                            ElfBuffEffectManager.Instance?.HandleBuff(effectId, raw, true);
+                            BuffVisualManager.Instance.HandleBuff(effectId, raw, true);
                         }
                     }
 
@@ -494,7 +494,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 world.Objects.Add(p);
                 _logger.LogDebug($"[Spawn] Added {name} to world.Objects.");
 
-                ElfBuffEffectManager.Instance?.EnsureBuffsForPlayer(maskedId);
+                BuffVisualManager.Instance.EnsureBuffsForPlayer(maskedId);
 
                 // Set final position
                 if (p.World != null && p.World.Terrain != null)
