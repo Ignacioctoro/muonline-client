@@ -210,7 +210,7 @@ namespace Client.Main.Core.Utilities
             Add(
                 16,
                 "Soul Barrier",
-                SkillType.Self);
+                SkillType.Friendly);
 
             Add(17, "Energy Ball",
                 SkillType.Target);
@@ -365,7 +365,7 @@ namespace Client.Main.Core.Utilities
             Add(
                 26,
                 "Heal",
-                SkillType.Target,
+                SkillType.Friendly,
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerSkillElf1);
 
@@ -382,14 +382,14 @@ namespace Client.Main.Core.Utilities
             Add(
                 27,
                 "Greater Defense",
-                SkillType.Self,
+                SkillType.Friendly,
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerSkillElf1);
 
             Add(
                 28,
                 "Greater Damage",
-                SkillType.Self,
+                SkillType.Friendly,
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerSkillElf1);
 
@@ -470,7 +470,7 @@ namespace Client.Main.Core.Utilities
             Add(
                 234,
                 "Recovery",
-                SkillType.Self,
+                SkillType.Friendly,
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerRecoverSkill);
 
@@ -673,7 +673,7 @@ namespace Client.Main.Core.Utilities
             Add(
                 217,
                 "Damage Reflection",
-                SkillType.Self);
+                SkillType.Friendly);
 
             Add(
                 218,

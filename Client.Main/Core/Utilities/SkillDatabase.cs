@@ -159,6 +159,12 @@ namespace Client.Main.Core.Utilities
             return GetSkillType(skillId) ==
                    SkillType.Target;
         }
+        public static bool IsFriendlySkill(
+            int skillId)
+        {
+            return GetSkillType(skillId) ==
+                SkillType.Friendly;
+        }
 
         public static bool IsSelfSkill(
             int skillId)

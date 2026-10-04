@@ -32,7 +32,7 @@ namespace Client.Data.BMD
             { 13, SkillType.Area },    // Cometfall
             { 14, SkillType.Area },    // Inferno
             { 15, SkillType.Self },    // Teleport Ally
-            { 16, SkillType.Target },    // Soul Barrier
+            { 16, SkillType.Self },      // Soul Barrier
             { 17, SkillType.Target },  // Energy Ball
             { 18, SkillType.Self },    // Defense
             { 19, SkillType.Target },    // Falling Slash

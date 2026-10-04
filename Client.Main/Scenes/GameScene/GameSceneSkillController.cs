@@ -122,11 +122,41 @@ namespace Client.Main.Scenes
             {
                 return false;
             }
+            
             if (SkillDatabase.IsSelfSkill(
                     skill.SkillId))
             {
                 return UseSelfSkill(
                     skill);
+            }
+
+            if (SkillDatabase.IsFriendlySkill(
+                    skill.SkillId))
+            {
+                ClearPendingSkill();
+
+                uint friendlyRange =
+                    SkillDatabase.GetSkillRange(
+                        skill.SkillId);
+
+                if (IsInSkillRange(
+                        target.Location,
+                        friendlyRange))
+                {
+                    return UseSkillOnPlayerTarget(
+                        skill,
+                        target,
+                        allowNonDuelTarget: true);
+                }
+
+                QueueSkillCast(
+                    skill,
+                    target,
+                    friendlyRange,
+                    isAreaSkill: false,
+                    allowNonDuelPlayer: true);
+
+                return true;
             }
 
             // No permitir skills desde SafeZone.
@@ -553,6 +583,24 @@ namespace Client.Main.Scenes
             }
 
             _scene.SetMouseInputConsumed();
+        }
+
+        private PlayerObject GetHoveredFriendlyPlayer()
+        {
+            if (_scene.MouseHoverObject
+                is not PlayerObject player)
+            {
+                return null;
+            }
+
+            if (player == _scene.Hero ||
+                player.IsDead ||
+                player.World != _scene.World)
+            {
+                return null;
+            }
+
+            return player;
         }
 
         private void UpdateNovaState()

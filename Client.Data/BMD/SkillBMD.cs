@@ -5,9 +5,15 @@ namespace Client.Data.BMD
     /// </summary>
     public enum SkillType : byte
     {
-        Target = 0,  // Requires target selection
-        Area = 1,    // Area effect / directional
-        Self = 2     // Self-cast / buff
+        Target = 0,
+        Area = 1,
+        Self = 2,
+
+        /// <summary>
+        /// Can target another player.
+        /// If no player is selected/hovered, the skill is cast on self.
+        /// </summary>
+        Friendly = 3
     }
 
     /// <summary>
