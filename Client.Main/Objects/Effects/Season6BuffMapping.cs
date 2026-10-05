@@ -210,7 +210,8 @@ namespace Client.Main.Objects.Effects
                 GreaterDamage or
                 GreaterDefense or
                 ElfSoldierBuff or
-                SoulBarrier;
+                SoulBarrier or
+                GreaterFortitude;
         }
     }
 }

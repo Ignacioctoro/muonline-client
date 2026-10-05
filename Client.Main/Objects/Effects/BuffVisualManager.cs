@@ -41,6 +41,7 @@ namespace Client.Main.Objects.Effects
             public ClassicSpearJointEffect SoulBarrierJoint;
 
             public ClassicWeaponBuffShineEffect AttackShine;
+            public ClassicGreaterFortitudeGlowEffect GreaterFortitudeGlow;
         }
 
         private readonly Dictionary<
@@ -207,6 +208,9 @@ namespace Client.Main.Objects.Effects
             bool soulBarrier =
                 state.ActiveEffects.Contains(
                     Season6BuffMapping.SoulBarrier);
+            bool greaterFortitude =
+                state.ActiveEffects.Contains(
+                    Season6BuffMapping.GreaterFortitude);
 
             // ---------------------------------------------------------
             // Classic SourceMain behavior:
@@ -251,6 +255,11 @@ namespace Client.Main.Objects.Effects
                 target,
                 state,
                 soulBarrier);
+            EnsureGreaterFortitude(
+                world,
+                target,
+                state,
+                greaterFortitude);
         }
 
         private static void EnsureGreenJoint(
@@ -320,6 +329,39 @@ namespace Client.Main.Objects.Effects
                 world,
                 state.SoulBarrierJoint);
         }
+        private static void EnsureGreaterFortitude(
+            WalkableWorldControl world,
+            PlayerObject target,
+            PlayerBuffVisualState state,
+            bool needed)
+        {
+            if (!needed)
+            {
+                RemoveVisual(
+                    ref state.GreaterFortitudeGlow);
+
+                return;
+            }
+
+            if (IsUsable(
+                    state.GreaterFortitudeGlow,
+                    target))
+            {
+                return;
+            }
+
+            RemoveVisual(
+                ref state.GreaterFortitudeGlow);
+
+            state.GreaterFortitudeGlow =
+                new ClassicGreaterFortitudeGlowEffect(
+                    target);
+
+            AddVisual(
+                world,
+                state.GreaterFortitudeGlow);
+        }
+
 
         private static void EnsureAttackShine(
             WalkableWorldControl world,
@@ -365,6 +407,17 @@ namespace Client.Main.Objects.Effects
                        effect.Owner,
                        target);
         }
+        private static bool IsUsable(
+            ClassicGreaterFortitudeGlowEffect effect,
+            PlayerObject target)
+        {
+            return effect != null &&
+                effect.Status !=
+                    GameControlStatus.Disposed &&
+                ReferenceEquals(
+                    effect.Owner,
+                    target);
+        }
 
         private static bool IsUsable(
             ClassicWeaponBuffShineEffect effect,
@@ -399,6 +452,8 @@ namespace Client.Main.Objects.Effects
 
             RemoveVisual(
                 ref state.AttackShine);
+            RemoveVisual(
+                ref state.GreaterFortitudeGlow);
         }
 
         private static void RemoveVisual<T>(
@@ -565,7 +620,7 @@ namespace Client.Main.Objects.Effects
                     RemoveSelf();
                     return;
                 }
-                
+
                 Position = _owner.WorldPosition.Translation;
 
                 bool hide =
