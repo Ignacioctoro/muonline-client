@@ -1,42 +1,120 @@
 #nullable enable
+
 using System.Linq;
 using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
 
 namespace Client.Main.Controls.UI.Game.Skills
 {
     /// <summary>
-    /// Main skill quick slot displayed in the center of the screen.
-    /// Shows the currently selected skill and opens the skill selection panel on click.
+    /// Skill activo del HUD.
+    ///
+    /// Click / tap corto:
+    /// abre la barra clásica de skills.
+    ///
+    /// Mantener pulsado:
+    /// abre el panel completo de administración.
     /// </summary>
     public class SkillQuickSlot : UIControl
     {
-        private readonly CharacterState _characterState;
-        private SkillSelectionPanel? _selectionPanel;
-        private readonly SkillSlotControl _currentSkillSlot;
-        // private readonly LabelControl _hintLabel;
+        private readonly CharacterState
+            _characterState;
 
-        private const int SLOT_SIZE = 52; // Compact size
+        private SkillSelectionPanel?
+            _selectionPanel;
 
-        public SkillEntryState? SelectedSkill { get; private set; }
+        private readonly SkillSlotControl
+            _currentSkillSlot;
 
-        public SkillQuickSlot(CharacterState characterState)
+        private readonly ClassicSkillBarControl
+            _classicSkillBar;
+
+        private const int SLOT_SIZE =
+            52;
+
+        // 550 ms evita que un click normal
+        // se confunda fácilmente con long press.
+        private const double LONG_PRESS_SECONDS =
+            0.55;
+
+        private bool _trackingPress;
+        private bool _longPressTriggered;
+        private bool _pressCancelled;
+
+        private double
+            _pressDurationSeconds;
+
+        public SkillEntryState?
+            SelectedSkill
         {
-            _characterState = characterState;
+            get;
+            private set;
+        }
+    
+        /// <summary>
+        /// Skill bajo el mouse dentro de la barra clásica.
+        /// Se usa para CTRL + 1...0.
+        /// </summary>
+        public SkillEntryState?
+            HoveredClassicSkill =>
+                _classicSkillBar.Visible
+                    ? _classicSkillBar.HoveredSkill
+                    : null;
 
-            // Position at bottom-center of screen - closer to edge
-            Align = ControlAlign.HorizontalCenter | ControlAlign.Bottom;
-            Margin = new Margin { Bottom = 30 }; // Much closer to bottom
+        public SkillQuickSlot(
+            CharacterState characterState)
+        {
+            _characterState =
+                characterState;
 
-            ViewSize = new Point(SLOT_SIZE + 8, SLOT_SIZE + 22); // Compact
-            Interactive = true;
+            // Es importante dejarlo en false:
+            // la barra clásica tendrá hijos fuera
+            // del rectángulo del skill principal.
+            AutoViewSize = false;
 
-            // Current skill display
+            Align =
+                ControlAlign.HorizontalCenter |
+                ControlAlign.Bottom;
+
+            Margin =
+                new Margin
+                {
+                    Bottom = 30
+                };
+            // Al desactivar AutoViewSize para permitir que la barra clásica
+            // tenga hijos fuera del rectángulo del skill central, el control
+            // dejó de encogerse como lo hacía anteriormente.
+            //
+            // Compensamos exactamente ese cambio de geometría para mantener
+            // el skill activo en su posición original del HUD.
+            Offset =
+                new Point(
+                    15,
+                    22);
+
+            ViewSize =
+                new Point(
+                    SLOT_SIZE + 8,
+                    SLOT_SIZE + 22);
+
+            ControlSize =
+                ViewSize;
+
+            // El contenedor ya no será el sensor del click.
+            // El propio icono central manejará mouse/touch.
+            Interactive = false;
+
+            // =========================================================
+            // CURRENT SKILL
+            // =========================================================
+
             float slotScale =
                 SLOT_SIZE /
-                (float)SkillSlotControl.SLOT_HEIGHT;
+                (float)
+                SkillSlotControl.SLOT_HEIGHT;
 
             int scaledWidth =
                 (int)(
@@ -48,146 +126,363 @@ namespace Client.Main.Controls.UI.Game.Skills
                     SkillSlotControl.SLOT_HEIGHT *
                     slotScale);
 
-            // Fine tuning for the center hole of the HUD.
-            // Negative X = move left
-            // Positive Y = move down
-            const int HORIZONTAL_NUDGE = -20;
-            const int VERTICAL_NUDGE = 20;
+            // Ajustes existentes del HUD B Royal.
+            const int HORIZONTAL_NUDGE =
+                -20;
 
-            _currentSkillSlot = new SkillSlotControl
-            {
-                IsSelected = false,
-                Skill = null,
-                Scale = slotScale
-            };
+            const int VERTICAL_NUDGE =
+                20;
+
+            _currentSkillSlot =
+                new SkillSlotControl
+                {
+                    IsSelected =
+                        false,
+
+                    Skill =
+                        null,
+
+                    Scale =
+                        slotScale
+                };
 
             _currentSkillSlot.X =
-                ((ViewSize.X - scaledWidth) / 2) +
+                ((ViewSize.X -
+                  scaledWidth) / 2)
+                +
                 HORIZONTAL_NUDGE;
 
             _currentSkillSlot.Y =
-                ((SLOT_SIZE - scaledHeight) / 2) +
+                ((SLOT_SIZE -
+                  scaledHeight) / 2)
+                +
                 VERTICAL_NUDGE;
 
-            Controls.Add(_currentSkillSlot);
+            Controls.Add(
+                _currentSkillSlot);
+            
+            // El sensor debe ser exactamente el mismo rectángulo
+            // que ocupa visualmente el skill central.
+            _currentSkillSlot.Click +=
+                (_, _) =>
+                {
+                    HandleCurrentSkillClick();
+                };
 
-            // Hint label - compact
-            // _hintLabel = new LabelControl
-            // {
-            //     Text = "",
-            //     TextColor = Color.Gray,
-            //     X = 0,
-            //     Y = SLOT_SIZE + 4,
-            //     ViewSize = new Point(SLOT_SIZE + 8, 16),
-            //     Scale = 0.65f
-            // };
-            // Controls.Add(_hintLabel);
+            // =========================================================
+            // CLASSIC SKILL BAR
+            // =========================================================
 
-            // Visual feedback - minimal background
-            BackgroundColor = Color.Transparent;
-            BorderColor = Color.Transparent;
-            BorderThickness = 0;
+            _classicSkillBar =
+                new ClassicSkillBarControl(
+                    _characterState);
 
-            var defaultSkill = _characterState.GetSkills().FirstOrDefault();
+            // MU clásico deja unos pocos pixels
+            // entre el skill actual y la lista.
+            const int CLASSIC_BAR_GAP =
+                3;
+
+            // El primer cuadro de la lista queda
+            // centrado horizontalmente sobre
+            // el skill activo.
+            _classicSkillBar.X =
+                _currentSkillSlot.X
+                +
+                (
+                    scaledWidth -
+                    SkillSlotControl.SLOT_WIDTH
+                ) / 2;
+
+            _classicSkillBar.Y =
+                _currentSkillSlot.Y
+                -
+                SkillSlotControl.SLOT_HEIGHT
+                -
+                CLASSIC_BAR_GAP;
+
+            _classicSkillBar.SkillSelected +=
+                OnClassicSkillSelected;
+
+            Controls.Add(
+                _classicSkillBar);
+
+            // =========================================================
+            // VISUAL
+            // =========================================================
+
+            BackgroundColor =
+                Color.Transparent;
+
+            BorderColor =
+                Color.Transparent;
+
+            BorderThickness =
+                0;
+
+            // =========================================================
+            // DEFAULT SKILL
+            // =========================================================
+
+            SkillEntryState?
+                defaultSkill =
+                    _characterState
+                        .GetSkills()
+                        .FirstOrDefault();
+
             if (defaultSkill != null)
             {
-                OnSkillSelectedFromPanel(defaultSkill);
+                ApplySelectedSkill(
+                    defaultSkill);
             }
         }
 
+        // =============================================================
+        // MANAGEMENT PANEL
+        // =============================================================
+
         /// <summary>
-        /// Connects the selection panel (must be called from parent scene).
+        /// Conecta el menú grande de skills.
         /// </summary>
-        public void SetSelectionPanel(SkillSelectionPanel panel)
+        public void SetSelectionPanel(
+            SkillSelectionPanel panel)
         {
             if (_selectionPanel != null)
             {
-                _selectionPanel.SkillSelected -= OnSkillSelectedFromPanel;
+                _selectionPanel.SkillSelected -=
+                    ApplySelectedSkill;
             }
 
-            _selectionPanel = panel;
-            _selectionPanel.SkillSelected += OnSkillSelectedFromPanel;
+            _selectionPanel =
+                panel;
+
+            _selectionPanel.SkillSelected +=
+                ApplySelectedSkill;
 
             if (SelectedSkill != null)
             {
-                _selectionPanel.HighlightSkill(SelectedSkill.SkillId);
+                _selectionPanel.HighlightSkill(
+                    SelectedSkill.SkillId);
             }
         }
 
-        private void OnSkillSelectedFromPanel(SkillEntryState skill)
+        // =============================================================
+        // SELECT SKILL
+        // =============================================================
+
+        private void ApplySelectedSkill(
+            SkillEntryState skill)
         {
-            SelectedSkill = skill;
-
-            // IMPORTANT: Update the skill slot's Skill property!
-            _currentSkillSlot.Skill = skill;
-
-            // Force display update
-            _currentSkillSlot.IsSelected = false;
-
-            if (skill != null)
+            if (skill == null)
             {
-                string skillName = SkillDatabase.GetSkillName(skill.SkillId);
-                // _hintLabel.Text = $"{skillName} Lv{skill.SkillLevel}";
-                // _hintLabel.TextColor = Color.Gold;
-                _selectionPanel?.HighlightSkill(skill.SkillId);
+                return;
             }
-            else
-            {
-                // _hintLabel.Text = "";
-                // _hintLabel.TextColor = Color.Gray;
-            }
+
+            SelectedSkill =
+                skill;
+
+            _currentSkillSlot.Skill =
+                skill;
+
+            _currentSkillSlot.IsSelected =
+                false;
+
+            _classicSkillBar.SetSelectedSkill(
+                skill);
+
+            _selectionPanel?
+                .HighlightSkill(
+                    skill.SkillId);
         }
+
+        private void OnClassicSkillSelected(
+            SkillEntryState skill)
+        {
+            ApplySelectedSkill(
+                skill);
+        }
+
+        /// <summary>
+        /// Usado también por los hotkeys 1-0
+        /// y por controles móviles.
+        /// </summary>
         public void SelectSkill(
             SkillEntryState skill)
         {
             if (skill == null)
+            {
                 return;
+            }
 
-            OnSkillSelectedFromPanel(
+            ApplySelectedSkill(
                 skill);
         }
 
-        public override bool OnClick()
-        {
-            base.OnClick();
+        // =============================================================
+        // SHORT CLICK
+        // =============================================================
 
-            // Toggle panel (only if panel is connected)
-            if (_selectionPanel != null)
+        private void HandleCurrentSkillClick()
+        {
+            // Si este release corresponde al long press,
+            // no ejecutar además el click corto.
+            if (_longPressTriggered ||
+                _pressCancelled)
             {
-                if (_selectionPanel.Visible)
-                {
-                    _selectionPanel.Close();
-                }
-                else
-                {
-                    _selectionPanel.Open(_characterState);
-                }
+                return;
             }
 
-            return true; // Handled
+            // Nunca mantener simultáneamente
+            // barra clásica + menú grande.
+            if (_selectionPanel?.Visible == true)
+            {
+                _selectionPanel.Close();
+            }
+
+            _classicSkillBar.Toggle();
         }
 
-        public override void Update(GameTime gameTime)
+        // =============================================================
+        // LONG PRESS
+        // =============================================================
+
+        public override void Update(
+            GameTime gameTime)
         {
-            base.Update(gameTime);
+            base.Update(
+                gameTime);
 
-            // Hover effect on hint only
-            bool panelVisible = _selectionPanel?.Visible ?? false;
+            MouseState mouse =
+                CurrentMouseState;
 
-            if (IsMouseOver && !panelVisible)
+            MouseState previousMouse =
+                PreviousMouseState;
+
+            // =========================================================
+            // SENSOR REAL DEL SKILL CENTRAL
+            // =========================================================
+
+            bool pointerOverCurrentSkill =
+                _currentSkillSlot
+                    .DisplayRectangle
+                    .Contains(
+                        mouse.Position);
+
+            // =========================================================
+            // NUEVO PRESS
+            // =========================================================
+
+            if (!_trackingPress &&
+                mouse.LeftButton ==
+                    ButtonState.Pressed &&
+                previousMouse.LeftButton ==
+                    ButtonState.Released &&
+                pointerOverCurrentSkill)
             {
-                if (SelectedSkill != null)
-                {
-                    // _hintLabel.TextColor = Color.Yellow;
-                }
+                _trackingPress =
+                    true;
+
+                _longPressTriggered =
+                    false;
+
+                _pressCancelled =
+                    false;
+
+                _pressDurationSeconds =
+                    0.0;
             }
-            else
+
+            // =========================================================
+            // PRESS ACTIVO
+            // =========================================================
+
+            if (_trackingPress &&
+                mouse.LeftButton ==
+                    ButtonState.Pressed)
             {
-                if (SelectedSkill != null)
+                // Si el dedo/mouse abandona el icono,
+                // cancelamos el long press.
+                if (!pointerOverCurrentSkill)
                 {
-                    // _hintLabel.TextColor = Color.Gold;
+                    _trackingPress =
+                        false;
+
+                    _pressCancelled =
+                        true;
+
+                    _pressDurationSeconds =
+                        0.0;
+
+                    return;
                 }
+
+                if (!_longPressTriggered)
+                {
+                    _pressDurationSeconds +=
+                        gameTime
+                            .ElapsedGameTime
+                            .TotalSeconds;
+
+                    if (_pressDurationSeconds >=
+                        LONG_PRESS_SECONDS)
+                    {
+                        TriggerLongPress();
+                    }
+                }
+
+                return;
             }
+
+            // =========================================================
+            // RELEASE
+            // =========================================================
+            //
+            // El Click del _currentSkillSlot ocurre durante
+            // base.Update(), antes de llegar aquí.
+            //
+            // Por eso _longPressTriggered todavía está activo
+            // cuando HandleCurrentSkillClick() es llamado.
+            // =========================================================
+
+            if (mouse.LeftButton ==
+                    ButtonState.Released &&
+                previousMouse.LeftButton ==
+                    ButtonState.Pressed)
+            {
+                ResetPressState();
+            }
+        }
+
+        private void TriggerLongPress()
+        {
+            _longPressTriggered =
+                true;
+
+            _classicSkillBar.Close();
+
+            if (_selectionPanel != null &&
+                !_selectionPanel.Visible)
+            {
+                _selectionPanel.Open(
+                    _characterState);
+            }
+
+            Scene?
+                .SetMouseInputConsumed();
+        }
+
+        private void ResetPressState()
+        {
+            _trackingPress =
+                false;
+
+            _longPressTriggered =
+                false;
+
+            _pressCancelled =
+                false;
+
+            _pressDurationSeconds =
+                0.0;
         }
     }
 }

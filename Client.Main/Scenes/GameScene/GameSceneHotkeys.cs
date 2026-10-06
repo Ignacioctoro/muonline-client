@@ -515,28 +515,70 @@ namespace Client.Main.Scenes
                 return;
             }
 
-            var skill = _skillHotkeys.GetSkill(slotIndex);
+            var skill =
+                _skillHotkeys.GetSkill(
+                    slotIndex);
 
             if (skill == null)
             {
                 return;
             }
 
-            _skillQuickSlot.SelectSkill(skill);
+            // Cambiar la skill activa.
+            _skillQuickSlot.SelectSkill(
+                skill);
+
+            // Sincronizar también el highlight amarillo
+            // del HUD con el hotkey seleccionado.
+            _mainControl?.SetSelectedSkillHotkey(
+                slotIndex);
         }
         private void AssignHoveredSkillHotkey(
             int slotIndex)
         {
-            if (_skillSelectionPanel == null ||
-                !_skillSelectionPanel.Visible)
+            // =========================================================
+            // 1. MENÚ GRANDE
+            // =========================================================
+
+            if (_skillSelectionPanel != null &&
+                _skillSelectionPanel.Visible)
             {
-                return;
+                var hoveredSkill =
+                    _skillSelectionPanel.HoveredSkill;
+
+                if (hoveredSkill != null)
+                {
+                    AssignHoveredSkillToSlot(
+                        slotIndex,
+                        hoveredSkill);
+
+                    return;
+                }
             }
 
-            var skill =
-                _skillSelectionPanel.HoveredSkill;
+            // =========================================================
+            // 2. BARRA CLÁSICA
+            // =========================================================
 
-            if (skill == null)
+            if (_skillQuickSlot != null)
+            {
+                var hoveredSkill =
+                    _skillQuickSlot.HoveredClassicSkill;
+
+                if (hoveredSkill != null)
+                {
+                    AssignHoveredSkillToSlot(
+                        slotIndex,
+                        hoveredSkill);
+                }
+            }
+        }
+
+        private void AssignHoveredSkillToSlot(
+            int slotIndex,
+            Client.Main.Core.Client.SkillEntryState skill)
+        {
+            if (_skillSelectionPanel == null)
             {
                 return;
             }
@@ -545,12 +587,18 @@ namespace Client.Main.Scenes
                 slotIndex,
                 skill);
 
-            // Mostrar automáticamente el banco correspondiente.
-            _skillSelectionPanel.SetQuickSlotBank(
-                slotIndex < 5 ? 0 : 1);
+            int bank =
+                slotIndex < 5
+                    ? 0
+                    : 1;
 
-            _mainControl.SetSkillHotkeyBank(
-                slotIndex < 5 ? 0 : 1);
+            // Mantener sincronizado el banco del menú grande.
+            _skillSelectionPanel.SetQuickSlotBank(
+                bank);
+
+            // Y el banco visible del HUD.
+            _mainControl?.SetSkillHotkeyBank(
+                bank);
         }
 
         private void ActivateBlendingEditor(HotkeyContext context)

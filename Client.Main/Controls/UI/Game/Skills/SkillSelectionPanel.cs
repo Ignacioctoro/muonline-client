@@ -42,7 +42,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         private const int GRID_Y = 126;
 
         private const int COLUMNS = 6;
-        private const int ROWS = 3;
+        private const int ROWS = 2;
         private const int PAGE_SIZE = COLUMNS * ROWS;
         private const float SKILL_GRID_SCALE = 1.30f;
 
