@@ -152,6 +152,8 @@ namespace Client.Main.Controls
         private readonly List<WorldObject> _visibleObjects = [];
         private bool _dirtyVisibleObjects = true;
 
+        private bool _classicFxDrawProbeLogged;
+
         public Dictionary<ushort, WalkerObject> WalkerObjectsById { get; } = [];
 
         private ILogger _logger = ModelObject.AppLoggerFactory?.CreateLogger<WorldControl>();
@@ -391,7 +393,7 @@ namespace Client.Main.Controls
                         .Translation;
 
                 probePosition.Z +=
-                    120f;
+                    300f;
 
                 ClassicFx.CreateSprite(
                     ClassicTextureIds.BitmapFlare,
@@ -430,13 +432,18 @@ namespace Client.Main.Controls
 
             RenderObjects(time);
 
-            // ClassicFX:
-            //
-            // En esta etapa únicamente contiene Sprites.
-            //
-            // Cuando tengamos Joints / Effects / Particles,
-            // este bloque será reemplazado por los passes
-            // equivalentes al orden de MainScene.cpp.
+            if (!_classicFxDrawProbeLogged)
+            {
+                Console.WriteLine(
+                    $"[ClassicFX][World] DRAW " +
+                    $"World={GetType().Name}, " +
+                    $"Status={Status}, " +
+                    $"ActiveSprites={ClassicFx.ActiveSpriteCount}");
+
+                _classicFxDrawProbeLogged =
+                    true;
+            }
+
             ClassicFx.RenderSprites();
         }
 

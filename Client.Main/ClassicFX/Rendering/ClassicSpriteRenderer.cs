@@ -1,6 +1,6 @@
 using System;
-using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Core;
+using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Primitives;
 using Client.Main.Graphics;
 using Microsoft.Xna.Framework;
@@ -90,6 +90,19 @@ namespace Client.Main.ClassicFX.Rendering
         private bool
             _disposed;
 
+        // =============================================================
+        // CLASSIC FX TEMPORARY DEBUG
+        //
+        // Se eliminan después de validar completamente
+        // ClassicSpriteRenderer.
+        // =============================================================
+
+        private bool
+            _debugFirstQueueLogged;
+
+        private bool
+            _debugFirstFlushLogged;
+
         public ClassicSpriteRenderer(
             GraphicsDevice graphicsDevice,
             ClassicTextureRepository textures)
@@ -137,7 +150,6 @@ namespace Client.Main.ClassicFX.Rendering
                     AlphaFunction =
                         CompareFunction.Greater,
 
-                    // Muy cercano al descarte cero clásico.
                     ReferenceAlpha =
                         2,
 
@@ -268,6 +280,37 @@ namespace Client.Main.ClassicFX.Rendering
                     sprite.Position,
                     Camera.Instance.View);
 
+            // =========================================================
+            // DEBUG TEMPORAL
+            // =========================================================
+
+            if (!_debugFirstQueueLogged)
+            {
+                Vector3 projected =
+                    _graphicsDevice
+                        .Viewport
+                        .Project(
+                            sprite.Position,
+                            Camera.Instance.Projection,
+                            Camera.Instance.View,
+                            Matrix.Identity);
+
+                Console.WriteLine(
+                    $"[ClassicFX][Sprite] QUEUE " +
+                    $"Type={sprite.Type}, " +
+                    $"World={sprite.Position}, " +
+                    $"Camera={cameraPosition}, " +
+                    $"Projected={projected}, " +
+                    $"Texture={resource.Data.Width}x{resource.Data.Height}, " +
+                    $"Components={resource.Data.Components}, " +
+                    $"Viewport=" +
+                    $"{_graphicsDevice.Viewport.Width}x" +
+                    $"{_graphicsDevice.Viewport.Height}");
+
+                _debugFirstQueueLogged =
+                    true;
+            }
+
             // Main:
             //
             // if (z >= -1.0f)
@@ -327,8 +370,6 @@ namespace Client.Main.ClassicFX.Rendering
             if (sprite.Type ==
                 ClassicTextureIds.BitmapFormationMark)
             {
-                // El Main ignora Scale para FormationMark
-                // y usa directamente 64 x 64.
                 width =
                     64f;
 
@@ -348,6 +389,18 @@ namespace Client.Main.ClassicFX.Rendering
                     sprite.AnimationFrame *
                     sprite.Scale;
 
+                // Main:
+                //
+                // Width =
+                //     bitmap.Width *
+                //     AnimationFrame *
+                //     Scale;
+                //
+                // Height =
+                //     bitmap.Height *
+                //     AnimationFrame *
+                //     Scale;
+                //
                 width =
                     resource.Data.Width *
                     renderScale;
@@ -470,7 +523,6 @@ namespace Client.Main.ClassicFX.Rendering
                 _quadCount *
                 VerticesPerSprite;
 
-            // Mismo orden de UV de RenderSprite().
             _vertices[
                 baseVertex + 0
             ] =
@@ -523,8 +575,9 @@ namespace Client.Main.ClassicFX.Rendering
 
             Flush();
 
-            // Dejamos estados neutros para el pipeline que continúa
-            // después de ClassicFX.
+            // Dejamos estados neutros para el pipeline
+            // que continúa después de ClassicFX.
+
             _graphicsDevice
                 .SetVertexBuffer(
                     null);
@@ -554,6 +607,23 @@ namespace Client.Main.ClassicFX.Rendering
                 return;
             }
 
+            // =========================================================
+            // DEBUG TEMPORAL
+            // =========================================================
+
+            if (!_debugFirstFlushLogged)
+            {
+                Console.WriteLine(
+                    $"[ClassicFX][Sprite] FLUSH " +
+                    $"Quads={_quadCount}, " +
+                    $"Texture={_batchTexture.Type}, " +
+                    $"Path={_batchTexture.Path}, " +
+                    $"Blend={_batchBlendMode}");
+
+                _debugFirstFlushLogged =
+                    true;
+            }
+
             int vertexCount =
                 _quadCount *
                 VerticesPerSprite;
@@ -564,11 +634,26 @@ namespace Client.Main.ClassicFX.Rendering
                 vertexCount,
                 SetDataOptions.Discard);
 
-            _graphicsDevice.SetVertexBuffer(
-                _vertexBuffer);
+            _graphicsDevice
+                .SetVertexBuffer(
+                    _vertexBuffer);
 
             _graphicsDevice.Indices =
                 _indexBuffer;
+
+            // =========================================================
+            // TEMPORAL:
+            //
+            // Estamos comparando el BlendState.Additive conocido
+            // de MonoGame contra ClassicRenderStates.Glow.
+            //
+            // DepthRead se mantiene porque ya comprobamos que
+            // el depth test funciona correctamente.
+            //
+            // Si el fondo negro desaparece con este estado,
+            // entonces la siguiente corrección estará en
+            // ClassicRenderStates.Glow, no aquí.
+            // =========================================================
 
             _graphicsDevice.BlendState =
                 ClassicRenderStates
@@ -635,7 +720,8 @@ namespace Client.Main.ClassicFX.Rendering
             }
         }
 
-        private static ClassicSpriteBlendMode
+        private static
+            ClassicSpriteBlendMode
             GetBlendMode(
                 int type,
                 int subType)
@@ -649,10 +735,10 @@ namespace Client.Main.ClassicFX.Rendering
 
             // zzzeffectsprite.cpp:
             //
-            // subtype 0 -> EnableAlphaBlend
-            // subtype 1 -> EnableAlphaBlendMinus
-            // subtype 2 -> EnableAlphaTest
-            // subtype 3 -> EnableAlphaBlend2
+            // subtype 0 -> EnableAlphaBlend()
+            // subtype 1 -> EnableAlphaBlendMinus()
+            // subtype 2 -> EnableAlphaTest()
+            // subtype 3 -> EnableAlphaBlend2()
             //
             return subType switch
             {
@@ -716,7 +802,7 @@ namespace Client.Main.ClassicFX.Rendering
                     0f,
                     1f);
 
-            // RenderSprite clásico:
+            // Main RenderSprite:
             //
             // RGB:
             //     alpha = 1
@@ -759,43 +845,75 @@ namespace Client.Main.ClassicFX.Rendering
             switch (subType)
             {
                 case 0:
-                    u = 0f;
-                    v = 0f;
+                    u =
+                        0f;
+
+                    v =
+                        0f;
+
                     break;
 
                 case 1:
-                    u = 0.33f;
-                    v = 0f;
+                    u =
+                        0.33f;
+
+                    v =
+                        0f;
+
                     break;
 
                 case 2:
-                    u = 0.66f;
-                    v = 0f;
+                    u =
+                        0.66f;
+
+                    v =
+                        0f;
+
                     break;
 
                 case 3:
-                    u = 0f;
-                    v = 0.33f;
+                    u =
+                        0f;
+
+                    v =
+                        0.33f;
+
                     break;
 
                 case 4:
-                    u = 0.33f;
-                    v = 0.33f;
+                    u =
+                        0.33f;
+
+                    v =
+                        0.33f;
+
                     break;
 
                 case 5:
-                    u = 0.66f;
-                    v = 0.33f;
+                    u =
+                        0.66f;
+
+                    v =
+                        0.33f;
+
                     break;
 
                 case 6:
-                    u = 0f;
-                    v = 0.66f;
+                    u =
+                        0f;
+
+                    v =
+                        0.66f;
+
                     break;
 
                 case 7:
-                    u = 0.33f;
-                    v = 0.66f;
+                    u =
+                        0.33f;
+
+                    v =
+                        0.66f;
+
                     break;
             }
         }
@@ -807,11 +925,17 @@ namespace Client.Main.ClassicFX.Rendering
                 return;
             }
 
-            _vertexBuffer?.Dispose();
-            _indexBuffer?.Dispose();
+            _vertexBuffer?
+                .Dispose();
 
-            _basicEffect?.Dispose();
-            _alphaTestEffect?.Dispose();
+            _indexBuffer?
+                .Dispose();
+
+            _basicEffect?
+                .Dispose();
+
+            _alphaTestEffect?
+                .Dispose();
 
             _disposed =
                 true;

@@ -1,3 +1,4 @@
+using System;
 using Client.Main.ClassicFX.Primitives;
 using Microsoft.Xna.Framework;
 
@@ -5,6 +6,9 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
+        private bool _debugRenderSpritesEntryLogged;
+        private bool _debugFirstSpriteCreateLogged;
+
         /// <summary>
         /// Equivalente a:
         ///
@@ -69,6 +73,20 @@ namespace Client.Main.ClassicFX.Core
                 light,
                 owner,
                 rotation);
+
+            if (!_debugFirstSpriteCreateLogged)
+            {
+                Console.WriteLine(
+                    $"[ClassicFX][Sprite] CREATE " +
+                    $"Handle={handle}, " +
+                    $"Type={type}, " +
+                    $"Position={position}, " +
+                    $"Scale={scale}, " +
+                    $"Active={ActiveSpriteCount}");
+
+                _debugFirstSpriteCreateLogged =
+                    true;
+            }
 
             return
                 handle;
@@ -274,6 +292,20 @@ namespace Client.Main.ClassicFX.Core
         public void RenderSprites(
             byte renderPass = 0)
         {
+            if (!_debugRenderSpritesEntryLogged)
+            {
+                Console.WriteLine(
+                    $"[ClassicFX][Sprite] RENDER ENTRY " +
+                    $"Disposed={_disposed}, " +
+                    $"Enabled={Enabled}, " +
+                    $"RendererNull={_spriteRenderer == null}, " +
+                    $"Active={ActiveSpriteCount}, " +
+                    $"Pass={renderPass}");
+
+                _debugRenderSpritesEntryLogged =
+                    true;
+            }
+
             if (_disposed ||
                 !Enabled ||
                 _spriteRenderer == null)
