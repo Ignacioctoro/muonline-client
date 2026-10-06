@@ -2,6 +2,7 @@
 using Client.Data.CAP;
 using Client.Data.OBJS;
 using Client.Main.Controllers;
+using Client.Main.ClassicFX.Core;
 using Client.Main.Core.Utilities;
 using Client.Main.Graphics;
 using Client.Main.Helpers;
@@ -152,7 +153,7 @@ namespace Client.Main.Controls
         public string AmbientSoundPath { get; set; }
 
         public TerrainControl Terrain { get; }
-
+        public ClassicFxRuntime ClassicFx { get; }
         public short WorldIndex { get; private set; }
         public bool IsSunWorld { get; protected set; } = true;
 
@@ -178,6 +179,7 @@ namespace Client.Main.Controls
             AutoViewSize = false;
             ViewSize = new(MuGame.Instance.Width, MuGame.Instance.Height);
             WorldIndex = worldIndex;
+            ClassicFx = new ClassicFxRuntime(this);
             if (Constants.SUN_WORLD_INDICES != null && Constants.SUN_WORLD_INDICES.Length > 0)
             {
                 IsSunWorld = Array.IndexOf(Constants.SUN_WORLD_INDICES, worldIndex) >= 0;
@@ -316,9 +318,15 @@ namespace Client.Main.Controls
 
         public override void Update(GameTime time)
         {
+            // ClassicFX usa el mismo GameTime real del mundo,
+            // pero internamente conserva la referencia clásica de 25 FPS.
+            ClassicFx.Update(
+                time);
+
             base.Update(time);
 
-            if (Status != GameControlStatus.Ready) return;
+            if (Status != GameControlStatus.Ready)
+                return;
 
             if (_objectsToInitialize.Count > 0)
             {
@@ -781,6 +789,7 @@ namespace Client.Main.Controls
         public override void Dispose()
         {
             var sw = Stopwatch.StartNew();
+            ClassicFx.Dispose();
 
             // Dispose and remove all objects except the local player
             foreach (var obj in Objects.ToArray())
