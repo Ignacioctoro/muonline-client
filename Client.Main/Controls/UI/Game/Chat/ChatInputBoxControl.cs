@@ -53,7 +53,8 @@ namespace Client.Main.Controls.UI
 
         private static readonly string[] s_baseChatTextures =
         {
-            "Interface/newui_chat_back.jpg"
+            "Interface/newui_chat_back.jpg",
+            "Interface/mini_map_ui_cancel.tga"
         };
 
         // Child Controls
@@ -67,6 +68,7 @@ namespace Client.Main.Controls.UI
         private SpriteControl _frameToggleButton;
         private SpriteControl _sizeButton;
         private SpriteControl _transparencyButton;
+        private SpriteControl _closeButton;
 
         // State
         private InputMessageType _currentInputType = InputMessageType.Chat;
@@ -237,6 +239,59 @@ namespace Client.Main.Controls.UI
                 SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"); // Play sound on click.
             };
             Controls.Add(_transparencyButton);
+            // =====================================================
+            // BOTÓN X - CERRAR CHAT
+            // =====================================================
+            //
+            // Ocupa el espacio libre que queda al extremo
+            // derecho de la fila inferior.
+            //
+            // La textura es la X clásica que ya usa
+            // MiniMapControl.
+            //
+
+            _closeButton =
+                new SpriteControl
+                {
+                    Name =
+                        "ChatCloseButton",
+
+                    TexturePath =
+                        "Interface/mini_map_ui_cancel.tga",
+
+                    TileWidth = 30,
+                    TileHeight = 25,
+
+                    X = 251,
+                    Y = 22,
+
+                    ViewSize =
+                        new Point(
+                            30,
+                            25),
+
+                    AutoViewSize = false,
+
+                    BlendState =
+                        BlendState.AlphaBlend,
+
+                    Interactive = true,
+
+                    Visible = false
+                };
+
+
+            _closeButton.Click +=
+                (s, e) =>
+                {
+                    // Hide() ya reproduce iButtonClick.wav
+                    // y además libera FocusControl.
+                    Hide();
+                };
+
+
+            Controls.Add(
+                _closeButton);
 
             // Subscribe to EnterKeyPressed event
             _chatInput.EnterKeyPressed += (s, e) =>
@@ -659,6 +714,7 @@ namespace Client.Main.Controls.UI
             _systemToggleButton.Visible = true;
             _chatLogToggleButton.Visible = true;
             _frameToggleButton.Visible = true;
+            _closeButton.Visible = true;
 
             bool showFrameButtons = _chatLogWindowRef.IsFrameVisible;
             _sizeButton.Visible = showFrameButtons;
@@ -677,6 +733,7 @@ namespace Client.Main.Controls.UI
             yield return _frameToggleButton;
             yield return _sizeButton;
             yield return _transparencyButton;
+            yield return _closeButton;
         }
 
         private static void DrawDisabledOverlay(SpriteControl btn)

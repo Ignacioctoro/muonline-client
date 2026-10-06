@@ -92,6 +92,7 @@ namespace Client.Main.Scenes
         private MobileSkillButton _mobileSkill1;
         private MobileSkillButton _mobileSkill2;
         private MobileSkillButton _mobileSkill3;
+        private MobileChatButton _mobileChatButton;
 
         private MobileSkillAssignPopup
             _mobileSkillAssignPopup;
@@ -188,9 +189,16 @@ namespace Client.Main.Scenes
             _mobileSkill1?.SetOpacity(opacity);
             _mobileSkill2?.SetOpacity(opacity);
             _mobileSkill3?.SetOpacity(opacity);
-            _mobilePickupPanel?
-                .SetOpacity(
-                    opacity);
+            _mobileChatButton?.SetOpacity(opacity);
+            if (!enabled &&
+                _mobileChatButton != null)
+            {
+                _mobileChatButton.Visible =
+                    false;
+
+                _mobileChatButton.CancelPress();
+            }
+            _mobilePickupPanel?.SetOpacity(opacity);
 
             if (!enabled &&
                 _mobilePickupPanel != null)
@@ -1037,7 +1045,8 @@ namespace Client.Main.Scenes
                         control is MobileChangeTargetButton ||
                         control is MobileTargetPanel ||
                         control is MobileJoystickControl ||
-                        control is MobilePickupPanel)
+                        control is MobilePickupPanel ||
+                        control is MobileChatButton)
                     {
                         continue;
                     }
@@ -1371,6 +1380,51 @@ namespace Client.Main.Scenes
             _mobileTargetPanel = new MobileTargetPanel();
             Controls.Add(_mobileTargetPanel);
             _mobileTargetPanel.BringToFront();
+            // ─────────────────────────────────────────────
+            // BOTÓN MÓVIL DE CHAT
+            // ─────────────────────────────────────────────
+
+            _mobileChatButton =
+                new MobileChatButton();
+
+
+            // Lo posicionamos exactamente donde normalmente
+            // comienza la barra de entrada del chat.
+            _mobileChatButton.X =
+                _chatInput.X;
+
+            _mobileChatButton.Y =
+                _chatInput.Y + 4;
+
+
+            Controls.Add(
+                _mobileChatButton);
+
+            _mobileChatButton
+                .BringToFront();
+
+
+            _mobileChatButton.ChatClicked +=
+                (s, e) =>
+                {
+                    SetMouseInputConsumed();
+
+                    // Lo ocultamos inmediatamente.
+                    // No esperamos al siguiente Update.
+                    _mobileChatButton.Visible =
+                        false;
+
+                    _mobileChatButton.CancelPress();
+
+                    // Show() ya:
+                    // - muestra la barra
+                    // - da foco al TextField
+                    // - limpia el texto
+                    // - reproduce el sonido
+                    _chatInput.Show();
+
+                    _chatInput.BringToFront();
+                };
 
             // ─────────────────────────────────────────────
             // Botón Ataque Monstruos
@@ -2521,6 +2575,32 @@ namespace Client.Main.Scenes
             UpdateMobilePickupPanel(
                 gameTime,
                 showMobilePickup);
+
+            // ─────────────────────────────────────────────
+            // BOTÓN MÓVIL DE CHAT
+            //
+            // Solo aparece cuando:
+            // - controles Android activos
+            // - chat cerrado
+            // ─────────────────────────────────────────────
+
+            if (_mobileChatButton != null)
+            {
+                bool showMobileChat =
+                    showMobileControls &&
+                    _chatInput?.Visible != true;
+
+
+                _mobileChatButton.Visible =
+                    showMobileChat;
+
+
+                if (!showMobileChat)
+                {
+                    _mobileChatButton
+                        .CancelPress();
+                }
+            }
 
 
             // ─────────────────────────────────────────────
