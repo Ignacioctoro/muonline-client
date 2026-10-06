@@ -99,6 +99,10 @@ namespace Client.Main.Objects.Effects
                     Blend.One
             };
 
+        // Intensidad visual del modelo class15_*.
+        // No afecta Magic_Ground1, shiny04 ni pin_lights.
+        private const float Grade15MeshOpacity =
+            0.30f;
 
         // --------------------------------------------------------------------
         // Effect configuration
@@ -342,6 +346,20 @@ namespace Client.Main.Objects.Effects
                     MathHelper.ToRadians(
                         90.0f)
             };
+
+
+            // ------------------------------------------------------------
+            // Independent intensity for each classic +15 sprite.
+            // ------------------------------------------------------------
+
+            _magicSprite.Intensity =
+                0.20f;
+
+            _shinySprite.Intensity =
+                1.0f;
+
+            _pinLightSprite.Intensity =
+                0.20f;
 
 
             Children.Add(
@@ -1011,7 +1029,8 @@ namespace Client.Main.Objects.Effects
                         effect.Parameters[
                                 "Brightness"]
                             ?.SetValue(
-                                baseBrightness);
+                                baseBrightness *
+                                Grade15MeshOpacity);
 
 
                         EffectTechnique?
@@ -1058,7 +1077,8 @@ namespace Client.Main.Objects.Effects
                         effect.Parameters[
                                 "Brightness"]
                             ?.SetValue(
-                                rgbMixBrightness);
+                                rgbMixBrightness *
+                                Grade15MeshOpacity);
 
 
                         EffectTechnique?
@@ -1101,9 +1121,9 @@ namespace Client.Main.Objects.Effects
                     if (_chromeTexture != null)
                     {
                         effect.Parameters[
-                                "Brightness"]
-                            ?.SetValue(
-                                1.0f);
+                            "Brightness"]
+                        ?.SetValue(
+                            Grade15MeshOpacity);
 
 
                         EffectTechnique?
@@ -1307,8 +1327,11 @@ namespace Client.Main.Objects.Effects
                 get;
                 set;
             }
-
-
+            public float Intensity
+            {
+                get;
+                set;
+            } = 1.0f;
             public Grade15Sprite(
                 string texturePath,
                 float scale,
@@ -1460,13 +1483,14 @@ namespace Client.Main.Objects.Effects
 
 
                 Color color =
-                    LightEnabled
-                        ? new Color(
-                            Light) *
-                        TotalAlpha
-                        : Color.White *
-                        TotalAlpha;
-
+                LightEnabled
+                    ? new Color(
+                        Light) *
+                    TotalAlpha *
+                    Intensity
+                    : Color.White *
+                    TotalAlpha *
+                    Intensity;
 
                 float depth =
                     MathHelper.Clamp(

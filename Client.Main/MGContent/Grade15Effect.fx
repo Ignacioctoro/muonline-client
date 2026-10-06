@@ -338,13 +338,16 @@ float4 PS_Chrome4(PixelInput input) : SV_Target
             chromeUv);
 
     float3 finalColor =
-        textureColor.rgb *
-        input.Color.rgb *
-        Alpha;
+    textureColor.rgb *
+    input.Color.rgb *
+    Brightness *
+    Alpha;
 
     return float4(
         finalColor,
-        textureColor.a * Alpha);
+        textureColor.a *
+        Brightness *
+        Alpha);
 }
 
 
