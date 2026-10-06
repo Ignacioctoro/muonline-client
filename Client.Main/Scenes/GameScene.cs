@@ -86,6 +86,12 @@ namespace Client.Main.Scenes
         private MobilePotionButton _mobilePotionE;
         private MobilePotionButton _mobilePotionR;
         private MobilePotionAssignPopup _mobilePotionAssignPopup;
+        private MobileSkillButton _mobileSkill1;
+        private MobileSkillButton _mobileSkill2;
+        private MobileSkillButton _mobileSkill3;
+
+        private MobileSkillAssignPopup
+            _mobileSkillAssignPopup;
 
         public void ApplyMobileControlsSettings()
         {
@@ -136,6 +142,15 @@ namespace Client.Main.Scenes
             if (_mobilePotionR != null)
                 _mobilePotionR.Visible = enabled;
 
+            if (_mobileSkill1 != null)
+                _mobileSkill1.Visible = enabled;
+
+            if (_mobileSkill2 != null)
+                _mobileSkill2.Visible = enabled;
+
+            if (_mobileSkill3 != null)
+                _mobileSkill3.Visible = enabled;
+
             // Aplicar opacidad
             _mobileTargetPanel?.SetOpacity(opacity);
             _mobileAttackButton?.SetOpacity(opacity);
@@ -146,6 +161,9 @@ namespace Client.Main.Scenes
             _mobilePotionW?.SetOpacity(opacity);
             _mobilePotionE?.SetOpacity(opacity);
             _mobilePotionR?.SetOpacity(opacity);
+            _mobileSkill1?.SetOpacity(opacity);
+            _mobileSkill2?.SetOpacity(opacity);
+            _mobileSkill3?.SetOpacity(opacity);
         }
 
         private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
@@ -190,6 +208,151 @@ namespace Client.Main.Scenes
 
                 return nearest;
             }
+            private void UseMobileSkill(
+                int slotIndex)
+            {
+                SetMouseInputConsumed();
+
+                if (_main == null ||
+                    _skillQuickSlot == null ||
+                    _skillController == null)
+                {
+                    return;
+                }
+
+                var skill =
+                    _main.SkillHotkeys
+                        .GetSkill(
+                            slotIndex);
+
+                if (skill == null)
+                {
+                    _chatLog?.AddMessage(
+                        "System",
+                        $"No hay skill asignada a {slotIndex + 1}.",
+                        MessageType.Error);
+
+                    return;
+                }
+
+                // =========================================================
+                // 1. CONVERTIRLA EN SKILL ACTIVA
+                // =========================================================
+
+                _skillQuickSlot.SelectSkill(
+                    skill);
+
+                // Actualizar el brillo amarillo
+                // del HUD inferior.
+                _main.SetSelectedSkillHotkey(
+                    slotIndex);
+
+
+                if (World is not
+                    WalkableWorldControl world)
+                {
+                    return;
+                }
+
+
+                // =========================================================
+                // 2. TARGET PVP SELECCIONADO
+                // =========================================================
+
+                if (_mobilePvpTargetId.HasValue)
+                {
+                    PlayerObject playerTarget =
+                        world.FindPlayerById(
+                            _mobilePvpTargetId.Value);
+
+                    if (playerTarget != null &&
+                        !playerTarget.IsDead &&
+                        playerTarget.World == World)
+                    {
+                        _mobileTargetPanel?
+                            .SetTarget(
+                                playerTarget.Name,
+                                isPlayer: true);
+
+                        _skillController
+                            .UseSelectedSkillOnPlayer(
+                                playerTarget,
+                                allowNonDuelTarget: true);
+
+                        return;
+                    }
+
+                    // Target anterior ya no existe.
+                    _mobilePvpTargetId =
+                        null;
+                }
+
+
+                // =========================================================
+                // 3. MONSTRUO
+                // =========================================================
+                //
+                // Por ahora usa exactamente la misma lógica
+                // que tu botón Skill Monster actual.
+                //
+                // Posteriormente podemos guardar también
+                // un _mobileMonsterTargetId para hacer
+                // lock absoluto del monstruo durante combo.
+                // =========================================================
+
+                var monster =
+                    world
+                        .FindNearestAttackableMonster();
+
+                if (monster != null)
+                {
+                    _mobileTargetPanel?
+                        .SetTarget(
+                            monster
+                                .GetType()
+                                .Name,
+
+                            isPlayer: false);
+                }
+
+                // IMPORTANTE:
+                // incluso con monster == null llamamos
+                // al controlador porque buffs/self skills
+                // y algunas skills de área no necesitan target.
+                _skillController
+                    .UseSelectedSkillOnMonster(
+                        monster);
+            }
+            private void RequestMobileSkillAssignment(
+                int slotIndex)
+            {
+                SetMouseInputConsumed();
+
+                MobileSkillButton anchor =
+                    slotIndex switch
+                    {
+                        0 => _mobileSkill1,
+                        1 => _mobileSkill2,
+                        2 => _mobileSkill3,
+                        _ => null
+                    };
+
+                if (anchor == null ||
+                    _mobileSkillAssignPopup == null)
+                {
+                    return;
+                }
+
+                // Nunca tener los dos selectores
+                // abiertos simultáneamente.
+                _mobilePotionAssignPopup?
+                    .Hide();
+
+                _mobileSkillAssignPopup
+                    .ShowFor(
+                        slotIndex,
+                        anchor.DisplayRectangle);
+            }
             private void UseMobilePotion(
                 Keys key)
             {
@@ -221,6 +384,8 @@ namespace Client.Main.Scenes
                 Keys key)
             {
                 SetMouseInputConsumed();
+
+                _mobileSkillAssignPopup?.Hide();
 
                 MobilePotionButton anchor =
                     key switch
@@ -280,6 +445,7 @@ namespace Client.Main.Scenes
 
                     // El HUD móvil no se bloquea entre sí.
                     if (control is MobilePotionButton ||
+                        control is MobileSkillButton ||
                         control is MobileAttackButton ||
                         control is MobilePvpAttackButton ||
                         control is MobileChangeTargetButton ||
@@ -377,6 +543,11 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(_mobilePotionAssignPopup))
                     return true;
 
+                if (IsWindowCovering(_mobileSkillAssignPopup))
+                {
+                    return true;
+                }
+
 
                 // Guild.
                 if (IsWindowCovering(_guildMenuDialog))
@@ -389,6 +560,25 @@ namespace Client.Main.Scenes
             // Performance optimization fields - track object IDs for O(1) lookups
             // ───────────────────────── Properties ─────────────────────────
             public HeroObject Hero => _hero;
+            public bool IsMobileJoystickActive
+            {
+                get
+                {
+                    if (_mobileJoystick == null ||
+                        !_mobileJoystick.Visible)
+                    {
+                        return false;
+                    }
+
+                    // IsActive funciona con touch real Android/iOS.
+                    //
+                    // IsMouseCaptured permite que la misma lógica
+                    // se pueda probar también con mouse en Windows.
+                    return
+                        _mobileJoystick.IsActive ||
+                        _mobileJoystick.IsMouseCaptured;
+                }
+            }
             public bool IsMobileJoystickCapturingMouse
             {
                 get
@@ -552,12 +742,32 @@ namespace Client.Main.Scenes
             // Cuando se asigna una skill desde el menú SKILL,
             // reflejarla en los slots 1-5 del HUD.
             _skillSelectionPanel.QuickSlotAssigned +=
-                (slotIndex, skill) =>
+            (slotIndex, skill) =>
+            {
+                // HUD clásico inferior.
+                _main.SkillHotkeys.SetSkill(
+                    slotIndex,
+                    skill);
+
+                // Botones Android 1 / 2 / 3.
+                switch (slotIndex)
                 {
-                    _main.SkillHotkeys.SetSkill(
-                        slotIndex,
-                        skill);
-                };
+                    case 0:
+                        _mobileSkill1?
+                            .SetSkill(skill);
+                        break;
+
+                    case 1:
+                        _mobileSkill2?
+                            .SetSkill(skill);
+                        break;
+
+                    case 2:
+                        _mobileSkill3?
+                            .SetSkill(skill);
+                        break;
+                }
+            };
 
             // Click / touch sobre un skill del HUD:
             // convertirlo en la skill activa.
@@ -880,6 +1090,153 @@ namespace Client.Main.Scenes
 
                     _mobilePotionR.AssignmentRequested +=
                         RequestMobilePotionAssignment;
+                    
+                    // ─────────────────────────────────────────────
+                    // BOTONES DE SKILL MÓVILES
+                    //
+                    // Índices internos:
+                    // 0 = hotkey 1
+                    // 1 = hotkey 2
+                    // 2 = hotkey 3
+                    // ─────────────────────────────────────────────
+
+                    _mobileSkill1 =
+                        new MobileSkillButton(
+                            0,
+                            visualSize: 58,
+                            touchSize: 72);
+
+                    _mobileSkill2 =
+                        new MobileSkillButton(
+                            1,
+                            visualSize: 58,
+                            touchSize: 72);
+
+                    _mobileSkill3 =
+                        new MobileSkillButton(
+                            2,
+                            visualSize: 58,
+                            touchSize: 72);
+
+
+                    // Posiciones iniciales basadas
+                    // en los círculos de tu captura.
+                    //
+                    // Ajustaremos unos pocos pixels
+                    // después de verlo funcionando.
+
+                    _mobileSkill1.X = 1022;
+                    _mobileSkill1.Y = 199;
+
+                    _mobileSkill2.X = 961;
+                    _mobileSkill2.Y = 259;
+
+                    _mobileSkill3.X = 921;
+                    _mobileSkill3.Y = 351;
+
+
+                    Controls.Add(
+                        _mobileSkill1);
+
+                    Controls.Add(
+                        _mobileSkill2);
+
+                    Controls.Add(
+                        _mobileSkill3);
+
+
+                    _mobileSkill1
+                        .BringToFront();
+
+                    _mobileSkill2
+                        .BringToFront();
+
+                    _mobileSkill3
+                        .BringToFront();
+
+
+                    // ─────────────────────────────────────────────
+                    // POPUP DE ASIGNACIÓN
+                    // ─────────────────────────────────────────────
+
+                    _mobileSkillAssignPopup =
+                        new MobileSkillAssignPopup(
+                            MuGame.Network
+                                .GetCharacterState(),
+
+                            slotIndex =>
+                                _main.SkillHotkeys
+                                    .GetSkill(
+                                        slotIndex),
+
+                            (slotIndex, skill) =>
+                                _skillSelectionPanel
+                                    .AssignSkillToQuickSlot(
+                                        slotIndex,
+                                        skill),
+
+                            slotIndex =>
+                                _skillSelectionPanel
+                                    .ClearQuickSlot(
+                                        slotIndex));
+
+
+                    Controls.Add(
+                        _mobileSkillAssignPopup);
+
+
+                    // ─────────────────────────────────────────────
+                    // ESTADO INICIAL
+                    // ─────────────────────────────────────────────
+
+                    _mobileSkill1.SetSkill(
+                        _main.SkillHotkeys
+                            .GetSkill(0));
+
+                    _mobileSkill2.SetSkill(
+                        _main.SkillHotkeys
+                            .GetSkill(1));
+
+                    _mobileSkill3.SetSkill(
+                        _main.SkillHotkeys
+                            .GetSkill(2));
+
+
+                    // ─────────────────────────────────────────────
+                    // TAP
+                    // ─────────────────────────────────────────────
+
+                    _mobileSkill1.SkillPressed +=
+                        UseMobileSkill;
+
+                    _mobileSkill2.SkillPressed +=
+                        UseMobileSkill;
+
+                    _mobileSkill3.SkillPressed +=
+                        UseMobileSkill;
+
+
+                    // ─────────────────────────────────────────────
+                    // LONG PRESS
+                    // ─────────────────────────────────────────────
+
+                    _mobileSkill1.AssignmentRequested +=
+                        RequestMobileSkillAssignment;
+
+                    _mobileSkill2.AssignmentRequested +=
+                        RequestMobileSkillAssignment;
+
+                    _mobileSkill3.AssignmentRequested +=
+                        RequestMobileSkillAssignment;
+
+
+                    // Los popups siempre encima
+                    // de los botones móviles.
+                    _mobilePotionAssignPopup?
+                        .BringToFront();
+
+                    _mobileSkillAssignPopup
+                        .BringToFront();
 
                     // Aplicar visibilidad/opacidad
                     // a todos los controles móviles.
@@ -1430,7 +1787,11 @@ namespace Client.Main.Scenes
                 !pauseOpen;
             if (!showMobileControls)
                 {
-                    _mobilePotionAssignPopup?.Hide();
+                    _mobilePotionAssignPopup?
+                        .Hide();
+
+                    _mobileSkillAssignPopup?
+                        .Hide();
                 }
 
             // ─────────────────────────────────────────────
@@ -1478,6 +1839,43 @@ namespace Client.Main.Scenes
                 if (!showMobileControls)
                 {
                     _mobilePotionR.CancelPress();
+                }
+            }
+            
+            // ─────────────────────────────────────────────
+            // SKILLS MÓVILES 1 / 2 / 3
+            // ─────────────────────────────────────────────
+
+            if (_mobileSkill1 != null)
+            {
+                _mobileSkill1.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobileSkill1.CancelPress();
+                }
+            }
+
+            if (_mobileSkill2 != null)
+            {
+                _mobileSkill2.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobileSkill2.CancelPress();
+                }
+            }
+
+            if (_mobileSkill3 != null)
+            {
+                _mobileSkill3.Visible =
+                    showMobileControls;
+
+                if (!showMobileControls)
+                {
+                    _mobileSkill3.CancelPress();
                 }
             }
 

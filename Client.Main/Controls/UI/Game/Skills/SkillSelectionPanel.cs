@@ -1265,6 +1265,31 @@ namespace Client.Main.Controls.UI.Game.Skills
 
             RefreshQuickSlotBank();
         }
+        public void ClearQuickSlot(
+            int slotIndex)
+        {
+            if (slotIndex < 0 ||
+                slotIndex >= QUICK_SLOT_COUNT)
+            {
+                return;
+            }
+
+            if (_quickSlotSkills[
+                    slotIndex] == null)
+            {
+                return;
+            }
+
+            _quickSlotSkills[
+                slotIndex] =
+                null;
+
+            RefreshQuickSlotBank();
+
+            QuickSlotAssigned?.Invoke(
+                slotIndex,
+                null);
+        }
 
         // =============================================================
         // PAGE MANAGEMENT

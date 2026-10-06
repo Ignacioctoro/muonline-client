@@ -456,6 +456,19 @@ namespace Client.Main.Controls
         /// attack range.
         /// Intended for mobile/touch attack controls.
         /// </summary>
+        /// <summary>
+        /// Busca el monstruo vivo más cercano dentro
+        /// del radio de adquisición móvil.
+        ///
+        /// IMPORTANTE:
+        /// El radio de búsqueda NO es el rango de ataque.
+        ///
+        /// Una vez elegido el objetivo:
+        ///
+        /// - Hero.Attack() se acerca si es necesario.
+        /// - GameSceneSkillController se acerca hasta
+        ///   entrar en el rango propio de la skill.
+        /// </summary>
         public new MonsterObject FindNearestAttackableMonster()
         {
             if (Walker is not PlayerObject player ||
@@ -464,26 +477,50 @@ namespace Client.Main.Controls
                 return null;
             }
 
-            float attackRange =
+            // Radio para detectar objetivos desde los
+            // controles móviles.
+            //
+            // 12 tiles permite seleccionar monstruos
+            // visibles y relativamente cercanos sin
+            // terminar buscando medio mapa.
+            const float MobileTargetSearchRange =
+                12f;
+
+            float searchRange =
                 player.GetAttackRangeTiles();
 
-            float attackRangeSquared =
-                attackRange * attackRange;
+            // Si alguna arma llegara a tener un rango
+            // superior a 12, respetamos ese rango.
+            if (searchRange <
+                MobileTargetSearchRange)
+            {
+                searchRange =
+                    MobileTargetSearchRange;
+            }
 
-            MonsterObject nearestMonster = null;
+            float searchRangeSquared =
+                searchRange *
+                searchRange;
+
+            MonsterObject nearestMonster =
+                null;
+
             float nearestDistanceSquared =
                 float.MaxValue;
 
-            var monsters = Monsters;
+            var monsters =
+                Monsters;
 
             for (int i = 0;
-                 i < monsters.Count;
-                 i++)
+                i < monsters.Count;
+                i++)
             {
-                var monster = monsters[i];
+                MonsterObject monster =
+                    monsters[i];
 
                 if (monster == null ||
-                    monster.IsDead)
+                    monster.IsDead ||
+                    monster.World != World)
                 {
                     continue;
                 }
@@ -493,8 +530,10 @@ namespace Client.Main.Controls
                         player.Location,
                         monster.Location);
 
+                // Está demasiado lejos incluso para
+                // considerarlo como target móvil.
                 if (distanceSquared >
-                    attackRangeSquared)
+                    searchRangeSquared)
                 {
                     continue;
                 }
@@ -505,7 +544,8 @@ namespace Client.Main.Controls
                     nearestDistanceSquared =
                         distanceSquared;
 
-                    nearestMonster = monster;
+                    nearestMonster =
+                        monster;
                 }
             }
 

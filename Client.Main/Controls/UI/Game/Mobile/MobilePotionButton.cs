@@ -201,32 +201,59 @@ namespace Client.Main.Controls.UI.Game.Mobile
             _plusLabel.Alpha = Alpha;
         }
 
-        public override void Update(GameTime gameTime)
+        public override void Update(
+            GameTime gameTime)
         {
             _coveredByWindow =
                 Scene is GameScene gameScene &&
-                gameScene.IsMobileControlCovered(this);
+                gameScene.IsMobileControlCovered(
+                    this);
 
-            if (_coveredByWindow)
+            // =========================================================
+            // Q JUNTO AL JOYSTICK
+            // =========================================================
+            //
+            // Q está intencionalmente al lado del joystick.
+            //
+            // Mientras un dedo ya controla el joystick,
+            // Q no debe interpretar ese mismo movimiento
+            // como una pulsación accidental.
+            //
+            // W / E / R NO se ven afectados.
+            // =========================================================
+
+            bool blockedByJoystick =
+                _hotkey == Keys.Q &&
+                Scene is GameScene joystickScene &&
+                joystickScene.IsMobileJoystickActive;
+
+            if (_coveredByWindow ||
+                blockedByJoystick)
             {
                 CancelPress();
-                _hitButton.Interactive = false;
+
+                _hitButton.Interactive =
+                    false;
             }
             else
             {
-                _hitButton.Interactive = true;
+                _hitButton.Interactive =
+                    true;
             }
 
-            base.Update(gameTime);
+            base.Update(
+                gameTime);
 
             RefreshItemState();
 
-            if (_coveredByWindow)
+            if (_coveredByWindow ||
+                blockedByJoystick)
             {
                 return;
             }
 
-            UpdatePressState(gameTime);
+            UpdatePressState(
+                gameTime);
         }
         private void RefreshItemState()
         {
