@@ -204,14 +204,17 @@ namespace Client.Main.Objects.Effects
         /// Effects for which the first version of our classic
         /// persistent visual renderer is implemented.
         /// </summary>
-        public static bool HasImplementedVisual(byte effectId)
+        public static bool HasImplementedVisual(
+            byte effectId)
         {
             return effectId is
                 GreaterDamage or
                 GreaterDefense or
                 ElfSoldierBuff or
                 SoulBarrier or
-                GreaterFortitude;
+                GreaterFortitude or
+                CriticalDamageIncrease or
+                CriticalDamageIncreaseMastery;
         }
     }
 }

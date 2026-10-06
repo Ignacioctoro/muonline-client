@@ -42,6 +42,7 @@ namespace Client.Main.Objects.Effects
 
             public ClassicWeaponBuffShineEffect AttackShine;
             public ClassicGreaterFortitudeGlowEffect GreaterFortitudeGlow;
+            public ClassicCriticalDamageAuraEffect CriticalDamageAura;
         }
 
         private readonly Dictionary<
@@ -211,6 +212,11 @@ namespace Client.Main.Objects.Effects
             bool greaterFortitude =
                 state.ActiveEffects.Contains(
                     Season6BuffMapping.GreaterFortitude);
+            bool criticalDamage =
+                state.ActiveEffects.Contains(
+                    Season6BuffMapping.CriticalDamageIncrease) ||
+                state.ActiveEffects.Contains(
+                    Season6BuffMapping.CriticalDamageIncreaseMastery);
 
             // ---------------------------------------------------------
             // Classic SourceMain behavior:
@@ -260,6 +266,12 @@ namespace Client.Main.Objects.Effects
                 target,
                 state,
                 greaterFortitude);
+
+            EnsureCriticalDamageAura(
+                world,
+                target,
+                state,
+                criticalDamage);
         }
 
         private static void EnsureGreenJoint(
@@ -361,6 +373,38 @@ namespace Client.Main.Objects.Effects
                 world,
                 state.GreaterFortitudeGlow);
         }
+        private static void EnsureCriticalDamageAura(
+            WalkableWorldControl world,
+            PlayerObject target,
+            PlayerBuffVisualState state,
+            bool needed)
+        {
+            if (!needed)
+            {
+                RemoveVisual(
+                    ref state.CriticalDamageAura);
+
+                return;
+            }
+
+            if (IsUsable(
+                    state.CriticalDamageAura,
+                    target))
+            {
+                return;
+            }
+
+            RemoveVisual(
+                ref state.CriticalDamageAura);
+
+            state.CriticalDamageAura =
+                new ClassicCriticalDamageAuraEffect(
+                    target);
+
+            AddVisual(
+                world,
+                state.CriticalDamageAura);
+        }
 
 
         private static void EnsureAttackShine(
@@ -394,6 +438,17 @@ namespace Client.Main.Objects.Effects
             AddVisual(
                 world,
                 state.AttackShine);
+        }
+        private static bool IsUsable(
+            ClassicCriticalDamageAuraEffect effect,
+            PlayerObject target)
+        {
+            return effect != null &&
+                effect.Status !=
+                    GameControlStatus.Disposed &&
+                ReferenceEquals(
+                    effect.Owner,
+                    target);
         }
 
         private static bool IsUsable(
@@ -454,6 +509,8 @@ namespace Client.Main.Objects.Effects
                 ref state.AttackShine);
             RemoveVisual(
                 ref state.GreaterFortitudeGlow);
+            RemoveVisual(
+                ref state.CriticalDamageAura);
         }
 
         private static void RemoveVisual<T>(

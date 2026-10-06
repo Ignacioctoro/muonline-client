@@ -562,15 +562,28 @@ namespace Client.Main.Core.Utilities
                 "Summon",
                 SkillType.Self);
 
-            //
-            // Classic Main sends this buff without selecting
-            // PLAYER_ATTACK_DEATHSTAB. The old table's 71 was wrong.
-            //
-            Add(
-                64,
-                "Increase Critical Damage",
-                SkillType.Self,
-                Season6SkillAnimationMode.KeepCurrent);
+           //
+        // Dark Lord - Increase Critical Damage
+        //
+        // Main:
+        //
+        // AT_SKILL_ADD_CRITICAL
+        //     SendRequestMagic(...)
+        //
+        // Y al procesar la animación:
+        //
+        //     SetAction(
+        //         o,
+        //         PLAYER_SKILL_HAND1);
+        //
+        // El antiguo PLAYER_ATTACK_DEATHSTAB era incorrecto.
+        //
+        Add(
+            64,
+            "Increase Critical Damage",
+            SkillType.Self,
+            Season6SkillAnimationMode.Explicit,
+            PlayerAction.PlayerSkillHand1);
 
             //
             // Classic AT_SKILL_THUNDER_STRIKE:
