@@ -148,9 +148,6 @@ namespace Client.Main.ClassicFX.Core
         private readonly uint[]
             _generations;
 
-        private int
-            _nextSearchIndex;
-
         public ClassicFxPoolKind Kind
         {
             get;
@@ -216,55 +213,38 @@ namespace Client.Main.ClassicFX.Core
         public bool TryAcquire(
             out ClassicFxHandle handle)
         {
-            int capacity =
-                Capacity;
-
-            int index =
-                _nextSearchIndex;
-
-            for (int checkedCount = 0;
-                 checkedCount <
-                    capacity;
-                 checkedCount++)
+            // Fidelidad Main:
+            //
+            // CreateEffect/CreateSprite/CreateParticle/etc.
+            // recorren los arrays clásicos desde índice 0 y utilizan
+            // siempre el primer slot que tenga Live == false.
+            //
+            // No utilizamos un cursor circular porque el índice del
+            // pool también determina el orden posterior de procesamiento
+            // y render.
+            for (int index = 0;
+                index < Capacity;
+                index++)
             {
-                if (!_active[index])
+                if (_active[index])
                 {
-                    _active[index] =
-                        true;
-
-                    ActiveCount++;
-
-                    handle =
-                        new ClassicFxHandle(
-                            Kind,
-                            index,
-                            _generations[
-                                index
-                            ]);
-
-                    index++;
-
-                    if (index >=
-                        capacity)
-                    {
-                        index =
-                            0;
-                    }
-
-                    _nextSearchIndex =
-                        index;
-
-                    return true;
+                    continue;
                 }
 
-                index++;
+                _active[index] =
+                    true;
 
-                if (index >=
-                    capacity)
-                {
-                    index =
-                        0;
-                }
+                ActiveCount++;
+
+                handle =
+                    new ClassicFxHandle(
+                        Kind,
+                        index,
+                        _generations[
+                            index
+                        ]);
+
+                return true;
             }
 
             handle =
@@ -298,13 +278,6 @@ namespace Client.Main.ClassicFX.Core
 
             AdvanceGeneration(
                 index);
-
-            if (index <
-                _nextSearchIndex)
-            {
-                _nextSearchIndex =
-                    index;
-            }
 
             return true;
         }
@@ -395,9 +368,6 @@ namespace Client.Main.ClassicFX.Core
             }
 
             ActiveCount =
-                0;
-
-            _nextSearchIndex =
                 0;
         }
 

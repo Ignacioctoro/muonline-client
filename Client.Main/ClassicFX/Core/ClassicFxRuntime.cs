@@ -19,8 +19,7 @@ namespace Client.Main.ClassicFX.Core
     ///
     /// Sobre esta base se agregarán las primitivas reales.
     /// </summary>
-    public sealed class ClassicFxRuntime :
-        IDisposable
+    public sealed partial class ClassicFxRuntime : IDisposable
     {
         private bool
             _disposed;
@@ -145,6 +144,8 @@ namespace Client.Main.ClassicFX.Core
 
             Pools.Clear();
 
+            ClearSpriteStorage();
+
             Clock
                 .ResetReferenceFrameCounter();
         }
@@ -158,8 +159,10 @@ namespace Client.Main.ClassicFX.Core
 
             Pools.Clear();
 
+            ClearSpriteStorage();
+
             _disposed =
                 true;
         }
-    }
+            }
 }
