@@ -25,13 +25,13 @@ namespace Client.Main.Objects.Effects
     ///     {
     ///         CreateEffect(
     ///             BITMAP_FLARE_FORCE,
-    ///             weaponPosition,
+    ///             hand/weapon position,
     ///             ...,
     ///             subtype: 1);
     ///     }
     /// }
     ///
-    /// BITMAP_FLARE_FORCE subtype 1 creates three joints:
+    /// BITMAP_FLARE_FORCE subtype 1 creates:
     ///
     ///     subtype 5
     ///     subtype 6
@@ -41,18 +41,31 @@ namespace Client.Main.Objects.Effects
     ///
     ///     BITMAP_FIRECRACKER
     ///
-    /// which is:
+    /// which corresponds to:
     ///
     ///     Data/Effect/Fire04
     ///
-    /// They remain attached to the weapon link bone and generate
-    /// three short spiralling trails around the weapon/hand.
+    /// Classic implementation attaches them to the weapon LinkBone.
+    ///
+    /// MonoGame adaptation:
+    ///
+    /// We attach directly to the actual player hand bones so both
+    /// hands retain the aura while the buff is active, regardless
+    /// of whether a weapon is equipped.
+    ///
+    /// The original geometry is preserved, but compensated in size
+    /// because the same numeric dimensions render substantially
+    /// larger in this client.
     /// </summary>
     public sealed class ClassicCriticalDamageAuraEffect
         : WorldObject
     {
         private const string TexturePath =
             "Effect/Fire04.OZJ";
+
+        // =============================================================
+        // CLASSIC TIMING
+        // =============================================================
 
         private const float ClassicReferenceFps =
             25.0f;
@@ -66,12 +79,16 @@ namespace Client.Main.Objects.Effects
             30.0f;
 
         //
-        // BITMAP_FLARE_FORCE subtype 5/6/7:
+        // BITMAP_FLARE_FORCE subtype 5 / 6 / 7:
         //
         // LifeTime = 15
         //
         private const float ActiveFrames =
             15.0f;
+
+        // =============================================================
+        // TRAILS
+        // =============================================================
 
         private const int TrailsPerHand =
             3;
@@ -80,8 +97,7 @@ namespace Client.Main.Objects.Effects
             2;
 
         //
-        // During a 15-frame lifetime the classic joint gradually
-        // increases MaxTails.
+        // Original joint gradually increases MaxTails while alive.
         //
         private const int MaxSamplesPerTrail =
             15;
@@ -109,20 +125,46 @@ namespace Client.Main.Objects.Effects
             MaxSegmentsPerTrail *
             IndicesPerSegment;
 
+        // =============================================================
+        // MONOGAME VISUAL COMPENSATION
+        // =============================================================
+
+        //
+        // The original values:
+        //
+        //     joint Scale   = 20
+        //     radius        = 30
+        //     local Y       = 20
+        //     Direction.Y   = -4
+        //
+        // are visually too large when applied literally in this
+        // MonoGame renderer.
+        //
+        // Keep all proportions, but shrink the entire local effect
+        // uniformly around the hand.
+        //
+        private const float PersistentVisualScale =
+            0.55f;
+
+        //
+        // Original:
         //
         // CreateJoint(... Scale = 20)
         //
         private const float TrailWidth =
-            20.0f;
+            20.0f *
+            PersistentVisualScale;
 
         //
-        // The original uses full (1, .8, 1) light.
+        // Original light:
         //
-        // MonoGame's additive renderer is visually stronger,
-        // so this is only a renderer-space compensation.
+        //     (1.0, 0.8, 1.0)
+        //
+        // Additive blending in MonoGame is visually stronger, so
+        // this acts only as renderer-space brightness compensation.
         //
         private const float Intensity =
-            0.70f;
+            0.55f;
 
         private static readonly BlendState ClassicAdditive =
             new BlendState
@@ -146,7 +188,16 @@ namespace Client.Main.Objects.Effects
                     Blend.One
             };
 
-        private readonly PlayerObject _owner;
+        // =============================================================
+        // OWNER
+        // =============================================================
+
+        private readonly PlayerObject
+            _owner;
+
+        // =============================================================
+        // GEOMETRY BUFFERS
+        // =============================================================
 
         private readonly VertexPositionColorTexture[]
             _vertices =
@@ -166,14 +217,21 @@ namespace Client.Main.Objects.Effects
 
         private DynamicIndexBuffer? _indexBuffer;
 
-        private int _vertexCount;
+        private int
+            _vertexCount;
 
-        private int _indexCount;
+        private int
+            _indexCount;
 
-        private float _elapsed;
+        private float
+            _elapsed;
 
         public PlayerObject Owner =>
             _owner;
+
+        // =============================================================
+        // CONSTRUCTOR
+        // =============================================================
 
         public ClassicCriticalDamageAuraEffect(
             PlayerObject owner)
@@ -190,13 +248,13 @@ namespace Client.Main.Objects.Effects
             BoundingBoxLocal =
                 new BoundingBox(
                     new Vector3(
-                        -250f,
-                        -250f,
-                        -120f),
+                        -160f,
+                        -160f,
+                        -100f),
                     new Vector3(
-                        250f,
-                        250f,
-                        320f));
+                        160f,
+                        160f,
+                        260f));
 
             Interactive =
                 false;
@@ -213,6 +271,10 @@ namespace Client.Main.Objects.Effects
             DepthState =
                 GraphicsManager.ReadOnlyDepth;
         }
+
+        // =============================================================
+        // LOAD
+        // =============================================================
 
         public override async Task LoadContent()
         {
@@ -267,6 +329,10 @@ namespace Client.Main.Objects.Effects
                     BufferUsage.WriteOnly);
         }
 
+        // =============================================================
+        // UPDATE
+        // =============================================================
+
         public override void Update(
             GameTime gameTime)
         {
@@ -300,6 +366,12 @@ namespace Client.Main.Objects.Effects
 
             if (Hidden)
             {
+                _vertexCount =
+                    0;
+
+                _indexCount =
+                    0;
+
                 return;
             }
 
@@ -327,6 +399,10 @@ namespace Client.Main.Objects.Effects
             }
         }
 
+        // =============================================================
+        // BUILD COMPLETE EFFECT
+        // =============================================================
+
         private void BuildGeometry()
         {
             _vertexCount =
@@ -336,8 +412,8 @@ namespace Client.Main.Objects.Effects
                 0;
 
             //
-            // Convert MonoGame real time back to classic
-            // effect frames.
+            // Convert real-time MonoGame time back into the original
+            // 25 FPS effect timing.
             //
             float absoluteFrame =
                 _elapsed *
@@ -348,7 +424,8 @@ namespace Client.Main.Objects.Effects
                 PulseFrames;
 
             //
-            // Original joint lives for 15 frames.
+            // Original joint only lives for 15 of the 30-frame
+            // recurring pulse.
             //
             if (pulseFrame >=
                 ActiveFrames)
@@ -357,7 +434,7 @@ namespace Client.Main.Objects.Effects
             }
 
             //
-            // MaxTails starts small and grows every frame.
+            // Classic MaxTails grows throughout the joint lifetime.
             //
             int sampleCount =
                 Math.Clamp(
@@ -368,31 +445,35 @@ namespace Client.Main.Objects.Effects
                     MaxSamplesPerTrail);
 
             //
-            // A single sample cannot form a ribbon yet.
+            // Need at least two samples to make one ribbon segment.
             //
             if (sampleCount < 2)
             {
                 return;
             }
 
+            // =========================================================
+            // CLASSIC FADE
+            // =============================================================
             //
             // Original:
             //
             // if (LifeTime < 7)
-            //     Light /= 1.5
             //
-            // Life starts at 15, therefore fading begins
-            // around classic frame 8.
+            //     Light /= 1.5;
+            //
+            // Life starts at 15, therefore fade starts at roughly
+            // classic frame 8.
             //
             float fadeFrames =
                 MathF.Max(
-                    0f,
+                    0.0f,
                     pulseFrame -
-                    8f);
+                    8.0f);
 
             float fade =
                 MathF.Pow(
-                    1f / 1.5f,
+                    1.0f / 1.5f,
                     fadeFrames);
 
             Vector3 light =
@@ -403,79 +484,59 @@ namespace Client.Main.Objects.Effects
                 fade *
                 Intensity;
 
+            // =========================================================
+            // BOTH HANDS
+            // =============================================================
+            //
+            // IMPORTANT:
+            //
+            // Do not check Weapon1 or Weapon2 here.
+            //
+            // This aura belongs to the hand/buff, not to the weapon
+            // model. It therefore remains visible:
+            //
+            //     weapon + weapon
+            //     weapon + empty hand
+            //     empty hand + weapon
+            //     empty hand + empty hand
+            //
             BuildHand(
                 isLeftHand: true,
-                _owner.Weapon1,
                 sampleCount,
                 light);
 
             BuildHand(
                 isLeftHand: false,
-                _owner.Weapon2,
                 sampleCount,
                 light);
         }
 
+        // =============================================================
+        // HAND
+        // =============================================================
+
         private void BuildHand(
             bool isLeftHand,
-            WeaponObject? weapon,
             int sampleCount,
             Vector3 light)
         {
-            if (weapon == null ||
-                weapon.Model == null)
-            {
-                return;
-            }
-
-            // =========================================================
-            // CLASSIC WEAPON FILTERS
-            // =========================================================
-
-            if (isLeftHand)
-            {
-                //
-                // Original:
-                //
-                // Weapon[0].Type != MODEL_BOW + 15
-                //
-                if (weapon.ItemGroup == 4 &&
-                    weapon.ItemNumber == 15)
-                {
-                    return;
-                }
-            }
-            else
-            {
-                //
-                // Original:
-                //
-                // Weapon[1].Type != MODEL_BOW + 7
-                //
-                if (weapon.ItemGroup == 4 &&
-                    weapon.ItemNumber == 7)
-                {
-                    return;
-                }
-
-                //
-                // Shields do not receive the critical aura.
-                //
-                if (weapon.ItemGroup == 6)
-                {
-                    return;
-                }
-            }
-
+            //
+            // PlayerObject exposes the actual animated hand bones.
+            //
+            // Left:
+            //
+            //     bone 33
+            //
+            // Right:
+            //
+            //     bone 42
+            //
             if (!_owner.TryGetHandWorldMatrix(
                     isLeftHand,
                     out Matrix handWorld))
             {
                 return;
             }
-
-            bool isBow =
-                weapon.ItemGroup == 4;
 
             Vector3 widthAxis1 =
                 Vector3.TransformNormal(
@@ -495,6 +556,12 @@ namespace Client.Main.Objects.Effects
                 ref widthAxis2,
                 Vector3.UnitZ);
 
+            //
+            // Classic joint Scale = 20.
+            //
+            // Our TrailWidth already contains the MonoGame size
+            // compensation.
+            //
             float halfWidth =
                 TrailWidth *
                 0.5f *
@@ -507,11 +574,11 @@ namespace Client.Main.Objects.Effects
                 halfWidth;
 
             //
-            // BITMAP_FLARE_FORCE subtype 1 creates:
+            // BITMAP_FLARE_FORCE subtype 1 creates exactly:
             //
-            //     5
-            //     6
-            //     7
+            //     subtype 5
+            //     subtype 6
+            //     subtype 7
             //
             for (int trail = 0;
                  trail < TrailsPerHand;
@@ -525,44 +592,63 @@ namespace Client.Main.Objects.Effects
                     widthAxis1,
                     widthAxis2,
                     subType,
-                    isBow,
                     sampleCount,
                     light);
             }
         }
+
+        // =============================================================
+        // TRAIL
+        // =============================================================
 
         private void BuildTrail(
             Matrix handWorld,
             Vector3 widthAxis1,
             Vector3 widthAxis2,
             int subType,
-            bool isBow,
             int sampleCount,
             Vector3 light)
         {
             int vertexStart =
                 _vertexCount;
 
+            //
+            // Original non-bow value:
+            //
+            // Direction = (0, -4, 0)
+            //
+            // Critical Damage is a Dark Lord skill, therefore the
+            // standard non-bow trajectory is the one we reproduce.
+            //
             float directionY =
-                isBow
-                    ? 0f
-                    : -4.0f;
+                -4.0f *
+                PersistentVisualScale;
 
             float accumulatedY =
-                0f;
+                0.0f;
 
             //
             // Original:
             //
-            // TargetPosition[2] = SubType * 90
+            // TargetPosition[2] =
+            //     SubType * 90
             //
             float baseAngle =
                 subType *
                 90.0f;
 
             //
-            // subtype 5 / 7 -> +40 deg
-            // subtype 6     -> -40 deg
+            // subtype 5:
+            //
+            //     +40 degrees per sample
+            //
+            // subtype 6:
+            //
+            //     -40 degrees per sample
+            //
+            // subtype 7:
+            //
+            //     +40 degrees per sample
             //
             float rotationDirection =
                 (subType & 1) != 0
@@ -580,8 +666,7 @@ namespace Client.Main.Objects.Effects
                  sample < sampleCount;
                  sample++)
             {
-                if (sample > 0 &&
-                    !isBow)
+                if (sample > 0)
                 {
                     accumulatedY +=
                         directionY;
@@ -589,16 +674,31 @@ namespace Client.Main.Objects.Effects
                     //
                     // Original:
                     //
-                    // Direction[1] -= .1
+                    // Direction[1] -= 0.1
                     //
                     directionY -=
-                        0.1f;
+                        0.1f *
+                        PersistentVisualScale;
                 }
 
+                //
+                // Original:
+                //
+                // TargetPosition[0] = 30
+                //
+                // then:
+                //
+                // TargetPosition[0] -= 0.15
+                //
+                // per generated point.
+                //
                 float radius =
-                    30.0f -
-                    sample *
-                    0.15f;
+                    (
+                        30.0f -
+                        sample *
+                        0.15f
+                    ) *
+                    PersistentVisualScale;
 
                 float angleDegrees =
                     baseAngle +
@@ -619,20 +719,31 @@ namespace Client.Main.Objects.Effects
                 //
                 //     (0, 0, radius)
                 //
-                // around Angle.X.
+                // around the hand.
                 //
                 Vector3 local =
                     new Vector3(
-                        0f,
+                        0.0f,
 
-                        20.0f +
+                        20.0f *
+                        PersistentVisualScale +
                         accumulatedY -
-                        MathF.Sin(angle) *
+                        MathF.Sin(
+                            angle) *
                         radius,
 
-                        MathF.Cos(angle) *
+                        MathF.Cos(
+                            angle) *
                         radius);
 
+                //
+                // CRITICAL:
+                //
+                // Transform using the actual animated hand bone.
+                //
+                // This is what makes the aura follow the hand instead
+                // of the weapon model.
+                //
                 Vector3 point =
                     Vector3.Transform(
                         local,
@@ -641,18 +752,35 @@ namespace Client.Main.Objects.Effects
                 int v =
                     _vertexCount;
 
+                //
+                // Safety.
+                //
+                if (v +
+                        VerticesPerSample >
+                    MaxVertices)
+                {
+                    break;
+                }
+
+                float u =
+                    sample /
+                    (float)
+                    Math.Max(
+                        1,
+                        sampleCount - 1);
+
+                // =====================================================
+                // FACE 1
+                // =====================================================
+
                 _vertices[v + 0] =
                     new VertexPositionColorTexture(
                         point -
                             widthAxis1,
                         color,
                         new Vector2(
-                            sample /
-                            (float)
-                            Math.Max(
-                                1,
-                                sampleCount - 1),
-                            0f));
+                            u,
+                            0.0f));
 
                 _vertices[v + 1] =
                     new VertexPositionColorTexture(
@@ -660,25 +788,25 @@ namespace Client.Main.Objects.Effects
                             widthAxis1,
                         color,
                         new Vector2(
-                            sample /
-                            (float)
-                            Math.Max(
-                                1,
-                                sampleCount - 1),
-                            1f));
+                            u,
+                            1.0f));
 
+                // =====================================================
+                // FACE 2
+                // =====================================================
+                //
+                // Second crossed ribbon allows the trail to retain
+                // volume from different camera angles, matching the
+                // classic joint renderer more closely.
+                //
                 _vertices[v + 2] =
                     new VertexPositionColorTexture(
                         point -
                             widthAxis2,
                         color,
                         new Vector2(
-                            sample /
-                            (float)
-                            Math.Max(
-                                1,
-                                sampleCount - 1),
-                            0f));
+                            u,
+                            0.0f));
 
                 _vertices[v + 3] =
                     new VertexPositionColorTexture(
@@ -686,20 +814,27 @@ namespace Client.Main.Objects.Effects
                             widthAxis2,
                         color,
                         new Vector2(
-                            sample /
-                            (float)
-                            Math.Max(
-                                1,
-                                sampleCount - 1),
-                            1f));
+                            u,
+                            1.0f));
 
                 _vertexCount +=
                     VerticesPerSample;
             }
 
+            //
+            // The effective number of samples may theoretically be
+            // lower if we reached our safety capacity.
+            //
+            int generatedSamples =
+                (
+                    _vertexCount -
+                    vertexStart
+                ) /
+                VerticesPerSample;
+
             for (int segment = 0;
                  segment <
-                    sampleCount - 1;
+                    generatedSamples - 1;
                  segment++)
             {
                 int current =
@@ -711,7 +846,10 @@ namespace Client.Main.Objects.Effects
                     current +
                     VerticesPerSample;
 
-                // Face 1
+                // =====================================================
+                // FACE 1
+                // =====================================================
+
                 AddTriangle(
                     current + 0,
                     current + 1,
@@ -722,7 +860,10 @@ namespace Client.Main.Objects.Effects
                     next + 1,
                     next + 0);
 
-                // Face 2
+                // =====================================================
+                // FACE 2
+                // =====================================================
+
                 AddTriangle(
                     current + 2,
                     current + 3,
@@ -734,6 +875,10 @@ namespace Client.Main.Objects.Effects
                     next + 2);
             }
         }
+
+        // =============================================================
+        // INDEX BUFFER HELPERS
+        // =============================================================
 
         private void AddTriangle(
             int a,
@@ -772,6 +917,10 @@ namespace Client.Main.Objects.Effects
             value.Normalize();
         }
 
+        // =============================================================
+        // DRAW
+        // =============================================================
+
         public override void Draw(
             GameTime gameTime)
         {
@@ -779,6 +928,7 @@ namespace Client.Main.Objects.Effects
                 gameTime);
 
             if (!Visible ||
+                Hidden ||
                 _indexCount <= 0 ||
                 _texture == null ||
                 _effect == null ||
@@ -811,6 +961,16 @@ namespace Client.Main.Objects.Effects
                 gd.Indices =
                     _indexBuffer;
 
+                // =====================================================
+                // ADDITIVE
+                // =====================================================
+                //
+                // Fire04 contains dark/black texels around the effect.
+                //
+                // Additive blending makes those pixels contribute
+                // nothing instead of drawing a dark rectangle around
+                // the aura.
+                //
                 gd.BlendState =
                     ClassicAdditive;
 
@@ -820,6 +980,10 @@ namespace Client.Main.Objects.Effects
                 gd.RasterizerState =
                     RasterizerState.CullNone;
 
+                //
+                // Vertex positions are already world-space because
+                // BuildTrail transformed them through handWorld.
+                //
                 _effect.World =
                     Matrix.Identity;
 
@@ -836,7 +1000,8 @@ namespace Client.Main.Objects.Effects
                     TotalAlpha;
 
                 int primitiveCount =
-                    _indexCount / 3;
+                    _indexCount /
+                    3;
 
                 foreach (
                     EffectPass pass
@@ -872,6 +1037,10 @@ namespace Client.Main.Objects.Effects
             }
         }
 
+        // =============================================================
+        // REMOVE
+        // =============================================================
+
         private void RemoveSelf()
         {
             if (Parent != null)
@@ -897,6 +1066,10 @@ namespace Client.Main.Objects.Effects
             Dispose();
         }
 
+        // =============================================================
+        // DISPOSE
+        // =============================================================
+
         public override void Dispose()
         {
             _vertexBuffer?.Dispose();
@@ -915,7 +1088,7 @@ namespace Client.Main.Objects.Effects
                 null;
 
             //
-            // TextureLoader owns this texture.
+            // TextureLoader owns the actual texture.
             //
             _texture =
                 null;
