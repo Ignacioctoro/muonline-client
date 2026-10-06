@@ -19,40 +19,26 @@ namespace Client.Main.Objects.Effects
     ///
     /// Original Main:
     ///
-    /// CreateEffect(
-    ///     BITMAP_LIGHT,
-    ///     target.Position,
-    ///     target.Angle,
-    ///     target.Light,
-    ///     1,
-    ///     target);
+    /// BITMAP_LIGHT subtype 1 acts as a controller while
+    /// eBuff_Life is active.
     ///
-    /// While eBuff_Life is active:
+    /// Every classic frame it selects two mirrored upper-body bones:
     ///
-    /// Vector(1.0f, 0.5f, 0.1f, Light);
+    ///     25, 26, 27, 20, 34, 35, 36
     ///
-    /// Index = rand() % 7;
+    /// and creates BITMAP_LIGHT particle subtype 4.
     ///
-    /// g_byUpperBoneLocation[7] =
-    /// {
-    ///     25, 26, 27,
-    ///     20,
-    ///     34, 35, 36
-    /// };
+    /// Subtype 4:
     ///
-    /// CreateParticle(
-    ///     BITMAP_LIGHT,
-    ///     ...,
-    ///     subtype 4,
-    ///     boneIndex,
-    ///     owner);
+    ///     LifeTime = 10
+    ///     Gravity = 0
+    ///     Scale = 2
     ///
-    /// Then creates the mirrored entry:
+    /// It stays attached to the selected player bone,
+    /// rises vertically, shrinks slightly and fades.
     ///
-    /// g_byUpperBoneLocation[6 - Index]
-    ///
-    /// Bone 20 corresponds to the head area, which produces
-    /// the characteristic yellow/orange hair/head glow.
+    /// Bone 20 is responsible for the characteristic
+    /// yellow/orange Greater Fortitude head/hair glow.
     /// </summary>
     public sealed class ClassicGreaterFortitudeGlowEffect
         : WorldObject
@@ -60,27 +46,59 @@ namespace Client.Main.Objects.Effects
         private const string TexturePath =
             "Effect/flare01.jpg";
 
+        private const float ClassicReferenceFps =
+            25.0f;
+
+        private const float SpawnInterval =
+            1.0f / ClassicReferenceFps;
+
+        private const float ParticleLifetime =
+            10.0f / ClassicReferenceFps;
+
+        /// <summary>
+        /// MU's BITMAP_LIGHT scale isn't equivalent to MonoGame
+        /// SpriteBatch scale.
+        ///
+        /// Neffis' screen projection makes the original Scale=2
+        /// considerably smaller, so this converts classic particle
+        /// scale to the visual size expected by the MU camera.
+        /// </summary>
+        private const float ClassicSpriteScaleMultiplier =
+            3.25f;
+        //
+        // Original MU world/effect coordinates are much larger
+        // vertically than Neffis/MonoGame player coordinates.
+        //
+        // Without this conversion, BITMAP_LIGHT subtype 4
+        // rises several hundred world units and goes far above
+        // the character's wings.
+        //
+        // Greater Fortitude should remain concentrated around
+        // head / shoulders / upper torso.
+        //
+        private const float ClassicVerticalMotionScale =
+            0.20f;
+
+        //
+        // Safety ceiling. The original effect does not turn
+        // into a tall vertical column above the character.
+        //
+        private const float MaxVerticalOffset =
+            95.0f;
+
+        private const int HeadBone =
+            20;
+
         private static readonly int[] UpperBones =
         {
             25,
             26,
             27,
-            20,
+            HeadBone,
             34,
             35,
             36
         };
-
-        private const float ClassicReferenceFps =
-            25.0f;
-
-        private const float SpawnInterval =
-            1.0f /
-            ClassicReferenceFps;
-
-        private const float ParticleLifetime =
-            10.0f /
-            ClassicReferenceFps;
 
         private static readonly BlendState ClassicAdditive =
             new BlendState
@@ -112,11 +130,29 @@ namespace Client.Main.Objects.Effects
 
             public float Lifetime;
 
-            public float Scale;
+            /// <summary>
+            /// Original:
+            ///
+            /// Scale -=
+            ///     (rand() % 400 + 400) /
+            ///     10000.f
+            ///
+            /// each classic frame.
+            /// </summary>
+            public float ScaleLossPerFrame;
 
-            public float UpOffset;
+            /// <summary>
+            /// Original:
+            ///
+            /// Gravity +=
+            ///     ((rand() % 40 + 60) /
+            ///      100.f * 9.5f)
+            ///
+            /// each classic frame.
+            /// </summary>
+            public float GravityStepPerFrame;
 
-            public float Rotation;
+            public float SpriteRotation;
         }
 
         private readonly PlayerObject _owner;
@@ -146,19 +182,22 @@ namespace Client.Main.Objects.Effects
             BoundingBoxLocal =
                 new BoundingBox(
                     new Vector3(
-                        -160f,
-                        -160f,
-                        -60f),
+                        -220f,
+                        -220f,
+                        -80f),
                     new Vector3(
-                        160f,
-                        160f,
-                        300f));
+                        220f,
+                        220f,
+                        650f));
 
-            Interactive = false;
+            Interactive =
+                false;
 
-            IsTransparent = true;
+            IsTransparent =
+                true;
 
-            AffectedByTransparency = true;
+            AffectedByTransparency =
+                true;
 
             BlendState =
                 ClassicAdditive;
@@ -236,9 +275,11 @@ namespace Client.Main.Objects.Effects
                 dt;
 
             //
-            // Original Main continuously spawns
-            // upper-body light particles while
-            // eBuff_Life remains active.
+            // Original Main:
+            //
+            // BITMAP_LIGHT subtype 1 continuously creates
+            // two subtype-4 particles while eBuff_Life
+            // remains active.
             //
             while (_spawnAccumulator >=
                    SpawnInterval)
@@ -257,42 +298,31 @@ namespace Client.Main.Objects.Effects
                     0,
                     UpperBones.Length);
 
+            int mirrorIndex =
+                UpperBones.Length -
+                1 -
+                index;
+
             int bone1 =
                 UpperBones[index];
 
             int bone2 =
-                UpperBones[
-                    UpperBones.Length -
-                    1 -
-                    index];
+                UpperBones[mirrorIndex];
 
             SpawnParticle(
                 bone1);
 
             SpawnParticle(
                 bone2);
-
-            //
-            // Bone 20 is the classic head anchor.
-            //
-            // Original Main reaches this bone randomly.
-            // With Neffis' different visual scale the
-            // head glow can become too subtle, so we
-            // reinforce it occasionally while preserving
-            // the original upper-body distribution.
-            //
-            if (MuGame.Random.Next(
-                    0,
-                    3) == 0)
-            {
-                SpawnParticle(
-                    20);
-            }
         }
 
         private void SpawnParticle(
             int boneIndex)
         {
+            //
+            // Don't create the particle when that bone
+            // isn't available in the current player model.
+            //
             if (!_owner.TryGetBoneWorldMatrix(
                     boneIndex,
                     out _))
@@ -300,13 +330,21 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
-            //
-            // Original BITMAP_LIGHT particle subtype 4:
-            //
-            // LifeTime = 10
-            // Gravity = 0
-            // Scale = 2
-            //
+            float scaleLoss =
+                MuGame.Random.Next(
+                    400,
+                    800) /
+                10000.0f;
+
+            float gravityStep =
+                (
+                    MuGame.Random.Next(
+                        60,
+                        100) /
+                    100.0f
+                ) *
+                9.5f;
+
             _particles.Add(
                 new GlowParticle
                 {
@@ -319,13 +357,13 @@ namespace Client.Main.Objects.Effects
                     Lifetime =
                         ParticleLifetime,
 
-                    Scale =
-                        2.0f,
+                    ScaleLossPerFrame =
+                        scaleLoss,
 
-                    UpOffset =
-                        0f,
+                    GravityStepPerFrame =
+                        gravityStep,
 
-                    Rotation =
+                    SpriteRotation =
                         MathHelper.ToRadians(
                             MuGame.Random.Next(
                                 0,
@@ -347,39 +385,8 @@ namespace Client.Main.Objects.Effects
                 particle.Age +=
                     dt;
 
-                float normalized =
-                    MathHelper.Clamp(
-                        particle.Age /
-                        particle.Lifetime,
-                        0f,
-                        1f);
-
-                //
-                // Classic subtype 4:
-                //
-                // particle rises,
-                // scale shrinks,
-                // light fades quickly.
-                //
-                particle.UpOffset =
-                    normalized *
-                    normalized *
-                    52f;
-
-                particle.Scale =
-                    MathHelper.Lerp(
-                        2.20f,
-                        0.28f,
-                        normalized);
-
-                particle.Rotation +=
-                    dt *
-                    2.5f;
-
                 if (particle.Age >=
-                        particle.Lifetime ||
-                    particle.Scale <=
-                        0.1f)
+                    particle.Lifetime)
                 {
                     _particles.RemoveAt(
                         i);
@@ -444,30 +451,110 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
+            //
+            // Convert elapsed real time back to the
+            // original client's 25 FPS effect time.
+            //
+            float classicFrame =
+                particle.Age *
+                ClassicReferenceFps;
+
+            classicFrame =
+                MathHelper.Clamp(
+                    classicFrame,
+                    0f,
+                    10f);
+
+            //
+            // Original subtype 4 starts with:
+            //
+            //     Scale = 2
+            //
+            // and only decreases around 0.04 - 0.08
+            // per classic frame.
+            //
+            float classicScale =
+                2.0f -
+                (
+                    particle.ScaleLossPerFrame *
+                    classicFrame
+                );
+
+            classicScale =
+                MathF.Max(
+                    classicScale,
+                    0.1f);
+
+            //
+            // Original:
+            //
+            // Gravity starts at zero and increases every
+            // frame. Position.Z is then increased by that
+            // accumulated gravity.
+            //
+            // Sum:
+            //
+            // G * (n * (n + 1) / 2)
+            //
+            float upOffset =
+                particle.GravityStepPerFrame *
+                (
+                    classicFrame *
+                    (
+                        classicFrame +
+                        1f
+                    ) *
+                    0.5f
+                );
+
+            //
+            // MU Main uses a different effect/world scale.
+            //
+            // Raw classic gravity would send these particles
+            // 300-500+ Neffis world units upward, which is why
+            // they were flying above the wings.
+            //
+            // Compress the vertical component so the effect remains
+            // around the head, shoulders and upper torso.
+            //
+            upOffset *=
+                ClassicVerticalMotionScale;
+
+            upOffset =
+                MathF.Min(
+                    upOffset,
+                    MaxVerticalOffset);
+
             Vector3 worldPosition =
                 boneWorld.Translation;
 
             worldPosition.Z +=
-                particle.UpOffset;
-
-            float normalized =
-                MathHelper.Clamp(
-                    particle.Age /
-                    particle.Lifetime,
-                    0f,
-                    1f);
+                upOffset;
 
             //
-            // Original persistent Inner light:
+            // Bone 20 starts inside/very close to the
+            // head geometry.
             //
-            // (1.0, 0.5, 0.1)
+            // A tiny initial lift prevents the additive
+            // sprite from disappearing inside the head
+            // because of the depth test.
+            //
+            if (particle.BoneIndex ==
+                HeadBone)
+            {
+                worldPosition.Z +=
+                    5f;
+            }
+
+            //
+            // Original subtype 4:
+            //
+            // Light *= 1 / 1.35 each frame.
             //
             float luminosity =
-                1f -
-                normalized;
-
-            luminosity *=
-                luminosity;
+                MathF.Pow(
+                    1.0f / 1.35f,
+                    classicFrame);
 
             Vector3 light =
                 new Vector3(
@@ -476,29 +563,27 @@ namespace Client.Main.Objects.Effects
                     0.10f) *
                 luminosity;
 
-            float finalScale =
-                particle.Scale;
-
             //
-            // Slight head emphasis.
+            // The head particle is the part that gives
+            // Greater Fortitude its characteristic
+            // yellow/orange hair glow.
             //
-            // Bone 20 is the classic head anchor,
-            // so make it a little stronger without
-            // changing the color or visual family.
+            // We keep the same particle family, only
+            // compensate slightly for Neffis' projection.
             //
-            if (particle.BoneIndex ==
-                20)
-            {
-                finalScale *=
-                    1.18f;
-            }
+            float headMultiplier =
+            particle.BoneIndex ==
+            HeadBone
+                ? 1.38f
+                : 0.92f;
 
             DrawWorldSprite(
                 spriteBatch,
                 worldPosition,
                 light,
-                finalScale,
-                particle.Rotation);
+                classicScale *
+                headMultiplier,
+                particle.SpriteRotation);
         }
 
         private void DrawWorldSprite(
@@ -513,20 +598,14 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
-            Matrix view =
-                Camera.Instance.View;
-
-            Matrix projection =
-                Camera.Instance.Projection;
-
             Viewport viewport =
                 GraphicsDevice.Viewport;
 
             Vector3 projected =
                 viewport.Project(
                     worldPosition,
-                    projection,
-                    view,
+                    Camera.Instance.Projection,
+                    Camera.Instance.View,
                     Matrix.Identity);
 
             if (projected.Z < 0f ||
@@ -535,13 +614,6 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
-            //
-            // IMPORTANT:
-            //
-            // Use the same screen-scale conversion
-            // already used by Neffis skill effects
-            // such as Power Slash / Fire Slash / Nova.
-            //
             float distance =
                 Vector3.Distance(
                     Camera.Instance.Position,
@@ -557,9 +629,19 @@ namespace Client.Main.Objects.Effects
             neffisScale *=
                 Constants.RENDER_SCALE;
 
+            //
+            // Important:
+            //
+            // Classic BITMAP_LIGHT Scale=2 is not equal
+            // to SpriteBatch scale=2.
+            //
+            // This conversion is the piece our previous
+            // implementation was missing.
+            //
             float spriteScale =
                 classicScale *
-                neffisScale;
+                neffisScale *
+                ClassicSpriteScaleMultiplier;
 
             if (!float.IsFinite(
                     spriteScale) ||
@@ -624,7 +706,7 @@ namespace Client.Main.Objects.Effects
             _particles.Clear();
 
             //
-            // Texture is owned by TextureLoader cache.
+            // Texture belongs to TextureLoader cache.
             //
             _texture = null;
 
