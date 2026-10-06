@@ -1,5 +1,8 @@
 // File: GameScene.cs
 using Client.Main.Controls;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Client.Main.Core.Models;
 using Client.Main.Controls.UI;
 using Client.Main.Core.Input;
 using Client.Main.Controls.UI.Game;
@@ -92,6 +95,27 @@ namespace Client.Main.Scenes
 
         private MobileSkillAssignPopup
             _mobileSkillAssignPopup;
+        // ─────────────────────────────────────────────
+        // PICKUP MÓVIL
+        // ─────────────────────────────────────────────
+
+        private MobilePickupPanel
+            _mobilePickupPanel;
+
+        private readonly List<ushort>
+            _mobilePickupCandidates =
+                new();
+
+        private int
+            _mobilePickupIndex;
+
+        private const double
+            MobilePickupRefreshIntervalSeconds =
+                0.12;
+
+        private double
+            _mobilePickupRefreshElapsed =
+                MobilePickupRefreshIntervalSeconds;
 
         public void ApplyMobileControlsSettings()
         {
@@ -164,6 +188,18 @@ namespace Client.Main.Scenes
             _mobileSkill1?.SetOpacity(opacity);
             _mobileSkill2?.SetOpacity(opacity);
             _mobileSkill3?.SetOpacity(opacity);
+            _mobilePickupPanel?
+                .SetOpacity(
+                    opacity);
+
+            if (!enabled &&
+                _mobilePickupPanel != null)
+            {
+                _mobilePickupPanel.Visible =
+                    false;
+
+                _mobilePickupPanel.CancelPress();
+            }
         }
 
         private PlayerObject FindMobilePvpTarget(bool excludeCurrentTarget)
@@ -407,6 +443,556 @@ namespace Client.Main.Scenes
                     key,
                     anchor.DisplayRectangle);
             }
+            // =============================================================
+            // PICKUP COMPARTIDO
+            //
+            // Windows:
+            //     Space
+            //
+            // Android:
+            //     MobilePickupPanel
+            //
+            // Ambos terminan usando TryPickupGroundItem().
+            // =============================================================
+
+            internal void TryPickupNearestGroundItem()
+            {
+                var network =
+                    MuGame.Network;
+
+                var scopeManager =
+                    network?
+                        .GetScopeManager();
+
+                var characterState =
+                    network?
+                        .GetCharacterState();
+
+
+                if (scopeManager == null ||
+                    characterState == null)
+                {
+                    _logger.LogWarning(
+                        "Cannot pickup item: " +
+                        "ScopeManager or CharacterState is null");
+
+                    _chatLog?.AddMessage(
+                        "System",
+                        "Cannot pickup item: system not ready.",
+                        MessageType.Error);
+
+                    return;
+                }
+
+
+                ushort? rawId =
+                    scopeManager
+                        .FindNearestPickupItemRawId(
+                            out bool outOfRange);
+
+
+                if (rawId.HasValue)
+                {
+                    TryPickupGroundItem(
+                        rawId.Value);
+
+                    return;
+                }
+
+
+                if (outOfRange)
+                {
+                    _logger.LogDebug(
+                        "Nearest item is too far away");
+
+                    _chatLog?.AddMessage(
+                        "System",
+                        "Item is too far away.",
+                        MessageType.System);
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "No items in pickup range");
+
+                    _chatLog?.AddMessage(
+                        "System",
+                        "No items in pickup range.",
+                        MessageType.System);
+                }
+            }
+
+
+            /// <summary>
+            /// Picks up one specific ground object.
+            ///
+            /// This is the real pickup path used by both
+            /// Space and the mobile pickup panel.
+            /// </summary>
+            private void TryPickupGroundItem(
+                ushort rawId)
+            {
+                var network =
+                    MuGame.Network;
+
+                var scopeManager =
+                    network?
+                        .GetScopeManager();
+
+                var characterState =
+                    network?
+                        .GetCharacterState();
+
+
+                if (network == null ||
+                    scopeManager == null ||
+                    characterState == null)
+                {
+                    _logger.LogWarning(
+                        "Cannot pickup item: " +
+                        "network state is not ready");
+
+                    return;
+                }
+
+
+                ushort maskedId =
+                    (ushort)(
+                        rawId &
+                        0x7FFF);
+
+
+                ScopeObject scopeObject =
+                    scopeManager
+                        .GetScopeObjectByMaskedId(
+                            maskedId);
+
+
+                // Puede ocurrir si otro jugador recogió
+                // el objeto justo antes del tap.
+                if (scopeObject == null)
+                {
+                    _logger.LogDebug(
+                        "Pickup object {RawId:X4} " +
+                        "disappeared before request",
+                        rawId);
+
+                    _mobilePickupRefreshElapsed =
+                        MobilePickupRefreshIntervalSeconds;
+
+                    return;
+                }
+
+
+                string displayName =
+                    BuildMobilePickupDisplayName(
+                        scopeObject);
+
+
+                // Igual que el pickup clásico existente:
+                // primero se guarda el RawId pendiente.
+                characterState
+                    .SetPendingPickupRawId(
+                        rawId);
+
+
+                // Si es un item real, guardar también
+                // sus bytes para el Inventory handler.
+                if (scopeObject is
+                    ItemScopeObject itemScope)
+                {
+                    characterState
+                        .StashPickedItem(
+                            itemScope
+                                .ItemData
+                                .ToArray());
+                }
+                else if (scopeObject is
+                    MoneyScopeObject)
+                {
+                    _logger.LogDebug(
+                        "Pickup initiated for Zen");
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Unknown scope object type " +
+                        "for pickup: {Type}",
+                        scopeObject.ObjectType);
+
+                    return;
+                }
+
+
+                var characterService =
+                    network
+                        .GetCharacterService();
+
+
+                if (characterService == null)
+                {
+                    _logger.LogWarning(
+                        "CharacterService is null, " +
+                        "cannot send pickup request");
+
+                    return;
+                }
+
+
+                _logger.LogInformation(
+                    "Picking up {ItemName} " +
+                    "with RawId {RawId:X4}",
+                    displayName,
+                    rawId);
+
+
+                _ = Task.Run(
+                    async () =>
+                    {
+                        try
+                        {
+                            bool success =
+                                await characterService
+                                    .SendPickupItemRequestAsync(
+                                        rawId,
+                                        network.TargetVersion);
+
+
+                            if (!success)
+                            {
+                                MuGame.ScheduleOnMainThread(
+                                    () =>
+                                    {
+                                        _chatLog?
+                                            .AddMessage(
+                                                "System",
+                                                $"Failed to pick up " +
+                                                $"{displayName}: " +
+                                                $"not connected to server.",
+                                                MessageType.Error);
+                                    });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(
+                                ex,
+                                "Error during pickup " +
+                                "request for RawId {RawId}",
+                                rawId);
+                        }
+                    });
+            }
+
+
+            // =============================================================
+            // ACTUALIZACIÓN DE LA BARRA MÓVIL
+            // =============================================================
+
+            private void UpdateMobilePickupPanel(
+                GameTime gameTime,
+                bool canShow)
+            {
+                if (_mobilePickupPanel == null)
+                {
+                    return;
+                }
+
+
+                // Chat abierto, menú ESC, controles deshabilitados, etc.
+                if (!canShow)
+                {
+                    _mobilePickupPanel.Visible =
+                        false;
+
+                    _mobilePickupPanel
+                        .CancelPress();
+
+                    // Hace que al volver a habilitarse
+                    // la detección sea inmediata.
+                    _mobilePickupRefreshElapsed =
+                        MobilePickupRefreshIntervalSeconds;
+
+                    return;
+                }
+
+
+                _mobilePickupRefreshElapsed +=
+                    gameTime
+                        .ElapsedGameTime
+                        .TotalSeconds;
+
+
+                // 0.12 s:
+                // suficientemente rápido visualmente,
+                // sin escanear el Scope 60 veces por segundo.
+                if (_mobilePickupRefreshElapsed <
+                    MobilePickupRefreshIntervalSeconds)
+                {
+                    return;
+                }
+
+
+                _mobilePickupRefreshElapsed =
+                    0;
+
+
+                var scopeManager =
+                    MuGame.Network?
+                        .GetScopeManager();
+
+
+                if (scopeManager == null)
+                {
+                    _mobilePickupCandidates
+                        .Clear();
+
+                    _mobilePickupIndex =
+                        0;
+
+                    _mobilePickupPanel
+                        .ClearSelection();
+
+                    return;
+                }
+
+
+                var candidates =
+                    scopeManager
+                        .GetPickupObjectsInRange();
+
+
+                if (candidates == null ||
+                    candidates.Count == 0)
+                {
+                    _mobilePickupCandidates
+                        .Clear();
+
+                    _mobilePickupIndex =
+                        0;
+
+                    _mobilePickupPanel
+                        .ClearSelection();
+
+                    return;
+                }
+
+
+                // Intentar conservar el item seleccionado
+                // aunque cambie ligeramente el orden por distancia.
+                ushort? previousRawId =
+                    null;
+
+
+                if (_mobilePickupCandidates.Count >
+                        0 &&
+                    _mobilePickupIndex >= 0 &&
+                    _mobilePickupIndex <
+                        _mobilePickupCandidates.Count)
+                {
+                    previousRawId =
+                        _mobilePickupCandidates[
+                            _mobilePickupIndex];
+                }
+
+
+                _mobilePickupCandidates
+                    .Clear();
+
+
+                foreach (ScopeObject candidate
+                    in candidates)
+                {
+                    _mobilePickupCandidates
+                        .Add(
+                            candidate.RawId);
+                }
+
+
+                if (previousRawId.HasValue)
+                {
+                    int previousIndex =
+                        _mobilePickupCandidates
+                            .IndexOf(
+                                previousRawId.Value);
+
+
+                    _mobilePickupIndex =
+                        previousIndex >= 0
+                            ? previousIndex
+                            : 0;
+                }
+                else
+                {
+                    _mobilePickupIndex =
+                        0;
+                }
+
+
+                UpdateMobilePickupSelectionVisual();
+            }
+
+
+            // =============================================================
+            // CAMBIAR ITEM
+            // =============================================================
+
+            private void SelectNextMobilePickupItem()
+            {
+                if (_mobilePickupCandidates.Count <= 1)
+                {
+                    return;
+                }
+
+
+                _mobilePickupIndex =
+                    (_mobilePickupIndex + 1) %
+                    _mobilePickupCandidates.Count;
+
+
+                UpdateMobilePickupSelectionVisual();
+            }
+
+
+            // =============================================================
+            // ACTUALIZAR TEXTO / CONTADOR
+            // =============================================================
+
+            private void UpdateMobilePickupSelectionVisual()
+            {
+                if (_mobilePickupPanel == null ||
+                    _mobilePickupCandidates.Count == 0)
+                {
+                    _mobilePickupPanel?
+                        .ClearSelection();
+
+                    return;
+                }
+
+
+                if (_mobilePickupIndex < 0 ||
+                    _mobilePickupIndex >=
+                        _mobilePickupCandidates.Count)
+                {
+                    _mobilePickupIndex =
+                        0;
+                }
+
+
+                ushort rawId =
+                    _mobilePickupCandidates[
+                        _mobilePickupIndex];
+
+
+                var scopeManager =
+                    MuGame.Network?
+                        .GetScopeManager();
+
+
+                if (scopeManager == null)
+                {
+                    _mobilePickupPanel
+                        .ClearSelection();
+
+                    return;
+                }
+
+
+                ushort maskedId =
+                    (ushort)(
+                        rawId &
+                        0x7FFF);
+
+
+                ScopeObject scopeObject =
+                    scopeManager
+                        .GetScopeObjectByMaskedId(
+                            maskedId);
+
+
+                // El objeto desapareció entre dos frames.
+                // Forzamos una nueva búsqueda.
+                if (scopeObject == null)
+                {
+                    _mobilePickupPanel
+                        .ClearSelection();
+
+                    _mobilePickupRefreshElapsed =
+                        MobilePickupRefreshIntervalSeconds;
+
+                    return;
+                }
+
+
+                string displayName =
+                    BuildMobilePickupDisplayName(
+                        scopeObject);
+
+
+                _mobilePickupPanel
+                    .SetSelection(
+                        rawId,
+                        displayName,
+                        _mobilePickupIndex,
+                        _mobilePickupCandidates.Count);
+            }
+
+
+            // =============================================================
+            // NOMBRE CORTO DEL DROP
+            //
+            // Reproduce lo importante del nombre mostrado
+            // por DroppedItemObject:
+            // Excellent + nombre + nivel.
+            // =============================================================
+
+            private static string BuildMobilePickupDisplayName(
+                ScopeObject scopeObject)
+            {
+                if (scopeObject is
+                    MoneyScopeObject money)
+                {
+                    return
+                        $"{money.Amount:N0} Zen";
+                }
+
+
+                if (scopeObject is not
+                    ItemScopeObject item)
+                {
+                    return "Item";
+                }
+
+
+                var details =
+                    ItemDatabase.ParseItemDetails(
+                        item.ItemData.Span);
+
+
+                string name =
+                    item.ItemDescription;
+
+
+                if (details.IsExcellent &&
+                    !name.StartsWith(
+                        "Excellent ",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    name =
+                        "Excellent " +
+                        name;
+                }
+
+
+                if (details.Level > 0)
+                {
+                    name +=
+                        $" +{details.Level}";
+                }
+
+
+                return name;
+            }
             public bool IsMobileControlCovered(GameControl mobileControl)
             {
                 if (mobileControl == null ||
@@ -450,7 +1036,8 @@ namespace Client.Main.Scenes
                         control is MobilePvpAttackButton ||
                         control is MobileChangeTargetButton ||
                         control is MobileTargetPanel ||
-                        control is MobileJoystickControl)
+                        control is MobileJoystickControl ||
+                        control is MobilePickupPanel)
                     {
                         continue;
                     }
@@ -1228,6 +1815,48 @@ namespace Client.Main.Scenes
 
                     _mobileSkill3.AssignmentRequested +=
                         RequestMobileSkillAssignment;
+                    // ─────────────────────────────────────────────
+                    // BARRA DE PICKUP MÓVIL
+                    // ─────────────────────────────────────────────
+
+                    _mobilePickupPanel =
+                        new MobilePickupPanel();
+
+                    Controls.Add(
+                        _mobilePickupPanel);
+
+                    _mobilePickupPanel
+                        .BringToFront();
+
+
+                    // RECOGER
+                    _mobilePickupPanel.PickupRequested +=
+                        rawId =>
+                        {
+                            SetMouseInputConsumed();
+
+                            TryPickupGroundItem(
+                                rawId);
+
+                            // Evita que un doble tap mande dos requests
+                            // mientras esperamos que el servidor quite
+                            // el objeto del scope.
+                            _mobilePickupPanel.Visible =
+                                false;
+
+                            _mobilePickupRefreshElapsed =
+                                0;
+                        };
+
+
+                    // CAMBIAR ITEM
+                    _mobilePickupPanel.NextItemRequested +=
+                        (s, e) =>
+                        {
+                            SetMouseInputConsumed();
+
+                            SelectNextMobilePickupItem();
+                        };
 
 
                     // Los popups siempre encima
@@ -1841,7 +2470,7 @@ namespace Client.Main.Scenes
                     _mobilePotionR.CancelPress();
                 }
             }
-            
+
             // ─────────────────────────────────────────────
             // SKILLS MÓVILES 1 / 2 / 3
             // ─────────────────────────────────────────────
@@ -1878,6 +2507,20 @@ namespace Client.Main.Scenes
                     _mobileSkill3.CancelPress();
                 }
             }
+            // ─────────────────────────────────────────────
+            // PICKUP MÓVIL
+            //
+            // Oculto mientras la barra de chat está abierta.
+            // ─────────────────────────────────────────────
+
+            bool showMobilePickup =
+                showMobileControls &&
+                _chatInput?.Visible != true;
+
+
+            UpdateMobilePickupPanel(
+                gameTime,
+                showMobilePickup);
 
 
             // ─────────────────────────────────────────────

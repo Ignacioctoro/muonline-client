@@ -483,6 +483,63 @@ namespace Client.Main.Core.Client
         {
             return FindNearestPickupItemRawId(out _);
         }
+        /// <summary>
+        /// Returns a snapshot of every pickupable object
+        /// currently inside pickup range.
+        ///
+        /// Objects are ordered from nearest to farthest.
+        /// Item and Money are both supported.
+        ///
+        /// This method intentionally does not write logs because
+        /// the mobile HUD may query it several times per second.
+        /// </summary>
+        public IReadOnlyList<ScopeObject>
+            GetPickupObjectsInRange(
+                double maxDistance = 5.0)
+        {
+            double maxDistanceSq =
+                maxDistance *
+                maxDistance;
+
+            return _objectsInScope
+                .Values
+                .Where(
+                    obj =>
+                        (obj.ObjectType ==
+                            ScopeObjectType.Item ||
+                        obj.ObjectType ==
+                            ScopeObjectType.Money) &&
+
+                        !(obj.PositionX == 0 &&
+                        obj.PositionY == 0))
+                .Select(
+                    obj =>
+                        new
+                        {
+                            Object = obj,
+
+                            DistanceSq =
+                                DistanceSquared(
+                                    _characterState.PositionX,
+                                    _characterState.PositionY,
+                                    obj.PositionX,
+                                    obj.PositionY)
+                        })
+                .Where(
+                    entry =>
+                        entry.DistanceSq <=
+                        maxDistanceSq)
+                .OrderBy(
+                    entry =>
+                        entry.DistanceSq)
+                .ThenBy(
+                    entry =>
+                        entry.Object.RawId)
+                .Select(
+                    entry =>
+                        entry.Object)
+                .ToArray();
+        }
 
         /// <summary>
         /// Calculates the squared distance between two points.
