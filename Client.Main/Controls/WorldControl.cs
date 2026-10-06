@@ -3,6 +3,7 @@ using Client.Data.CAP;
 using Client.Data.OBJS;
 using Client.Main.Controllers;
 using Client.Main.ClassicFX.Core;
+using Client.Main.ClassicFX.Data;
 using Client.Main.Core.Utilities;
 using Client.Main.Graphics;
 using Client.Main.Helpers;
@@ -127,6 +128,14 @@ namespace Client.Main.Controls
     {
         // --- Fields & Constants ---
         private int _renderCounter;
+        // =============================================================
+        // CLASSIC FX TEMPORARY DEBUG PROBE
+        //
+        // Eliminar cuando validemos ClassicSpriteRenderer.
+        // =============================================================
+        private const bool
+            ClassicFxSpriteProbeEnabled =
+                true;
         private DepthStencilState _currentDepthState = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDefault = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDepthRead = DepthStencilState.DepthRead;
@@ -209,6 +218,9 @@ namespace Client.Main.Controls
         public override async Task Load()
         {
             await base.Load();
+
+            await ClassicFx
+                .LoadContentAsync();
 
             CreateMapTileObjects();
 
@@ -359,6 +371,49 @@ namespace Client.Main.Controls
             var objects = _visibleObjects;
             for (int i = objects.Count - 1; i >= 0; i--)
                 objects[i].Update(time);
+            // =============================================================
+            // CLASSIC FX TEMPORARY SPRITE PROBE
+            //
+            // Crea un BITMAP_FLARE cada frame sobre el personaje.
+            // RenderSprites() lo dibuja y libera ese mismo frame,
+            // exactamente como el sistema clásico.
+            // =============================================================
+
+            if (ClassicFxSpriteProbeEnabled &&
+                this is WalkableWorldControl walkable &&
+                walkable.Walker != null &&
+                walkable.Walker.Visible)
+            {
+                Vector3 probePosition =
+                    walkable
+                        .Walker
+                        .WorldPosition
+                        .Translation;
+
+                probePosition.Z +=
+                    120f;
+
+                ClassicFx.CreateSprite(
+                    ClassicTextureIds.BitmapFlare,
+
+                    probePosition,
+
+                    // Valor MU literal.
+                    0.50f,
+
+                    // Verde a propósito para identificar
+                    // inequívocamente el probe ClassicFX.
+                    new Vector3(
+                        0.25f,
+                        1.00f,
+                        0.25f),
+
+                    rotation:
+                        0f,
+
+                    subType:
+                        0);
+            }
         }
 
         public override void Draw(GameTime time)
@@ -372,7 +427,17 @@ namespace Client.Main.Controls
             }
 
             base.Draw(time);
+
             RenderObjects(time);
+
+            // ClassicFX:
+            //
+            // En esta etapa únicamente contiene Sprites.
+            //
+            // Cuando tengamos Joints / Effects / Particles,
+            // este bloque será reemplazado por los passes
+            // equivalentes al orden de MainScene.cpp.
+            ClassicFx.RenderSprites();
         }
 
         // --- Object Management ---

@@ -1,5 +1,9 @@
 using System;
+using System.Threading.Tasks;
+using Client.Main.ClassicFX.Data;
+using Client.Main.ClassicFX.Rendering;
 using Client.Main.Controls;
+using Client.Main.Controllers;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -24,6 +28,9 @@ namespace Client.Main.ClassicFX.Core
         private bool
             _disposed;
 
+        private ClassicSpriteRenderer
+            _spriteRenderer;
+
         public WorldControl World
         {
             get;
@@ -40,6 +47,10 @@ namespace Client.Main.ClassicFX.Core
         }
 
         public ClassicFxPools Pools
+        {
+            get;
+        }
+        public ClassicTextureRepository Textures
         {
             get;
         }
@@ -75,6 +86,27 @@ namespace Client.Main.ClassicFX.Core
 
             Pools =
                 new ClassicFxPools();
+
+            Textures =
+                new ClassicTextureRepository();
+        }
+        public async Task LoadContentAsync()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            await Textures
+                .LoadCoreAsync();
+
+            _spriteRenderer ??=
+                new ClassicSpriteRenderer(
+                    GraphicsManager
+                        .Instance
+                        .GraphicsDevice,
+
+                    Textures);
         }
 
         /// <summary>
@@ -161,8 +193,14 @@ namespace Client.Main.ClassicFX.Core
 
             ClearSpriteStorage();
 
+            _spriteRenderer?
+                .Dispose();
+
+            _spriteRenderer =
+                null;
+
             _disposed =
                 true;
         }
-            }
+     }
 }

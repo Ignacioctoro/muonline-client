@@ -259,6 +259,111 @@ namespace Client.Main.ClassicFX.Core
                 .Release(
                     handle);
         }
+        /// <summary>
+        /// Equivalente inicial de RenderSprites().
+        ///
+        /// renderPass:
+        ///
+        /// 0 = pass normal
+        /// 1 = primera pasada de water map
+        /// 2 = segunda pasada de water map
+        ///
+        /// Conservamos ya la lógica original aunque por ahora
+        /// el cliente MonoGame utilice únicamente pass 0.
+        /// </summary>
+        public void RenderSprites(
+            byte renderPass = 0)
+        {
+            if (_disposed ||
+                !Enabled ||
+                _spriteRenderer == null)
+            {
+                return;
+            }
+
+            CheckSprites();
+
+            _spriteRenderer.Begin();
+
+            for (int i = 0;
+                i < ClassicFxPools.MaxSprites;
+                i++)
+            {
+                if (!Pools
+                        .Sprites
+                        .IsActive(
+                            i))
+                {
+                    continue;
+                }
+
+                ref ClassicSprite sprite =
+                    ref GetSpriteRef(
+                        i);
+
+                // Main:
+                //
+                // byRenderOneMore == 1
+                //
+                // if Position.Z > 350:
+                //     continue
+                //
+                if (renderPass == 1)
+                {
+                    if (sprite.Position.Z >
+                        350f)
+                    {
+                        continue;
+                    }
+                }
+                else if (renderPass == 2)
+                {
+                    // Main:
+                    //
+                    // if Position.Z <= 300:
+                    //     Live = false
+                    //     continue
+                    //
+                    if (sprite.Position.Z <=
+                        300f)
+                    {
+                        ReleaseSpriteAt(
+                            i);
+
+                        continue;
+                    }
+                }
+
+                // RenderSprite(OBJECT*)
+                //
+                // AnimationFrame se actualiza en el render,
+                // no en MoveEffects.
+                sprite.AnimationFrame =
+                    UpdateSpriteAnimationFrame(
+                        sprite.AnimationFrame,
+                        sprite.Visible);
+
+                _spriteRenderer
+                    .QueueSprite(
+                        sprite);
+
+                // Main:
+                //
+                // if (byRenderOneMore == 0 ||
+                //     byRenderOneMore == 2)
+                //
+                //     Live = false;
+                //
+                if (renderPass == 0 ||
+                    renderPass == 2)
+                {
+                    ReleaseSpriteAt(
+                        i);
+                }
+            }
+
+            _spriteRenderer.End();
+        }
 
         private void ClearSpriteStorage()
         {
