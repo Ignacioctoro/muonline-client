@@ -2,7 +2,10 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.ClassicFX.Rendering
 {
-    internal enum ClassicSpriteBlendMode : byte
+    /// <summary>
+    /// Modos de blending utilizados por el Main clásico.
+    /// </summary>
+    internal enum ClassicBlendMode : byte
     {
         Glow = 0,
 
@@ -10,23 +13,31 @@ namespace Client.Main.ClassicFX.Rendering
 
         AlphaTest,
 
-        Luminance
+        Luminance,
+
+        Alpha
     }
 
     /// <summary>
-    /// Traducción directa de los estados OpenGL
-    /// utilizados por ZzzOpenglUtil.
-    ///
-    /// No son aproximaciones visuales.
+    /// Separamos profundidad de blending porque en el Main
+    /// son estados independientes.
     /// </summary>
+    internal enum ClassicDepthMode : byte
+    {
+        ReadOnly = 0,
+
+        ReadWrite,
+
+        Disabled
+    }
+
     internal static class ClassicRenderStates
     {
         /// <summary>
         /// EnableAlphaBlend()
         ///
-        /// Main:
-        ///     GL_ONE,
-        ///     GL_ONE
+        /// GL_ONE,
+        /// GL_ONE
         /// </summary>
         public static readonly BlendState Glow =
             new()
@@ -47,9 +58,8 @@ namespace Client.Main.ClassicFX.Rendering
         /// <summary>
         /// EnableAlphaBlendMinus()
         ///
-        /// Main:
-        ///     GL_ZERO,
-        ///     GL_ONE_MINUS_SRC_COLOR
+        /// GL_ZERO,
+        /// GL_ONE_MINUS_SRC_COLOR
         /// </summary>
         public static readonly BlendState Subtract =
             new()
@@ -70,9 +80,8 @@ namespace Client.Main.ClassicFX.Rendering
         /// <summary>
         /// EnableAlphaBlend2()
         ///
-        /// Main:
-        ///     GL_ONE_MINUS_SRC_COLOR,
-        ///     GL_ONE
+        /// GL_ONE_MINUS_SRC_COLOR,
+        /// GL_ONE
         /// </summary>
         public static readonly BlendState Luminance =
             new()
@@ -91,43 +100,33 @@ namespace Client.Main.ClassicFX.Rendering
             };
 
         /// <summary>
-        /// EnableAlphaTest()
+        /// Blend alpha clásico.
         ///
-        /// Para color usamos el comportamiento
-        /// no-premultiplicado equivalente a:
-        ///
-        /// SRC_ALPHA,
-        /// ONE_MINUS_SRC_ALPHA
-        ///
-        /// El descarte por alpha lo hará AlphaTestEffect.
+        /// GL_SRC_ALPHA,
+        /// GL_ONE_MINUS_SRC_ALPHA
         /// </summary>
-        public static readonly BlendState AlphaTest =
+        public static readonly BlendState Alpha =
             BlendState.NonPremultiplied;
 
-        public static readonly DepthStencilState
-            DepthReadOnly =
-                DepthStencilState.DepthRead;
-
-        public static readonly DepthStencilState
-            DepthWrite =
-                DepthStencilState.Default;
-
         public static BlendState GetBlendState(
-            ClassicSpriteBlendMode mode)
+            ClassicBlendMode mode)
         {
             return mode switch
             {
-                ClassicSpriteBlendMode.Glow =>
+                ClassicBlendMode.Glow =>
                     Glow,
 
-                ClassicSpriteBlendMode.Subtract =>
+                ClassicBlendMode.Subtract =>
                     Subtract,
 
-                ClassicSpriteBlendMode.AlphaTest =>
-                    AlphaTest,
-
-                ClassicSpriteBlendMode.Luminance =>
+                ClassicBlendMode.Luminance =>
                     Luminance,
+
+                ClassicBlendMode.Alpha =>
+                    Alpha,
+
+                ClassicBlendMode.AlphaTest =>
+                    Alpha,
 
                 _ =>
                     Glow
@@ -135,14 +134,22 @@ namespace Client.Main.ClassicFX.Rendering
         }
 
         public static DepthStencilState GetDepthState(
-            ClassicSpriteBlendMode mode)
+            ClassicDepthMode mode)
         {
-            return
-                mode ==
-                ClassicSpriteBlendMode.AlphaTest
+            return mode switch
+            {
+                ClassicDepthMode.ReadOnly =>
+                    DepthStencilState.DepthRead,
 
-                    ? DepthWrite
-                    : DepthReadOnly;
+                ClassicDepthMode.ReadWrite =>
+                    DepthStencilState.Default,
+
+                ClassicDepthMode.Disabled =>
+                    DepthStencilState.None,
+
+                _ =>
+                    DepthStencilState.DepthRead
+            };
         }
     }
 }

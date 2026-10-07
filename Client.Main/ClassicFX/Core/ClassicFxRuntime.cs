@@ -8,28 +8,20 @@ using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
 {
-    /// <summary>
-    /// Runtime central del sistema clásico de efectos.
-    ///
-    /// Este objeto pertenece a un WorldControl.
-    ///
-    /// En esta primera fase todavía no dibuja ni crea efectos.
-    /// Su responsabilidad inicial es establecer:
-    ///
-    /// - Clock
-    /// - Random
-    /// - Pools
-    /// - ciclo Update
-    ///
-    /// Sobre esta base se agregarán las primitivas reales.
-    /// </summary>
-    public sealed partial class ClassicFxRuntime : IDisposable
+    public sealed partial class ClassicFxRuntime :
+        IDisposable
     {
         private bool
             _disposed;
 
+        private ClassicBillboardRenderer
+            _billboardRenderer;
+
         private ClassicSpriteRenderer
             _spriteRenderer;
+
+        private ClassicParticleRenderer
+            _particleRenderer;
 
         public WorldControl World
         {
@@ -50,17 +42,12 @@ namespace Client.Main.ClassicFX.Core
         {
             get;
         }
+
         public ClassicTextureRepository Textures
         {
             get;
         }
 
-        /// <summary>
-        /// Interruptor global del runtime.
-        ///
-        /// No se utilizará para alterar la fidelidad.
-        /// Es principalmente útil para debugging.
-        /// </summary>
         public bool Enabled
         {
             get;
@@ -90,6 +77,7 @@ namespace Client.Main.ClassicFX.Core
             Textures =
                 new ClassicTextureRepository();
         }
+
         public async Task LoadContentAsync()
         {
             if (_disposed)
@@ -100,29 +88,23 @@ namespace Client.Main.ClassicFX.Core
             await Textures
                 .LoadCoreAsync();
 
-            _spriteRenderer ??=
-                new ClassicSpriteRenderer(
+            _billboardRenderer ??=
+                new ClassicBillboardRenderer(
                     GraphicsManager
                         .Instance
-                        .GraphicsDevice,
+                        .GraphicsDevice);
 
+            _spriteRenderer ??=
+                new ClassicSpriteRenderer(
+                    _billboardRenderer,
+                    Textures);
+
+            _particleRenderer ??=
+                new ClassicParticleRenderer(
+                    _billboardRenderer,
                     Textures);
         }
 
-        /// <summary>
-        /// Update central.
-        ///
-        /// Posteriormente este será el equivalente lógico de:
-        ///
-        /// MoveEffects()
-        /// MoveJoints()
-        /// MoveParticles()
-        /// MoveSprites()
-        /// MoveBlurs()
-        /// MoveObjectBlurs()
-        ///
-        /// El orden exacto se fijará según MainScene.cpp.
-        /// </summary>
         public void Update(
             GameTime gameTime)
         {
@@ -131,8 +113,6 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
 
-            // El clock se mantiene actualizado incluso si apagamos
-            // temporalmente los efectos para debug.
             Clock.Update(
                 gameTime);
 
@@ -141,32 +121,16 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
 
-            // ---------------------------------------------------------
-            // FASE 3 irá aquí.
+            MoveParticles();
+
+            // Próximos:
             //
-            // Importante:
-            // NO agregar WorldObject.Update() individuales.
-            //
-            // Los futuros loops serán del estilo:
-            //
-            // for (int i = 0;
-            //      i < ClassicFxPools.MaxEffects;
-            //      i++)
-            // {
-            //     if (!Pools.Effects.IsActive(i))
-            //         continue;
-            //
-            //     ref ClassicEffect effect =
-            //         ref Effects[i];
-            //
-            //     ...
-            // }
-            // ---------------------------------------------------------
+            // MoveEffects();
+            // MoveJoints();
+            // MoveBlurs();
+            // MoveObjectBlurs();
         }
 
-        /// <summary>
-        /// Limpia todo el estado de efectos manteniendo el runtime.
-        /// </summary>
         public void Reset()
         {
             if (_disposed)
@@ -177,6 +141,8 @@ namespace Client.Main.ClassicFX.Core
             Pools.Clear();
 
             ClearSpriteStorage();
+
+            ClearParticleStorage();
 
             Clock
                 .ResetReferenceFrameCounter();
@@ -193,14 +159,22 @@ namespace Client.Main.ClassicFX.Core
 
             ClearSpriteStorage();
 
-            _spriteRenderer?
-                .Dispose();
+            ClearParticleStorage();
 
             _spriteRenderer =
+                null;
+
+            _particleRenderer =
+                null;
+
+            _billboardRenderer?
+                .Dispose();
+
+            _billboardRenderer =
                 null;
 
             _disposed =
                 true;
         }
-     }
+    }
 }

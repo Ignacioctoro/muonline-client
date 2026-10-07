@@ -135,7 +135,11 @@ namespace Client.Main.Controls
         // =============================================================
         private const bool
             ClassicFxSpriteProbeEnabled =
-                true;
+                false;
+
+        private const bool
+                ClassicFxParticleProbeEnabled =
+                    false;
         private DepthStencilState _currentDepthState = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDefault = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDepthRead = DepthStencilState.DepthRead;
@@ -151,8 +155,6 @@ namespace Client.Main.Controls
         private readonly Queue<WorldObject> _objectsToInitialize = [];
         private readonly List<WorldObject> _visibleObjects = [];
         private bool _dirtyVisibleObjects = true;
-
-        private bool _classicFxDrawProbeLogged;
 
         public Dictionary<ushort, WalkerObject> WalkerObjectsById { get; } = [];
 
@@ -416,6 +418,45 @@ namespace Client.Main.Controls
                     subType:
                         0);
             }
+            // =============================================================
+            // CLASSIC FX TEMPORARY PARTICLE PROBE
+            //
+            // Primera prueba visible de PARTICLE:
+            // BITMAP_FLARE_BLUE / SubType 0.
+            //
+            // Se elimina al validar Particle v1.
+            // =============================================================
+
+            if (ClassicFxParticleProbeEnabled &&
+                this is WalkableWorldControl particleWalkable &&
+                particleWalkable.Walker != null &&
+                particleWalkable.Walker.Visible &&
+                ClassicFx.ActiveParticleCount < 12)
+            {
+                Vector3 particlePosition =
+                    particleWalkable
+                        .Walker
+                        .WorldPosition
+                        .Translation;
+
+                particlePosition.Z +=
+                    220f;
+
+                ClassicFx.CreateParticle(
+                    ClassicTextureIds.BitmapFlareBlue,
+
+                    particlePosition,
+
+                    Vector3.Zero,
+
+                    Vector3.One,
+
+                    subType:
+                        0,
+
+                    scale:
+                        0.50f);
+            }
         }
 
         public override void Draw(GameTime time)
@@ -432,19 +473,8 @@ namespace Client.Main.Controls
 
             RenderObjects(time);
 
-            if (!_classicFxDrawProbeLogged)
-            {
-                Console.WriteLine(
-                    $"[ClassicFX][World] DRAW " +
-                    $"World={GetType().Name}, " +
-                    $"Status={Status}, " +
-                    $"ActiveSprites={ClassicFx.ActiveSpriteCount}");
-
-                _classicFxDrawProbeLogged =
-                    true;
-            }
-
             ClassicFx.RenderSprites();
+            ClassicFx.RenderParticles();
         }
 
         // --- Object Management ---
