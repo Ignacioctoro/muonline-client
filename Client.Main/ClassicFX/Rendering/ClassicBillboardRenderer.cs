@@ -29,6 +29,9 @@ namespace Client.Main.ClassicFX.Rendering
         ///
         /// 3000 * 4 = 12000 vértices,
         /// todavía dentro de ushort.
+        ///
+        /// Algunas partículas generan más de un quad. Cuando el buffer
+        /// se llena, Flush() lo envía y continúa sin perder orden.
         /// </summary>
         private const int MaxQuads =
             ClassicFxPools.MaxParticles;
@@ -212,6 +215,10 @@ namespace Client.Main.ClassicFX.Rendering
         ///
         /// Position sigue estando en coordenadas mundiales MU.
         /// Width/Height ya vienen resueltos por el primitive.
+        ///
+        /// alphaOverride existe por reglas del RenderSprite original
+        /// donde ciertas texturas RGBA fuerzan alpha = 1.0.
+        /// Particle lo necesita para BITMAP_BLOOD + 1.
         /// </summary>
         public void Queue(
             ClassicTextureResource texture,
@@ -225,7 +232,8 @@ namespace Client.Main.ClassicFX.Rendering
             float u = 0f,
             float v = 0f,
             float uWidth = 1f,
-            float vHeight = 1f)
+            float vHeight = 1f,
+            float? alphaOverride = null)
         {
             if (_disposed ||
                 texture == null ||
@@ -388,7 +396,8 @@ namespace Client.Main.ClassicFX.Rendering
             Color color =
                 BuildColor(
                     light,
-                    texture.Data.Components);
+                    texture.Data.Components,
+                    alphaOverride);
 
             int baseVertex =
                 _quadCount *
@@ -581,7 +590,8 @@ namespace Client.Main.ClassicFX.Rendering
 
         private static Color BuildColor(
             Vector3 light,
-            int components)
+            int components,
+            float? alphaOverride)
         {
             float r =
                 MathHelper.Clamp(
@@ -609,10 +619,17 @@ namespace Client.Main.ClassicFX.Rendering
             // RGBA:
             //     alpha = Light[0]
             //
+            // Excepciones como BITMAP_BLOOD + 1:
+            //     alpha = 1
             float alpha =
-                components == 3
-                    ? 1f
-                    : r;
+                alphaOverride.HasValue
+                    ? MathHelper.Clamp(
+                        alphaOverride.Value,
+                        0f,
+                        1f)
+                    : components == 3
+                        ? 1f
+                        : r;
 
             return new Color(
                 r,

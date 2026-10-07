@@ -431,7 +431,10 @@ namespace Client.Main.ClassicFX.Core
 
                 _particleRenderer
                     .QueueParticle(
-                        particle);
+                        ref particle,
+                        i,
+                        Clock.FrameFactor,
+                        (float)Clock.WorldTimeMilliseconds);
             }
 
             _particleRenderer.End();
