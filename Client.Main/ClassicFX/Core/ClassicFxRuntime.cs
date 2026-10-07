@@ -88,6 +88,9 @@ namespace Client.Main.ClassicFX.Core
             await Textures
                 .LoadCoreAsync();
 
+            await Textures
+                .LoadParticlesAsync();
+
             _billboardRenderer ??=
                 new ClassicBillboardRenderer(
                     GraphicsManager

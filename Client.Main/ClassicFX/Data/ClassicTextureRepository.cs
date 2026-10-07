@@ -99,15 +99,65 @@ namespace Client.Main.ClassicFX.Data
         }
     }
 
+    internal readonly struct ClassicTextureLoadResult
+    {
+        public int Loaded
+        {
+            get;
+        }
+
+        public int Reused
+        {
+            get;
+        }
+
+        public int Failed
+        {
+            get;
+        }
+
+        public ClassicTextureLoadResult(
+            int loaded,
+            int reused,
+            int failed)
+        {
+            Loaded =
+                loaded;
+
+            Reused =
+                reused;
+
+            Failed =
+                failed;
+        }
+    }
+
     /// <summary>
-    /// Equivalente inicial del array global Bitmaps[]
-    /// utilizado por el Main.
+    /// Equivalente del catálogo global Bitmaps[] utilizado por el Main.
     ///
-    /// Por ahora cargamos únicamente un conjunto pequeño
-    /// necesario para validar ClassicSpriteRenderer.
+    /// El catálogo se separa por familias ClassicFX para mantener trazabilidad
+    /// con el cliente original:
     ///
-    /// Este catálogo crecerá cuando portemos las familias
-    /// Particle / Joint / Effect.
+    /// - CoreDefinitions:
+    ///   mínimo compartido usado por Sprite y por validaciones iniciales.
+    ///
+    /// - ParticleDefinitions:
+    ///   los BITMAP_* de Particle cuya textura fue resuelta contra los
+    ///   LoadBitmap() del Main y el Data_Broyal actual, más los TexType
+    ///   indirectos verificables usados desde CreateParticle().
+    ///
+    /// Particle tiene 98 tipos lógicos en ParticleTypes.json. Además,
+    /// CreateParticle() puede cambiar TexType a slots auxiliares. Quedan
+    /// deliberadamente sin mapping estático cuatro casos:
+    ///
+    /// - BITMAP_SMOKE + 2: sin LoadBitmap verificable.
+    /// - BITMAP_SWORD_FORCE: sin LoadBitmap verificable.
+    /// - BITMAP_CLOUD + 2: sin LoadBitmap global verificable.
+    /// - BITMAP_CHROME + 2: slot reutilizado dinámicamente según el mapa.
+    ///
+    /// No se les asigna una textura "parecida": quedan visibles como una
+    /// diferencia real de la referencia hasta resolver el sistema de slots
+    /// dinámicos/map-specific del Main.
     /// </summary>
     public sealed class ClassicTextureRepository
     {
@@ -156,74 +206,630 @@ namespace Client.Main.ClassicFX.Data
                     SamplerState.LinearClamp)
             ];
 
+        /// <summary>
+        /// Catálogo Particle completo en cuanto a texturas verificadas.
+        ///
+        /// Samplers traducidos desde LoadBitmap():
+        ///
+        /// GL_LINEAR  + CLAMP  -> LinearClamp
+        /// GL_LINEAR  + REPEAT -> LinearWrap
+        /// GL_NEAREST + CLAMP  -> PointClamp
+        /// GL_NEAREST + REPEAT -> PointWrap
+        ///
+        /// Las rutas usan el casing real encontrado en Data_Broyal.
+        /// TextureLoader sigue recibiendo la extensión lógica original
+        /// (.jpg/.tga) y resuelve los contenedores .OZJ/.OZT.
+        /// </summary>
+        private static readonly
+            ClassicTextureDefinition[]
+            ParticleDefinitions =
+            [
+                // Indirect TexType usados por CreateParticle().
+                new(
+                    ClassicTextureIds.BitmapExtLoginImpact,
+                    "Effect/Impack03.jpg",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapEventCloud,
+                    "Effect/clouds2.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapChrome3,
+                    "Effect/Chrome03.jpg",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapGroundSmoke,
+                    "Effect/ground_smoke.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapAdvSmoke,
+                    "Effect/fi01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapAdvSmoke + 1,
+                    "Effect/fi02.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapAgAdditionEffect,
+                    "Effect/mist01.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapBlood,
+                    "Effect/blood01.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapBlood + 1,
+                    "Effect/blood.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapBlueBlur,
+                    "Skill/SwordEff.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapBubble,
+                    "Object8/drop01.jpg",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapCherryBlossomEventFlower,
+                    "Effect/cherryblossom/sakuras02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapCherryBlossomEventPetal,
+                    "Effect/cherryblossom/sakuras01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapChrome2,
+                    "Effect/Chrome02.jpg",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapChromeEnergy2,
+                    "Effect/energy02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapCloud,
+                    "Effect/clouds.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapClud64,
+                    "Effect/clud64.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapCursedTempleEffectMasker,
+                    "Effect/masker.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapDamage1,
+                    "Effect/Damage1.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapDamage2,
+                    "Effect/Damage2.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapDsEffect,
+                    "Effect/BowE.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapEffect,
+                    "Logo/chasellight.jpg",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapEnergy,
+                    "Effect/Thunder01.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapExplotion,
+                    "Effect/Explotion01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapExplotion + 1,
+                    "Effect/DinoE.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapExplotionMono,
+                    "Effect/explotion01mono.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFire,
+                    "Effect/Fire01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFire + 1,
+                    "Effect/Fire02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFire + 2,
+                    "Effect/Fire03.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFire + 3,
+                    "Effect/Fire05.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireCursedLich,
+                    "Effect/firehik02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireHik1,
+                    "Effect/firehik01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireHik1Mono,
+                    "Effect/firehik_mono01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireHik2Mono,
+                    "Effect/firehik_mono02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireHik3,
+                    "Effect/firehik03.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireHik3Mono,
+                    "Effect/firehik_mono03.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFireRed,
+                    "Effect/firered.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFirecracker,
+                    "Effect/Fire04.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlame,
+                    "Effect/Flame01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlare,
+                    "Effect/Flare.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlare + 1,
+                    "Effect/flare02.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapFlareBlue,
+                    "Effect/flareBlue.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlareRed,
+                    "Effect/flareRed.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlower01,
+                    "Skill/flower1.tga",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlower01 + 1,
+                    "Skill/flower2.tga",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapFlower01 + 2,
+                    "Skill/flower3.tga",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapGhostCloud1,
+                    "Effect/ghosteffect01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapGhostCloud2,
+                    "Effect/Ghosteffect02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLight + 2,
+                    "Effect/cra_04.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapGmAurora,
+                    "Skill/gmmzine.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapHole,
+                    "Effect/hole.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapLight + 3,
+                    "Effect/impack01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLight + 1,
+                    "Object9/Impack03.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLeafTotemGolem,
+                    "Monster/totemgolem_leaf.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLight,
+                    "Effect/flare01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLightning,
+                    "Effect/lightning.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLightning + 1,
+                    "Effect/lightning2.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapLightningMega1,
+                    "Effect/lighting_mega01.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapLightningMega2,
+                    "Effect/lighting_mega02.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapLightningMega3,
+                    "Effect/lighting_mega03.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapMagic,
+                    "Effect/Magic_Ground1.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapMagic + 1,
+                    "Effect/Magic_Ground2.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapOrora,
+                    "Effect/hikorora.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapPinLight,
+                    "Effect/pin_lights.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapPlus,
+                    "Effect/Plus.tga",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapPoundingBall,
+                    "Effect/PoundingBall.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapRainCircle,
+                    "World1/rain02.tga",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapRainCircle + 1,
+                    "World10/rain03.tga",
+                    SamplerState.PointClamp),
+
+                new(
+                    ClassicTextureIds.BitmapRaklionClouds,
+                    "Effect/clouds3.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapShiny + 4,
+                    "Effect/ring.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSbumb,
+                    "Effect/sbumb.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapShiny,
+                    "Effect/Shiny01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapShiny + 1,
+                    "Effect/Shiny02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapShiny + 2,
+                    "Effect/Shiny03.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapShiny + 6,
+                    "Effect/shiny05.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapShockWave,
+                    "Effect/Shockwave.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSmoke,
+                    "Effect/smoke01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSmoke + 1,
+                    "Effect/smoke02.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSmoke + 3,
+                    "Effect/smoke04.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSmoke + 4,
+                    "Effect/smoke05.tga",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSmokeLine1,
+                    "Effect/smokelines01.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapSmokeLine2,
+                    "Effect/smokelines02.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapSmokeLine3,
+                    "Effect/smokelines03.jpg",
+                    SamplerState.LinearWrap),
+
+                new(
+                    ClassicTextureIds.BitmapSnowEffect1,
+                    "Effect/snowseff01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSnowEffect2,
+                    "Effect/snowseff02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSpark,
+                    "Effect/Spark02.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSpark + 1,
+                    "Effect/Spark03.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSpark + 2,
+                    "Effect/spark.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSpotWater,
+                    "Effect/coll.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSummonSahamuttExplosion,
+                    "Effect/loungexflow.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapSwordEffectMono,
+                    "Effect/Swordeff_mono.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapTorchFire,
+                    "Effect/Torchfire.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapTrueBlue,
+                    "Effect/fantaB.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapTrueFire,
+                    "Effect/fantaF.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapTwinTailWater,
+                    "Effect/water.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapWaterfall1,
+                    "Effect/waterFall1.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapWaterfall2,
+                    "Effect/waterFall2.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapWaterfall3,
+                    "Effect/waterFall3.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapWaterfall4,
+                    "Effect/waterFall4.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
+                    ClassicTextureIds.BitmapWaterfall5,
+                    "Effect/waterFall5.jpg",
+                    SamplerState.LinearClamp)
+            ];
+
         private readonly
             Dictionary<int, ClassicTextureResource>
             _resources =
                 new();
 
         private bool
-            _loaded;
+            _coreLoaded;
+
+        private bool
+            _particlesLoaded;
+
+        public int LoadedTextureCount =>
+            _resources.Count;
+
+        public int KnownUnresolvedParticleTextureCount =>
+            4;
 
         public async Task LoadCoreAsync()
         {
-            if (_loaded)
+            if (_coreLoaded)
             {
                 return;
             }
 
-            for (int i = 0;
-                 i < CoreDefinitions.Length;
-                 i++)
-            {
-                ClassicTextureDefinition definition =
-                    CoreDefinitions[i];
+            ClassicTextureLoadResult result =
+                await LoadDefinitionsAsync(
+                    CoreDefinitions);
 
-                TextureData data =
-                    await TextureLoader
-                        .Instance
-                        .Prepare(
-                            definition.Path);
-
-                if (data == null)
-                {
-                    Console.WriteLine(
-                        $"[ClassicFX] Texture data not found: " +
-                        $"{definition.Type} -> {definition.Path}");
-
-                    continue;
-                }
-
-                Texture2D texture =
-                    TextureLoader
-                        .Instance
-                        .GetTexture2D(
-                            definition.Path);
-
-                if (texture == null)
-                {
-                    Console.WriteLine(
-                        $"[ClassicFX] Texture2D could not be created: " +
-                        $"{definition.Type} -> {definition.Path}");
-
-                    continue;
-                }
-
-                _resources[
-                    definition.Type
-                ] =
-                    new ClassicTextureResource(
-                        definition.Type,
-                        definition.Path,
-                        data,
-                        texture,
-                        definition.SamplerState);
-            }
-
-            _loaded =
+            _coreLoaded =
                 true;
 
             Console.WriteLine(
-                $"[ClassicFX] Loaded {_resources.Count} core textures.");
+                $"[ClassicFX] Core textures: " +
+                $"{result.Loaded} loaded, " +
+                $"{result.Reused} reused, " +
+                $"{result.Failed} failed. " +
+                $"Total={_resources.Count}.");
+        }
+
+        public async Task LoadParticlesAsync()
+        {
+            if (_particlesLoaded)
+            {
+                return;
+            }
+
+            // Core primero para que las texturas compartidas se reutilicen
+            // y no se preparen dos veces.
+            if (!_coreLoaded)
+            {
+                await LoadCoreAsync();
+            }
+
+            ClassicTextureLoadResult result =
+                await LoadDefinitionsAsync(
+                    ParticleDefinitions);
+
+            _particlesLoaded =
+                true;
+
+            Console.WriteLine(
+                $"[ClassicFX] Particle textures: " +
+                $"{result.Loaded} loaded, " +
+                $"{result.Reused} reused, " +
+                $"{result.Failed} failed, " +
+                $"{KnownUnresolvedParticleTextureCount} known unresolved. " +
+                $"Total={_resources.Count}.");
+
+            Console.WriteLine(
+                $"[ClassicFX] Particle texture unresolved by reference: " +
+                $"BITMAP_SMOKE + 2 " +
+                $"({ClassicTextureIds.BitmapSmoke + 2}).");
+
+            Console.WriteLine(
+                $"[ClassicFX] Particle texture unresolved by reference: " +
+                $"BITMAP_SWORD_FORCE " +
+                $"({ClassicTextureIds.BitmapSwordForce}).");
+
+            Console.WriteLine(
+                $"[ClassicFX] Particle texture unresolved by reference: " +
+                $"BITMAP_CLOUD + 2 " +
+                $"({ClassicTextureIds.BitmapCloud + 2}).");
+
+            Console.WriteLine(
+                $"[ClassicFX] Particle texture is a map-dependent dynamic slot: " +
+                $"BITMAP_CHROME + 2 " +
+                $"({ClassicTextureIds.BitmapChrome + 2}).");
+        }
+
+        public bool IsKnownUnresolvedParticleTexture(
+            int type)
+        {
+            return
+                type ==
+                    ClassicTextureIds.BitmapSmoke +
+                    2 ||
+                type ==
+                    ClassicTextureIds.BitmapSwordForce ||
+                type ==
+                    ClassicTextureIds.BitmapCloud +
+                    2 ||
+                type ==
+                    ClassicTextureIds.BitmapChrome +
+                    2;
         }
 
         public bool TryGet(
@@ -243,6 +849,91 @@ namespace Client.Main.ClassicFX.Data
                 null;
 
             return false;
+        }
+
+        private async Task<ClassicTextureLoadResult>
+            LoadDefinitionsAsync(
+                ClassicTextureDefinition[] definitions)
+        {
+            int loaded =
+                0;
+
+            int reused =
+                0;
+
+            int failed =
+                0;
+
+            for (int i = 0;
+                 i < definitions.Length;
+                 i++)
+            {
+                ClassicTextureDefinition definition =
+                    definitions[i];
+
+                if (_resources.TryGetValue(
+                        definition.Type,
+                        out ClassicTextureResource existing) &&
+                    existing != null &&
+                    existing.IsReady)
+                {
+                    reused++;
+
+                    continue;
+                }
+
+                TextureData data =
+                    await TextureLoader
+                        .Instance
+                        .Prepare(
+                            definition.Path);
+
+                if (data == null)
+                {
+                    failed++;
+
+                    Console.WriteLine(
+                        $"[ClassicFX] Texture data not found: " +
+                        $"{definition.Type} -> {definition.Path}");
+
+                    continue;
+                }
+
+                Texture2D texture =
+                    TextureLoader
+                        .Instance
+                        .GetTexture2D(
+                            definition.Path);
+
+                if (texture == null)
+                {
+                    failed++;
+
+                    Console.WriteLine(
+                        $"[ClassicFX] Texture2D could not be created: " +
+                        $"{definition.Type} -> {definition.Path}");
+
+                    continue;
+                }
+
+                _resources[
+                    definition.Type
+                ] =
+                    new ClassicTextureResource(
+                        definition.Type,
+                        definition.Path,
+                        data,
+                        texture,
+                        definition.SamplerState);
+
+                loaded++;
+            }
+
+            return
+                new ClassicTextureLoadResult(
+                    loaded,
+                    reused,
+                    failed);
         }
     }
 }

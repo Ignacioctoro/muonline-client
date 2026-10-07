@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Primitives;
 using Microsoft.Xna.Framework;
@@ -70,7 +70,11 @@ namespace Client.Main.ClassicFX.Core
                 target);
 
             InitializeParticleByType(
-                ref particle);
+                ref particle,
+                position,
+                angle,
+                light,
+                scale);
 
             return
                 handle;
@@ -147,76 +151,6 @@ namespace Client.Main.ClassicFX.Core
         }
 
         /// <summary>
-        /// Port progresivo del switch(o->Type)
-        /// dentro de CreateParticle().
-        ///
-        /// Primera familia real:
-        /// BITMAP_FLARE_BLUE.
-        /// </summary>
-        private void InitializeParticleByType(
-            ref ClassicParticle particle)
-        {
-            switch (particle.Type)
-            {
-                case ClassicTextureIds.BitmapFlareBlue:
-                {
-                    if (particle.SubType ==
-                        0)
-                    {
-                        // Main:
-                        //
-                        // LifeTime =
-                        //     30 + rand() % 10;
-                        particle.LifeTime =
-                            30f +
-                            Random.Modulo(
-                                10);
-
-                        particle.Light =
-                            Vector3.One;
-
-                        particle.Velocity =
-                            new Vector3(
-                                0f,
-                                0f,
-
-                                Random.Modulo(
-                                    100) /
-                                50f);
-                    }
-                    else if (particle.SubType ==
-                             1)
-                    {
-                        // Main:
-                        //
-                        // LifeTime =
-                        //     26 + rand() % 2;
-                        particle.LifeTime =
-                            26f +
-                            Random.Modulo(
-                                2);
-
-                        particle.Gravity =
-                            0f;
-
-                        particle.Velocity.X =
-                            0f;
-
-                        particle.Scale +=
-                            Random.Modulo(
-                                6) *
-                            0.1f;
-
-                        particle.Rotation =
-                            Random.Modulo(
-                                360);
-                    }
-
-                    break;
-                }
-            }
-        }
-
         public void MoveParticles()
         {
             if (_disposed ||
@@ -409,7 +343,7 @@ namespace Client.Main.ClassicFX.Core
                     ref GetParticleRef(
                         i);
 
-                // Misma separación de water pass del Main.
+                // Misma separaciÃ³n de water pass del Main.
                 if (renderPass ==
                     1)
                 {
