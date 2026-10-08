@@ -59,7 +59,8 @@ namespace Client.Main.ClassicFX.Core
                 InitializeJointCreateV(ref joint, targetPosition, scale,
                     pkKey, priorColor) ||
                 InitializeJointCreateW(ref joint, scale) ||
-                InitializeJointCreateX(ref joint, scale, angle);
+                InitializeJointCreateX(ref joint, scale, angle) ||
+                InitializeJointCreateY(ref joint, targetPosition, scale);
 
             if (!initialized)
             {

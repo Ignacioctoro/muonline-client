@@ -265,6 +265,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapPinLight =
             32374;
 
+        public const int BitmapDrainLifeGhost =
+            32375;
+
         public const int BitmapOrora =
             32377;
 
@@ -313,8 +316,17 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapSbumb =
             32466;
 
+        public const int BitmapForcePillar =
+            32467;
+
+        public const int BitmapSwordEff =
+            32468;
+
         public const int BitmapDamage1 =
             32469;
+
+        public const int BitmapGroundWind =
+            32470;
 
         public const int BitmapDamage2 =
             32472;
