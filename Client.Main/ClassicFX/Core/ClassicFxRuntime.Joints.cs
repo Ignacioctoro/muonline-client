@@ -52,7 +52,9 @@ namespace Client.Main.ClassicFX.Core
                     handle, ref joint, targetPosition, scale) ||
                 InitializeJointCreateR(ref joint, scale) ||
                 InitializeJointCreateS(ref joint, targetPosition, scale,
-                    priorColor, pkKey);
+                    priorColor, pkKey) ||
+                InitializeJointCreateT(ref joint, targetPosition, scale,
+                    priorColor);
 
             if (!initialized)
             {

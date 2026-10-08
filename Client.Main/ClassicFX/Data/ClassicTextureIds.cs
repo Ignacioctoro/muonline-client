@@ -111,6 +111,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapJointSpirit =
             32220;
 
+        public const int BitmapJointFire =
+            32221;
+
         public const int BitmapJointSpark =
             32222;
 
@@ -215,6 +218,10 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapGmAurora =
             32312;
+
+        // Original _TextureIndex.h, four slots after LuckyCharmEffect53.
+        public const int BitmapLuckySealEffect =
+            32324;
 
         public const int BitmapCherryBlossomEventPetal =
             32353;
