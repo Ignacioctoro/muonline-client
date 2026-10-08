@@ -446,6 +446,57 @@ namespace Client.Main.ClassicFX.Rendering
             _quadCount++;
         }
 
+        /// <summary>
+        /// A true 3D quad for native JOINT tail strips. Reuses the same
+        /// dynamic vertex buffer, index buffer, effects and batching logic
+        /// as Sprite/Particle; no new GPU pipeline or per-tail draw call.
+        /// The caller specifies the four corners and native U/V coordinates.
+        /// </summary>
+        public void QueueWorldQuad(
+            ClassicTextureResource texture,
+            in Vector3 p0, in Vector3 p1, in Vector3 p2, in Vector3 p3,
+            in Vector2 uv0, in Vector2 uv1, in Vector2 uv2, in Vector2 uv3,
+            in Vector3 light,
+            ClassicBlendMode blendMode,
+            ClassicDepthMode depthMode)
+        {
+            if (_disposed || texture == null || !texture.IsReady)
+                return;
+
+            Vector3 v0 = Vector3.Transform(p0, Camera.Instance.View);
+            Vector3 v1 = Vector3.Transform(p1, Camera.Instance.View);
+            Vector3 v2 = Vector3.Transform(p2, Camera.Instance.View);
+            Vector3 v3 = Vector3.Transform(p3, Camera.Instance.View);
+            if (v0.Z >= -1f && v1.Z >= -1f &&
+                v2.Z >= -1f && v3.Z >= -1f)
+                return;
+
+            if (_quadCount > 0 &&
+                (!ReferenceEquals(_batchTexture, texture) ||
+                 _batchBlendMode != blendMode ||
+                 _batchDepthMode != depthMode))
+                Flush();
+            if (_quadCount >= MaxQuads)
+                Flush();
+
+            _batchTexture = texture;
+            _batchBlendMode = blendMode;
+            _batchDepthMode = depthMode;
+
+            // RenderJoints packs alpha=1 even for RGBA textures. Do not
+            // reuse RenderSprite's alpha=light.X convention here.
+            Color color = new Color(
+                MathHelper.Clamp(light.X, 0f, 1f),
+                MathHelper.Clamp(light.Y, 0f, 1f),
+                MathHelper.Clamp(light.Z, 0f, 1f), 1f);
+            int index = _quadCount * VerticesPerQuad;
+            _vertices[index] = new VertexPositionColorTexture(v0, color, uv0);
+            _vertices[index + 1] = new VertexPositionColorTexture(v1, color, uv1);
+            _vertices[index + 2] = new VertexPositionColorTexture(v2, color, uv2);
+            _vertices[index + 3] = new VertexPositionColorTexture(v3, color, uv3);
+            _quadCount++;
+        }
+
         public void End()
         {
             if (_disposed)

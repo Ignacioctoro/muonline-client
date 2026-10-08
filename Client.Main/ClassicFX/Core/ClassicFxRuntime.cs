@@ -23,6 +23,9 @@ namespace Client.Main.ClassicFX.Core
         private ClassicParticleRenderer
             _particleRenderer;
 
+        private ClassicJointRenderer
+            _jointRenderer;
+
         public WorldControl World
         {
             get;
@@ -106,6 +109,9 @@ namespace Client.Main.ClassicFX.Core
                 new ClassicParticleRenderer(
                     _billboardRenderer,
                     Textures);
+
+            _jointRenderer ??=
+                new ClassicJointRenderer(_billboardRenderer, Textures);
         }
 
         public void Update(
@@ -129,6 +135,7 @@ namespace Client.Main.ClassicFX.Core
             BeginClassicFxMoveFrame();
 
             MoveParticles();
+            MoveJoints();
 
             // PrÃ³ximos:
             //
@@ -180,6 +187,9 @@ namespace Client.Main.ClassicFX.Core
                 null;
 
             _particleRenderer =
+                null;
+
+            _jointRenderer =
                 null;
 
             _billboardRenderer?

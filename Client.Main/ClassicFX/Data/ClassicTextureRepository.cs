@@ -203,7 +203,32 @@ namespace Client.Main.ClassicFX.Data
                 new(
                     ClassicTextureIds.BitmapPinLight,
                     "Effect/pin_lights.jpg",
-                    SamplerState.LinearClamp)
+                    SamplerState.LinearClamp),
+
+                // MuMain ZzzOpenData.cpp: verified original joint textures.
+                // Data_Broyal: matching Effect/*.OZJ assets confirmed.
+                new(ClassicTextureIds.BitmapJointSpark,
+                    "Effect/Spark01.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapJointThunder,
+                    "Effect/JointThunder01.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapJointSpirit,
+                    "Effect/JointSpirit01.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapJointSpirit2,
+                    "Effect/JointSpirit02.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapJointEnergy,
+                    "Effect/JointLaser01.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapJointHealing,
+                    "Effect/JointEnergy01.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapJointLaser + 1,
+                    "Effect/JointLaser02.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapJointForce,
+                    "Effect/motion_blur_r2.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapBlur + 1,
+                    "Effect/motion_blur.jpg", SamplerState.PointClamp),
+                new(ClassicTextureIds.BitmapFlare + 1,
+                    "Effect/flare02.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapFlash,
+                    "Effect/Flashing.jpg", SamplerState.LinearClamp)
             ];
 
         /// <summary>

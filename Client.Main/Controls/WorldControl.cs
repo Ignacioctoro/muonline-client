@@ -140,6 +140,9 @@ namespace Client.Main.Controls
         private const bool
                 ClassicFxParticleProbeEnabled =
                     false;
+        // Manual verification: change to true temporarily to render a real
+        // THUNDER+1 joint above the character through ClassicJointRenderer.
+        private const bool ClassicFxJointProbeEnabled = false;
         private DepthStencilState _currentDepthState = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDefault = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDepthRead = DepthStencilState.DepthRead;
@@ -457,6 +460,20 @@ namespace Client.Main.Controls
                     scale:
                         0.50f);
             }
+            // ClassicFX JOINT validation, disabled in normal gameplay.
+            // 1 single native THUNDER+1 subtype 1 at a time (no fake sprites).
+            if (ClassicFxJointProbeEnabled &&
+                this is WalkableWorldControl jointWalkable &&
+                jointWalkable.Walker != null &&
+                jointWalkable.Walker.Visible &&
+                ClassicFx.ActiveJointCount == 0)
+            {
+                Vector3 position = jointWalkable.Walker.WorldPosition.Translation;
+                ClassicFx.CreateJoint(
+                    ClassicTextureIds.BitmapJointThunder + 1,
+                    position, position + new Vector3(0f, 0f, 30f),
+                    Vector3.Zero, subType: 1, scale: 45f);
+            }
         }
 
         public override void Draw(GameTime time)
@@ -473,6 +490,8 @@ namespace Client.Main.Controls
 
             RenderObjects(time);
 
+            // Joint rendering may emit Sprite commands: draw joints first.
+            ClassicFx.RenderJoints();
             ClassicFx.RenderSprites();
             ClassicFx.RenderParticles();
         }
