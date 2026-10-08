@@ -1,0 +1,523 @@
+// ClassicFX Effect bridge v1. Native references: ZzzEffect.cpp CreateEffect,
+// MoveEffects and RenderEffects for MODEL_SWELL_OF_MAGICPOWER / MODEL_ARROWSRE06.
+// MonoGame's existing ModelObject is the only BMD renderer.
+using System;
+using System.Threading.Tasks;
+using Client.Main.ClassicFX.Data;
+using Client.Main.ClassicFX.Rendering;
+using Client.Main.Content;
+using Client.Main.Controllers;
+using Client.Main.Models;
+using Client.Main.Objects;
+using Client.Main.Objects.Player;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+namespace Client.Main.ClassicFX.Core
+{
+    // A named model type; not a fabricated original Main numeric MODEL_* ID.
+    // Future types belong here and in the model catalogue below.
+    public enum ClassicFxEffectType
+    {
+        SwellOfMagicPower = 1,
+        ArrowsRe06 = 2,
+        ShockWave = 3,
+        Twlight = 4
+    }
+
+    public sealed partial class ClassicFxRuntime
+    {
+        private struct EffectState
+        {
+            public ClassicFxEffectType Type;
+            public int SubType;
+            public ClassicFxOwner Owner;
+            public Vector3 Position;
+            public Vector3 Angle;
+            public Vector3 Light;
+            public float Scale;
+            public float Alpha;
+            public float LifeTime;
+            public float BlendMeshLight;
+            public int BoneIndex;
+            public bool FirstMove;
+            // Native EyeRight and PKKey drive ShockWave(14)/Twlight(3)
+            // luminous fade independently of the model's Alpha.
+            public Vector3 BaseLight;
+            public float Phase;
+            public byte TriggerMask;
+            public ClassicFxEffectModelObject ModelView;
+        }
+
+        private readonly EffectState[] _effects =
+            new EffectState[ClassicFxPools.MaxEffects];
+
+        public int ActiveEffectCount => Pools.Effects.ActiveCount;
+
+        /// <summary>
+        /// CreateEffect() bridge. Only accepted original type/subtype pairs
+        /// are allocated. Unknown cases do NOT claim to render anything.
+        /// This pool owns the state and the corresponding NeffisDev model.
+        /// </summary>
+        public ClassicFxHandle CreateEffect(
+            ClassicFxEffectType type,
+            Vector3 position,
+            Vector3 angle,
+            Vector3 light,
+            ClassicFxOwner owner,
+            int subType = 0,
+            int boneIndex = -1,
+            float scale = 1f)
+        {
+            if (_disposed || !Enabled)
+                return ClassicFxHandle.Invalid;
+
+            bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
+                           (type == ClassicFxEffectType.Twlight && subType == 3);
+            if (terrain)
+            {
+                // Native these are Effect objects with texture terrain render,
+                // NOT standalone sprites/billboards nor BMD model objects.
+                if (owner.WorldObject == null ||
+                    !ReferenceEquals(owner.WorldObject.World, World))
+                    return ClassicFxHandle.Invalid;
+            }
+            else if (owner.WorldObject is not PlayerObject player ||
+                     !ReferenceEquals(player.World, World) ||
+                     player.Status != GameControlStatus.Ready)
+            {
+                return ClassicFxHandle.Invalid;
+            }
+
+            string modelPath = null;
+            float life;
+            if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
+            {
+                modelPath = "Effect/magic_powerup.bmd";
+                life = 45f;
+            }
+            else if (type == ClassicFxEffectType.ArrowsRe06 && subType == 1 && boneIndex >= 0)
+            {
+                modelPath = "Effect/arrowsre06.bmd";
+                life = 40f;
+            }
+            else if (terrain)
+            {
+                life = 30f; // source CreateEffect(), ShockWave 14 / Twlight 3
+            }
+            else
+                return ClassicFxHandle.Invalid;
+
+            if (!Pools.Effects.TryAcquire(out ClassicFxHandle handle))
+                return ClassicFxHandle.Invalid;
+
+            ClassicFxEffectModelObject view = null;
+            if (modelPath != null)
+            {
+                view = new ClassicFxEffectModelObject(modelPath, type);
+                view.Position = position;
+                view.Angle = angle;
+                view.Scale = scale;
+            }
+            _effects[handle.Index] = new EffectState
+            {
+                Type = type,
+                SubType = subType,
+                Owner = owner,
+                Position = position,
+                Angle = angle,
+                Light = light,
+                BaseLight = light,
+                Scale = scale,
+                Alpha = terrain ? 0f : 1f,
+                BlendMeshLight = 1f,
+                LifeTime = life,
+                BoneIndex = boneIndex,
+                FirstMove = true,
+                ModelView = view
+            };
+            try
+            {
+                // BMD effects are drawn by the existing WorldControl/ModelObject.
+                // Terrain Effects are drawn in ClassicFxRuntime.RenderEffects().
+                if (view != null)
+                {
+                    World.Objects.Add(view);
+                    _ = view.Load();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ClassicFX] CreateEffect {type} failed: {ex.Message}");
+                ReleaseEffect(handle);
+                return ClassicFxHandle.Invalid;
+            }
+            return handle;
+        }
+
+        public bool IsEffectAlive(ClassicFxHandle handle) =>
+            Pools.Effects.IsAlive(handle);
+
+        public bool ReleaseEffect(ClassicFxHandle handle)
+        {
+            if (!Pools.Effects.IsAlive(handle))
+                return false;
+            ReleaseEffectAt(handle.Index);
+            return true;
+        }
+
+        private void ReleaseEffectAt(int index)
+        {
+            var view = _effects[index].ModelView;
+            _effects[index] = default;
+            ClassicFxHandle handle = Pools.Effects.GetHandle(index);
+            if (handle.IsValid)
+                Pools.Effects.Release(handle);
+            if (view != null)
+            {
+                World?.RemoveObject(view);
+                view.Dispose();
+            }
+        }
+
+        // Called by ClassicFxRuntime.Update() before MoveParticles/MoveJoints.
+        // Original 25-FPS lifetime semantics remain FPS-independent.
+        private void MoveEffects()
+        {
+            if (_disposed || !Enabled)
+                return;
+            float f = Clock.FrameFactor;
+            if (f <= 0f)
+                return;
+            for (int i = 0; i < _effects.Length; i++)
+            {
+                if (!Pools.Effects.IsActive(i))
+                    continue;
+                ref EffectState e = ref _effects[i];
+                bool terrain = e.Type == ClassicFxEffectType.ShockWave ||
+                               e.Type == ClassicFxEffectType.Twlight;
+                if (terrain)
+                {
+                    // Terrain effects can outlive their BMD owner: preserve
+                    // last known ground position if owner has disappeared.
+                    MoveTerrainEffect(ref e, f);
+                }
+                else
+                {
+                    if (e.Owner.WorldObject is not PlayerObject player ||
+                        player.Status != GameControlStatus.Ready ||
+                        player.IsDead ||
+                        !ReferenceEquals(player.World, World) ||
+                        e.ModelView == null ||
+                        e.ModelView.Status == GameControlStatus.Disposed ||
+                        e.ModelView.Status == GameControlStatus.Error)
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+
+                    e.Position = player.WorldPosition.Translation;
+                    if (e.Type == ClassicFxEffectType.SwellOfMagicPower)
+                    {
+                        MoveSwellOfMagicPower(ref e, player);
+                    }
+                    else if (e.Type == ClassicFxEffectType.ArrowsRe06)
+                    {
+                        if (!TryPlayerBonePosition(player, e.BoneIndex, out Vector3 pos))
+                            continue;
+                        e.Position = pos;
+                        if (e.LifeTime >= 15f)
+                            e.Scale *= MathF.Pow(1.05f, f);
+                        else
+                            e.Scale *= MathF.Pow(0.95f, f);
+                        ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
+                        CreateSprite(ClassicTextureIds.BitmapLight, pos,
+                            e.Scale, e.Light, source);
+                        CreateSprite(ClassicTextureIds.BitmapLight, pos,
+                            e.Scale * 0.8f, e.Light, source);
+                        if (e.LifeTime <= 10f)
+                            e.Alpha *= MathF.Pow(0.95f, f);
+                    }
+                    e.ModelView.Position = e.Position;
+                    e.ModelView.Angle = e.Angle;
+                    e.ModelView.Scale = e.Scale;
+                    e.ModelView.Alpha = MathHelper.Clamp(e.Alpha, 0f, 1f);
+                    e.ModelView.BlendMeshLight = e.BlendMeshLight;
+                }
+                e.LifeTime -= f;
+                if (e.LifeTime <= 0f)
+                    ReleaseEffectAt(i);
+            }
+        }
+
+        private void MoveSwellOfMagicPower(ref EffectState e, PlayerObject owner)
+        {
+            // Native invokes these three FX pulses at LifeTime 45, 35, 25.
+            // Track consumed thresholds: a 60-FPS frame can visit the same
+            // integer LifeTime more than once, so avoid duplicate pulses.
+            if (e.LifeTime <= 45f && (e.TriggerMask & 1) == 0)
+            {
+                e.TriggerMask |= 1;
+                EmitWizardryGroundPulse(ref e);
+            }
+            if (e.LifeTime <= 35f && (e.TriggerMask & 2) == 0)
+            {
+                e.TriggerMask |= 2;
+                EmitWizardryGroundPulse(ref e);
+            }
+            if (e.LifeTime <= 25f && (e.TriggerMask & 4) == 0)
+            {
+                e.TriggerMask |= 4;
+                EmitWizardryGroundPulse(ref e);
+            }
+
+            // Main MoveEffects(MODEL_SWELL_OF_MAGICPOWER), subtype 0:
+            // 45 frames; hand models at 45; purple 2LINE_GHOST during >=30;
+            // body sprites in final 20 frames; mesh fade in final 20.
+            if (e.FirstMove)
+            {
+                e.FirstMove = false;
+                var source = ClassicFxOwner.FromWorldObject(owner);
+                Vector3 purple = new Vector3(0.2f, 0.2f, 0.9f);
+                if (TryPlayerBonePosition(owner, 28, out Vector3 right))
+                    CreateEffect(ClassicFxEffectType.ArrowsRe06,
+                        right, e.Angle, purple, source, 1, 28);
+                if (TryPlayerBonePosition(owner, 37, out Vector3 left))
+                    CreateEffect(ClassicFxEffectType.ArrowsRe06,
+                        left, e.Angle, purple, source, 1, 37);
+                Console.WriteLine("[ClassicFX] Effect MODEL_SWELL_OF_MAGICPOWER: 45 frames");
+            }
+
+            if (e.LifeTime >= 30f)
+            {
+                // Main creates two per frame, each FPS checked.
+                ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
+                Vector3 purple = new Vector3(0.3f, 0.2f, 0.9f);
+                for (int j = 0; j < 2; j++)
+                {
+                    CreateJointFpsChecked(ClassicTextureIds.Bitmap2LineGhost,
+                        e.Position, e.Position, e.Angle, 1, source,
+                        20f + System.Random.Shared.Next(10), priorColor: purple);
+                }
+            }
+            if (e.LifeTime <= 20f)
+            {
+                Vector3 light = new Vector3(0.7f, 0.3f, 0.9f) *
+                                (e.LifeTime * 0.05f);
+                Matrix[] bones = owner.GetBoneTransforms();
+                if (bones != null)
+                {
+                    Matrix world = owner.WorldPosition;
+                    ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
+                    for (int b = 0; b < bones.Length; b++)
+                        CreateSprite(ClassicTextureIds.BitmapLight,
+                            (bones[b] * world).Translation, 1.5f, light, source);
+                }
+                e.BlendMeshLight *= MathF.Pow(0.86f, Clock.FrameFactor);
+            }
+        }
+
+        private void EmitWizardryGroundPulse(ref EffectState source)
+        {
+            // Source ZzzEffect.cpp: 2x ShockWave 14 at Scale=5,
+            // 1x Twlight 3 at Scale=6. Their native EyeRight = Light.
+            if (source.ModelView == null)
+                return;
+            ClassicFxOwner owner = ClassicFxOwner.FromWorldObject(source.ModelView);
+            Vector3 light = new Vector3(0.4f, 0.3f, 0.9f);
+            // MonoGame character angles use radians; Effect terrain rotation
+            // uses classic degrees.
+            Vector3 angle = new Vector3(0f, 0f,
+                MathHelper.ToDegrees(source.Angle.Z));
+            for (int n = 0; n < 2; n++)
+                CreateEffect(ClassicFxEffectType.ShockWave,
+                    source.Position, angle, light, owner, subType: 14, scale: 5f);
+            CreateEffect(ClassicFxEffectType.Twlight,
+                source.Position, angle, light, owner, subType: 3, scale: 6f);
+        }
+
+        private void MoveTerrainEffect(ref EffectState e, float f)
+        {
+            // Source MoveHandlers.cpp: Move_BITMAP_SHOCK_WAVE/Move_BITMAP_TWLIGHT.
+            // Both of Wizardry's subtypes use the same scale/fade logic.
+            WorldObject owner = e.Owner.WorldObject;
+            if (owner != null && ReferenceEquals(owner.World, World) &&
+                owner.Status != GameControlStatus.Disposed)
+                e.Position = owner.WorldPosition.Translation;
+
+            e.Scale = MathF.Max(0f, e.Scale - 0.15f * f);
+            if (e.Type == ClassicFxEffectType.Twlight)
+                e.Angle.Z += 10f * f;
+
+            if (e.LifeTime >= 20f)
+            {
+                e.Alpha += 0.1f * f;
+                e.Phase += f;
+                e.Light = e.BaseLight * (e.Phase * 0.1f);
+            }
+            else if (e.LifeTime <= 10f)
+            {
+                e.Phase -= f;
+                e.Alpha -= 0.1f * f;
+                e.Light = e.BaseLight * (e.Phase * 0.1f);
+            }
+        }
+
+        /// <summary>
+        /// Native RenderTerrainAlphaBitmap for ShockWave 14 and Twlight 3.
+        /// Uses one shared GPU-batched billboard pipeline; geometry is a
+        /// tessellated XY plane following the existing MonoGame terrain.
+        /// Mesh BMD effects continue through WorldControl.RenderObjects().
+        /// </summary>
+        public void RenderEffects()
+        {
+            if (_disposed || !Enabled || _billboardRenderer == null ||
+                World?.Terrain == null)
+                return;
+
+            _billboardRenderer.Begin();
+            for (int i = 0; i < _effects.Length; i++)
+            {
+                if (!Pools.Effects.IsActive(i)) continue;
+                ref EffectState e = ref _effects[i];
+                int textureId = e.Type switch
+                {
+                    ClassicFxEffectType.ShockWave => ClassicTextureIds.BitmapShockWave,
+                    ClassicFxEffectType.Twlight => ClassicTextureIds.BitmapTwlight,
+                    _ => -1
+                };
+                if (textureId < 0 || e.Scale <= 0f ||
+                    !Textures.TryGet(textureId, out ClassicTextureResource tex))
+                    continue;
+
+                QueueTerrainEffect(ref e, tex);
+            }
+            _billboardRenderer.End();
+        }
+
+        private void QueueTerrainEffect(ref EffectState e, ClassicTextureResource texture)
+        {
+            // The Main measures RenderTerrainAlphaBitmap SizeX/Y in tiles
+            // of 100 world units. One tile is ~100 world units in MU.
+            float halfSize = e.Scale * 50f;
+            float diameter = halfSize * 2f;
+            // Native renders each terrain tile. A bounded regular grid
+            // samples slopes without recreating the entire terrain renderer.
+            // 4..10 divisions: keeps mobile GPU work controlled.
+            int segments = Math.Clamp((int)MathF.Ceiling(e.Scale), 4, 10);
+            float step = diameter / segments;
+            float angle = MathHelper.ToRadians(-e.Angle.Z);
+            float ca = MathF.Cos(angle), sa = MathF.Sin(angle);
+
+            for (int y = 0; y < segments; y++)
+            {
+                float dy0 = -halfSize + step * y;
+                float dy1 = dy0 + step;
+                for (int x = 0; x < segments; x++)
+                {
+                    float dx0 = -halfSize + step * x;
+                    float dx1 = dx0 + step;
+                    Vector3 p0 = EffectGroundPoint(e.Position, dx0, dy0);
+                    Vector3 p1 = EffectGroundPoint(e.Position, dx1, dy0);
+                    Vector3 p2 = EffectGroundPoint(e.Position, dx1, dy1);
+                    Vector3 p3 = EffectGroundPoint(e.Position, dx0, dy1);
+                    Vector2 uv0 = EffectGroundUv(dx0, dy0, diameter, ca, sa);
+                    Vector2 uv1 = EffectGroundUv(dx1, dy0, diameter, ca, sa);
+                    Vector2 uv2 = EffectGroundUv(dx1, dy1, diameter, ca, sa);
+                    Vector2 uv3 = EffectGroundUv(dx0, dy1, diameter, ca, sa);
+                    _billboardRenderer.QueueWorldQuad(texture,
+                        p0, p1, p2, p3, uv0, uv1, uv2, uv3,
+                        e.Light, ClassicBlendMode.Glow, ClassicDepthMode.ReadOnly);
+                }
+            }
+        }
+
+        private Vector3 EffectGroundPoint(Vector3 center, float dx, float dy)
+        {
+            float x = center.X + dx, y = center.Y + dy;
+            return new Vector3(x, y,
+                World.Terrain.RequestTerrainHeight(x, y) + 2.0f);
+        }
+
+        private static Vector2 EffectGroundUv(float x, float y,
+            float diameter, float ca, float sa)
+        {
+            float u = (x * ca - y * sa) / diameter + 0.5f;
+            float v = (x * sa + y * ca) / diameter + 0.5f;
+            return new Vector2(u, v);
+        }
+
+        private static bool TryPlayerBonePosition(PlayerObject owner,
+            int boneIndex, out Vector3 position)
+        {
+            Matrix[] bones = owner.GetBoneTransforms();
+            if (bones == null || (uint)boneIndex >= (uint)bones.Length)
+            {
+                position = Vector3.Zero;
+                return false;
+            }
+            position = (bones[boneIndex] * owner.WorldPosition).Translation;
+            return true;
+        }
+
+        private void ClearEffectStorage()
+        {
+            for (int i = 0; i < _effects.Length; i++)
+            {
+                var view = _effects[i].ModelView;
+                _effects[i] = default;
+                if (view == null)
+                    continue;
+                World?.RemoveObject(view);
+                view.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// No second BMD renderer: meshes, animation and blend go through
+    /// NeffisDev's existing ModelObject and WorldControl passes.
+    /// </summary>
+    internal sealed class ClassicFxEffectModelObject : ModelObject
+    {
+        private readonly string _bmdPath;
+
+        public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
+        {
+            _bmdPath = bmdPath;
+            IsTransparent = true;
+            AffectedByTransparency = true;
+            BlendState = BlendState.Additive;
+            BlendMesh = 0;
+            BlendMeshLight = 1f;
+            DepthState = DepthStencilState.DepthRead;
+            RenderShadow = false;
+            LightEnabled = false;
+            UseSunLight = false;
+            ContinuousAnimation = true;
+            AnimationSpeed = 25f;
+            Color = type == ClassicFxEffectType.SwellOfMagicPower
+                ? new Color(0.7f, 0.4f, 0.9f)
+                : new Color(0.2f, 0.2f, 0.9f);
+            BoundingBoxLocal = new BoundingBox(
+                new Vector3(-250f, -250f, -200f),
+                new Vector3(250f, 250f, 350f));
+            Interactive = false;
+        }
+
+        public override async Task Load()
+        {
+            try
+            {
+                Model = await BMDLoader.Instance.Prepare(_bmdPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ClassicFX] BMD {_bmdPath}: {ex.Message}");
+                Status = GameControlStatus.Error;
+                return;
+            }
+            await base.Load();
+        }
+    }
+}

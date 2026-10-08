@@ -310,6 +310,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapRaklionClouds =
             32397;
 
+        // MuMain BITMAP_TWLIGHT (immediately before 2LINE_GHOST).
+        public const int BitmapTwlight = 32402;
+
         public const int Bitmap2LineGhost =
             32403;
 

@@ -170,6 +170,10 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/flare01.jpg",
                     SamplerState.LinearClamp),
 
+                // Native RenderTerrainAlphaBitmap(BITMAP_TWLIGHT).
+                new(ClassicTextureIds.BitmapTwlight,
+                    "Skill/twlighthik01.jpg", SamplerState.LinearClamp),
+
                 new(
                     ClassicTextureIds.BitmapShiny,
                     "Effect/Shiny01.jpg",

@@ -1,4 +1,4 @@
-﻿using Client.Data.ATT;
+using Client.Data.ATT;
 using Client.Data.CAP;
 using Client.Data.OBJS;
 using Client.Main.Controllers;
@@ -490,6 +490,8 @@ namespace Client.Main.Controls
 
             RenderObjects(time);
 
+            // Native BITMAP_SHOCK_WAVE / BITMAP_TWLIGHT terrain overlays.
+            ClassicFx.RenderEffects();
             // Joint rendering may emit Sprite commands: draw joints first.
             ClassicFx.RenderJoints();
             ClassicFx.RenderSprites();

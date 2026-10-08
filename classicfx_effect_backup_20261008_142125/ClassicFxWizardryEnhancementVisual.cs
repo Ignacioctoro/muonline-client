@@ -19,8 +19,6 @@ namespace Client.Main.Objects.Effects
     public sealed class ClassicFxWizardryEnhancementVisual : WorldObject
     {
         private readonly PlayerObject _owner;
-        private bool _castEffectCreated;
-        private double _nextArrowsPulseMilliseconds;
 
         public PlayerObject Owner => _owner;
 
@@ -64,40 +62,6 @@ namespace Client.Main.Objects.Effects
             Matrix[] bones = _owner.GetBoneTransforms();
             if (bones == null || bones.Length == 0)
                 return;
-
-            // One-time original MODEL_SWELL_OF_MAGICPOWER 45-frame cast.
-            // The already-ported persistent BITMAP_LIGHT aura stays intact.
-            ClassicFxOwner effectOwner = ClassicFxOwner.FromWorldObject(_owner);
-            double nowMillis = fx.Clock.WorldTimeMilliseconds;
-            if (!_castEffectCreated)
-            {
-                var cast = fx.CreateEffect(
-                    ClassicFxEffectType.SwellOfMagicPower,
-                    _owner.WorldPosition.Translation,
-                    _owner.TotalAngle,
-                    new Vector3(0.4f, 0.3f, 0.9f), effectOwner);
-                if (cast.IsValid)
-                {
-                    _castEffectCreated = true;
-                    _nextArrowsPulseMilliseconds = nowMillis + 6000.0;
-                    Console.WriteLine("[ClassicFX] Wizardry Enhancement: 3D cast Effect started");
-                }
-            }
-            else if (nowMillis >= _nextArrowsPulseMilliseconds)
-            {
-                // Original MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF:
-                // each six seconds, emit subtype-1 arrowsre06 on bones 28/37.
-                Vector3 purple = new Vector3(0.2f, 0.2f, 0.9f);
-                foreach (int bone in new[] { 28, 37 })
-                {
-                    if ((uint)bone >= (uint)bones.Length) continue;
-                    Vector3 hand = (bones[bone] * _owner.WorldPosition).Translation;
-                    fx.CreateEffect(ClassicFxEffectType.ArrowsRe06,
-                        hand, _owner.TotalAngle, purple, effectOwner,
-                        subType: 1, boneIndex: bone);
-                }
-                _nextArrowsPulseMilliseconds = nowMillis + 6000.0;
-            }
 
             // Native RenderEffects(MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF, 0):
             // fLumi = (abs(sin(WorldTime * .001f)) + .2f) * .5f;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Rendering;
@@ -134,7 +134,6 @@ namespace Client.Main.ClassicFX.Core
             // Resets/reuses the fixed terrain-light pool; no allocations.
             BeginClassicFxMoveFrame();
 
-            MoveEffects();
             MoveParticles();
             MoveJoints();
 
@@ -160,7 +159,6 @@ namespace Client.Main.ClassicFX.Core
             ClearParticleStorage();
 
             ClearJointStorage();
-            ClearEffectStorage();
 
             ResetMoveBridge();
 
@@ -182,7 +180,6 @@ namespace Client.Main.ClassicFX.Core
             ClearParticleStorage();
 
             ClearJointStorage();
-            ClearEffectStorage();
 
             DisposeMoveBridge();
 
