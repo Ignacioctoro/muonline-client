@@ -42,6 +42,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapLight =
             32002;
 
+        public const int BitmapBlur =
+            32018;
+
         public const int BitmapSwordForce =
             32039;
 
@@ -81,6 +84,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapFlare =
             32131;
 
+        public const int BitmapJointLaser =
+            32137;
+
         public const int BitmapMagic =
             32140;
 
@@ -101,6 +107,9 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapJointSpirit =
             32220;
+
+        public const int BitmapJointSpark =
+            32222;
 
         // Original _TextureIndex.h: joint energy/healing slots.
         public const int BitmapJointEnergy =

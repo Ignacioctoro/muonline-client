@@ -49,7 +49,8 @@ namespace Client.Main.ClassicFX.Core
                     ref joint, targetPosition, scale,
                     priorColor.HasValue, characterIndex) ||
                 InitializeJointCreateQ(
-                    handle, ref joint, targetPosition, scale);
+                    handle, ref joint, targetPosition, scale) ||
+                InitializeJointCreateR(ref joint, scale);
 
             if (!initialized)
             {
