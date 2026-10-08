@@ -59,7 +59,14 @@ namespace Client.Main.ClassicFX.Core
                 case 1:
                 case 2:
                 case 3:
-                    j.Velocity = 90f * j.SubType;
+                    // Native: 0, 90, 180, 240 (not 90 * subtype).
+                    j.Velocity = j.SubType switch
+                    {
+                        0 => 0f,
+                        1 => 90f,
+                        2 => 180f,
+                        _ => 240f
+                    };
                     j.Direction = new Vector3(sourceScale * 1.5f, 0f, 0f);
                     break;
 

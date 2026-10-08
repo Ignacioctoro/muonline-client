@@ -105,6 +105,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapBubble =
             32214;
 
+        // Original _TextureIndex.h: JOINT_FORCE lies between BUBBLE and CHROME2.
+        public const int BitmapJointForce =
+            32215;
+
         public const int BitmapChrome2 =
             32216;
 
@@ -135,6 +139,12 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapFlash =
             32236;
+
+        public const int BitmapInferno =
+            32237;
+
+        public const int BitmapLava =
+            32238;
 
         public const int BitmapFormationMark =
             32241;

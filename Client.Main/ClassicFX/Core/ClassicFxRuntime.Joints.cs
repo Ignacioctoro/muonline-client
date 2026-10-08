@@ -55,7 +55,10 @@ namespace Client.Main.ClassicFX.Core
                     priorColor, pkKey) ||
                 InitializeJointCreateT(ref joint, targetPosition, scale,
                     priorColor) ||
-                InitializeJointCreateU(ref joint, targetPosition, scale);
+                InitializeJointCreateU(ref joint, targetPosition, scale) ||
+                InitializeJointCreateV(ref joint, targetPosition, scale,
+                    pkKey, priorColor) ||
+                InitializeJointCreateW(ref joint, scale);
 
             if (!initialized)
             {
