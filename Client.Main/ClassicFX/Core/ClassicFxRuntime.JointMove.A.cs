@@ -29,10 +29,14 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxHandle handle = Pools.Joints.GetHandle(i);
                 ref ClassicJoint j = ref _joints[i];
 
-                if (!IsJointMoveFamilyA(j.Type))
-                    continue; // The remaining branches are not ported yet.
+                bool live;
+                if (IsJointMoveFamilyA(j.Type))
+                    live = MoveJointFamilyA(ref j);
+                else if (j.Type == ClassicTextureIds.BitmapJointEnergy)
+                    live = MoveJointFamilyB(ref j);
+                else
+                    continue; // Other native branches are still pending.
 
-                bool live = MoveJointFamilyA(ref j);
                 if (!live || j.LifeTime < 0f)
                     ReleaseJoint(handle);
             }
