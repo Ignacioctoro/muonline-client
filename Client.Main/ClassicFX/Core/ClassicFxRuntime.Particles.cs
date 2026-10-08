@@ -249,6 +249,14 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
 
+            if (MoveParticleD(
+                    ref particle,
+                    frameFactor,
+                    ref keepAlive))
+            {
+                return;
+            }
+
             switch (particle.Type)
             {
                 case ClassicTextureIds.BitmapFlareBlue:
