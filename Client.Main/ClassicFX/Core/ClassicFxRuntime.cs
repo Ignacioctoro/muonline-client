@@ -151,6 +151,8 @@ namespace Client.Main.ClassicFX.Core
 
             ClearParticleStorage();
 
+            ClearJointStorage();
+
             ResetMoveBridge();
 
             Clock
@@ -169,6 +171,8 @@ namespace Client.Main.ClassicFX.Core
             ClearSpriteStorage();
 
             ClearParticleStorage();
+
+            ClearJointStorage();
 
             DisposeMoveBridge();
 

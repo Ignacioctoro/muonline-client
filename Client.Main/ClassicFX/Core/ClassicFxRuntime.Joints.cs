@@ -1,0 +1,104 @@
+using Client.Main.ClassicFX.Primitives;
+using Microsoft.Xna.Framework;
+
+namespace Client.Main.ClassicFX.Core
+{
+    public sealed partial class ClassicFxRuntime
+    {
+        private readonly ClassicJoint[] _joints =
+            new ClassicJoint[ClassicFxPools.MaxJoints];
+
+        public int ActiveJointCount => Pools.Joints.ActiveCount;
+
+        /// <summary>
+        /// Common slot allocation for MuMain CreateJoint(). This does NOT
+        /// claim to initialize every joint Type/SubType: the native switch,
+        /// MoveJoints and RenderJoints have not been connected yet.
+        /// </summary>
+        public ClassicFxHandle CreateJoint(
+            int type,
+            Vector3 position,
+            Vector3 targetPosition,
+            Vector3 angle,
+            int subType = 0,
+            ClassicFxOwner target = default,
+            float scale = 10f,
+            short pkKey = -1,
+            ushort skillIndex = 0,
+            ushort skillSerialNum = 0,
+            int characterIndex = -1,
+            Vector3? priorColor = null,
+            short targetIndex = -1)
+        {
+            if (_disposed || !Enabled ||
+                !Pools.Joints.TryAcquire(out ClassicFxHandle handle))
+                return ClassicFxHandle.Invalid;
+
+            ref ClassicJoint joint = ref _joints[handle.Index];
+            Vector3 initialLight = priorColor ?? Vector3.One;
+            joint.InitializeCommon(
+                type, position, targetPosition, angle, subType,
+                target, scale, pkKey, skillIndex, skillSerialNum,
+                characterIndex, initialLight, targetIndex);
+
+            // The next block ports the native CreateJoint Type switch,
+            // including its exceptions to bCreateStartTail. No geometry is
+            // emitted now, and this does not activate a placeholder effect.
+            return handle;
+        }
+
+        public ClassicFxHandle CreateJointFpsChecked(
+            int type,
+            Vector3 position,
+            Vector3 targetPosition,
+            Vector3 angle,
+            int subType = 0,
+            ClassicFxOwner target = default,
+            float scale = 10f,
+            short pkKey = -1,
+            ushort skillIndex = 0,
+            ushort skillSerialNum = 0,
+            int characterIndex = -1,
+            Vector3? priorColor = null,
+            short targetIndex = -1)
+        {
+            if (!Random.FpsCheck(1, Clock))
+                return ClassicFxHandle.Invalid;
+            return CreateJoint(type, position, targetPosition, angle,
+                subType, target, scale, pkKey, skillIndex,
+                skillSerialNum, characterIndex, priorColor, targetIndex);
+        }
+
+        public bool TryGetJoint(
+            ClassicFxHandle handle,
+            out ClassicJoint joint)
+        {
+            if (handle.Kind != ClassicFxPoolKind.Joint ||
+                !Pools.Joints.IsAlive(handle))
+            {
+                joint = default;
+                return false;
+            }
+            joint = _joints[handle.Index];
+            return true;
+        }
+
+        public bool ReleaseJoint(ClassicFxHandle handle)
+        {
+            if (handle.Kind != ClassicFxPoolKind.Joint ||
+                !Pools.Joints.IsAlive(handle))
+                return false;
+
+            _joints[handle.Index].Clear();
+            return Pools.Joints.Release(handle);
+        }
+
+        private void ClearJointStorage()
+        {
+            // Pool has already been cleared. Release owner references,
+            // but retain fixed tail storage for slots within this runtime.
+            for (int i = 0; i < _joints.Length; i++)
+                _joints[i].Clear();
+        }
+    }
+}
