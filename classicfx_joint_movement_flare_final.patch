@@ -1,0 +1,639 @@
+diff --git a/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.cs b/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.cs
+--- a/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.cs
++++ b/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.cs
+@@ -45,4 +45,8 @@
+                 else if (IsJointMoveComplexType(j.Type))
+                     live = MoveJointComplex(ref j, i, handle);
++                else if (j.Type == ClassicTextureIds.BitmapFlare ||
++                         j.Type == ClassicTextureIds.BitmapFlareBlue ||
++                         j.Type == ClassicTextureIds.BitmapFlare + 1)
++                    live = MoveFlareJointFull(ref j, i, handle);
+                 else
+                     continue; // Other native branches are still pending.
+diff --git a/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.Additional.cs b/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.Additional.cs
+--- a/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.Additional.cs
++++ b/Client.Main/ClassicFX/Core/ClassicFxRuntime.JointMovement.Additional.cs
+@@ -555,2 +555,623 @@
++
++        // ==============================================================
++        // MuMain ZzzEffectJoint.cpp 5373-6238:
++        // BITMAP_FLARE / BITMAP_FLARE_BLUE / BITMAP_FLARE+1.
++        // Port of movement/simulation only; RenderJoints is separate.
++        // These source-only OBJECT dependencies must be wired by the game.
++        // ==============================================================
++        public Func<ClassicFxOwner, Vector3?> JointFlareOwnerStartPositionResolver { get; set; }
++        public Func<ClassicFxOwner, Vector3?> JointFlareOwnerHeadAngleResolver { get; set; }
++        public Func<ClassicFxOwner, bool?> JointFlareOwnerMovingOrAttackingResolver { get; set; }
++        public Func<ClassicFxOwner, bool?> JointFlareOwnerActionCancelsResolver { get; set; }
++        public Action<ClassicFxOwner, Vector3> JointFlareSetArrowOwnerPositionRequested { get; set; }
++        public event Action JointFlareMeteoriteSoundRequested;
++
++        private int _nativeFlare40InitialLifetime = -1;
++
++        private bool MoveFlareJointFull(ref ClassicJoint j, int slot, ClassicFxHandle handle)
++        {
++            float f = Clock.FrameFactor;
++            if (f <= 0f) return true;
++            ClassicMatrix3x4 matrix = ClassicMath.AngleMatrix(j.Angle);
++            // Native common pre-switch excludes BITMAP_FLARE/BLUE subtype 1
++            // and BITMAP_FLARE subtype 42, NOT BITMAP_FLARE+1.
++            bool skipMove = (j.SubType == 1 &&
++                (j.Type == ClassicTextureIds.BitmapFlare ||
++                 j.Type == ClassicTextureIds.BitmapFlareBlue)) ||
++                 (j.Type == ClassicTextureIds.BitmapFlare && j.SubType == 42);
++            if (!skipMove && j.Velocity != 0f)
++                j.Position += ClassicMath.VectorRotate(
++                    new Vector3(0f, -j.Velocity, 0f), matrix) * f;
++
++            bool alive = j.Type == ClassicTextureIds.BitmapFlare + 1
++                ? MoveFlarePlusJoint(ref j, slot, handle, f, ref matrix)
++                : MoveFlareClassicJoint(ref j, slot, handle, f, ref matrix);
++            if (!alive) return false;
++            // The native post-switch CreateTail uses Matrix from entry,
++            // unless subtype branch updates it via AngleMatrix.
++            if (j.CreateTails)
++                AppendJointTailMoveA(ref j, matrix);
++            j.LifeTime -= f;
++            return j.LifeTime >= 0f;
++        }
++
++        private static void ShiftFlareTails(ref ClassicJoint j, Vector3 oldMinusNew)
++        {
++            if (j.Tails == null) return;
++            int count = Math.Clamp(j.NumTails, 0, ClassicJoint.MaxTailSegments);
++            for (int n = count - 1; n >= 0; n--)
++                for (int k = 0; k < ClassicJoint.VerticesPerTail; k++)
++                    j.Tails[n * 4 + k] -= oldMinusNew;
++        }
++
++        private Vector3 MagicFlareDirection(int slot, float rate = 1f)
++        {
++            // GetMagicScrew(iFrame), with the source's even/odd slot sign.
++            int frame = (int)(Clock.WorldTimeMilliseconds / 40f);
++            frame = ((slot & 1) != 0 ? frame : -frame) + slot * 53731;
++            float a = (frame + 55555f) * 0.048f * rate;
++            float b = frame * 0.0613f * rate;
++            float c = (frame + 11111f) * 0.1113f * rate;
++            float dx = MathF.Sin(a) * MathF.Cos(b);
++            float dy = MathF.Sin(a) * MathF.Sin(b);
++            float dz = MathF.Cos(a);
++            float sa = MathF.Sin(c), ca = MathF.Cos(c);
++            return new Vector3(ca * dy - sa * dz,
++                sa * dy + ca * dz, dx);
++        }
++
++        private bool MoveFlareClassicJoint(ref ClassicJoint j, int slot,
++            ClassicFxHandle handle, float f, ref ClassicMatrix3x4 matrix)
++        {
++            switch (j.SubType)
++            {
++                case 0: case 10: case 18:
++                {
++                    float count = j.PKKey != -1 && j.PKKey != 0
++                        ? (j.Direction.Y + j.LifeTime) / j.PKKey
++                        : j.SubType == 18
++                            ? (j.Direction.Y + j.LifeTime * 2f) * 0.1f
++                            : (j.Direction.Y + j.LifeTime) * 0.1f;
++                    // Native uses powf(-1, FPS_ANIMATION_FACTOR). Preserve
++                    // frame-factor sign without NaN for non-integer factors.
++                    if (j.PKKey == -1 && j.SubType == 18 && j.Skill == 1)
++                        count *= -1f;
++                    j.Position.X = j.TargetPosition.X + MathF.Cos(count) * j.Velocity;
++                    j.Position.Y = j.TargetPosition.Y - MathF.Sin(count) * j.Velocity;
++                    if (j.SubType == 0) j.Position.Z += j.Direction.Z * f;
++                    else if (j.SubType == 10) j.Position.Z -= j.Direction.Z * f;
++                    else
++                    {
++                        j.Position.Z += j.Direction.Z * 1.1f * f;
++                        j.Velocity += f * 0.1f;
++                        j.Scale += f * 0.2f;
++                    }
++                    break;
++                }
++                case 20:
++                    if (!TryGetOwnerBonePosition(j.Target, 33, out j.Position))
++                        return false;
++                    break;
++                case 14: case 15:
++                {
++                    if (j.Target.HasOwner)
++                    {
++                        float count = j.Direction.Y * 0.1f;
++                        if (j.SubType == 15) count = -count;
++                        j.Position.X = j.TargetPosition.X + MathF.Cos(count) * j.Velocity;
++                        j.Position.Y = j.TargetPosition.Y - MathF.Sin(count) * j.Velocity;
++                        j.Position.Z += j.Direction.Z * f;
++                        if (j.LifeTime < 20f) j.Velocity += 5f * f;
++                        j.Scale += f;
++                        j.Direction.Y += 4f * f;
++                        j.Direction.Z += ((R(200) + 200f) / 100f) * f;
++                    }
++                    break;
++                }
++                case 2: case 21: case 22: case 24: case 50: case 51:
++                    if (j.SubType == 51)
++                    {
++                        j.Direction.Z += 10f * f;
++                        j.Position.X = j.TargetPosition.X;
++                        j.Position.Y = j.TargetPosition.Y;
++                        j.Position.Z += j.Direction.Z * f;
++                    }
++                    if (j.LifeTime <= 25f || j.SubType == 50)
++                    {
++                        j.Direction.Z += 5f * f;
++                        j.Position.X = j.TargetPosition.X;
++                        j.Position.Y = j.TargetPosition.Y;
++                        j.Position.Z += j.Direction.Z * f;
++                    }
++                    break;
++                case 41:
++                    if (j.LifeTime <= 20f)
++                    {
++                        j.Direction.Z += f;
++                        j.Position.X = j.TargetPosition.X;
++                        j.Position.Y = j.TargetPosition.Y;
++                        j.Position.Z += j.Direction.Z * f;
++                        j.Light *= MathF.Pow(1f / 1.1f, f);
++                    }
++                    AddClassicTerrainLight(j.Position.X, j.Position.Y, j.Light, 1f);
++                    break;
++                case 42:
++                    if (!TryGetOwnerSnapshot(j.Target, out _)) return false;
++                    j.Angle.Z += 15f * f;
++                    j.LifeTime = 100f;
++                    matrix = ClassicMath.AngleMatrix(j.Angle);
++                    j.Position = j.StartPosition + ClassicMath.VectorRotate(
++                        j.Direction, matrix);
++                    if (((int)j.Angle.Z % 45) == 0 && R(100) <= 50)
++                        CreateJointFpsChecked(ClassicTextureIds.BitmapFlare,
++                            j.Position, j.Position, Vector3.Zero, 41, scale: j.Scale);
++                    AddClassicTerrainLight(j.TargetPosition.X,
++                        j.TargetPosition.Y, j.Light, 2f);
++                    break;
++                case 19:
++                    if (j.LifeTime <= 25f)
++                    {
++                        j.Direction.Z -= 5f * f;
++                        j.Position.X = j.TargetPosition.X;
++                        j.Position.Y = j.TargetPosition.Y;
++                        j.Position.Z += j.Direction.Z * f;
++                    }
++                    break;
++                case 40:
++                    MoveFlareRing40(ref j, f, ref matrix);
++                    break;
++                case 4: case 6: case 12:
++                    MoveFlareOrbit(ref j, f);
++                    break;
++                case 5:
++                    j.Direction.Z -= 60f * f;
++                    j.Position.X = j.TargetPosition.X;
++                    j.Position.Y = j.TargetPosition.Y;
++                    j.Position.Z += j.Direction.Z * f;
++                    j.Scale = R(4) + 6f;
++                    break;
++                case 7: case 11: case 25: case 45: case 46: case 47:
++                    if (!MoveFlareMagic(ref j, slot, handle)) return false;
++                    break;
++                case 8:
++                    j.Position = j.StartPosition + ClassicMath.VectorRotate(
++                        new Vector3(0f, -50f, 0f),
++                        ClassicMath.AngleMatrix(j.TargetPosition));
++                    matrix = ClassicMath.AngleMatrix(j.Angle);
++                    j.TargetPosition.Z += 10f;
++                    break;
++                case 9:
++                    matrix = ClassicMath.AngleMatrix(j.Angle);
++                    for (int k = 0; k < Math.Clamp(j.MaxTails, 0, 200); k++)
++                    {
++                        j.Position += j.StartPosition;
++                        AppendJointTailMoveA(ref j, matrix);
++                    }
++                    break;
++                case 13:
++                    if (j.LifeTime <= 25f)
++                    {
++                        j.Direction.Z += f;
++                        j.Position.X = j.TargetPosition.X;
++                        j.Position.Y = j.TargetPosition.Y;
++                        j.Position.Z += j.Direction.Z * f;
++                    }
++                    break;
++                case 17:
++                    if (JointFlareOwnerActionCancelsResolver?.Invoke(j.Target) == true)
++                        j.LifeTime -= 10f * f;
++                    else
++                    {
++                        j.Direction.X += MathF.Sin(R(360) * 0.1f) * 4f * f;
++                        j.Direction.Y += MathF.Cos(R(360) * 0.1f) * 4f * f;
++                        j.Direction.Z += j.Velocity * f;
++                        j.Position = j.TargetPosition + j.Direction;
++                    }
++                    if (j.LifeTime < 12f) j.Light *= MathF.Pow(1f / 1.3f, f);
++                    break;
++                case 16:
++                    if (j.Target.HasOwner)
++                    {
++                        if (!TryGetOwnerPosition(j.Target, out Vector3 anchor16))
++                            return false;
++                        ShiftFlareTails(ref j, j.TargetPosition - anchor16);
++                        j.TargetPosition = anchor16;
++                        if (j.LifeTime < 20f) j.Light *= MathF.Pow(1f / 1.1f, f);
++                        else if (j.LifeTime < 40f) j.Light = new Vector3(0.25f);
++                        else j.Light *= MathF.Pow(1.04f, f);
++                    }
++                    break;
++                case 23:
++                    MoveFlare23(ref j, f, ref matrix);
++                    break;
++                case 43:
++                    if (!TryGetOwnerPosition(j.Target, out Vector3 flare43)) return false;
++                    j.LifeTime = 100f;
++                    if (Random.FpsCheck(3, Clock))
++                    {
++                        Vector3 p = flare43 + new Vector3(
++                            (R(60) - 30f) * f, (R(60) - 30f) * f, 30f * f);
++                        CreateJoint(ClassicTextureIds.BitmapFlare,
++                            p, p, j.Angle, 44, j.Target, j.Scale,
++                            priorColor: j.Light);
++                    }
++                    break;
++                case 44:
++                    if (!TryGetOwnerSnapshot(j.Target, out _)) return false;
++                    if (j.LifeTime <= 20f)
++                    {
++                        j.Direction.Z += f;
++                        j.Position.X = j.TargetPosition.X;
++                        j.Position.Y = j.TargetPosition.Y;
++                        j.Position.Z += j.Direction.Z * f;
++                        j.Light *= MathF.Pow(1f / 1.05f, f);
++                        CreateSprite(ClassicTextureIds.BitmapPinLight,
++                            j.Position, 1.5f, j.Light);
++                        CreateSprite(ClassicTextureIds.BitmapPinLight,
++                            j.Position, 0.5f, j.Light);
++                        if (j.Position.Z >= 400f) return false;
++                    }
++                    break;
++                default:
++                    // Native has no per-subtype movement case for 1,3 etc.
++                    break;
++            }
++            // Native Fade after type branch; subtype 14/15/16 included.
++            if ((j.SubType != 5 && j.SubType != 7 && j.SubType != 11) &&
++                j.LifeTime < 10f)
++                j.Light *= MathF.Pow(1f / 1.3f, f);
++            if ((j.SubType == 0 || j.SubType == 10 || j.SubType == 18) &&
++                j.Scale < 40f &&
++                JointFlareOwnerMovingOrAttackingResolver?.Invoke(j.Target) == true)
++            {
++                j.SubType = 1;
++                j.CreateTails = false;
++                j.LifeTime = MathF.Min(j.LifeTime, 10f);
++            }
++            return true;
++        }
++
++        private void MoveFlareRing40(ref ClassicJoint j, float f,
++            ref ClassicMatrix3x4 matrix)
++        {
++            // Native uses a function-level static lMax, initialized once.
++            if (_nativeFlare40InitialLifetime < 0)
++                _nativeFlare40InitialLifetime = (int)j.LifeTime;
++            j.CreateTails = false;
++            j.NumTails = 0;
++            Vector3 previous = j.Position;
++            const float radius = 50f;
++            float azimuth = MathHelper.ToRadians(90f - j.Angle.Z);
++            for (int n = 0; n < ClassicJoint.MaxTailSegments; n++)
++            {
++                float theta = n * MathF.PI / 6f;
++                float rc = radius * MathF.Cos(theta);
++                float rs = radius * MathF.Sin(theta);
++                Vector3 point = new Vector3(rc * MathF.Cos(azimuth),
++                    rc * MathF.Sin(azimuth), rs);
++                float elapsed = _nativeFlare40InitialLifetime - j.LifeTime;
++                j.TargetPosition.X += j.Direction.X * elapsed * f;
++                j.TargetPosition.Y += j.Direction.Y * elapsed * f;
++                j.Position = j.TargetPosition + point;
++                matrix = ClassicMath.AngleMatrix(j.Angle);
++                AppendJointTailMoveA(ref j, matrix);
++            }
++            j.Position = previous;
++            j.Position.X += j.Direction.X * 12f * f;
++            j.Position.Y += j.Direction.Y * 12f * f;
++            j.TargetPosition = j.Position;
++            j.Scale *= MathF.Pow(1.1f, f);
++            j.Light = new Vector3(0.5f + R(64) / 255f,
++                0.5f + R(64) / 255f, 0.5f + R(128) / 255f);
++        }
++
++        private void MoveFlareOrbit(ref ClassicJoint j, float f)
++        {
++            float count;
++            Vector3 shift;
++            if (j.SubType == 6)
++            {
++                count = j.Direction.X + j.LifeTime *
++                    (j.Type == ClassicTextureIds.BitmapFlareBlue ? 0.8f : 0.5f);
++                float radius = MathF.Max((int)j.LifeTime, 1) * 2f;
++                shift = new Vector3(-MathF.Cos(count) * radius,
++                    MathF.Sin(count) * radius, 0f);
++            }
++            else if (j.SubType == 12)
++            {
++                count = (j.Direction.X + j.LifeTime) * 0.1f;
++                shift = new Vector3(-MathF.Cos(count) * 26f,
++                    MathF.Sin(count) * 26f - (90f - j.LifeTime) * 0.3f, 0f);
++            }
++            else
++            {
++                count = (j.Direction.X + j.LifeTime) * 0.1f;
++                float radius = MathF.Max((int)(j.LifeTime + 40f), 10) * 0.65f;
++                shift = new Vector3(-MathF.Cos(count) * radius,
++                    MathF.Sin(count) * radius, 0f);
++            }
++            j.TargetPosition.X += j.Direction.Y * f;
++            j.TargetPosition.Y += j.Direction.Z * f;
++            float rot = MathHelper.ToRadians(90f - j.Angle.Z);
++            j.Position = new Vector3(
++                shift.X * MathF.Sin(rot) + j.TargetPosition.X,
++                shift.X * MathF.Cos(rot) + j.TargetPosition.Y,
++                shift.Y + j.TargetPosition.Z);
++        }
++
++        private bool MoveFlareMagic(ref ClassicJoint j, int slot,
++            ClassicFxHandle handle)
++        {
++            if (!TryGetOwnerSnapshot(j.Target, out ClassicFxOwnerSnapshot owner))
++                return false;
++            bool usesStart = j.SubType == 11 || j.SubType == 25;
++            Vector3 ownerBase = owner.Position;
++            if (usesStart)
++            {
++                Vector3? ownerStart = JointFlareOwnerStartPositionResolver?.Invoke(j.Target);
++                if (!ownerStart.HasValue) return false;
++                ownerBase = ownerStart.Value;
++            }
++            float fLife = j.LifeTime * 40f / 30f;
++            float pos = usesStart
++                ? fLife < 20f ? fLife * 4f : fLife + 60f
++                : fLife < 10f ? fLife * 7f : fLife + 60f;
++            float divisor = 30f + j.MultiUse;
++            if (MathF.Abs(divisor) < 0.00001f)
++                return false; // Native division by zero is invalid.
++            pos = pos / divisor * 30f;
++            if ((int)j.LifeTime == 30)
++                JointFlareMeteoriteSoundRequested?.Invoke();
++            float circle = usesStart
++                ? MathF.Min(MathF.Max(0f, fLife - 10f) * 5f, 150f)
++                : MathF.Min(MathF.Max(0f, 40f - fLife) * 15f, 150f);
++            Vector3 dir = MagicFlareDirection(slot,
++                j.SubType == 11 ? 1.5f : 1f);
++            Vector3 onCircle = j.TargetPosition + dir * circle;
++            int frame = (int)(Clock.WorldTimeMilliseconds / 40f);
++            frame = ((slot & 1) != 0 ? frame : -frame) + slot * 53731;
++            for (int k = 0; k < 3; k++)
++            {
++                float jitter = 25f * MathF.Cos(
++                    (slot * 51231f + k * 3711f + frame / 10) * 0.01f);
++                float b = k == 0 ? ownerBase.X : k == 1 ? ownerBase.Y : ownerBase.Z;
++                float p = k == 0 ? onCircle.X : k == 1 ? onCircle.Y : onCircle.Z;
++                p = (pos * p + (100f - pos) * (b + jitter)) * 0.01f;
++                if (k == 0) j.Position.X = p;
++                else if (k == 1) j.Position.Y = p;
++                else j.Position.Z = p;
++            }
++            if (!usesStart) j.Position.Z += 100f;
++            Vector3 light = j.SubType == 11
++                ? new Vector3(0.3f, 0.3f, 0.5f)
++                : j.SubType == 25 ? new Vector3(0.9f, 0.4f, 0.6f)
++                : new Vector3(0.5f, 0.5f, 1f);
++            if (usesStart && j.Skill == 1)
++                JointFlareSetArrowOwnerPositionRequested?.Invoke(j.Target, j.Position);
++            if (j.SubType == 45 && j.LifeTime <= 1f)
++            {
++                JointSecondaryEffectRequested?.Invoke(handle,
++                    "MODEL_CHANGE_UP_EFF", owner.Position,
++                    owner.Angle, owner.Light, 1, 1f);
++                JointSecondaryEffectRequested?.Invoke(handle,
++                    "MODEL_CHANGE_UP_CYLINDER", owner.Position,
++                    owner.Angle, owner.Light, 1, 1f);
++            }
++            if (j.SubType != 47)
++            {
++                CreateSprite(ClassicTextureIds.BitmapShiny + 1,
++                    j.Position, (R(2) + 8f) * 0.10f, light, j.Target, R(360));
++                CreateSprite(ClassicTextureIds.BitmapLight,
++                    j.Position, (R(2) + 8f) * 0.18f, light, j.Target, R(360));
++                CreateSprite(ClassicTextureIds.BitmapLight,
++                    j.Position, (R(2) + 8f) * 0.18f, light, j.Target, R(360));
++            }
++            if (j.SubType != 11 && j.SubType != 45 && j.SubType != 46 &&
++                j.SubType != 47 && (int)j.LifeTime == 1)
++                CreateParticleFpsChecked(ClassicTextureIds.BitmapExplotion,
++                    j.Position, Vector3.Zero, Vector3.One, 1, 0.6f);
++            return true;
++        }
++
++        private void MoveFlare23(ref ClassicJoint j, float f,
++            ref ClassicMatrix3x4 matrix)
++        {
++            if (j.LifeTime >= 20f) return;
++            j.Velocity = 200f;
++            if (j.LifeTime < 8f)
++            {
++                j.Velocity = 0f;
++                matrix = ClassicMath.AngleMatrix(j.HeadAngle);
++                AppendJointTailMoveA(ref j, matrix);
++                return;
++            }
++            // The original loop count is Direction.Z. Respect the fixed pool
++            // capacity to prevent exhausted tails becoming an unbounded loop.
++            int limit = Math.Clamp((int)MathF.Ceiling(MathF.Max(0f, j.Direction.Z)),
++                0, ClassicJoint.MaxTailSegments);
++            for (int i = 0; i < limit; i++)
++            {
++                j.Direction.Y += 1.5f * f;
++                switch ((int)j.MultiUse)
++                {
++                    case 0: j.HeadAngle.X += 3f * f; j.HeadAngle.Z -= j.Direction.Y * f; break;
++                    case 1: j.HeadAngle.X -= 3f * f; j.HeadAngle.Z -= j.Direction.Y * f; break;
++                    case 2: j.HeadAngle.X += 3f * f; j.HeadAngle.Z += j.Direction.Y * f; break;
++                    case 3: j.HeadAngle.X -= 3f * f; j.HeadAngle.Z += j.Direction.Y * f; break;
++                    case 4: j.HeadAngle.Z -= j.Direction.Y * f; break;
++                    case 5: j.HeadAngle.X -= j.Direction.Y * f; break;
++                }
++                j.Direction.Y = MathF.Min(j.Direction.Y, 15f);
++                matrix = ClassicMath.AngleMatrix(j.HeadAngle);
++                Vector3 delta = ClassicMath.VectorRotate(
++                    new Vector3(0f, -j.Velocity * f, 0f), matrix);
++                j.Position = j.StartPosition + delta;
++                AppendJointTailMoveA(ref j, matrix);
++                if (j.NumTails >= j.MaxTails - 1)
++                {
++                    j.Velocity = 0f;
++                    break;
++                }
++            }
++            j.Direction.Z += 4f * f;
++        }
++
++        private bool MoveFlarePlusJoint(ref ClassicJoint j, int slot,
++            ClassicFxHandle handle, float f, ref ClassicMatrix3x4 matrix)
++        {
++            switch (j.SubType)
++            {
++                case 5: case 16: case 6:
++                {
++                    if (j.SubType == 6 && !j.Target.HasOwner)
++                        return false;
++                    float limit = j.SubType == 6 ? 30f : 25f;
++                    if (j.LifeTime >= limit)
++                    {
++                        j.Angle.Z -= 10f * f;
++                        j.Position.Z += 2.5f * f;
++                    }
++                    if (j.SubType == 6 || j.LifeTime < limit)
++                    {
++                        j.Velocity = MathF.Min(30f, j.Velocity + 5f * f);
++                        float oldAngle = j.Angle.Z;
++                        Vector3 target = j.TargetPosition;
++                        if (j.SubType == 6 || j.SubType == 16)
++                        {
++                            if (!TryGetOwnerPosition(j.Target, out target)) return false;
++                            if (j.SubType == 6) target.Z += 150f * f;
++                        }
++                        float distance = MoveJointHummingA(ref j.Angle,
++                            j.Position, target, j.Velocity, f);
++                        if (distance <= 70f &&
++                            MathF.Abs(oldAngle - j.Angle.Z) > 20f &&
++                            j.Velocity >= 20f)
++                            j.Velocity -= (j.SubType == 5 ? 5f : 10f) * f;
++                        if (j.LifeTime < (j.SubType == 6 ? 15f : 10f))
++                        {
++                            float light = j.Light.X * MathF.Pow(1f / 1.2f, f);
++                            j.Light = new Vector3(light);
++                        }
++                    }
++                    Vector3 terrainLight;
++                    float range;
++                    if (j.SubType == 16)
++                    {
++                        terrainLight = Vector3.One;
++                        range = 1f;
++                    }
++                    else
++                    {
++                        float lum = (R(4) + 8f) * 0.03f;
++                        terrainLight = j.SubType == 5
++                            ? new Vector3(lum * 0.4f, lum * 0.8f, lum * 0.4f)
++                            : new Vector3(lum * 0.4f, lum, lum * 0.8f);
++                        range = 2f;
++                    }
++                    AddClassicTerrainLight(j.Position.X, j.Position.Y,
++                        terrainLight, range);
++                    return true;
++                }
++                case 7:
++                    j.Position.X = j.StartPosition.X +
++                        MathF.Sin(j.LifeTime / 2.5f) * j.Direction.X;
++                    j.Position.Y = j.StartPosition.Y;
++                    j.Position.Z += j.Velocity * f;
++                    j.Velocity -= 0.1f * f;
++                    j.Direction.X -= 0.1f * f;
++                    if (j.LifeTime < 15f)
++                        j.Light *= MathF.Pow(1f / 1.2f, f);
++                    return true;
++                case 8: case 9:
++                    if (!TryGetOwnerPosition(j.Target, out j.Position)) return false;
++                    if (j.SubType == 8) j.Position.Z = 300f;
++                    else j.Position.Z += j.MultiUse * f;
++                    return true;
++                case 12: case 13: case 14: case 15: case 17: case 18:
++                    if (!TryGetOwnerSnapshot(j.Target, out _)) return false;
++                    if (j.SubType == 17)
++                        j.Light = new Vector3(1f, 1f, 0.2f);
++                    else if (j.SubType == 14)
++                    {
++                        CreateSprite(ClassicTextureIds.BitmapSpark + 1,
++                            j.Position, 5f, j.Light);
++                        CreateParticleFpsChecked(ClassicTextureIds.BitmapSmoke,
++                            j.Position, j.Angle, j.Light, 34, 1f);
++                        CreateParticleFpsChecked(ClassicTextureIds.BitmapSmoke,
++                            j.Position, j.Angle, j.Light, 35, 1f);
++                        j.Light = new Vector3(0.7f, 0.3f, 0.3f);
++                        CreateParticleFpsChecked(ClassicTextureIds.BitmapSpark + 1,
++                            j.Position, j.Angle, j.Light, 10, 4f);
++                        j.Light = new Vector3(1f, 1f, 0.2f);
++                    }
++                    else if (j.SubType == 15)
++                    {
++                        for (int i = 0; i < 2; i++)
++                            CreateParticleFpsChecked(ClassicTextureIds.BitmapShiny,
++                                j.Position, j.Angle, j.Light, 3, 0.5f);
++                    }
++                    if (j.LifeTime < 15f)
++                        j.Light *= MathF.Pow(1f / 1.2f, f);
++                    if (j.SubType != 18)
++                    {
++                        float lum = (R(4) + 8f) * 0.03f;
++                        AddClassicTerrainLight(j.Position.X, j.Position.Y,
++                            new Vector3(lum * 0.4f, lum, lum * 0.8f), 2f);
++                    }
++                    return true;
++                case 19: case 20:
++                    return MoveFlarePlusTriplet(ref j, f, ref matrix, false);
++                default:
++                    return MoveFlarePlusTriplet(ref j, f, ref matrix, true);
++            }
++        }
++
++        private bool MoveFlarePlusTriplet(ref ClassicJoint j, float f,
++            ref ClassicMatrix3x4 matrix, bool nativeDefault)
++        {
++            if (!TryGetOwnerSnapshot(j.Target, out ClassicFxOwnerSnapshot owner))
++            {
++                if (!nativeDefault) return false;
++                j.LifeTime = -1f;
++                j.Position = j.TargetPosition;
++                j.Position.Z += 50f * f;
++                return true;
++            }
++            Vector3? start = JointFlareOwnerStartPositionResolver?.Invoke(j.Target);
++            if (!start.HasValue)
++                return false; // Native OBJECT::StartPosition is not root Position.
++            Vector3 delta = (owner.Position - start.Value) / 3f;
++            j.TargetPosition = start.Value;
++            matrix = ClassicMath.AngleMatrix(j.Angle);
++            Vector3 angle = j.Angle;
++            if (nativeDefault)
++            {
++                Vector3? head = JointFlareOwnerHeadAngleResolver?.Invoke(j.Target);
++                if (!head.HasValue) return false;
++                angle = head.Value;
++                angle.Y += (j.Velocity - 90f) * f;
++            }
++            else
++            {
++                // In original 19/20 Angle[] is uninitialized; the old C++
++                // read is undefined. Use the existing joint angle as a
++                // deterministic input instead of reproducing undefined data.
++                angle = j.Angle;
++            }
++            for (int n = 0; n < 3; n++)
++            {
++                if (nativeDefault || j.SubType == 19)
++                    angle.Y += 30f * f;
++                j.TargetPosition += delta;
++                Vector3 rotation = ClassicMath.VectorRotate(
++                    j.Direction, ClassicMath.AngleMatrix(angle));
++                j.Position = j.TargetPosition + rotation;
++                if (j.NumTails < j.MaxTails - 1 || j.Skill != 0)
++                    AppendJointTailMoveA(ref j, matrix);
++            }
++            if (nativeDefault && j.LifeTime < 15f)
++                j.Light *= MathF.Pow(1f / 1.5f, f);
++            return true;
++        }
+     }
+ }

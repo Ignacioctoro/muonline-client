@@ -46,6 +46,10 @@ namespace Client.Main.ClassicFX.Core
                     live = MoveJointFamilyD(ref j);
                 else if (IsJointMoveComplexType(j.Type))
                     live = MoveJointComplex(ref j, i, handle);
+                else if (j.Type == ClassicTextureIds.BitmapFlare ||
+                         j.Type == ClassicTextureIds.BitmapFlareBlue ||
+                         j.Type == ClassicTextureIds.BitmapFlare + 1)
+                    live = MoveFlareJointFull(ref j, i, handle);
                 else
                     continue; // Other native branches are still pending.
 
