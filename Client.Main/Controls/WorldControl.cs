@@ -142,7 +142,7 @@ namespace Client.Main.Controls
                     false;
         // Manual verification: change to true temporarily to render a real
         // THUNDER+1 joint above the character through ClassicJointRenderer.
-        private const bool ClassicFxJointProbeEnabled = true;
+        private const bool ClassicFxJointProbeEnabled = false;
         private DepthStencilState _currentDepthState = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDefault = DepthStencilState.Default;
         private static readonly DepthStencilState DepthStateDepthRead = DepthStencilState.DepthRead;

@@ -36,14 +36,17 @@ namespace Client.Main.Objects.Effects
                 get;
             } = new();
 
-            public ClassicSpearJointEffect GreenJoint;
+            // Compatibilidad con el renderer anterior y el puente ClassicFX.
+            public WorldObject GreenJoint;
 
-            public ClassicSpearJointEffect SoulBarrierJoint;
+            public WorldObject SoulBarrierJoint;
 
             public ClassicWeaponBuffShineEffect AttackShine;
             public ClassicGreaterFortitudeGlowEffect GreaterFortitudeGlow;
             public ClassicCriticalDamageAuraEffect CriticalDamageAura;
         }
+
+        private const bool UseClassicFxSpearJoints = true;
 
         private readonly Dictionary<
             ushort,
@@ -298,10 +301,9 @@ namespace Client.Main.Objects.Effects
             RemoveVisual(
                 ref state.GreenJoint);
 
-            state.GreenJoint =
-                new ClassicSpearJointEffect(
-                    target,
-                    4);
+            state.GreenJoint = UseClassicFxSpearJoints
+                ? new ClassicFxSpearJointVisual(target, 4)
+                : new ClassicSpearJointEffect(target, 4);
 
             AddVisual(
                 world,
@@ -332,10 +334,9 @@ namespace Client.Main.Objects.Effects
             RemoveVisual(
                 ref state.SoulBarrierJoint);
 
-            state.SoulBarrierJoint =
-                new ClassicSpearJointEffect(
-                    target,
-                    0);
+            state.SoulBarrierJoint = UseClassicFxSpearJoints
+                ? new ClassicFxSpearJointVisual(target, 0)
+                : new ClassicSpearJointEffect(target, 0);
 
             AddVisual(
                 world,
@@ -452,15 +453,16 @@ namespace Client.Main.Objects.Effects
         }
 
         private static bool IsUsable(
-            ClassicSpearJointEffect effect,
+            WorldObject effect,
             PlayerObject target)
         {
-            return effect != null &&
-                   effect.Status !=
-                       GameControlStatus.Disposed &&
-                   ReferenceEquals(
-                       effect.Owner,
-                       target);
+            if (effect == null || effect.Status == GameControlStatus.Disposed)
+                return false;
+            if (UseClassicFxSpearJoints && effect is ClassicFxSpearJointVisual classic)
+                return ReferenceEquals(classic.Owner, target);
+            if (!UseClassicFxSpearJoints && effect is ClassicSpearJointEffect previous)
+                return ReferenceEquals(previous.Owner, target);
+            return false;
         }
         private static bool IsUsable(
             ClassicGreaterFortitudeGlowEffect effect,
