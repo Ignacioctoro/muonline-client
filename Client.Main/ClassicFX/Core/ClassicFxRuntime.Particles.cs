@@ -225,6 +225,14 @@ namespace Client.Main.ClassicFX.Core
             float frameFactor,
             ref bool keepAlive)
         {
+            if (MoveParticleA(
+                    ref particle,
+                    frameFactor,
+                    ref keepAlive))
+            {
+                return;
+            }
+
             switch (particle.Type)
             {
                 case ClassicTextureIds.BitmapFlareBlue:
