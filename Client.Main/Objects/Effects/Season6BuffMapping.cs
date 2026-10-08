@@ -214,7 +214,10 @@ namespace Client.Main.Objects.Effects
                 SoulBarrier or
                 GreaterFortitude or
                 CriticalDamageIncrease or
-                CriticalDamageIncreaseMastery;
+                CriticalDamageIncreaseMastery or
+                WizardryEnhance or
+                WizardryEnhanceStrengthener or
+                WizardryEnhanceMastery;
         }
     }
 }

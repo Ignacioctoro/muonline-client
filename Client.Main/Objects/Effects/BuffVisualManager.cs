@@ -44,6 +44,7 @@ namespace Client.Main.Objects.Effects
             public ClassicWeaponBuffShineEffect AttackShine;
             public ClassicGreaterFortitudeGlowEffect GreaterFortitudeGlow;
             public ClassicCriticalDamageAuraEffect CriticalDamageAura;
+            public ClassicFxWizardryEnhancementVisual WizardryEnhancement;
         }
 
         private const bool UseClassicFxSpearJoints = true;
@@ -221,6 +222,11 @@ namespace Client.Main.Objects.Effects
                 state.ActiveEffects.Contains(
                     Season6BuffMapping.CriticalDamageIncreaseMastery);
 
+            bool wizardryEnhancement =
+                state.ActiveEffects.Contains(Season6BuffMapping.WizardryEnhance) ||
+                state.ActiveEffects.Contains(Season6BuffMapping.WizardryEnhanceStrengthener) ||
+                state.ActiveEffects.Contains(Season6BuffMapping.WizardryEnhanceMastery);
+
             // ---------------------------------------------------------
             // Classic SourceMain behavior:
             //
@@ -275,6 +281,8 @@ namespace Client.Main.Objects.Effects
                 target,
                 state,
                 criticalDamage);
+
+            EnsureWizardryEnhancement(world, target, state, wizardryEnhancement);
         }
 
         private static void EnsureGreenJoint(
@@ -408,6 +416,30 @@ namespace Client.Main.Objects.Effects
         }
 
 
+        private static void EnsureWizardryEnhancement(
+            WalkableWorldControl world,
+            PlayerObject target,
+            PlayerBuffVisualState state,
+            bool needed)
+        {
+            if (!needed)
+            {
+                RemoveVisual(ref state.WizardryEnhancement);
+                return;
+            }
+
+            if (state.WizardryEnhancement != null &&
+                state.WizardryEnhancement.Status != GameControlStatus.Disposed &&
+                ReferenceEquals(state.WizardryEnhancement.Owner, target))
+                return;
+
+            RemoveVisual(ref state.WizardryEnhancement);
+            state.WizardryEnhancement =
+                new ClassicFxWizardryEnhancementVisual(target);
+            AddVisual(world, state.WizardryEnhancement);
+            Console.WriteLine("[ClassicFX] Wizardry Enhancement: buff MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF activo");
+        }
+
         private static void EnsureAttackShine(
             WalkableWorldControl world,
             PlayerObject target,
@@ -513,6 +545,7 @@ namespace Client.Main.Objects.Effects
                 ref state.GreaterFortitudeGlow);
             RemoveVisual(
                 ref state.CriticalDamageAura);
+            RemoveVisual(ref state.WizardryEnhancement);
         }
 
         private static void RemoveVisual<T>(
