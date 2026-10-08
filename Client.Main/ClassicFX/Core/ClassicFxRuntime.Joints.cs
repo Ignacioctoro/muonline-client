@@ -50,7 +50,9 @@ namespace Client.Main.ClassicFX.Core
                     priorColor.HasValue, characterIndex) ||
                 InitializeJointCreateQ(
                     handle, ref joint, targetPosition, scale) ||
-                InitializeJointCreateR(ref joint, scale);
+                InitializeJointCreateR(ref joint, scale) ||
+                InitializeJointCreateS(ref joint, targetPosition, scale,
+                    priorColor, pkKey);
 
             if (!initialized)
             {

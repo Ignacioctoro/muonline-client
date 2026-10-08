@@ -84,6 +84,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapFlare =
             32131;
 
+        public const int BitmapJointThunder =
+            32134;
+
         public const int BitmapJointLaser =
             32137;
 
@@ -126,6 +129,9 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapFlareRed =
             32231;
+
+        public const int BitmapFlash =
+            32236;
 
         public const int BitmapFormationMark =
             32241;
