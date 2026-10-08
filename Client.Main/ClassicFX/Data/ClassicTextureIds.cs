@@ -99,6 +99,13 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapChrome2 =
             32216;
 
+        // Original _TextureIndex.h: joint energy/healing slots.
+        public const int BitmapJointEnergy =
+            32223;
+
+        public const int BitmapJointHealing =
+            32224;
+
         public const int BitmapFlareBlue =
             32229;
 
@@ -113,6 +120,10 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapPlus =
             32242;
+
+        // Original _TextureIndex.h: scorpion tail precedes DS_EFFECT.
+        public const int BitmapScolpionTail =
+            32256;
 
         public const int BitmapDsEffect =
             32257;

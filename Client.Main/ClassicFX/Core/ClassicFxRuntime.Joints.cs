@@ -41,9 +41,15 @@ namespace Client.Main.ClassicFX.Core
                 target, scale, pkKey, skillIndex, skillSerialNum,
                 characterIndex, initialLight, targetIndex);
 
-            // The next block ports the native CreateJoint Type switch,
-            // including its exceptions to bCreateStartTail. No geometry is
-            // emitted now, and this does not activate a placeholder effect.
+            // Only families with complete native creation rules are
+            // accepted. Unported ones must not consume an invisible slot.
+            if (!InitializeJointCreateP(
+                    ref joint, targetPosition, scale,
+                    priorColor.HasValue, characterIndex))
+            {
+                ReleaseJoint(handle);
+                return ClassicFxHandle.Invalid;
+            }
             return handle;
         }
 
