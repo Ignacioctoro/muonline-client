@@ -10,7 +10,7 @@ namespace Client.Main.ClassicFX.Core
         /// <summary>
         /// Primer tramo de MoveParticles() de sven-n/MuMain:
         /// ZzzEffectParticle.cpp, desde BITMAP_EFFECT hasta BITMAP_CHROME_ENERGY2.
-        /// El caso BITMAP_FLARE_BLUE permanece en el dispatcher existente.
+        /// BITMAP_FLARE_BLUE también se maneja aquí; no quedan fallbacks.
         /// true = este Type fue procesado; false = continuar al siguiente bloque.
         /// </summary>
         private bool MoveParticleA(
@@ -59,6 +59,32 @@ namespace Client.Main.ClassicFX.Core
                         p.Frame = 1;
                     }
                     p.Rotation += R(16) * ff;
+                    return true;
+                }
+
+                // BITMAP_FLARE_BLUE was previously a provisional fallback in
+                // ClassicFxRuntime.Particles.cs. Keep all movement Type cases in A-M.
+                case ClassicTextureIds.BitmapFlareBlue:
+                {
+                    if (p.SubType == 0)
+                    {
+                        p.Scale = 0.2f;
+                        p.Velocity.Z += 0.4f * ff;
+                        p.Velocity.Z = MathF.Min(8f * ff, p.Velocity.Z);
+                        if (p.LifeTime < 5f)
+                        {
+                            // Main: 0.98f + (0.02f * 1 - FPS_ANIMATION_FACTOR).
+                            p.Light *= 0.98f + (0.02f - ff);
+                        }
+                    }
+                    else if (p.SubType == 1)
+                    {
+                        p.Light.X *= 0.99f + (0.01f - ff);
+                        float fade = MathF.Pow(1f / 1.1f, ff);
+                        p.Light.Y *= fade;
+                        p.Light.Z *= fade;
+                        p.Scale += 1.5f * ff;
+                    }
                     return true;
                 }
 
