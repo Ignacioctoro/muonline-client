@@ -44,6 +44,8 @@ namespace Client.Main.ClassicFX.Core
                     live = MoveJointFamilyC(ref j, i, handle);
                 else if (IsJointMoveFamilyD(j.Type))
                     live = MoveJointFamilyD(ref j);
+                else if (IsJointMoveComplexType(j.Type))
+                    live = MoveJointComplex(ref j, i, handle);
                 else
                     continue; // Other native branches are still pending.
 
