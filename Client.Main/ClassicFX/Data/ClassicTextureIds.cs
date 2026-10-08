@@ -184,6 +184,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapChromeEnergy2 =
             32271;
 
+        // MuMain _TextureIndex.h, BITMAP_PIERCING.
+        public const int BitmapPiercing =
+            32275;
+
         public const int BitmapShockWave =
             32278;
 
