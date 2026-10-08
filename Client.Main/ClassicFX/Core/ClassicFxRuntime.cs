@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Rendering;
@@ -124,9 +124,13 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
 
+            // ClassicFX transient state used by MoveParticles().
+            // Resets/reuses the fixed terrain-light pool; no allocations.
+            BeginClassicFxMoveFrame();
+
             MoveParticles();
 
-            // Próximos:
+            // PrÃ³ximos:
             //
             // MoveEffects();
             // MoveJoints();
@@ -147,6 +151,8 @@ namespace Client.Main.ClassicFX.Core
 
             ClearParticleStorage();
 
+            ResetMoveBridge();
+
             Clock
                 .ResetReferenceFrameCounter();
         }
@@ -163,6 +169,8 @@ namespace Client.Main.ClassicFX.Core
             ClearSpriteStorage();
 
             ClearParticleStorage();
+
+            DisposeMoveBridge();
 
             _spriteRenderer =
                 null;
@@ -181,3 +189,4 @@ namespace Client.Main.ClassicFX.Core
         }
     }
 }
+
