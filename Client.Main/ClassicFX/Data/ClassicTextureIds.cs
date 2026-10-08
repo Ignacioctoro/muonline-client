@@ -99,6 +99,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapChrome2 =
             32216;
 
+        public const int BitmapJointSpirit =
+            32220;
+
         // Original _TextureIndex.h: joint energy/healing slots.
         public const int BitmapJointEnergy =
             32223;
@@ -164,6 +167,9 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapTrueBlue =
             32283;
+
+        public const int BitmapJointSpirit2 =
+            32284;
 
         public const int BitmapWaterfall1 =
             32286;
@@ -261,6 +267,9 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapRaklionClouds =
             32397;
+
+        public const int Bitmap2LineGhost =
+            32403;
 
         public const int BitmapAgAdditionEffect =
             32434;

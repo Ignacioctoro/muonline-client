@@ -1,3 +1,4 @@
+using System;
 using Client.Main.ClassicFX.Primitives;
 using Microsoft.Xna.Framework;
 
@@ -43,13 +44,25 @@ namespace Client.Main.ClassicFX.Core
 
             // Only families with complete native creation rules are
             // accepted. Unported ones must not consume an invisible slot.
-            if (!InitializeJointCreateP(
+            bool initialized =
+                InitializeJointCreateP(
                     ref joint, targetPosition, scale,
-                    priorColor.HasValue, characterIndex))
+                    priorColor.HasValue, characterIndex) ||
+                InitializeJointCreateQ(
+                    handle, ref joint, targetPosition, scale);
+
+            if (!initialized)
             {
                 ReleaseJoint(handle);
                 return ClassicFxHandle.Invalid;
             }
+
+            // Native CreateJoint() applies this after every Type branch.
+            // Avoid division by zero before the first MonoGame Update().
+            float frameFactor = Clock.FrameFactor > 0f ? Clock.FrameFactor : 1f;
+            joint.MaxTails = Math.Clamp(
+                (int)(joint.MaxTails / frameFactor),
+                0, ClassicJoint.MaxTailSegments);
             return handle;
         }
 
