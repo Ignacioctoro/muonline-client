@@ -159,6 +159,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapDsEffect =
             32257;
 
+        public const int BitmapDsShock =
+            32258;
+
         public const int BitmapClud64 =
             32260;
 

@@ -34,6 +34,10 @@ namespace Client.Main.ClassicFX.Core
                     live = MoveJointFamilyA(ref j);
                 else if (j.Type == ClassicTextureIds.BitmapJointEnergy)
                     live = MoveJointFamilyB(ref j);
+                else if (j.Type == ClassicTextureIds.BitmapJointHealing ||
+                         j.Type == ClassicTextureIds.BitmapJointSpirit ||
+                         j.Type == ClassicTextureIds.BitmapJointSpirit2)
+                    live = MoveJointFamilyC(ref j, i, handle);
                 else
                     continue; // Other native branches are still pending.
 
