@@ -137,6 +137,7 @@ namespace Client.Main.ClassicFX.Core
             MoveEffects();
             MoveParticles();
             MoveJoints();
+            MoveBlurs();
 
             // PrÃ³ximos:
             //
@@ -161,6 +162,7 @@ namespace Client.Main.ClassicFX.Core
 
             ClearJointStorage();
             ClearEffectStorage();
+            ClearBlurStorage();
 
             ResetMoveBridge();
 
@@ -183,6 +185,7 @@ namespace Client.Main.ClassicFX.Core
 
             ClearJointStorage();
             ClearEffectStorage();
+            ClearBlurStorage();
 
             DisposeMoveBridge();
 

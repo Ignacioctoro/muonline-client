@@ -494,6 +494,7 @@ namespace Client.Main.Controls
             ClassicFx.RenderEffects();
             // Joint rendering may emit Sprite commands: draw joints first.
             ClassicFx.RenderJoints();
+            ClassicFx.RenderBlurs();
             ClassicFx.RenderSprites();
             ClassicFx.RenderParticles();
         }

@@ -45,6 +45,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapBlur =
             32018;
 
+        public const int BitmapBlur2 =
+            32243;
+
         public const int BitmapSwordForce =
             32039;
 
