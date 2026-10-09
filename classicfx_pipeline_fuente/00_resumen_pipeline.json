@@ -1,0 +1,16 @@
+{
+  "sha_main_fijado": "21728b1e5b03e0763b38ef9e23f79645e0df7ad2",
+  "tipos_effect_catalogo": 464,
+  "tipos_effect_enum_cliente": 22,
+  "tipos_effect_mapeados_esta_auditoria": 22,
+  "llamadas_createEffect_directas_literales": 227,
+  "tipos_distintos_en_llamadas_directas": 96,
+  "tipos_distintos_directos_no_mapeados": 89,
+  "llamadas_createEffect_hijas_literales": 42,
+  "tipos_distintos_en_llamadas_hijas": 28,
+  "fuentes_directas": [
+    "src/source/Engine/Object/ZzzCharacter.cpp",
+    "src/source/Render/Effects/ZzzEffectMagicSkill.cpp"
+  ],
+  "NOTA": "Es analisis estatico de llamadas literales: NO es una lista exhaustiva de skills ni un conteo de efectos necesarios; NO confirma fidelidad visual."
+}

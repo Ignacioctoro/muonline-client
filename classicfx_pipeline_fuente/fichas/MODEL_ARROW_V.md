@@ -1,0 +1,47 @@
+# MODEL_ARROW_V
+
+Cliente: SIN MAPEO LOCAL
+Llamadas directas: 1; hijas: 0
+Create metadata: NO; Move handler: NO DETECTADO
+Modelo AccessModel: Skill/ArrowV[index=1].bmd
+
+## Fragmento de CreateEffect
+
+```cpp
+            case MODEL_ARROW_V:
+            case MODEL_ARROW_SAW:
+            case MODEL_ARROW_NATURE:
+            case MODEL_ARROW_WING:
+            case MODEL_ARROW_BOMB:
+            case MODEL_LACEARROW:
+            case MODEL_DARK_SCREAM:
+            case MODEL_DARK_SCREAM_FIRE:
+            case MODEL_ARROW_SPARK:
+            case MODEL_ARROW_RING:
+            case MODEL_ARROW_TANKER:
+            case MODEL_ARROW_DARKSTINGER:
+            case MODEL_ARROW_GAMBLE:
+                break;
+            case MODEL_FIRE:
+                if (o->SubType == 1)
+                {
+                    for (int j = 0; j < 2; j++)
+                        CreateEffectFpsChecked(MODEL_STONE1 + rand() % 2, o->Position, o->Angle, o->Light);
+                }
+                break;
+
+            case BITMAP_ENERGY:
+                CreateParticleFpsChecked(BITMAP_SPARK + 1, o->Position, o->Angle, Light, 1, 6.f);
+                break;
+
+            case MODEL_LIGHTNING_ORB:
+            {
+                CreateEffectFpsChecked(MODEL_LIGHTNING_ORB, o->Position, o->Angle, o->Light, 1);
+            }
+            break;
+
+            case MODEL_SNOW1:
+            {
+                for (int j = 0; j < 2; j++)
+                {
+```

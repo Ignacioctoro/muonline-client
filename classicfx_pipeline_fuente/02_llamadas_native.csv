@@ -1,0 +1,270 @@
+﻿tipo_llamada,file,line,call,effect,skills_cercanos_NO_VERIFICADOS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1227,CreateEffect,MODEL_SAW,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1237,CreateEffect,BITMAP_FIRE+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1470,CreateEffect,MODEL_BONE1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1472,CreateEffect,MODEL_BONE2,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1485,CreateEffect,MODEL_BONE1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1487,CreateEffect,MODEL_BONE2,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1496,CreateEffect,MODEL_BIG_STONE1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1497,CreateEffect,MODEL_BIG_STONE2,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1666,CreateEffect,MODEL_SKILL_INFERNO,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1673,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1692,CreateEffect,BITMAP_BLIZZARD,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1707,CreateEffect,MODEL_SKILL_INFERNO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1743,CreateEffect,MODEL_SKILL_INFERNO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1755,CreateEffect,MODEL_PIERCING+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1771,CreateEffect,MODEL_PIERCING+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1817,CreateEffect,MODEL_SKILL_INFERNO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1825,CreateEffect,MODEL_SKILL_BLAST,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1834,CreateEffect,MODEL_STAFF_OF_DESTRUCTION,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1845,CreateEffect,MODEL_SKILL_INFERNO,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1855,CreateEffect,MODEL_SKILL_INFERNO,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1867,CreateEffect,MODEL_ARROW_BOMB,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1873,CreateEffect,MODEL_ARROW_BOMB,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1875,CreateEffect,MODEL_ARROW_BOMB,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1899,CreateEffect,MODEL_STAFF_OF_DESTRUCTION,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1913,CreateEffect,BITMAP_BOSS_LASER+1,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1929,CreateEffect,BITMAP_BOSS_LASER,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1945,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1947,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1949,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1956,CreateEffect,MODEL_FIRE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1969,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1982,CreateEffect,MODEL_CIRCLE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1983,CreateEffect,MODEL_CIRCLE_LIGHT,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,1991,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2000,CreateEffect,MODEL_FIRE,AT_SKILL_BOSS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2049,CreateEffect,BITMAP_BOSS_LASER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2059,CreateEffect,MODEL_SKILL_BLAST,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2060,CreateEffect,MODEL_SKILL_BLAST,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2065,CreateEffect,MODEL_FIRE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2066,CreateEffect,MODEL_FIRE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2085,CreateEffect,MODEL_PIERCING+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2105,CreateEffect,MODEL_FIRE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2120,CreateEffect,MODEL_PIERCING+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2136,CreateEffect,MODEL_PIERCING+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2681,CreateEffect,MODEL_SPEAR,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2682,CreateEffect,MODEL_SPEAR,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2729,CreateEffect,MODEL_SPEAR,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2730,CreateEffect,MODEL_SPEAR,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2756,CreateEffect,MODEL_SPEARSKILL,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2775,CreateEffect,BITMAP_GATHERING,AT_SKILL_PENETRATION|AT_SKILL_PENETRATION_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2792,CreateEffect,BITMAP_GATHERING,AT_SKILL_PENETRATION|AT_SKILL_PENETRATION_STR|AT_SKILL_FIRE_SLASH|AT_SKILL_FIRE_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2804,CreateEffect,BITMAP_SWORD_FORCE,AT_SKILL_FIRE_SLASH|AT_SKILL_FIRE_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2808,CreateEffect,BITMAP_SWORD_FORCE,AT_SKILL_FIRE_SLASH|AT_SKILL_FIRE_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2828,CreateEffect,MODEL_MAGIC2,AT_SKILL_POWER_SLASH|AT_SKILL_POWER_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2830,CreateEffect,MODEL_MAGIC2,AT_SKILL_POWER_SLASH|AT_SKILL_POWER_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2832,CreateEffect,MODEL_MAGIC2,AT_SKILL_POWER_SLASH|AT_SKILL_POWER_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2834,CreateEffect,MODEL_MAGIC2,AT_SKILL_POWER_SLASH|AT_SKILL_POWER_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,2836,CreateEffect,MODEL_MAGIC2,AT_SKILL_POWER_SLASH|AT_SKILL_POWER_SLASH_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4157,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_SUMMON
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4165,CreateEffect,MODEL_SKILL_FURY_STRIKE,AT_SKILL_SUMMON|AT_SKILL_RAGEFUL_BLOW|AT_SKILL_RAGEFUL_BLOW_STR|AT_SKILL_RAGEFUL_BLOW_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4177,CreateEffect,MODEL_BLOW_OF_DESTRUCTION,AT_SKILL_RAGEFUL_BLOW|AT_SKILL_RAGEFUL_BLOW_STR|AT_SKILL_RAGEFUL_BLOW_MASTERY|AT_SKILL_STRIKE_OF_DESTRUCTION|AT_SKILL_STRIKE_OF_DESTRUCTION_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4208,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_POWER_SLASH|AT_SKILL_POWER_SLASH_STR|AT_SKILL_SWELL_LIFE|AT_SKILL_SWELL_LIFE_STR|AT_SKILL_SWELL_LIFE_PROFICIENCY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4254,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_MANA
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4271,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_INVISIBLE
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4375,CreateEffect,MODEL_DARKLORD_SKILL,AT_SKILL_ADD_CRITICAL|AT_SKILL_ADD_CRITICAL_STR1|AT_SKILL_ADD_CRITICAL_STR2|AT_SKILL_ADD_CRITICAL_STR3
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4380,CreateEffect,MODEL_DARKLORD_SKILL,AT_SKILL_ADD_CRITICAL|AT_SKILL_ADD_CRITICAL_STR1|AT_SKILL_ADD_CRITICAL_STR2|AT_SKILL_ADD_CRITICAL_STR3
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4385,CreateEffect,MODEL_CIRCLE,AT_SKILL_ADD_CRITICAL|AT_SKILL_ADD_CRITICAL_STR1|AT_SKILL_ADD_CRITICAL_STR2|AT_SKILL_ADD_CRITICAL_STR3|AT_SKILL_PARTY_TELEPORT
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4386,CreateEffect,MODEL_CIRCLE_LIGHT,AT_SKILL_ADD_CRITICAL_STR2|AT_SKILL_ADD_CRITICAL_STR3|AT_SKILL_PARTY_TELEPORT
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4401,CreateEffect,BITMAP_FLARE_FORCE,AT_SKILL_PARTY_TELEPORT|AT_SKILL_THUNDER_STRIKE
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4406,CreateEffect,BITMAP_SHOTGUN,AT_SKILL_PARTY_TELEPORT|AT_SKILL_THUNDER_STRIKE|AT_SKILL_RIDER
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4416,CreateEffect,MODEL_SKILL_WHEEL1,AT_SKILL_RIDER|AT_SKILL_TWISTING_SLASH|AT_SKILL_TWISTING_SLASH_STR|AT_SKILL_TWISTING_SLASH_STR_MG|AT_SKILL_TWISTING_SLASH_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4425,CreateEffect,MODEL_CIRCLE,AT_SKILL_TWISTING_SLASH_STR|AT_SKILL_TWISTING_SLASH_STR_MG|AT_SKILL_TWISTING_SLASH_MASTERY|AT_SKILL_HELL_FIRE|AT_SKILL_HELL_FIRE_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4426,CreateEffect,MODEL_CIRCLE_LIGHT,AT_SKILL_TWISTING_SLASH_STR|AT_SKILL_TWISTING_SLASH_STR_MG|AT_SKILL_TWISTING_SLASH_MASTERY|AT_SKILL_HELL_FIRE|AT_SKILL_HELL_FIRE_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4436,CreateEffect,MODEL_CIRCLE,AT_SKILL_HELL_FIRE|AT_SKILL_HELL_FIRE_STR|AT_SKILL_NOVA
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4447,CreateEffect,MODEL_FIRE,AT_SKILL_NOVA|AT_SKILL_DECAY|AT_SKILL_DECAY_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4448,CreateEffect,MODEL_FIRE,AT_SKILL_NOVA|AT_SKILL_DECAY|AT_SKILL_DECAY_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4468,CreateEffect,MODEL_BLIZZARD,AT_SKILL_ICE_STORM
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4485,CreateEffect,BITMAP_FLAME,AT_SKILL_FLAME|AT_SKILL_FLAME_STR|AT_SKILL_FLAME_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4495,CreateEffect,MODEL_STORM,AT_SKILL_FLAME|AT_SKILL_FLAME_STR|AT_SKILL_FLAME_STR_MG|AT_SKILL_STORM
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4508,CreateEffect,MODEL_DARK_SCREAM,AT_SKILL_FLAME|AT_SKILL_STORM|AT_SKILL_FIRE_SCREAM|AT_SKILL_FIRE_SCREAM_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4509,CreateEffect,MODEL_DARK_SCREAM_FIRE,AT_SKILL_FLAME|AT_SKILL_STORM|AT_SKILL_FIRE_SCREAM|AT_SKILL_FIRE_SCREAM_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4518,CreateEffect,MODEL_DARK_SCREAM,AT_SKILL_STORM|AT_SKILL_FIRE_SCREAM|AT_SKILL_FIRE_SCREAM_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4519,CreateEffect,MODEL_DARK_SCREAM_FIRE,AT_SKILL_FIRE_SCREAM|AT_SKILL_FIRE_SCREAM_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4529,CreateEffect,MODEL_DARK_SCREAM,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4530,CreateEffect,MODEL_DARK_SCREAM_FIRE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4552,CreateEffect,BITMAP_BOSS_LASER,AT_SKILL_FLASH
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4564,CreateEffect,MODEL_SKILL_BLAST,AT_SKILL_FLASH|AT_SKILL_BLAST|AT_SKILL_BLAST_STR|AT_SKILL_BLAST_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4565,CreateEffect,MODEL_SKILL_BLAST,AT_SKILL_FLASH|AT_SKILL_BLAST|AT_SKILL_BLAST_STR|AT_SKILL_BLAST_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4577,CreateEffect,MODEL_SKILL_INFERNO,AT_SKILL_BLAST_STR|AT_SKILL_BLAST_STR_MG|AT_SKILL_INFERNO|AT_SKILL_INFERNO_STR|AT_SKILL_INFERNO_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4687,CreateEffect,MODEL_SWORD_FORCE,AT_SKILL_RUSH
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4692,CreateEffect,MODEL_SWORD_FORCE,AT_SKILL_RUSH|AT_SKILL_OCCUPY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4705,CreateEffect,MODEL_DARKLORD_SKILL,AT_SKILL_RUSH|AT_SKILL_OCCUPY|AT_SKILL_SPIRAL_SLASH|AT_SKILL_BRAND_OF_SKILL
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4710,CreateEffect,MODEL_DARKLORD_SKILL,AT_SKILL_OCCUPY|AT_SKILL_SPIRAL_SLASH|AT_SKILL_BRAND_OF_SKILL
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4712,CreateEffect,MODEL_MANA_RUNE,AT_SKILL_SPIRAL_SLASH|AT_SKILL_BRAND_OF_SKILL
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4719,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4720,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4721,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT2,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4726,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR|AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4728,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR|AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4729,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR|AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4730,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_BERSERKER|AT_SKILL_ALICE_BERSERKER_STR|AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4731,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4732,CreateEffect,MODEL_SUMMONER_CASTING_EFFECT2,AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4733,CreateEffect,MODEL_SUMMONER_CASTING_EFFECT22,AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4734,CreateEffect,MODEL_SUMMONER_CASTING_EFFECT222,AT_SKILL_ALICE_WEAKNESS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4736,CreateEffect,BITMAP_SHINY+6,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4737,CreateEffect,BITMAP_PIN_LIGHT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4742,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4743,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4744,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4745,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4746,CreateEffect,BITMAP_MAGIC_ZIN,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4747,CreateEffect,MODEL_SUMMONER_CASTING_EFFECT2,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4748,CreateEffect,MODEL_SUMMONER_CASTING_EFFECT22,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4749,CreateEffect,MODEL_SUMMONER_CASTING_EFFECT222,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4750,CreateEffect,BITMAP_SHINY+6,AT_SKILL_ALICE_ENERVATION
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4751,CreateEffect,BITMAP_PIN_LIGHT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4757,CreateEffect,MODEL_EFFECT_FLAME_STRIKE,AT_SKILL_FLAME_STRIKE
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4775,CreateEffect,BITMAP_JOINT_THUNDER,AT_SKILL_FLAME_STRIKE|AT_SKILL_GIGANTIC_STORM
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4790,CreateEffect,MODEL_LIGHTNING_SHOCK,AT_SKILL_LIGHTNING_SHOCK|AT_SKILL_LIGHTNING_SHOCK_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4877,CreateEffect,MODEL_STONE_COFFIN+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4912,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_ICE_ARROW|AT_SKILL_ICE_ARROW_STR|AT_SKILL_DEEPIMPACT|AT_SKILL_HEALING|AT_SKILL_HEALING_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4924,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_HEALING|AT_SKILL_HEALING_STR|AT_SKILL_DEFENSE|AT_SKILL_DEFENSE_STR|AT_SKILL_DEFENSE_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4949,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_ATTACK|AT_SKILL_ATTACK_STR|AT_SKILL_ATTACK_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4958,CreateEffect,MODEL_ICE,AT_SKILL_ATTACK_STR|AT_SKILL_ATTACK_MASTERY|AT_SKILL_ICE|AT_SKILL_ICE_STR|AT_SKILL_ICE_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4961,CreateEffect,MODEL_ICE_SMALL,AT_SKILL_ATTACK_STR|AT_SKILL_ATTACK_MASTERY|AT_SKILL_ICE|AT_SKILL_ICE_STR|AT_SKILL_ICE_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,4995,CreateEffect,MODEL_POISON,AT_SKILL_SOUL_BARRIER|AT_SKILL_SOUL_BARRIER_STR|AT_SKILL_SOUL_BARRIER_PROFICIENCY|AT_SKILL_POISON|AT_SKILL_POISON_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5008,CreateEffect,MODEL_FIRE,AT_SKILL_POISON|AT_SKILL_POISON_STR|AT_SKILL_METEO
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5012,CreateEffect,MODEL_SKILL_JAVELIN,AT_SKILL_POISON|AT_SKILL_POISON_STR|AT_SKILL_METEO|AT_SKILL_JAVELIN
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5013,CreateEffect,MODEL_SKILL_JAVELIN,AT_SKILL_POISON|AT_SKILL_POISON_STR|AT_SKILL_METEO|AT_SKILL_JAVELIN
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5014,CreateEffect,MODEL_SKILL_JAVELIN,AT_SKILL_POISON_STR|AT_SKILL_METEO|AT_SKILL_JAVELIN
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5028,CreateEffect,MODEL_PIER_PART,AT_SKILL_METEO|AT_SKILL_JAVELIN|AT_SKILL_DEATH_CANNON|AT_SKILL_SPACE_SPLIT
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5032,CreateEffect,MODEL_FIRE,AT_SKILL_DEATH_CANNON|AT_SKILL_SPACE_SPLIT|AT_SKILL_FIREBALL
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5041,CreateEffect,BITMAP_FLAME,AT_SKILL_SPACE_SPLIT|AT_SKILL_FIREBALL|AT_SKILL_FLAME|AT_SKILL_FLAME_STR|AT_SKILL_FLAME_STR_MG
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5048,CreateEffect,MODEL_MAGIC2,AT_SKILL_FIREBALL|AT_SKILL_FLAME|AT_SKILL_FLAME_STR|AT_SKILL_FLAME_STR_MG|AT_SKILL_POWERWAVE
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5050,CreateEffect,MODEL_MAGIC2,AT_SKILL_FIREBALL|AT_SKILL_FLAME|AT_SKILL_FLAME_STR|AT_SKILL_FLAME_STR_MG|AT_SKILL_POWERWAVE
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5053,CreateEffect,MODEL_MAGIC2,AT_SKILL_FLAME|AT_SKILL_FLAME_STR|AT_SKILL_FLAME_STR_MG|AT_SKILL_POWERWAVE
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5059,CreateEffect,MODEL_WAVES,AT_SKILL_FLAME|AT_SKILL_POWERWAVE|AT_SKILL_FORCE|AT_SKILL_FORCE_WAVE|AT_SKILL_FORCE_WAVE_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5060,CreateEffect,MODEL_WAVES,AT_SKILL_FLAME|AT_SKILL_POWERWAVE|AT_SKILL_FORCE|AT_SKILL_FORCE_WAVE|AT_SKILL_FORCE_WAVE_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5061,CreateEffect,MODEL_PIERCING2,AT_SKILL_FLAME|AT_SKILL_POWERWAVE|AT_SKILL_FORCE|AT_SKILL_FORCE_WAVE|AT_SKILL_FORCE_WAVE_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5074,CreateEffect,MODEL_PIER_PART,AT_SKILL_FORCE_WAVE|AT_SKILL_FORCE_WAVE_STR|AT_SKILL_FIREBURST|AT_SKILL_FIREBURST_STR|AT_SKILL_FIREBURST_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5077,CreateEffect,MODEL_PIER_PART,AT_SKILL_FIREBURST|AT_SKILL_FIREBURST_STR|AT_SKILL_FIREBURST_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5079,CreateEffect,MODEL_PIER_PART,AT_SKILL_FIREBURST|AT_SKILL_FIREBURST_STR|AT_SKILL_FIREBURST_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5082,CreateEffect,MODEL_DARKLORD_SKILL,AT_SKILL_FIREBURST|AT_SKILL_FIREBURST_STR|AT_SKILL_FIREBURST_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5083,CreateEffect,MODEL_DARKLORD_SKILL,AT_SKILL_FIREBURST|AT_SKILL_FIREBURST_STR|AT_SKILL_FIREBURST_MASTERY
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5126,CreateEffect,MODEL_SNOW1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5130,CreateEffect,MODEL_WOOSISTONE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5136,CreateEffect,MODEL_EFFECT_SAPITRES_ATTACK,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5140,CreateEffect,BITMAP_ENERGY,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5152,CreateEffect,MODEL_LIGHTNING_ORB,AT_SKILL_ALICE_LIGHTNINGORB
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5180,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_SLEEP|AT_SKILL_ALICE_SLEEP_STR|AT_SKILL_ALICE_THORNS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5184,CreateEffect,BITMAP_MAGIC+1,AT_SKILL_ALICE_SLEEP|AT_SKILL_ALICE_SLEEP_STR|AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_THORNS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5190,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT,AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_THORNS|AT_SKILL_ALICE_SLEEP|AT_SKILL_ALICE_SLEEP_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5191,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT2,AT_SKILL_ALICE_THORNS|AT_SKILL_ALICE_SLEEP|AT_SKILL_ALICE_SLEEP_STR|AT_SKILL_ALICE_BLIND
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5196,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT,AT_SKILL_ALICE_THORNS|AT_SKILL_ALICE_SLEEP_STR|AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_SLEEP
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5197,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT2,AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_SLEEP|AT_SKILL_ALICE_SLEEP_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5202,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT,AT_SKILL_ALICE_SLEEP|AT_SKILL_ALICE_SLEEP_STR|AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_THORNS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5203,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT2,AT_SKILL_ALICE_SLEEP_STR|AT_SKILL_ALICE_BLIND|AT_SKILL_ALICE_THORNS
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,5220,CreateEffect,MODEL_ALICE_DRAIN_LIFE,AT_SKILL_ALICE_THORNS|AT_SKILL_ALICE_CHAINLIGHTNING|AT_SKILL_ALICE_CHAINLIGHTNING_STR|AT_SKILL_ALICE_DRAINLIFE|AT_SKILL_ALICE_DRAINLIFE_STR
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,6135,CreateEffect,BITMAP_FIRECRACKER0001,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,7889,CreateEffect,MODEL_STAR_SHINE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,7992,CreateEffect,MODEL_FEATHER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,7993,CreateEffect,MODEL_FEATHER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,7994,CreateEffect,MODEL_FEATHER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,7995,CreateEffect,MODEL_FEATHER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,8235,CreateEffect,MODEL_MOONHARVEST_MOON,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,8759,CreateEffect,MODEL_EFFECT_FIRE_HIK3_MONO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,8762,CreateEffect,MODEL_EFFECT_FIRE_HIK3_MONO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,8765,CreateEffect,MODEL_EFFECT_FIRE_HIK3_MONO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,8768,CreateEffect,MODEL_EFFECT_FIRE_HIK3_MONO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,8771,CreateEffect,MODEL_EFFECT_FIRE_HIK3_MONO,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,9013,CreateEffect,MODEL_MOONHARVEST_MOON,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,9035,CreateEffect,MODEL_MOONHARVEST_GAM,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,9042,CreateEffect,MODEL_MOONHARVEST_SONGPUEN1,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,9043,CreateEffect,MODEL_MOONHARVEST_SONGPUEN2,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,9051,CreateEffect,MODEL_NEWYEARSDAY_EVENT_BEKSULKI,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10048,CreateEffect,BITMAP_FLARE_FORCE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10051,CreateEffect,MODEL_DARKLORD_SKILL,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10061,CreateEffect,BITMAP_FLARE_FORCE,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10064,CreateEffect,MODEL_DARKLORD_SKILL,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10519,CreateEffect,BITMAP_GATHERING,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10556,CreateEffect,MODEL_DARKLORD_SKILL,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10559,CreateEffect,MODEL_DARKLORD_SKILL,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10589,CreateEffect,MODEL_FENRIR_THUNDER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10590,CreateEffect,MODEL_FENRIR_THUNDER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10755,CreateEffect,MODEL_FENRIR_THUNDER,AT_SKILL_ALICE_BLIND
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10756,CreateEffect,MODEL_FENRIR_THUNDER,AT_SKILL_ALICE_BLIND
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10764,CreateEffect,MODEL_FENRIR_THUNDER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10765,CreateEffect,MODEL_FENRIR_THUNDER,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10855,CreateEffect,BITMAP_ORORA,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10857,CreateEffect,BITMAP_SPARK+2,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10859,CreateEffect,BITMAP_LIGHT_MARKS,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10879,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10893,CreateEffect,MODEL_ALICE_BUFFSKILL_EFFECT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10907,CreateEffect,BITMAP_SHINY+6,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10908,CreateEffect,BITMAP_PIN_LIGHT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10923,CreateEffect,BITMAP_SHINY+6,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10924,CreateEffect,BITMAP_PIN_LIGHT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10959,CreateEffect,MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF,AT_SKILL_SUMMON_EXPLOSION|AT_SKILL_SUMMON_REQUIEM
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,10980,CreateEffect,BITMAP_LIGHT,
+DIRECTA - fuente Character/MagicSkill,src/source/Engine/Object/ZzzCharacter.cpp,11503,CreateEffect,MODEL_PROTECTGUILD,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,294,CreateEffectFpsChecked,MODEL_LIGHTNING_ORB,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,313,CreateEffectFpsChecked,MODEL_WOOSISTONE,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,414,CreateEffect,MODEL_INFINITY_ARROW,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,415,CreateEffect,MODEL_INFINITY_ARROW1,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,416,CreateEffect,MODEL_INFINITY_ARROW2,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,417,CreateEffect,MODEL_INFINITY_ARROW3,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,418,CreateEffect,MODEL_INFINITY_ARROW4,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,441,CreateEffect,MODEL_SHIELD_CRASH2,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,621,CreateEffect,BITMAP_DAMAGE_01_MONO,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,623,CreateEffect,BITMAP_DAMAGE_01_MONO,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,639,CreateEffect,BITMAP_MAGIC,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,647,CreateEffect,MODEL_KNIGHT_PLANCRACK_A,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,659,CreateEffect,MODEL_KNIGHT_PLANCRACK_A,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,1113,CreateEffect,MODEL_PIERCING,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,1127,CreateEffect,MODEL_PIERCING,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,1146,CreateEffect,MODEL_PIERCING,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,1314,CreateEffect,MODEL_PIERCING,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,2395,CreateEffect,MODEL_HALLOWEEN_CANDY_STAR,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,2588,CreateEffect,MODEL_PIERCING,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,3081,CreateEffect,MODEL_CUNDUN_GHOST,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,3837,CreateEffect,BITMAP_MAGIC,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,3838,CreateEffect,BITMAP_TARGET_POSITION_EFFECT2,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,3855,CreateEffect,MODEL_EFFECT_SAPITRES_ATTACK_2,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,3990,CreateEffect,MODEL_BLOW_OF_DESTRUCTION,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,4929,CreateEffect,MODEL_EMPIREGUARDIAN_BLOW_OF_DESTRUCTION,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,5256,CreateEffect,MODEL_VOLCANO_STONE,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,5258,CreateEffect,BITMAP_LIGHT_RED,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,6010,CreateEffectFpsChecked,MODEL_FENRIR_THUNDER,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,6444,CreateEffectFpsChecked,MODEL_SKILL_INFERNO,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,6884,CreateEffectFpsChecked,MODEL_SKILL_INFERNO,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7181,CreateEffectFpsChecked,MODEL_EFFECT_SAPITRES_ATTACK_2,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7202,CreateEffectFpsChecked,BITMAP_SHOCK_WAVE,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7203,CreateEffectFpsChecked,BITMAP_SHOCK_WAVE,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7204,CreateEffectFpsChecked,BITMAP_TWLIGHT,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7225,CreateEffectFpsChecked,MODEL_ARROWSRE06,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7227,CreateEffectFpsChecked,MODEL_ARROWSRE06,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7343,CreateEffectFpsChecked,MODEL_ARROWSRE06,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7346,CreateEffectFpsChecked,MODEL_ARROWSRE06,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,7496,CreateEffectFpsChecked,BITMAP_RING_OF_GRADATION,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,8911,CreateEffect,BITMAP_MAGIC+1,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,8915,CreateEffect,BITMAP_MAGIC+1,
+HIJA - creada por otro Effect,src/source/Render/Effects/ZzzEffect.cpp,9138,CreateEffect,BITMAP_OUR_INFLUENCE_GROUND,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,168,CreateEffect,BITMAP_SPARK+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,179,CreateEffect,BITMAP_SPARK+1,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,225,CreateEffect,MODEL_ARROW_IMPACT,AT_SKILL_PENETRATION|AT_SKILL_PENETRATION_STR|AT_SKILL_ICE_ARROW|AT_SKILL_ICE_ARROW_STR|AT_SKILL_DEEPIMPACT
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,232,CreateEffect,MODEL_ARROW_STEEL,AT_SKILL_PENETRATION|AT_SKILL_PENETRATION_STR|AT_SKILL_ICE_ARROW|AT_SKILL_ICE_ARROW_STR|AT_SKILL_DEEPIMPACT
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,235,CreateEffect,MODEL_ARROW_STEEL,AT_SKILL_PENETRATION|AT_SKILL_PENETRATION_STR|AT_SKILL_ICE_ARROW|AT_SKILL_ICE_ARROW_STR|AT_SKILL_DEEPIMPACT
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,238,CreateEffect,MODEL_ARROW_SAW,AT_SKILL_PENETRATION|AT_SKILL_PENETRATION_STR|AT_SKILL_ICE_ARROW|AT_SKILL_ICE_ARROW_STR|AT_SKILL_DEEPIMPACT
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,241,CreateEffect,MODEL_ARROW_LASER,AT_SKILL_ICE_ARROW|AT_SKILL_ICE_ARROW_STR|AT_SKILL_DEEPIMPACT
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,244,CreateEffect,MODEL_ARROW_THUNDER,AT_SKILL_DEEPIMPACT
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,247,CreateEffect,MODEL_ARROW_WING,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,250,CreateEffect,MODEL_ARROW_BOMB,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,253,CreateEffect,MODEL_ARROW_DOUBLE,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,256,CreateEffect,MODEL_ARROW_BEST_CROSSBOW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,260,CreateEffect,MODEL_ARROW_DRILL,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,266,CreateEffect,MODEL_ARROW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,269,CreateEffect,MODEL_ARROW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,272,CreateEffect,MODEL_ARROW_V,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,275,CreateEffect,MODEL_ARROW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,278,CreateEffect,MODEL_ARROW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,281,CreateEffect,MODEL_ARROW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,284,CreateEffect,MODEL_ARROW_NATURE,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,287,CreateEffect,MODEL_ARROW_HOLY,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,290,CreateEffect,MODEL_LACEARROW,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,293,CreateEffect,MODEL_ARROW_SPARK,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,296,CreateEffect,MODEL_ARROW_RING,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,299,CreateEffect,MODEL_ARROW_DARKSTINGER,
+DIRECTA - fuente Character/MagicSkill,src/source/Render/Effects/ZzzEffectMagicSkill.cpp,303,CreateEffect,MODEL_ARROW_GAMBLE,
