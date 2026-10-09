@@ -329,11 +329,23 @@ namespace Client.Main.ClassicFX.Core
             // uses classic degrees.
             Vector3 angle = new Vector3(0f, 0f,
                 MathHelper.ToDegrees(source.Angle.Z));
+            int createdShockWaves = 0;
             for (int n = 0; n < 2; n++)
-                CreateEffect(ClassicFxEffectType.ShockWave,
-                    source.Position, angle, light, owner, subType: 14, scale: 5f);
-            CreateEffect(ClassicFxEffectType.Twlight,
-                source.Position, angle, light, owner, subType: 3, scale: 6f);
+            {
+                if (CreateEffect(ClassicFxEffectType.ShockWave,
+                    source.Position, angle, light, owner, subType: 14, scale: 5f).IsValid)
+                    createdShockWaves++;
+            }
+            bool createdTwlight = CreateEffect(ClassicFxEffectType.Twlight,
+                source.Position, angle, light, owner, subType: 3, scale: 6f).IsValid;
+
+            // Three messages per cast at most. Distinguishes failed creation
+            // from a missing texture; avoids per-frame console spam.
+            Console.WriteLine(
+                $"[ClassicFX] Wizardry pulse: ShockWave {createdShockWaves}/2 " +
+                $"(texture={Textures.TryGet(ClassicTextureIds.BitmapShockWave, out _)}), " +
+                $"Twlight {(createdTwlight ? 1 : 0)}/1 " +
+                $"(texture={Textures.TryGet(ClassicTextureIds.BitmapTwlight, out _)}).");
         }
 
         private void MoveTerrainEffect(ref EffectState e, float f)
@@ -397,34 +409,50 @@ namespace Client.Main.ClassicFX.Core
 
         private void QueueTerrainEffect(ref EffectState e, ClassicTextureResource texture)
         {
-            // The Main measures RenderTerrainAlphaBitmap SizeX/Y in tiles
-            // of 100 world units. One tile is ~100 world units in MU.
-            float halfSize = e.Scale * 50f;
-            float diameter = halfSize * 2f;
-            // Native renders each terrain tile. A bounded regular grid
-            // samples slopes without recreating the entire terrain renderer.
-            // 4..10 divisions: keeps mobile GPU work controlled.
-            int segments = Math.Clamp((int)MathF.Ceiling(e.Scale), 4, 10);
-            float step = diameter / segments;
-            float angle = MathHelper.ToRadians(-e.Angle.Z);
-            float ca = MathF.Cos(angle), sa = MathF.Sin(angle);
+            // Main: RenderTerrainAlphaBitmap(), ZzzLodTerrain.cpp.
+            // Each quad sits on an ACTUAL 100-unit tile; its four Z values
+            // match TerrainRenderer's visual mesh, including TWFlags.Height.
+            // Reuses the existing batched ClassicBillboardRenderer on Android.
+            float tileScale = Constants.TERRAIN_SCALE;
+            float fx = e.Position.X / tileScale;
+            float fy = e.Position.Y / tileScale;
+            int cellX = (int)fx;
+            int cellY = (int)fy;
+            float size = e.Scale;
+            if (size <= 0f) return;
 
-            for (int y = 0; y < segments; y++)
+            // Faithful original tile bounds and texcoord derivation.
+            int extent = (int)size + 1;
+            float texU = (cellX - fx) + 0.5f * size;
+            float texV = (cellY - fy) + 0.5f * size;
+            float invSize = 1f / size;
+            float radians = MathHelper.ToRadians(-e.Angle.Z);
+            float cos = MathF.Cos(radians);
+            float sin = MathF.Sin(radians);
+            int lastTile = Constants.TERRAIN_SIZE - 1;
+
+            for (int dy = -extent; dy <= extent; dy++)
             {
-                float dy0 = -halfSize + step * y;
-                float dy1 = dy0 + step;
-                for (int x = 0; x < segments; x++)
+                int tileY = cellY + dy;
+                if (tileY < 0 || tileY >= lastTile) continue;
+
+                for (int dx = -extent; dx <= extent; dx++)
                 {
-                    float dx0 = -halfSize + step * x;
-                    float dx1 = dx0 + step;
-                    Vector3 p0 = EffectGroundPoint(e.Position, dx0, dy0);
-                    Vector3 p1 = EffectGroundPoint(e.Position, dx1, dy0);
-                    Vector3 p2 = EffectGroundPoint(e.Position, dx1, dy1);
-                    Vector3 p3 = EffectGroundPoint(e.Position, dx0, dy1);
-                    Vector2 uv0 = EffectGroundUv(dx0, dy0, diameter, ca, sa);
-                    Vector2 uv1 = EffectGroundUv(dx1, dy0, diameter, ca, sa);
-                    Vector2 uv2 = EffectGroundUv(dx1, dy1, diameter, ca, sa);
-                    Vector2 uv3 = EffectGroundUv(dx0, dy1, diameter, ca, sa);
+                    int tileX = cellX + dx;
+                    if (tileX < 0 || tileX >= lastTile) continue;
+
+                    Vector3 p0 = EffectTerrainTilePoint(tileX, tileY);
+                    Vector3 p1 = EffectTerrainTilePoint(tileX + 1, tileY);
+                    Vector3 p2 = EffectTerrainTilePoint(tileX + 1, tileY + 1);
+                    Vector3 p3 = EffectTerrainTilePoint(tileX, tileY + 1);
+
+                    float u0 = texU + dx;
+                    float v0 = texV + dy;
+                    Vector2 uv0 = EffectTerrainTileUv(u0, v0, invSize, cos, sin);
+                    Vector2 uv1 = EffectTerrainTileUv(u0 + 1f, v0, invSize, cos, sin);
+                    Vector2 uv2 = EffectTerrainTileUv(u0 + 1f, v0 + 1f, invSize, cos, sin);
+                    Vector2 uv3 = EffectTerrainTileUv(u0, v0 + 1f, invSize, cos, sin);
+
                     _billboardRenderer.QueueWorldQuad(texture,
                         p0, p1, p2, p3, uv0, uv1, uv2, uv3,
                         e.Light, ClassicBlendMode.Glow, ClassicDepthMode.ReadOnly);
@@ -432,19 +460,24 @@ namespace Client.Main.ClassicFX.Core
             }
         }
 
-        private Vector3 EffectGroundPoint(Vector3 center, float dx, float dy)
+        private Vector3 EffectTerrainTilePoint(int tileX, int tileY)
         {
-            float x = center.X + dx, y = center.Y + dy;
-            return new Vector3(x, y,
-                World.Terrain.RequestTerrainHeight(x, y) + 2.0f);
+            float x = tileX * Constants.TERRAIN_SCALE;
+            float y = tileY * Constants.TERRAIN_SCALE;
+            // DepthRead + 2 world units prevents z fighting on flat tiles.
+            float z = World.Terrain.RequestTerrainRenderHeight(x, y) + 2f;
+            return new Vector3(x, y, z);
         }
 
-        private static Vector2 EffectGroundUv(float x, float y,
-            float diameter, float ca, float sa)
+        private static Vector2 EffectTerrainTileUv(
+            float u, float v, float invSize, float cos, float sin)
         {
-            float u = (x * ca - y * sa) / diameter + 0.5f;
-            float v = (x * sa + y * ca) / diameter + 0.5f;
-            return new Vector2(u, v);
+            // Original: rotate texcoords around center (0.5, 0.5).
+            float x = u * invSize - 0.5f;
+            float y = v * invSize - 0.5f;
+            return new Vector2(
+                x * cos - y * sin + 0.5f,
+                x * sin + y * cos + 0.5f);
         }
 
         private static bool TryPlayerBonePosition(PlayerObject owner,

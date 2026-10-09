@@ -67,6 +67,58 @@ namespace Client.Main.Controls.Terrain
                  + (1 - xd) * yd * h4;
         }
 
+        /// <summary>
+        /// Height of the terrain MESH, not the gameplay/collision height.
+        /// TerrainRenderer vertices use HeightMap.R * 1.5f and add 1200f
+        /// individually for TWFlags.Height. The two triangles follow the
+        /// same 0-1-2 / 2-3-0 diagonal as the renderer at LOD 1.
+        /// </summary>
+        public float RequestTerrainRenderHeight(float worldX, float worldY)
+        {
+            if (_data.HeightMap == null ||
+                !float.IsFinite(worldX) || !float.IsFinite(worldY) ||
+                worldX < 0f || worldY < 0f)
+                return 0f;
+
+            float x = worldX / Constants.TERRAIN_SCALE;
+            float y = worldY / Constants.TERRAIN_SCALE;
+            int xi = (int)x;
+            int yi = (int)y;
+            if (xi < 0 || yi < 0 ||
+                xi >= Constants.TERRAIN_SIZE - 1 ||
+                yi >= Constants.TERRAIN_SIZE - 1)
+                return 0f;
+
+            int i1 = yi * Constants.TERRAIN_SIZE + xi;
+            int i2 = i1 + 1;
+            int i4 = i1 + Constants.TERRAIN_SIZE;
+            int i3 = i4 + 1;
+            if (i3 >= _data.HeightMap.Length)
+                return 0f;
+
+            float h1 = GetTerrainRenderVertexHeight(i1);
+            float h2 = GetTerrainRenderVertexHeight(i2);
+            float h3 = GetTerrainRenderVertexHeight(i3);
+            float h4 = GetTerrainRenderVertexHeight(i4);
+            float fx = x - xi;
+            float fy = y - yi;
+
+            // Reconstruct the same two triangles, not a bilinear surface.
+            return fx >= fy
+                ? h1 + (h2 - h1) * fx + (h3 - h2) * fy
+                : h1 + (h3 - h4) * fx + (h4 - h1) * fy;
+        }
+
+        private float GetTerrainRenderVertexHeight(int index)
+        {
+            float h = _data.HeightMap[index].R * 1.5f;
+            var flags = _data.Attributes?.TerrainWall;
+            if (flags != null && (uint)index < (uint)flags.Length &&
+                (flags[index] & TWFlags.Height) != 0)
+                h += SpecialHeight;
+            return h;
+        }
+
         public Vector3 RequestTerrainLight(float xf, float yf, float ambientLight)
         {
             if (_data.Attributes?.TerrainWall == null
