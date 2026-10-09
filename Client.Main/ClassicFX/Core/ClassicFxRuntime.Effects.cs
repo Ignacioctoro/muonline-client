@@ -107,11 +107,17 @@ namespace Client.Main.ClassicFX.Core
             MagicGround2Definition magicCircleDefinition = default;
             bool magicCircleGround = type == ClassicFxEffectType.MagicCircleGround &&
                 TryGetMagicGround2Definition(subType, out magicCircleDefinition);
+            bool nativeGroundV8 = TryGetV8GroundEffectDefinition(type, subType,
+                out V8GroundEffectDefinition groundV8Definition);
+            // Preserve already-ported Wizardry subtypes ShockWave 14 / Twlight 3.
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
             if (magicGround2 && subType == 7 && owner.WorldObject == null)
                 return ClassicFxHandle.Invalid; // Native subtype 7 follows Owner.
-            if (magicGround2 || magicCircleGround || additionalTerrain)
+            if (nativeGroundV8 && groundV8Definition.RequiresOwner &&
+                owner.WorldObject == null)
+                return ClassicFxHandle.Invalid;
+            if (nativeGroundV8 || magicGround2 || magicCircleGround || additionalTerrain)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
                 // If present, Owner still must belong to this world.
@@ -210,6 +216,12 @@ namespace Client.Main.ClassicFX.Core
                     in magicCircleDefinition, scale);
                 if (magicCircleDefinition.RandomAngle)
                     angle.Z = Random.Modulo(360);
+            }
+            else if (nativeGroundV8)
+            {
+                life = groundV8Definition.LifeTime;
+                effectScale = InitializeV8GroundScale(in groundV8Definition, scale);
+                light *= groundV8Definition.LightMultiplier;
             }
             else if (terrain)
             {
@@ -331,6 +343,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.MagicCircleGround)
                 {
                     // MuMain +2 has no Move handler: the shared pool ages it.
+                }
+                else if (IsV8GroundEffectType(e.Type, e.SubType))
+                {
+                    if (!MoveV8GroundEffect(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
                 }
                 else if (terrain)
                 {
