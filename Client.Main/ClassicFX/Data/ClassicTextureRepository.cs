@@ -177,7 +177,7 @@ namespace Client.Main.ClassicFX.Data
                 // Main ZzzOpenData.cpp: BITMAP_SHOCK_WAVE -> Effect/ShockWave.jpg.
                 // Physical Data_Broyal asset: Effect/Shockwave.OZJ.
                 new(ClassicTextureIds.BitmapShockWave,
-                    "Effect/Shockwave.jpg", SamplerState.LinearWrap),
+                    "Effect/Shockwave.jpg", SamplerState.LinearClamp),
 
                 new(
                     ClassicTextureIds.BitmapShiny,
