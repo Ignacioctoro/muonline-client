@@ -57,7 +57,8 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.MagicCircle1 or
                 ClassicFxEffectType.Magic1 or
                 ClassicFxEffectType.MagicCapsule2 or
-                ClassicFxEffectType.Poison;
+                 ClassicFxEffectType.Poison or
+                 ClassicFxEffectType.DarkLordSkill;
 
         private static bool TryGetBatch2EffectModelDefinition(
             ClassicFxEffectType type, int subtype,
@@ -66,6 +67,14 @@ namespace Client.Main.ClassicFX.Core
             definition = default;
             switch (type)
             {
+                case ClassicFxEffectType.DarkLordSkill:
+                    // MODEL_DARKLORD_SKILL: both equipped-hand subtypes.
+                    if (subtype != 0 && subtype != 1) return false;
+                    definition = new Batch2EffectModelDefinition(
+                        "Skill/DarkLordSkill.bmd", 10f, 0.2f,
+                        velocity: 0.1f);
+                    return true;
+
                 case ClassicFxEffectType.SwordForce:
                     // MuMain MODEL_SWORD_FORCE: types 0/2 grow and spawn
                     // copies 1/3, and then create spark/fire impacts.
@@ -122,6 +131,14 @@ namespace Client.Main.ClassicFX.Core
         {
             switch (e.Type)
             {
+                case ClassicFxEffectType.DarkLordSkill:
+                    // MuMain common MoveEffects branch, 25-FPS semantics.
+                    e.Scale += e.Velocity * f;
+                    e.Velocity += 0.02f * f;
+                    if (e.LifeTime < 7f)
+                        e.BlendMeshLight *= MathF.Pow(1f / 1.8f, f);
+                    return true;
+
                 case ClassicFxEffectType.SwordForce:
                     return MoveSwordForceEffect(ref e, f);
 

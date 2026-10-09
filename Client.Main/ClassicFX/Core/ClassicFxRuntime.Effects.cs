@@ -40,7 +40,8 @@ namespace Client.Main.ClassicFX.Core
         LightningGround = 19,
         MagicGround = 20,
         MagicGround2 = 21,
-        MagicCircleGround = 22
+        MagicCircleGround = 22,
+        DarkLordSkill = 23
     }
 
     public sealed partial class ClassicFxRuntime
@@ -192,6 +193,11 @@ namespace Client.Main.ClassicFX.Core
                 effectDirection = batch2Definition.Direction;
                 effectVelocity = batch2Definition.Velocity;
                 effectPosition.Z += batch2Definition.SpawnZ * Clock.FrameFactor;
+                if (type == ClassicFxEffectType.DarkLordSkill)
+                    angle = new Vector3(
+                        MathHelper.ToRadians(45f),
+                        MathHelper.ToRadians(subType == 0 ? 45f : -45f),
+                        0f);
             }
             else if (additionalTerrain)
             {
@@ -247,6 +253,8 @@ namespace Client.Main.ClassicFX.Core
                     view.BlendMesh = effectBlendMesh;
                     view.HiddenMesh = effectHiddenMesh;
                 }
+                // Translation from native Effect state to MonoGame BMD presentation.
+                view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
             _effects[handle.Index] = new EffectState
             {
@@ -420,9 +428,7 @@ namespace Client.Main.ClassicFX.Core
                     }
                     e.ModelView.Position = e.Position;
                     e.ModelView.Angle = e.Angle;
-                    e.ModelView.Scale = e.Scale;
-                    e.ModelView.Alpha = MathHelper.Clamp(e.Alpha, 0f, 1f);
-                    e.ModelView.BlendMeshLight = e.BlendMeshLight;
+                    e.ModelView.ApplyNativeRenderState(e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
                 }
                 e.LifeTime -= f;
                 if (e.LifeTime <= 0f)
@@ -712,10 +718,20 @@ namespace Client.Main.ClassicFX.Core
     internal sealed class ClassicFxEffectModelObject : ModelObject
     {
         private readonly string _bmdPath;
+        // This is a model-asset renderer profile, not skill-logic scale tuning.
+        // Values are grounded in the previous DarkLordCriticalHandEffect renderer.
+        // Disable for a side-by-side A/B comparison of the generic model bridge.
+        private const bool EnableDarkLordModelProfile = true;
+        private readonly bool _useDarkLordModelProfile;
+        private const float DarkLordRenderMaxScale = 0.65f;
+        private const float DarkLordRenderOpacity = 0.48f;
+        private const float DarkLordRenderBlendIntensity = 0.70f;
 
         public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
         {
             _bmdPath = bmdPath;
+            _useDarkLordModelProfile = EnableDarkLordModelProfile &&
+                type == ClassicFxEffectType.DarkLordSkill;
             IsTransparent = true;
             AffectedByTransparency = true;
             BlendState = BlendState.Additive;
@@ -725,7 +741,7 @@ namespace Client.Main.ClassicFX.Core
             RenderShadow = false;
             LightEnabled = false;
             UseSunLight = false;
-            ContinuousAnimation = true;
+            ContinuousAnimation = !_useDarkLordModelProfile;
             AnimationSpeed = 25f;
             Color = type == ClassicFxEffectType.SwellOfMagicPower
                 ? new Color(0.7f, 0.4f, 0.9f)
@@ -734,6 +750,42 @@ namespace Client.Main.ClassicFX.Core
                 new Vector3(-250f, -250f, -200f),
                 new Vector3(250f, 250f, 350f));
             Interactive = false;
+        }
+
+        // Classic spell BMDs may require a different shader/material path
+        // than world actors. The first measured profile concerns DarkLordSkill.
+        protected override bool AllowDynamicLightingShader =>
+            !_useDarkLordModelProfile;
+
+        // Keep original EffectState math unmodified. Translation happens only
+        // when state enters the MonoGame renderer. All non-profiled models
+        // retain the previous ClassicFX presentation, exactly as before.
+        public void ApplyNativeRenderState(float nativeScale,
+            float nativeAlpha, float nativeBlendMeshLight, Vector3 nativeLight)
+        {
+            if (_useDarkLordModelProfile)
+            {
+                // The prior ModelObject cast uses Light=(1,.6,.3), NOT just Color.
+                // When the dynamic shader is disabled, CPU skinning obtains
+                // vertex illumination from ModelObject.Light. Zero = black.
+                // Keep the native source light and do not double-tint it.
+                Light = nativeLight;
+                Color = Microsoft.Xna.Framework.Color.White;
+                // Previous functioning DarkLordCriticalHandEffect parameters.
+                // This is a temporary renderer calibration for this BMD asset,
+                // not a change to native lifespan or growth physics.
+                Scale = MathF.Min(nativeScale, DarkLordRenderMaxScale);
+                Alpha = MathHelper.Clamp(
+                    nativeAlpha * DarkLordRenderOpacity, 0f, 1f);
+                BlendMeshLight = nativeBlendMeshLight * DarkLordRenderBlendIntensity;
+                BlendMesh = -1; // Previous ModelObject default, not mesh 0.
+            }
+            else
+            {
+                Scale = nativeScale;
+                Alpha = MathHelper.Clamp(nativeAlpha, 0f, 1f);
+                BlendMeshLight = nativeBlendMeshLight;
+            }
         }
 
         public override async Task Load()

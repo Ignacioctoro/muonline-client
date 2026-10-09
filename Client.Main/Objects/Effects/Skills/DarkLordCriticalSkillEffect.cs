@@ -25,6 +25,8 @@ namespace Client.Main.Objects.Effects.Skills
     public sealed class DarkLordCriticalSkillEffect :
         ISkillVisualEffect
     {
+        // Set false to compare against DarkLordCriticalCastEffect.
+        private const bool UseClassicFxCriticalPilot = true;
         public WorldObject? CreateEffect(
             SkillEffectContext context)
         {
@@ -35,8 +37,15 @@ namespace Client.Main.Objects.Effects.Skills
                 return null;
             }
 
-            return new DarkLordCriticalCastEffect(
-                player);
+            if (UseClassicFxCriticalPilot &&
+                context.World.ClassicFx != null &&
+                context.World.ClassicFx.Enabled &&
+                !context.World.ClassicFx.IsDisposed)
+            {
+                return new ClassicFxDarkLordCriticalCastVisual(player);
+            }
+
+            return new DarkLordCriticalCastEffect(player);
         }
     }
 }

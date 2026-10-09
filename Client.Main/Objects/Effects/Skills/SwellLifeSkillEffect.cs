@@ -16,6 +16,8 @@ namespace Client.Main.Objects.Effects.Skills
     public sealed class SwellLifeSkillEffect :
         ISkillVisualEffect
     {
+        // Toggle to false to compare with the original MonoGame renderer.
+        private const bool UseClassicFxInnerPilot = true;
         public WorldObject? CreateEffect(
             SkillEffectContext context)
         {
@@ -25,8 +27,15 @@ namespace Client.Main.Objects.Effects.Skills
                 return null;
             }
 
-            return new SwellLifeCastEffect(
-                context.Caster);
+            if (UseClassicFxInnerPilot &&
+                context.World.ClassicFx != null &&
+                context.World.ClassicFx.Enabled &&
+                !context.World.ClassicFx.IsDisposed)
+            {
+                return new ClassicFxSwellLifeCastVisual(context.Caster);
+            }
+
+            return new SwellLifeCastEffect(context.Caster);
         }
     }
 }
