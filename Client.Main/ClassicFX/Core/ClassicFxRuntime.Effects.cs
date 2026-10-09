@@ -35,7 +35,10 @@ namespace Client.Main.ClassicFX.Core
         MagicCircle1 = 14,
         Magic1 = 15,
         MagicCapsule2 = 16,
-        Poison = 17
+        Poison = 17,
+        MagicZin = 18,
+        LightningGround = 19,
+        MagicGround = 20
     }
 
     public sealed partial class ClassicFxRuntime
@@ -91,9 +94,19 @@ namespace Client.Main.ClassicFX.Core
                 type, subType, out AdditionalEffectModelDefinition modelDefinition);
             bool batch2Model = TryGetBatch2EffectModelDefinition(
                 type, subType, out Batch2EffectModelDefinition batch2Definition);
+            bool additionalTerrain = TryGetV5TerrainDefinition(type, subType,
+                out V5TerrainEffectDefinition terrainDefinition);
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
-            if (terrain)
+            if (additionalTerrain)
+            {
+                // Original terrain bitmaps can be spawned with a null Owner.
+                // If present, Owner still must belong to this world.
+                if (owner.WorldObject != null &&
+                    !ReferenceEquals(owner.WorldObject.World, World))
+                    return ClassicFxHandle.Invalid;
+            }
+            else if (terrain)
             {
                 // Native these are Effect objects with texture terrain render,
                 // NOT standalone sprites/billboards nor BMD model objects.
@@ -160,6 +173,13 @@ namespace Client.Main.ClassicFX.Core
                 effectDirection = batch2Definition.Direction;
                 effectVelocity = batch2Definition.Velocity;
                 effectPosition.Z += batch2Definition.SpawnZ * Clock.FrameFactor;
+            }
+            else if (additionalTerrain)
+            {
+                life = terrainDefinition.LifeTime;
+                effectScale = terrainDefinition.UseCallerScale
+                    ? scale * terrainDefinition.Scale : terrainDefinition.Scale;
+                effectAlpha = terrainDefinition.Alpha;
             }
             else if (terrain)
             {
@@ -265,7 +285,15 @@ namespace Client.Main.ClassicFX.Core
                 ref EffectState e = ref _effects[i];
                 bool terrain = e.Type == ClassicFxEffectType.ShockWave ||
                                e.Type == ClassicFxEffectType.Twlight;
-                if (terrain)
+                if (IsV5TerrainEffectType(e.Type))
+                {
+                    if (!MoveV5TerrainEffect(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (terrain)
                 {
                     // Terrain effects can outlive their BMD owner: preserve
                     // last known ground position if owner has disappeared.
@@ -485,6 +513,11 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (!Pools.Effects.IsActive(i)) continue;
                 ref EffectState e = ref _effects[i];
+                if (IsV5TerrainEffectType(e.Type))
+                {
+                    RenderV5TerrainEffect(ref e);
+                    continue;
+                }
                 int textureId = e.Type switch
                 {
                     ClassicFxEffectType.ShockWave => ClassicTextureIds.BitmapShockWave,
@@ -500,7 +533,10 @@ namespace Client.Main.ClassicFX.Core
             _billboardRenderer.End();
         }
 
-        private void QueueTerrainEffect(ref EffectState e, ClassicTextureResource texture)
+        private void QueueTerrainEffect(ref EffectState e, ClassicTextureResource texture,
+            float? scaleOverride = null, Vector3? lightOverride = null,
+            float? angleZOverride = null,
+            ClassicBlendMode blendOverride = ClassicBlendMode.Glow)
         {
             // Main: RenderTerrainAlphaBitmap(), ZzzLodTerrain.cpp.
             // Each quad sits on an ACTUAL 100-unit tile; its four Z values
@@ -511,7 +547,7 @@ namespace Client.Main.ClassicFX.Core
             float fy = e.Position.Y / tileScale;
             int cellX = (int)fx;
             int cellY = (int)fy;
-            float size = e.Scale;
+            float size = scaleOverride ?? e.Scale;
             if (size <= 0f) return;
 
             // Faithful original tile bounds and texcoord derivation.
@@ -519,7 +555,7 @@ namespace Client.Main.ClassicFX.Core
             float texU = (cellX - fx) + 0.5f * size;
             float texV = (cellY - fy) + 0.5f * size;
             float invSize = 1f / size;
-            float radians = MathHelper.ToRadians(-e.Angle.Z);
+            float radians = MathHelper.ToRadians(-(angleZOverride ?? e.Angle.Z));
             float cos = MathF.Cos(radians);
             float sin = MathF.Sin(radians);
             int lastTile = Constants.TERRAIN_SIZE - 1;
@@ -548,7 +584,7 @@ namespace Client.Main.ClassicFX.Core
 
                     _billboardRenderer.QueueWorldQuad(texture,
                         p0, p1, p2, p3, uv0, uv1, uv2, uv3,
-                        e.Light, ClassicBlendMode.Glow, ClassicDepthMode.ReadOnly);
+                        lightOverride ?? e.Light, blendOverride, ClassicDepthMode.ReadOnly);
                 }
             }
         }

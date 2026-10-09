@@ -274,6 +274,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapDrainLifeGhost =
             32375;
 
+        // MuMain _TextureIndex.h: immediately after DRAIN_LIFE_GHOST.
+        public const int BitmapMagicZin =
+            32376;
+
         public const int BitmapOrora =
             32377;
 

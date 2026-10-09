@@ -170,6 +170,11 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/flare01.jpg",
                     SamplerState.LinearClamp),
 
+                // MuMain ZzzOpenData.cpp: BITMAP_MAGIC_ZIN -> mzine_typer2.jpg.
+                // Data_Broyal contains Effect/mzine_typer2.OZJ.
+                new(ClassicTextureIds.BitmapMagicZin,
+                    "Effect/mzine_typer2.jpg", SamplerState.LinearClamp),
+
                 // Native RenderTerrainAlphaBitmap(BITMAP_TWLIGHT).
                 new(ClassicTextureIds.BitmapTwlight,
                     "Skill/twlighthik01.jpg", SamplerState.LinearClamp),
