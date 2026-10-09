@@ -30,7 +30,12 @@ namespace Client.Main.ClassicFX.Core
         SummonerCasting2 = 9,
         SummonerCasting22 = 10,
         SummonerCasting222 = 11,
-        SummonerCasting4 = 12
+        SummonerCasting4 = 12,
+        SwordForce = 13,
+        MagicCircle1 = 14,
+        Magic1 = 15,
+        MagicCapsule2 = 16,
+        Poison = 17
     }
 
     public sealed partial class ClassicFxRuntime
@@ -44,6 +49,8 @@ namespace Client.Main.ClassicFX.Core
             public Vector3 Angle;
             public Vector3 Light;
             public float Scale;
+            public Vector3 Direction;
+            public float Velocity;
             public float Alpha;
             public float LifeTime;
             public float BlendMeshLight;
@@ -82,6 +89,8 @@ namespace Client.Main.ClassicFX.Core
 
             bool additionalModel = TryGetAdditionalModelDefinition(
                 type, subType, out AdditionalEffectModelDefinition modelDefinition);
+            bool batch2Model = TryGetBatch2EffectModelDefinition(
+                type, subType, out Batch2EffectModelDefinition batch2Definition);
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
             if (terrain)
@@ -92,13 +101,17 @@ namespace Client.Main.ClassicFX.Core
                     !ReferenceEquals(owner.WorldObject.World, World))
                     return ClassicFxHandle.Invalid;
             }
-            else if (additionalModel)
+            else if (additionalModel || batch2Model)
             {
-                // Native model effects may be unowned; AirForce requires Owner.
+                // Native model Effects can be unowned. Owner-required
+                // variants are checked against their original creation rules.
                 if (owner.WorldObject != null &&
                     !ReferenceEquals(owner.WorldObject.World, World))
                     return ClassicFxHandle.Invalid;
                 if (type == ClassicFxEffectType.AirForce && owner.WorldObject == null)
+                    return ClassicFxHandle.Invalid;
+                if (batch2Model && batch2Definition.RequiresOwner &&
+                    owner.WorldObject == null)
                     return ClassicFxHandle.Invalid;
             }
             else if (owner.WorldObject is not PlayerObject player ||
@@ -112,6 +125,12 @@ namespace Client.Main.ClassicFX.Core
             float life;
             float effectScale = scale;
             float effectMeshLight = 1f;
+            float effectAlpha = 1f;
+            int effectBlendMesh = 0;
+            int effectHiddenMesh = -1;
+            Vector3 effectDirection = Vector3.Zero;
+            float effectVelocity = 0f;
+            Vector3 effectPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -129,6 +148,19 @@ namespace Client.Main.ClassicFX.Core
                 effectScale = modelDefinition.Scale;
                 effectMeshLight = modelDefinition.BlendMeshLight;
             }
+            else if (batch2Model)
+            {
+                modelPath = batch2Definition.Path;
+                life = batch2Definition.LifeTime;
+                effectScale = batch2Definition.UseCallerScale
+                    ? scale : batch2Definition.Scale;
+                effectMeshLight = batch2Definition.BlendMeshLight;
+                effectBlendMesh = batch2Definition.BlendMesh;
+                effectHiddenMesh = batch2Definition.HiddenMesh;
+                effectDirection = batch2Definition.Direction;
+                effectVelocity = batch2Definition.Velocity;
+                effectPosition.Z += batch2Definition.SpawnZ * Clock.FrameFactor;
+            }
             else if (terrain)
             {
                 life = 30f; // source CreateEffect(), ShockWave 14 / Twlight 3
@@ -143,23 +175,30 @@ namespace Client.Main.ClassicFX.Core
             if (modelPath != null)
             {
                 view = new ClassicFxEffectModelObject(modelPath, type);
-                view.Position = position;
+                view.Position = effectPosition;
                 view.Angle = angle;
                 view.Scale = effectScale;
-                if (additionalModel)
+                if (additionalModel || batch2Model)
                     view.Color = new Color(Vector3.Clamp(light, Vector3.Zero, Vector3.One));
+                if (batch2Model)
+                {
+                    view.BlendMesh = effectBlendMesh;
+                    view.HiddenMesh = effectHiddenMesh;
+                }
             }
             _effects[handle.Index] = new EffectState
             {
                 Type = type,
                 SubType = subType,
                 Owner = owner,
-                Position = position,
+                Position = effectPosition,
                 Angle = angle,
                 Light = light,
                 BaseLight = light,
                 Scale = effectScale,
-                Alpha = terrain ? 0f : 1f,
+                Direction = effectDirection,
+                Velocity = effectVelocity,
+                Alpha = terrain ? 0f : effectAlpha,
                 BlendMeshLight = effectMeshLight,
                 LifeTime = life,
                 BoneIndex = boneIndex,
@@ -245,6 +284,14 @@ namespace Client.Main.ClassicFX.Core
                     if (IsAdditionalModelEffectType(e.Type))
                     {
                         if (!MoveAdditionalModelEffect(ref e, f))
+                        {
+                            ReleaseEffectAt(i);
+                            continue;
+                        }
+                    }
+                    else if (IsBatch2EffectModelType(e.Type))
+                    {
+                        if (!MoveBatch2EffectModel(ref e, f))
                         {
                             ReleaseEffectAt(i);
                             continue;
