@@ -22,7 +22,15 @@ namespace Client.Main.ClassicFX.Core
         SwellOfMagicPower = 1,
         ArrowsRe06 = 2,
         ShockWave = 3,
-        Twlight = 4
+        Twlight = 4,
+        AirForce = 5,
+        SummonerCasting1 = 6,
+        SummonerCasting11 = 7,
+        SummonerCasting111 = 8,
+        SummonerCasting2 = 9,
+        SummonerCasting22 = 10,
+        SummonerCasting222 = 11,
+        SummonerCasting4 = 12
     }
 
     public sealed partial class ClassicFxRuntime
@@ -72,6 +80,8 @@ namespace Client.Main.ClassicFX.Core
             if (_disposed || !Enabled)
                 return ClassicFxHandle.Invalid;
 
+            bool additionalModel = TryGetAdditionalModelDefinition(
+                type, subType, out AdditionalEffectModelDefinition modelDefinition);
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
             if (terrain)
@@ -80,6 +90,15 @@ namespace Client.Main.ClassicFX.Core
                 // NOT standalone sprites/billboards nor BMD model objects.
                 if (owner.WorldObject == null ||
                     !ReferenceEquals(owner.WorldObject.World, World))
+                    return ClassicFxHandle.Invalid;
+            }
+            else if (additionalModel)
+            {
+                // Native model effects may be unowned; AirForce requires Owner.
+                if (owner.WorldObject != null &&
+                    !ReferenceEquals(owner.WorldObject.World, World))
+                    return ClassicFxHandle.Invalid;
+                if (type == ClassicFxEffectType.AirForce && owner.WorldObject == null)
                     return ClassicFxHandle.Invalid;
             }
             else if (owner.WorldObject is not PlayerObject player ||
@@ -91,6 +110,8 @@ namespace Client.Main.ClassicFX.Core
 
             string modelPath = null;
             float life;
+            float effectScale = scale;
+            float effectMeshLight = 1f;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -100,6 +121,13 @@ namespace Client.Main.ClassicFX.Core
             {
                 modelPath = "Effect/arrowsre06.bmd";
                 life = 40f;
+            }
+            else if (additionalModel)
+            {
+                modelPath = modelDefinition.Path;
+                life = modelDefinition.LifeTime;
+                effectScale = modelDefinition.Scale;
+                effectMeshLight = modelDefinition.BlendMeshLight;
             }
             else if (terrain)
             {
@@ -117,7 +145,9 @@ namespace Client.Main.ClassicFX.Core
                 view = new ClassicFxEffectModelObject(modelPath, type);
                 view.Position = position;
                 view.Angle = angle;
-                view.Scale = scale;
+                view.Scale = effectScale;
+                if (additionalModel)
+                    view.Color = new Color(Vector3.Clamp(light, Vector3.Zero, Vector3.One));
             }
             _effects[handle.Index] = new EffectState
             {
@@ -128,9 +158,9 @@ namespace Client.Main.ClassicFX.Core
                 Angle = angle,
                 Light = light,
                 BaseLight = light,
-                Scale = scale,
+                Scale = effectScale,
                 Alpha = terrain ? 0f : 1f,
-                BlendMeshLight = 1f,
+                BlendMeshLight = effectMeshLight,
                 LifeTime = life,
                 BoneIndex = boneIndex,
                 FirstMove = true,
@@ -204,11 +234,7 @@ namespace Client.Main.ClassicFX.Core
                 }
                 else
                 {
-                    if (e.Owner.WorldObject is not PlayerObject player ||
-                        player.Status != GameControlStatus.Ready ||
-                        player.IsDead ||
-                        !ReferenceEquals(player.World, World) ||
-                        e.ModelView == null ||
+                    if (e.ModelView == null ||
                         e.ModelView.Status == GameControlStatus.Disposed ||
                         e.ModelView.Status == GameControlStatus.Error)
                     {
@@ -216,27 +242,47 @@ namespace Client.Main.ClassicFX.Core
                         continue;
                     }
 
-                    e.Position = player.WorldPosition.Translation;
-                    if (e.Type == ClassicFxEffectType.SwellOfMagicPower)
+                    if (IsAdditionalModelEffectType(e.Type))
                     {
-                        MoveSwellOfMagicPower(ref e, player);
-                    }
-                    else if (e.Type == ClassicFxEffectType.ArrowsRe06)
-                    {
-                        if (!TryPlayerBonePosition(player, e.BoneIndex, out Vector3 pos))
+                        if (!MoveAdditionalModelEffect(ref e, f))
+                        {
+                            ReleaseEffectAt(i);
                             continue;
-                        e.Position = pos;
-                        if (e.LifeTime >= 15f)
-                            e.Scale *= MathF.Pow(1.05f, f);
-                        else
-                            e.Scale *= MathF.Pow(0.95f, f);
-                        ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
-                        CreateSprite(ClassicTextureIds.BitmapLight, pos,
-                            e.Scale, e.Light, source);
-                        CreateSprite(ClassicTextureIds.BitmapLight, pos,
-                            e.Scale * 0.8f, e.Light, source);
-                        if (e.LifeTime <= 10f)
-                            e.Alpha *= MathF.Pow(0.95f, f);
+                        }
+                    }
+                    else
+                    {
+                        if (e.Owner.WorldObject is not PlayerObject player ||
+                            player.Status != GameControlStatus.Ready ||
+                            player.IsDead ||
+                            !ReferenceEquals(player.World, World))
+                        {
+                            ReleaseEffectAt(i);
+                            continue;
+                        }
+
+                        e.Position = player.WorldPosition.Translation;
+                        if (e.Type == ClassicFxEffectType.SwellOfMagicPower)
+                        {
+                            MoveSwellOfMagicPower(ref e, player);
+                        }
+                        else if (e.Type == ClassicFxEffectType.ArrowsRe06)
+                        {
+                            if (!TryPlayerBonePosition(player, e.BoneIndex, out Vector3 pos))
+                                continue;
+                            e.Position = pos;
+                            if (e.LifeTime >= 15f)
+                                e.Scale *= MathF.Pow(1.05f, f);
+                            else
+                                e.Scale *= MathF.Pow(0.95f, f);
+                            ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
+                            CreateSprite(ClassicTextureIds.BitmapLight, pos,
+                                e.Scale, e.Light, source);
+                            CreateSprite(ClassicTextureIds.BitmapLight, pos,
+                                e.Scale * 0.8f, e.Light, source);
+                            if (e.LifeTime <= 10f)
+                                e.Alpha *= MathF.Pow(0.95f, f);
+                        }
                     }
                     e.ModelView.Position = e.Position;
                     e.ModelView.Angle = e.Angle;
