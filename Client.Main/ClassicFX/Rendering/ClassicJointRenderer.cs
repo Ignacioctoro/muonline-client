@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Client.Main.ClassicFX.Core;
 using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Primitives;
@@ -17,6 +18,8 @@ namespace Client.Main.ClassicFX.Rendering
     {
         private readonly ClassicBillboardRenderer _quads;
         private readonly ClassicTextureRepository _textures;
+        // One warning per unresolved texture, not one message per frame.
+        private readonly HashSet<int> _missingTextureWarnings = new();
 
         public ClassicJointRenderer(ClassicBillboardRenderer quads,
             ClassicTextureRepository textures)
@@ -38,7 +41,11 @@ namespace Client.Main.ClassicFX.Rendering
                 pass == 2 && joint.OnlyOneRender == 1)
                 return;
             if (!_textures.TryGet(joint.TexType, out ClassicTextureResource texture))
+            {
+                if (_missingTextureWarnings.Add(joint.TexType))
+                    Console.WriteLine($"[ClassicFX][Joint] No loaded texture for TexType={joint.TexType} (joint type={joint.Type}, subtype={joint.SubType}).");
                 return;
+            }
 
             ClassicBlendMode blend = joint.RenderType switch
             {

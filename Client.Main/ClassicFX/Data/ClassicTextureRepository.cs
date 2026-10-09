@@ -214,6 +214,27 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/pin_lights.jpg",
                     SamplerState.LinearClamp),
 
+                // MuMain ZzzOpenData.cpp: native Joint textures.
+                // All paths were checked against the current Data_Broyal files.
+                new(ClassicTextureIds.BitmapScolpionTail,
+                    "Effect/ScolTail.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.Bitmap2LineGhost,
+                    "Skill/2line_gost.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapDrainLifeGhost,
+                    "Effect/gostmark01.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapForcePillar,
+                    "Effect/force_Pillar.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapSwordEff,
+                    "Effect/!SwordEff.jpg", SamplerState.LinearWrap),
+                new(ClassicTextureIds.BitmapGroundWind,
+                    "Effect/ground_wind.jpg", SamplerState.LinearClamp),
+                // Original lives under Effect/partCharge1 in MuMain;
+                // Data_Broyal stores the actual OZJ in Effect/.
+                new(ClassicTextureIds.BitmapLuckySealEffect,
+                    "Effect/bujuckline.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapInferno,
+                    "Effect/inferno.jpg", SamplerState.LinearClamp),
+
                 // MuMain ZzzOpenData.cpp: verified original joint textures.
                 // Data_Broyal: matching Effect/*.OZJ assets confirmed.
                 new(ClassicTextureIds.BitmapJointSpark,

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Primitives;
 using Microsoft.Xna.Framework;
@@ -10,6 +11,7 @@ namespace Client.Main.ClassicFX.Core
     // family-specific math, behaviour or public API.
     public sealed partial class ClassicFxRuntime
     {
+        private readonly HashSet<int> _unhandledJointMoveTypes = new();
 
         // MuMain: ZzzEffectJoint.cpp MoveJoint(), lines 2980-3040,
         // 3708-3745, 4202-4247 and 6863-6868, plus shared tail/lifetime
@@ -51,7 +53,14 @@ namespace Client.Main.ClassicFX.Core
                          j.Type == ClassicTextureIds.BitmapFlare + 1)
                     live = MoveFlareJointFull(ref j, i, handle);
                 else
-                    continue; // Other native branches are still pending.
+                {
+                    // Never leave unsupported joints active forever: they
+                    // exhaust the fixed pool and would be invisible/frozen.
+                    if (_unhandledJointMoveTypes.Add(j.Type))
+                        Console.WriteLine($"[ClassicFX][Joint] Unsupported MoveJoint type={j.Type}, subtype={j.SubType}; releasing the joint.");
+                    ReleaseJoint(handle);
+                    continue;
+                }
 
                 if (!live || j.LifeTime < 0f)
                     ReleaseJoint(handle);
