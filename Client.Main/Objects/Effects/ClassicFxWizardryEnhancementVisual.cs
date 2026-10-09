@@ -19,7 +19,6 @@ namespace Client.Main.Objects.Effects
     public sealed class ClassicFxWizardryEnhancementVisual : WorldObject
     {
         private readonly PlayerObject _owner;
-        private bool _castEffectCreated;
         private double _nextArrowsPulseMilliseconds;
 
         public PlayerObject Owner => _owner;
@@ -36,6 +35,32 @@ namespace Client.Main.Objects.Effects
                 new Vector3(140f, 140f, 310f));
         }
 
+        // This is a CAST event, never an effect of attaching an active buff.
+        // In particular, map/scope reloads must not replay the casting model.
+        public static bool IsWizardryEnhancementSkill(ushort skillId) =>
+            skillId == 233 || skillId == 380 || skillId == 383;
+
+        public static void TriggerCast(PlayerObject caster)
+        {
+            if (caster == null ||
+                caster.Status != GameControlStatus.Ready ||
+                caster.World == null)
+                return;
+
+            ClassicFxRuntime fx = caster.World.ClassicFx;
+            if (fx == null || !fx.Enabled || fx.IsDisposed)
+                return;
+
+            ClassicFxOwner effectOwner = ClassicFxOwner.FromWorldObject(caster);
+            var cast = fx.CreateEffect(
+                ClassicFxEffectType.SwellOfMagicPower,
+                caster.WorldPosition.Translation,
+                caster.TotalAngle,
+                new Vector3(0.4f, 0.3f, 0.9f), effectOwner);
+
+            if (cast.IsValid)
+                Console.WriteLine("[ClassicFX] Wizardry Enhancement: cast triggered by skill animation");
+        }
         public override void Update(GameTime gameTime)
         {
             base.Update(gameTime);
@@ -65,28 +90,18 @@ namespace Client.Main.Objects.Effects
             if (bones == null || bones.Length == 0)
                 return;
 
-            // One-time original MODEL_SWELL_OF_MAGICPOWER 45-frame cast.
-            // The already-ported persistent BITMAP_LIGHT aura stays intact.
+            // The persistent aura is attached by buff state and must NOT
+            // initiate a casting animation (e.g. when changing maps).
+            // Only real skill casts call TriggerCast().
             ClassicFxOwner effectOwner = ClassicFxOwner.FromWorldObject(_owner);
             double nowMillis = fx.Clock.WorldTimeMilliseconds;
-            if (!_castEffectCreated)
+            if (_nextArrowsPulseMilliseconds <= 0.0)
+                _nextArrowsPulseMilliseconds = nowMillis + 6000.0;
+
+            if (nowMillis >= _nextArrowsPulseMilliseconds)
             {
-                var cast = fx.CreateEffect(
-                    ClassicFxEffectType.SwellOfMagicPower,
-                    _owner.WorldPosition.Translation,
-                    _owner.TotalAngle,
-                    new Vector3(0.4f, 0.3f, 0.9f), effectOwner);
-                if (cast.IsValid)
-                {
-                    _castEffectCreated = true;
-                    _nextArrowsPulseMilliseconds = nowMillis + 6000.0;
-                    Console.WriteLine("[ClassicFX] Wizardry Enhancement: 3D cast Effect started");
-                }
-            }
-            else if (nowMillis >= _nextArrowsPulseMilliseconds)
-            {
-                // Original MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF:
-                // each six seconds, emit subtype-1 arrowsre06 on bones 28/37.
+                // Original persistent MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF:
+                // hand pulse every six seconds on bones 28/37.
                 Vector3 purple = new Vector3(0.2f, 0.2f, 0.9f);
                 foreach (int bone in new[] { 28, 37 })
                 {

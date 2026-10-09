@@ -1368,6 +1368,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         //
                         remotePlayer.TriggerVehicleSkillAnimation(skillId);
 
+                        // Remote player cast. Scope/buff status packets never
+                        // create this one-shot casting animation.
+                        if (ClassicFxWizardryEnhancementVisual.IsWizardryEnhancementSkill(skillId))
+                            ClassicFxWizardryEnhancementVisual.TriggerCast(remotePlayer);
 
                         // =====================================================
                         // TARGET POSITION
@@ -1600,6 +1604,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                     remotePlayer.TriggerVehicleSkillAnimation(skillId);
 
+
+                    // A remote skill animation is an actual cast; a restored
+                    // active buff from scope/map change is not.
+                    if (ClassicFxWizardryEnhancementVisual.IsWizardryEnhancementSkill(skillId))
+                        ClassicFxWizardryEnhancementVisual.TriggerCast(remotePlayer);
 
                     var remoteEffectContext =
                         new Objects.Effects.Skills

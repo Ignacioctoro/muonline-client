@@ -39,6 +39,7 @@ namespace Client.Main.Objects.Effects
         private Vector3 _center;
         private int _torusCount;
         private float _lifeFrames = LifeFrames;
+        private long _lastClassicNovaFrame = -1;
         private bool _initialized;
         private bool _lightAdded;
         private TerrainControl? _lightTerrain;
@@ -119,20 +120,35 @@ namespace Client.Main.Objects.Effects
             float factor = FPSCounter.Instance.FPS_ANIMATION_FACTOR;
             float stageFactor = _stage / MaxNovaStage;
 
+            float lifeBeforeUpdate = _lifeFrames;
             _lifeFrames -= factor;
             float lifeFactor = MathHelper.Clamp(_lifeFrames / LifeFrames, 0f, 1f);
             float progress = 1f - lifeFactor;
 
-            UpdateTorusParticles(dt);
+            if (ClassicNovaFxEmitter.IsActive(World))
+            {
+                if (World != null)
+                    ClassicNovaFxEmitter.EmitRelease(
+                        World, this, _caster, _stage, lifeBeforeUpdate,
+                        ref _lastClassicNovaFrame);
+            }
+            else
+            {
+                UpdateTorusParticles(dt);
+            }
             UpdateLight(lifeFactor, stageFactor, progress);
 
-            if (_lifeFrames <= 0f && _torusCount == 0)
+            if (_lifeFrames <= 0f &&
+                (ClassicNovaFxEmitter.IsActive(World) || _torusCount == 0))
                 RemoveSelf();
         }
 
         public override void Draw(GameTime gameTime)
         {
             base.Draw(gameTime);
+
+            if (ClassicNovaFxEmitter.IsActive(World))
+                return; // ClassicFX renders the Nova spirit joints.
 
             if (!Visible || _spriteBatch == null)
                 return;
@@ -172,7 +188,8 @@ namespace Client.Main.Objects.Effects
             Camera.Instance.Shake(shakePower, 0.35f, 20f);
 
             // One clear expanding ring, no additional center burst.
-            SpawnTorusBand(progress: 0f, strong: true, 160);
+            if (!ClassicNovaFxEmitter.IsActive(World))
+                SpawnTorusBand(progress: 0f, strong: true, 160);
         }
 
         private void SpawnTorusBand(float progress, bool strong, int segments)

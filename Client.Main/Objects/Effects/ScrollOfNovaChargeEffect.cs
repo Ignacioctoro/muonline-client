@@ -39,6 +39,7 @@ namespace Client.Main.Objects.Effects
 
         private WalkableWorldControl? _registeredWorld;
         private int _particleCount;
+        private long _lastClassicNovaFrame = -1;
         private float _spawnTimer;
         private float _opacity;
         private float _targetOpacity;
@@ -213,8 +214,16 @@ namespace Client.Main.Objects.Effects
             float lerpSpeed = _finishing ? 6f : 8f;
             _opacity = MathHelper.Lerp(_opacity, _targetOpacity, MathHelper.Clamp(dt * lerpSpeed, 0f, 1f));
 
-            SpawnParticles(dt, anchor);
-            UpdateParticles(dt, anchor);
+            if (ClassicNovaFxEmitter.IsActive(World))
+            {
+                if (!_finishing && World != null)
+                    ClassicNovaFxEmitter.EmitCharge(World, _caster, _stage, ref _lastClassicNovaFrame);
+            }
+            else
+            {
+                SpawnParticles(dt, anchor);
+                UpdateParticles(dt, anchor);
+            }
             UpdateLight(anchor);
 
             if (_finishing && _opacity <= 0.02f && _particleCount == 0)
@@ -226,6 +235,9 @@ namespace Client.Main.Objects.Effects
         public override void Draw(GameTime gameTime)
         {
             base.Draw(gameTime);
+
+            if (ClassicNovaFxEmitter.IsActive(World))
+                return; // Joint/Particle geometry is rendered once by ClassicFX.
 
             if (!Visible || _opacity <= 0.01f || _spriteBatch == null)
                 return;

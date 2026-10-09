@@ -1252,6 +1252,12 @@ namespace Client.Main.Scenes
                     skill.SkillId,
                     targetId);
 
+            // Immediate local cast (after movement/mana/cooldown checks).
+            // The network handler triggers this only for remote players,
+            // preventing the server echo from drawing it twice locally.
+            if (ClassicFxWizardryEnhancementVisual.IsWizardryEnhancementSkill(skill.SkillId))
+                ClassicFxWizardryEnhancementVisual.TriggerCast(hero);
+
             return true;
         }
 
