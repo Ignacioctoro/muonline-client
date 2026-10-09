@@ -38,7 +38,9 @@ namespace Client.Main.ClassicFX.Core
         Poison = 17,
         MagicZin = 18,
         LightningGround = 19,
-        MagicGround = 20
+        MagicGround = 20,
+        MagicGround2 = 21,
+        MagicCircleGround = 22
     }
 
     public sealed partial class ClassicFxRuntime
@@ -64,6 +66,8 @@ namespace Client.Main.ClassicFX.Core
             public Vector3 BaseLight;
             public float Phase;
             public byte TriggerMask;
+            // Last native tick emitting children for BITMAP_MAGIC+1 subtypes 6/8.
+            public int LastChildNativeTick;
             public ClassicFxEffectModelObject ModelView;
         }
 
@@ -96,9 +100,18 @@ namespace Client.Main.ClassicFX.Core
                 type, subType, out Batch2EffectModelDefinition batch2Definition);
             bool additionalTerrain = TryGetV5TerrainDefinition(type, subType,
                 out V5TerrainEffectDefinition terrainDefinition);
+            MagicGround2Definition magicGround2Definition = default;
+            bool magicGround2 = type == ClassicFxEffectType.MagicGround2 &&
+                TryGetMagicGround2Definition(subType, out magicGround2Definition);
+            // Both BITMAP_MAGIC+1 and BITMAP_MAGIC+2 share native CreateEffect().
+            MagicGround2Definition magicCircleDefinition = default;
+            bool magicCircleGround = type == ClassicFxEffectType.MagicCircleGround &&
+                TryGetMagicGround2Definition(subType, out magicCircleDefinition);
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
-            if (additionalTerrain)
+            if (magicGround2 && subType == 7 && owner.WorldObject == null)
+                return ClassicFxHandle.Invalid; // Native subtype 7 follows Owner.
+            if (magicGround2 || magicCircleGround || additionalTerrain)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
                 // If present, Owner still must belong to this world.
@@ -181,6 +194,23 @@ namespace Client.Main.ClassicFX.Core
                     ? scale * terrainDefinition.Scale : terrainDefinition.Scale;
                 effectAlpha = terrainDefinition.Alpha;
             }
+            else if (magicGround2)
+            {
+                life = magicGround2Definition.LifeTime;
+                effectScale = InitializeMagicGround2Scale(
+                    in magicGround2Definition, scale);
+                if (magicGround2Definition.RandomAngle)
+                    angle.Z = Random.Modulo(360); // degrees: native BITMAP_MAGIC+1:7
+            }
+            else if (magicCircleGround)
+            {
+                // Original CreateEffect(BITMAP_MAGIC+2) shares init with +1.
+                life = magicCircleDefinition.LifeTime;
+                effectScale = InitializeMagicGround2Scale(
+                    in magicCircleDefinition, scale);
+                if (magicCircleDefinition.RandomAngle)
+                    angle.Z = Random.Modulo(360);
+            }
             else if (terrain)
             {
                 life = 30f; // source CreateEffect(), ShockWave 14 / Twlight 3
@@ -223,6 +253,7 @@ namespace Client.Main.ClassicFX.Core
                 LifeTime = life,
                 BoneIndex = boneIndex,
                 FirstMove = true,
+                LastChildNativeTick = -1,
                 ModelView = view
             };
             try
@@ -292,6 +323,14 @@ namespace Client.Main.ClassicFX.Core
                         ReleaseEffectAt(i);
                         continue;
                     }
+                }
+                else if (e.Type == ClassicFxEffectType.MagicGround2)
+                {
+                    MoveMagicGround2(ref e, f);
+                }
+                else if (e.Type == ClassicFxEffectType.MagicCircleGround)
+                {
+                    // MuMain +2 has no Move handler: the shared pool ages it.
                 }
                 else if (terrain)
                 {
@@ -513,6 +552,16 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (!Pools.Effects.IsActive(i)) continue;
                 ref EffectState e = ref _effects[i];
+                if (e.Type == ClassicFxEffectType.MagicGround2)
+                {
+                    RenderMagicGround2(ref e);
+                    continue;
+                }
+                if (e.Type == ClassicFxEffectType.MagicCircleGround)
+                {
+                    RenderMagicCircleGround(ref e);
+                    continue;
+                }
                 if (IsV5TerrainEffectType(e.Type))
                 {
                     RenderV5TerrainEffect(ref e);

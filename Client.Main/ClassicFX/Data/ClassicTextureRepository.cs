@@ -623,6 +623,13 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/Magic_Ground2.jpg",
                     SamplerState.LinearClamp),
 
+                // MuMain ZzzOpenData.cpp: BITMAP_MAGIC+2 = Magic_Circle1.
+                // Data_Broyal physical asset: Effect/Magic_Circle1.OZJ.
+                new(
+                    ClassicTextureIds.BitmapMagic + 2,
+                    "Effect/Magic_Circle1.jpg",
+                    SamplerState.LinearWrap),
+
                 new(
                     ClassicTextureIds.BitmapOrora,
                     "Effect/hikorora.jpg",
