@@ -48,7 +48,8 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.ShockWaveGround01 or
                 ClassicFxEffectType.Wave || IsS6Batch02ModelType(type) ||
                 IsS6Batch04ModelType(type) || IsS6Batch05ModelType(type) ||
-                IsS6Batch06ModelType(type) || IsS6Batch07ModelType(type);
+                IsS6Batch06ModelType(type) || IsS6Batch07ModelType(type) ||
+                IsS6Batch08ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -113,7 +114,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch06ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch07ModelDefinition(type, subType,
+                    if (TryGetS6Batch07ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch08ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -172,6 +176,10 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.Snow2:
                 case ClassicFxEffectType.Snow3:
                     return MoveS6Batch07Model(ref effect, f);
+                case ClassicFxEffectType.DarkScream:
+                case ClassicFxEffectType.DarkScreamFire:
+                case ClassicFxEffectType.ManaRune:
+                    return MoveS6Batch08Model(ref effect, f);
                 default:
                     return false;
             }
