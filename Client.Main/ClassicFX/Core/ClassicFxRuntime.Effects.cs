@@ -101,7 +101,22 @@ namespace Client.Main.ClassicFX.Core
         FuryQuake8 = 80,
         FenrirFootThunder = 81,
         TwinTail = 82,
-        CloudGround = 83
+        CloudGround = 83,
+        BrokenIce0 = 84,
+        BrokenIce1 = 85,
+        BrokenIce2 = 86,
+        BrokenIce3 = 87,
+        CursedStatue1 = 88,
+        CursedStatue2 = 89,
+        SnowmanHead = 90,
+        SnowmanBody = 91,
+        Feather = 92,
+        FeatherForeign = 93,
+        SapitresAttack1 = 94,
+        SapitresAttack2 = 95,
+        FlameStrike = 96,
+        StarShine = 97,
+        SapitresAttackCarrier = 98
     }
 
     public sealed partial class ClassicFxRuntime
@@ -194,6 +209,9 @@ namespace Client.Main.ClassicFX.Core
             bool furyStrike = type == ClassicFxEffectType.FuryStrike &&
                 (subType is 0 or 2 or 3);
             bool s6TimedTerrain = IsS6Batch14TerrainType(type, subType);
+            bool s6Batch15Logical =
+                (type == ClassicFxEffectType.StarShine && subType == 0) ||
+                (type == ClassicFxEffectType.SapitresAttackCarrier && subType == 0);
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -211,7 +229,8 @@ namespace Client.Main.ClassicFX.Core
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
-                s6TimedTerrain || magicGround2 || magicCircleGround ||
+                s6TimedTerrain || s6Batch15Logical ||
+                magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
@@ -417,6 +436,14 @@ namespace Client.Main.ClassicFX.Core
                         ref effectScale, ref life, ref effectAlpha,
                         ref effectDirection))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch15ModelType(type) &&
+                    !InitializeS6Batch15Model(type, subType, owner,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectDirection, ref effectGravity,
+                        ref effectHeading, ref effectVelocity,
+                        ref effectMeshLight))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -492,6 +519,19 @@ namespace Client.Main.ClassicFX.Core
                     ref effectPosition, ref angle, ref effectScale,
                     ref effectAlpha, out life);
             }
+            else if (s6Batch15Logical)
+            {
+                life = type == ClassicFxEffectType.StarShine ? 30f : 20f;
+                if (type == ClassicFxEffectType.StarShine)
+                {
+                    effectAlpha = 0.2f;
+                    angle.X = MathHelper.ToRadians(Random.Modulo(360));
+                }
+                else if (owner.WorldObject == null)
+                {
+                    return ClassicFxHandle.Invalid;
+                }
+            }
             else if (furyStrike)
             {
                 // Logical 20-tick carrier. Native RenderFuryStrike() draws
@@ -555,6 +595,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch12ModelView(view, type, subType);
                 if (IsS6Batch13QuakeType(type))
                     ConfigureS6Batch13ModelView(view, type, subType);
+                if (IsS6Batch15ModelType(type))
+                    ConfigureS6Batch15ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -606,6 +648,13 @@ namespace Client.Main.ClassicFX.Core
                     inputLight, angle, light, owner, subType: 1);
             if (type == ClassicFxEffectType.FenrirThunder)
                 StartS6FenrirThunderSprite(ref _effects[handle.Index]);
+            if (type == ClassicFxEffectType.SapitresAttackCarrier)
+            {
+                for (int n = 0; n < 10; n++)
+                    CreateEffect(ClassicFxEffectType.SapitresAttack2,
+                        effectPosition, angle, light,
+                        ClassicFxOwner.None, subType: 14);
+            }
             return handle;
         }
 
@@ -685,6 +734,14 @@ namespace Client.Main.ClassicFX.Core
                         ReleaseEffectAt(i);
                         continue;
                     }
+                }
+                else if (e.Type == ClassicFxEffectType.StarShine)
+                {
+                    MoveS6StarShine(ref e, f);
+                }
+                else if (e.Type == ClassicFxEffectType.SapitresAttackCarrier)
+                {
+                    MoveS6SapitresCarrier(ref e, f);
                 }
                 else if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {

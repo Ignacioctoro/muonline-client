@@ -54,7 +54,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch10ModelType(type) ||
                 IsS6Batch11ModelType(type) ||
                 IsS6Batch12ModelType(type) ||
-                IsS6Batch13QuakeType(type);
+                IsS6Batch13QuakeType(type) ||
+                IsS6Batch15ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -137,7 +138,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch12ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch13ModelDefinition(type, subType,
+                    if (TryGetS6Batch13ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch15ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -225,6 +229,20 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.FuryQuake7:
                 case ClassicFxEffectType.FuryQuake8:
                     return MoveS6Batch13Quake(ref effect, f);
+                case ClassicFxEffectType.BrokenIce0:
+                case ClassicFxEffectType.BrokenIce1:
+                case ClassicFxEffectType.BrokenIce2:
+                case ClassicFxEffectType.BrokenIce3:
+                case ClassicFxEffectType.CursedStatue1:
+                case ClassicFxEffectType.CursedStatue2:
+                case ClassicFxEffectType.SnowmanHead:
+                case ClassicFxEffectType.SnowmanBody:
+                case ClassicFxEffectType.Feather:
+                case ClassicFxEffectType.FeatherForeign:
+                case ClassicFxEffectType.SapitresAttack1:
+                case ClassicFxEffectType.SapitresAttack2:
+                case ClassicFxEffectType.FlameStrike:
+                    return MoveS6Batch15Model(ref effect, f);
                 default:
                     return false;
             }
