@@ -303,7 +303,7 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxOwner fxOwner = e.ModelView != null
                     ? ClassicFxOwner.FromWorldObject(e.ModelView)
                     : ClassicFxOwner.None;
-                if (Clock.AdvancedReferenceFrame && fxOwner.HasOwner)
+                if (fxOwner.HasOwner)
                 {
                     CreateJoint(ClassicTextureIds.BitmapFlash,
                         from, from, e.Angle, subType: 2,
@@ -317,7 +317,7 @@ namespace Client.Main.ClassicFX.Core
             return true;
         }
 
-        private static bool MoveS6SkinShell(ref EffectState e, float f)
+        private bool MoveS6SkinShell(ref EffectState e, float f)
         {
             e.Position += e.Direction * f;
             // Native applies 0.9 and 1.1, in that order, each tick.
@@ -325,8 +325,21 @@ namespace Client.Main.ClassicFX.Core
             e.Position.Z += e.Gravity * f;
             e.Gravity -= 3f * f;
 
-            // Requires terrain from the world; this routine is called on
-            // a ClassicFxRuntime instance and delegates below.
+            float ground = RequestTerrainHeight(e.Position.X, e.Position.Y);
+            if (e.Position.Z < ground)
+            {
+                e.Position.Z = ground;
+                e.Gravity = -e.Gravity * 0.2f;
+                e.LifeTime -= 5f * f;
+                e.Angle.X -= MathHelper.ToRadians(
+                    e.Scale * 128f * f);
+            }
+            else
+            {
+                e.Angle.X -= MathHelper.ToRadians(
+                    e.Scale * 16f * f);
+            }
+            e.Alpha = e.LifeTime / 10f;
             return true;
         }
 
