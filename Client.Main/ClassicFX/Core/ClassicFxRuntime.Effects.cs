@@ -300,6 +300,17 @@ namespace Client.Main.ClassicFX.Core
         SummonerNeilGround1 = 270,
         SummonerNeilGround2 = 271,
         SummonerNeilGround3 = 272,
+        // S6 Batch 25: Cursed Temple, Doppelganger, Raklion, Shockwave, Wind Force, SD.
+        CursedTempleHolyItem = 273,
+        CursedTempleProtection = 274,
+        CursedTempleRestraint = 275,
+        DoppelgangerSlimeChip = 276,
+        RaklionBossMagic = 277,
+        Shockwave01 = 278,
+        Shockwave02 = 279,
+        ShockwaveSpin01 = 280,
+        WindForce = 281,
+        SdAura = 282,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -360,7 +371,8 @@ namespace Client.Main.ClassicFX.Core
             int boneIndex = -1,
             float scale = 1f,
             int nativePkKey = 0,
-            int nativeSkillIndex = 0)
+            int nativeSkillIndex = 0,
+            float nativeAnimationSpeed = 0f)
         {
             if (_disposed || !Enabled)
                 return ClassicFxHandle.Invalid;
@@ -497,6 +509,7 @@ namespace Client.Main.ClassicFX.Core
             Vector3 s6Batch22StoredPosition = position;
             Vector3 s6Batch23StoredPosition = position;
             Vector3 s6Batch24StoredPosition = position;
+            Vector3 s6Batch25StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -710,6 +723,14 @@ namespace Client.Main.ClassicFX.Core
                             ref effectVelocity, ref light))
                         return ClassicFxHandle.Invalid;
                 }
+                if (IsS6Batch25ModelType(type) &&
+                    !InitializeS6Batch25Model(type, owner, ref subType,
+                        nativeAnimationSpeed, ref effectPosition,
+                        ref s6Batch25StoredPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectVelocity, ref effectGravity,
+                        ref effectHeading))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -888,7 +909,9 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = IsS6Batch24ModelType(type)
+                StartPosition = IsS6Batch25ModelType(type)
+                    ? s6Batch25StoredPosition
+                    : IsS6Batch24ModelType(type)
                     ? s6Batch24StoredPosition
                     : IsS6Batch23Kundun(type) &&
                         subType is 2 or 3 or 4

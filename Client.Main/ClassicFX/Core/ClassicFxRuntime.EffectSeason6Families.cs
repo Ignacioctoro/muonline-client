@@ -64,7 +64,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch21ModelType(type) ||
                 IsS6Batch22ModelType(type) ||
                 IsS6Batch23ModelType(type) ||
-                IsS6Batch24ModelType(type);
+                IsS6Batch24ModelType(type) ||
+                IsS6Batch25ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -177,7 +178,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch23ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch24ModelDefinition(type, subType,
+                    if (TryGetS6Batch24ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch25ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -455,6 +459,17 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.SummonerNeilGround2:
                 case ClassicFxEffectType.SummonerNeilGround3:
                     return MoveS6Batch24Model(ref effect, f);
+                case ClassicFxEffectType.CursedTempleHolyItem:
+                case ClassicFxEffectType.CursedTempleProtection:
+                case ClassicFxEffectType.CursedTempleRestraint:
+                case ClassicFxEffectType.DoppelgangerSlimeChip:
+                case ClassicFxEffectType.RaklionBossMagic:
+                case ClassicFxEffectType.Shockwave01:
+                case ClassicFxEffectType.Shockwave02:
+                case ClassicFxEffectType.ShockwaveSpin01:
+                case ClassicFxEffectType.WindForce:
+                case ClassicFxEffectType.SdAura:
+                    return MoveS6Batch25Model(ref effect, f);
                 default:
                     return false;
             }
