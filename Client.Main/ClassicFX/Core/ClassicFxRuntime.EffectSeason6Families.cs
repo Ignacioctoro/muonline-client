@@ -48,7 +48,7 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.ShockWaveGround01 or
                 ClassicFxEffectType.Wave || IsS6Batch02ModelType(type) ||
                 IsS6Batch04ModelType(type) || IsS6Batch05ModelType(type) ||
-                IsS6Batch06ModelType(type);
+                IsS6Batch06ModelType(type) || IsS6Batch07ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -110,7 +110,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch05ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch06ModelDefinition(type, subType,
+                    if (TryGetS6Batch06ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch07ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -161,6 +164,14 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.ArrowDouble:
                 case ClassicFxEffectType.ArrowWing:
                     return MoveS6Batch06Model(ref effect, f);
+                case ClassicFxEffectType.Fire:
+                case ClassicFxEffectType.Ice:
+                case ClassicFxEffectType.IceSmall:
+                case ClassicFxEffectType.Blizzard:
+                case ClassicFxEffectType.Snow1:
+                case ClassicFxEffectType.Snow2:
+                case ClassicFxEffectType.Snow3:
+                    return MoveS6Batch07Model(ref effect, f);
                 default:
                     return false;
             }

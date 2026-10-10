@@ -64,7 +64,14 @@ namespace Client.Main.ClassicFX.Core
         ArrowBomb = 43,
         ArrowNature = 44,
         ArrowDouble = 45,
-        ArrowWing = 46
+        ArrowWing = 46,
+        Fire = 47,
+        Ice = 48,
+        IceSmall = 49,
+        Blizzard = 50,
+        Snow1 = 51,
+        Snow2 = 52,
+        Snow3 = 53
     }
 
     public sealed partial class ClassicFxRuntime
@@ -90,6 +97,7 @@ namespace Client.Main.ClassicFX.Core
             // Native EyeRight and PKKey drive ShockWave(14)/Twlight(3)
             // luminous fade independently of the model's Alpha.
             public Vector3 BaseLight;
+            public Vector3 StartPosition; // native MODEL_BLIZZARD StartPosition
             public float Phase;
             public byte TriggerMask;
             // Last native tick emitting children for BITMAP_MAGIC+1 subtypes 6/8.
@@ -316,6 +324,11 @@ namespace Client.Main.ClassicFX.Core
                         ref effectPosition, ref angle, ref light,
                         ref effectScale, ref effectDirection,
                         ref effectVelocity, ref effectGravity);
+                if (IsS6Batch07ModelType(type))
+                    InitializeS6Batch07Spawn(type, subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectDirection,
+                        ref effectVelocity, ref effectGravity, ref effectMeshLight);
             }
             else if (additionalTerrain)
             {
@@ -390,6 +403,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch05ModelView(view, type, subType);
                 if (IsS6Batch06ModelType(type))
                     ConfigureS6Batch06ModelView(view, type, subType);
+                if (IsS6Batch07ModelType(type))
+                    ConfigureS6Batch07ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -399,6 +414,7 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
+                StartPosition = effectPosition,
                 Angle = angle,
                 Light = light,
                 BaseLight = light,
@@ -595,7 +611,8 @@ namespace Client.Main.ClassicFX.Core
                     e.ModelView.Position = e.Position;
                     e.ModelView.Angle = e.Angle;
                     e.ModelView.ApplyNativeRenderState(e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
-                    if (IsS6Batch05ModelType(e.Type))
+                    if (IsS6Batch05ModelType(e.Type) ||
+                        IsS6Batch07ModelType(e.Type))
                         e.ModelView.Color = new Color(Vector3.Clamp(
                             e.Light, Vector3.Zero, Vector3.One));
                 }
