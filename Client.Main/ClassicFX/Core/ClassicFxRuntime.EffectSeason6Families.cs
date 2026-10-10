@@ -56,7 +56,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch12ModelType(type) ||
                 IsS6Batch13QuakeType(type) ||
                 IsS6Batch15ModelType(type) ||
-                IsS6Batch16ModelType(type);
+                IsS6Batch16ModelType(type) ||
+                IsS6Batch17ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -145,7 +146,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch15ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch16ModelDefinition(type, subType,
+                    if (TryGetS6Batch16ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch17ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -266,6 +270,23 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.ArrowSpark:
                 case ClassicFxEffectType.ArrowGamble:
                     return MoveS6Batch16Model(ref effect, f);
+                case ClassicFxEffectType.HalloweenCandyBlue:
+                case ClassicFxEffectType.HalloweenCandyOrange:
+                case ClassicFxEffectType.HalloweenCandyYellow:
+                case ClassicFxEffectType.HalloweenCandyRed:
+                case ClassicFxEffectType.HalloweenCandyHobak:
+                case ClassicFxEffectType.HalloweenCandyStar:
+                case ClassicFxEffectType.MoonHarvestGam:
+                case ClassicFxEffectType.MoonHarvestSongpuen1:
+                case ClassicFxEffectType.MoonHarvestSongpuen2:
+                case ClassicFxEffectType.MoonHarvestMoon:
+                case ClassicFxEffectType.ChangeUpEffect:
+                case ClassicFxEffectType.ChangeUpNasa:
+                case ClassicFxEffectType.ChangeUpCylinder:
+                case ClassicFxEffectType.ArrowBestCrossbow:
+                case ClassicFxEffectType.ArrowDrill:
+                case ClassicFxEffectType.ArrowRing:
+                    return MoveS6Batch17Model(ref effect, f);
                 default:
                     return false;
             }

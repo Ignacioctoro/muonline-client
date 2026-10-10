@@ -135,7 +135,25 @@ namespace Client.Main.ClassicFX.Core
         ArrowV = 113,
         ArrowSaw = 114,
         ArrowSpark = 115,
-        ArrowGamble = 116
+        ArrowGamble = 116,
+        // Season 6 Batch 17: Halloween, Moon Harvest, Change Up and arrows.
+        HalloweenCandyBlue = 117,
+        HalloweenCandyOrange = 118,
+        HalloweenCandyYellow = 119,
+        HalloweenCandyRed = 120,
+        HalloweenCandyHobak = 121,
+        HalloweenCandyStar = 122,
+        MoonHarvestGam = 123,
+        MoonHarvestSongpuen1 = 124,
+        MoonHarvestSongpuen2 = 125,
+        MoonHarvestMoon = 126,
+        ChangeUpEffect = 127,
+        ChangeUpNasa = 128,
+        ChangeUpCylinder = 129,
+        ArrowBestCrossbow = 130,
+        ArrowDrill = 131,
+        ArrowRing = 132,
+        HalloweenEx = 133
     }
 
     public sealed partial class ClassicFxRuntime
@@ -231,6 +249,8 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch15Logical =
                 (type == ClassicFxEffectType.StarShine && subType == 0) ||
                 (type == ClassicFxEffectType.SapitresAttackCarrier && subType == 0);
+            bool s6Batch17Logical =
+                type == ClassicFxEffectType.HalloweenEx && subType == 0;
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -248,7 +268,7 @@ namespace Client.Main.ClassicFX.Core
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
-                s6TimedTerrain || s6Batch15Logical ||
+                s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -469,6 +489,14 @@ namespace Client.Main.ClassicFX.Core
                         ref life, ref effectAlpha, ref effectDirection,
                         ref effectGravity, ref effectVelocity,
                         ref effectMeshLight);
+                if (IsS6Batch17ModelType(type) &&
+                    !InitializeS6Batch17Model(type, subType, owner,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectDirection, ref effectGravity,
+                        ref effectHeading, ref effectVelocity,
+                        ref effectMeshLight))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -543,6 +571,11 @@ namespace Client.Main.ClassicFX.Core
                 InitializeS6Batch14Terrain(type, subType,
                     ref effectPosition, ref angle, ref effectScale,
                     ref effectAlpha, out life);
+            }
+            else if (s6Batch17Logical)
+            {
+                // MODEL_HALLOWEEN_EX is a zero-lifetime 24-candy carrier.
+                life = 0f;
             }
             else if (s6Batch15Logical)
             {
@@ -624,6 +657,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch15ModelView(view, type, subType);
                 if (IsS6Batch16ModelType(type))
                     ConfigureS6Batch16ModelView(view, type);
+                if (IsS6Batch17ModelType(type))
+                    ConfigureS6Batch17ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -682,6 +717,8 @@ namespace Client.Main.ClassicFX.Core
                         effectPosition, angle, light,
                         ClassicFxOwner.None, subType: 14);
             }
+            if (s6Batch17Logical)
+                EmitS6HalloweenEx(effectPosition, angle, light);
             return handle;
         }
 
@@ -769,6 +806,12 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.SapitresAttackCarrier)
                 {
                     MoveS6SapitresCarrier(ref e, f);
+                }
+                else if (e.Type == ClassicFxEffectType.HalloweenEx)
+                {
+                    // Native carrier creates 24 children once, then expires.
+                    ReleaseEffectAt(i);
+                    continue;
                 }
                 else if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {
