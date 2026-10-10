@@ -61,7 +61,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch18ModelType(type) ||
                 IsS6Batch19CrushModel(type) ||
                 IsS6Batch20AvailableModel(type) ||
-                IsS6Batch21ModelType(type);
+                IsS6Batch21ModelType(type) ||
+                IsS6Batch22ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -165,7 +166,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch20ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch21ModelDefinition(type, subType,
+                    if (TryGetS6Batch21ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch22ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -395,6 +399,23 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.ShadowRookWristLeft:
                 case ClassicFxEffectType.ShadowRookWristRight:
                     return MoveS6Batch21Model(ref effect, f);
+                case ClassicFxEffectType.TotemGolemPart1:
+                case ClassicFxEffectType.TotemGolemPart2:
+                case ClassicFxEffectType.TotemGolemPart3:
+                case ClassicFxEffectType.TotemGolemPart4:
+                case ClassicFxEffectType.TotemGolemPart5:
+                case ClassicFxEffectType.TotemGolemPart6:
+                case ClassicFxEffectType.IceGiantPart1:
+                case ClassicFxEffectType.IceGiantPart2:
+                case ClassicFxEffectType.IceGiantPart3:
+                case ClassicFxEffectType.IceGiantPart4:
+                case ClassicFxEffectType.IceGiantPart5:
+                case ClassicFxEffectType.IceGiantPart6:
+                case ClassicFxEffectType.Bone1:
+                case ClassicFxEffectType.Bone2:
+                case ClassicFxEffectType.BigStone1:
+                case ClassicFxEffectType.BigStone2:
+                    return MoveS6Batch22Model(ref effect, f);
                 default:
                     return false;
             }

@@ -252,6 +252,23 @@ namespace Client.Main.ClassicFX.Core
         ShadowRookKneeRight = 225,
         ShadowRookWristLeft = 226,
         ShadowRookWristRight = 227,
+        // S6 Batch 22: Totem Golem, Ice Giant, Bone and BigStone.
+        TotemGolemPart1 = 228,
+        TotemGolemPart2 = 229,
+        TotemGolemPart3 = 230,
+        TotemGolemPart4 = 231,
+        TotemGolemPart5 = 232,
+        TotemGolemPart6 = 233,
+        IceGiantPart1 = 234,
+        IceGiantPart2 = 235,
+        IceGiantPart3 = 236,
+        IceGiantPart4 = 237,
+        IceGiantPart5 = 238,
+        IceGiantPart6 = 239,
+        Bone1 = 240,
+        Bone2 = 241,
+        BigStone1 = 242,
+        BigStone2 = 243,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -327,6 +344,9 @@ namespace Client.Main.ClassicFX.Core
                 type, subType, out Batch2EffectModelDefinition batch2Definition);
             bool season6Model = TryGetSeason6ModelDefinition(
                 type, subType, out Season6ModelDefinition season6Definition);
+            if (IsS6Batch22HeavyModel(type) && subType == 5 &&
+                owner.WorldObject == null)
+                return ClassicFxHandle.Invalid;
             bool additionalTerrain = TryGetV5TerrainDefinition(type, subType,
                 out V5TerrainEffectDefinition terrainDefinition);
             MagicGround2Definition magicGround2Definition = default;
@@ -438,6 +458,7 @@ namespace Client.Main.ClassicFX.Core
             float effectVelocity = 0f;
             float effectGravity = 0f;
             Vector3 effectPosition = position;
+            Vector3 s6Batch22StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -628,6 +649,13 @@ namespace Client.Main.ClassicFX.Core
                         ref effectDirection, ref effectGravity,
                         ref effectHeading, ref effectVelocity,
                         type);
+                if (IsS6Batch22ModelType(type) &&
+                    !InitializeS6Batch22Model(type, ref subType, owner,
+                        ref effectPosition, ref s6Batch22StoredPosition,
+                        ref angle, ref light, ref effectScale, ref life,
+                        ref effectDirection, ref effectGravity,
+                        ref effectHeading, ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -804,9 +832,11 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = (type == ClassicFxEffectType.PierPart && subType == 0) ||
-                    (type == ClassicFxEffectType.BlowOfDestruction && subType == 0)
-                    ? inputLight : effectPosition,
+                StartPosition = IsS6Batch22HeavyModel(type) && subType == 5
+                    ? s6Batch22StoredPosition
+                    : (type == ClassicFxEffectType.PierPart && subType == 0) ||
+                      (type == ClassicFxEffectType.BlowOfDestruction && subType == 0)
+                        ? inputLight : effectPosition,
                 HeadAngle = effectHeading,
                 Angle = angle,
                 Light = light,
