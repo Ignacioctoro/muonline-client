@@ -6,6 +6,7 @@
 using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controls;
+using Client.Main.Models;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
