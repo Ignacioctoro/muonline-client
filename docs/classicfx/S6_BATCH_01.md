@@ -11,7 +11,7 @@ native effect types (unsupported subtypes still return an invalid handle):
 | Native Effect | C# type | Subtypes |
 |---|---|---|
 | MODEL_ALICE_BUFFSKILL_EFFECT | AliceBuffSkillEffect | 0,1,2,3,4 |
-| MODEL_ALICE_BUFFSKILL_EFFECT2 | AliceBuffSkillEffect2 | 0 |
+| MODEL_ALICE_BUFFSKILL_EFFECT2 | AliceBuffSkillEffect2 | 0,1,2 |
 | MODEL_SHOCKWAVE_GROUND01 | ShockWaveGround01 | 0,1,2 |
 | MODEL_WAVE | Wave | 0 |
 

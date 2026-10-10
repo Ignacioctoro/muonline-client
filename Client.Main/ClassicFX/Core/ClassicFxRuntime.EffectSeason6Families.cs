@@ -72,7 +72,9 @@ namespace Client.Main.ClassicFX.Core
                     return false;
 
                 case ClassicFxEffectType.AliceBuffSkillEffect2:
-                    if (subType != 0) return false;
+                    // MuMain target casts also pass subtypes 1 and 2;
+                    // all three share EffectTypes.json initialization.
+                    if (subType < 0 || subType > 2) return false;
                     definition = new Season6ModelDefinition(
                         "Effect/elshildring2.bmd", 35f, 0.15f,
                         alpha: 0f, meshLight: 0f,
