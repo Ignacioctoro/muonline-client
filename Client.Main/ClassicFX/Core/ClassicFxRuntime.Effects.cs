@@ -41,7 +41,11 @@ namespace Client.Main.ClassicFX.Core
         MagicGround = 20,
         MagicGround2 = 21,
         MagicCircleGround = 22,
-        DarkLordSkill = 23
+        DarkLordSkill = 23,
+        AliceBuffSkillEffect = 24,
+        AliceBuffSkillEffect2 = 25,
+        ShockWaveGround01 = 26,
+        Wave = 27
     }
 
     public sealed partial class ClassicFxRuntime
@@ -99,6 +103,8 @@ namespace Client.Main.ClassicFX.Core
                 type, subType, out AdditionalEffectModelDefinition modelDefinition);
             bool batch2Model = TryGetBatch2EffectModelDefinition(
                 type, subType, out Batch2EffectModelDefinition batch2Definition);
+            bool season6Model = TryGetSeason6ModelDefinition(
+                type, subType, out Season6ModelDefinition season6Definition);
             bool additionalTerrain = TryGetV5TerrainDefinition(type, subType,
                 out V5TerrainEffectDefinition terrainDefinition);
             MagicGround2Definition magicGround2Definition = default;
@@ -134,7 +140,7 @@ namespace Client.Main.ClassicFX.Core
                     !ReferenceEquals(owner.WorldObject.World, World))
                     return ClassicFxHandle.Invalid;
             }
-            else if (additionalModel || batch2Model)
+            else if (additionalModel || batch2Model || season6Model)
             {
                 // Native model Effects can be unowned. Owner-required
                 // variants are checked against their original creation rules.
@@ -144,6 +150,9 @@ namespace Client.Main.ClassicFX.Core
                 if (type == ClassicFxEffectType.AirForce && owner.WorldObject == null)
                     return ClassicFxHandle.Invalid;
                 if (batch2Model && batch2Definition.RequiresOwner &&
+                    owner.WorldObject == null)
+                    return ClassicFxHandle.Invalid;
+                if (season6Model && season6Definition.NeedsOwner &&
                     owner.WorldObject == null)
                     return ClassicFxHandle.Invalid;
             }
@@ -199,6 +208,20 @@ namespace Client.Main.ClassicFX.Core
                         MathHelper.ToRadians(subType == 0 ? 45f : -45f),
                         0f);
             }
+            else if (season6Model)
+            {
+                modelPath = season6Definition.Path;
+                life = season6Definition.LifeTime;
+                effectScale = season6Definition.UseCallerScale ? scale : season6Definition.Scale;
+                effectAlpha = season6Definition.Alpha;
+                effectMeshLight = season6Definition.MeshLight;
+                effectPosition.Z += season6Definition.OffsetZ * Clock.FrameFactor;
+                if (season6Definition.WhiteLight) light = Vector3.One;
+                // MuMain EffectTypes: ALICE rings reset the yaw to 0 on spawn.
+                if (type == ClassicFxEffectType.AliceBuffSkillEffect2 ||
+                    (type == ClassicFxEffectType.AliceBuffSkillEffect && subType <= 2))
+                    angle.Z = 0f;
+            }
             else if (additionalTerrain)
             {
                 life = terrainDefinition.LifeTime;
@@ -246,7 +269,7 @@ namespace Client.Main.ClassicFX.Core
                 view.Position = effectPosition;
                 view.Angle = angle;
                 view.Scale = effectScale;
-                if (additionalModel || batch2Model)
+                if (additionalModel || batch2Model || season6Model)
                     view.Color = new Color(Vector3.Clamp(light, Vector3.Zero, Vector3.One));
                 if (batch2Model)
                 {
@@ -387,6 +410,14 @@ namespace Client.Main.ClassicFX.Core
                     else if (IsBatch2EffectModelType(e.Type))
                     {
                         if (!MoveBatch2EffectModel(ref e, f))
+                        {
+                            ReleaseEffectAt(i);
+                            continue;
+                        }
+                    }
+                    else if (IsSeason6ModelType(e.Type))
+                    {
+                        if (!MoveSeason6Model(ref e, f))
                         {
                             ReleaseEffectAt(i);
                             continue;
