@@ -46,7 +46,7 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.SkinShell:
                     if (subType is not (0 or 1)) return false;
                     definition = new Season6ModelDefinition(
-                        "Skill/skinshell.bmd", 40f, 0.4f);
+                        "Skill/SkinShell.bmd", 40f, 0.4f);
                     return true;
 
                 case ClassicFxEffectType.StunStone:
