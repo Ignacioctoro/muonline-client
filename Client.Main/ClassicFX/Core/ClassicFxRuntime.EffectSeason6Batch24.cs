@@ -41,14 +41,10 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (subType != 0) return false;
             }
-            else if (type is ClassicFxEffectType.SummonerNeil or
-                     ClassicFxEffectType.SummonerSahamutt ||
-                     ClassicFxEffectType.SummonerNeilKnife1 or
-                     ClassicFxEffectType.SummonerNeilKnife2 or
-                     ClassicFxEffectType.SummonerNeilKnife3 or
-                     ClassicFxEffectType.SummonerNeilGround1 or
-                     ClassicFxEffectType.SummonerNeilGround2 or
-                     ClassicFxEffectType.SummonerNeilGround3)
+            else if (type == ClassicFxEffectType.SummonerNeil ||
+                     type == ClassicFxEffectType.SummonerSahamutt ||
+                     IsS6Batch24NeilKnife(type) ||
+                     IsS6Batch24NeilGround(type))
             {
                 if (subType is < 0 or > 2) return false;
             }
@@ -82,8 +78,8 @@ namespace Client.Main.ClassicFX.Core
                           IsS6Batch24Head(type) ? 0.8f : 1f;
             float alpha = IsS6Batch24Head(type) ||
                           IsS6Batch24NeilGround(type) ||
-                          type is ClassicFxEffectType.SummonerNeil or
-                              ClassicFxEffectType.SummonerSahamutt
+                          type == ClassicFxEffectType.SummonerNeil ||
+                          type == ClassicFxEffectType.SummonerSahamutt
                               ? 0f : 1f;
             definition = new Season6ModelDefinition(path, life, scale,
                 alpha: alpha, meshLight:
