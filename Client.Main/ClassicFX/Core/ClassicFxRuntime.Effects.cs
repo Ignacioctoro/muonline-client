@@ -153,7 +153,20 @@ namespace Client.Main.ClassicFX.Core
         ArrowBestCrossbow = 130,
         ArrowDrill = 131,
         ArrowRing = 132,
-        HalloweenEx = 133
+        HalloweenEx = 133,
+        // S6 Batch 18: native Christmas and New Year's Day event models.
+        XmasEventBox = 134,
+        XmasEventCandy = 135,
+        XmasEventTree = 136,
+        XmasEventSocks = 137,
+        XmasEventIceHeart = 138,
+        NewYearsDayBeksulki = 139,
+        NewYearsDayCandy = 140,
+        NewYearsDayMoney = 141,
+        NewYearsDayHotPepperGreen = 142,
+        NewYearsDayHotPepperRed = 143,
+        NewYearsDayPig = 144,
+        NewYearsDayYut = 145
     }
 
     public sealed partial class ClassicFxRuntime
@@ -213,6 +226,15 @@ namespace Client.Main.ClassicFX.Core
         {
             if (_disposed || !Enabled)
                 return ClassicFxHandle.Invalid;
+
+            // Main CreateEffect flips the red/green New Year's pepper
+            // before loading its model. Preserve the chosen BMD identity.
+            if ((type is ClassicFxEffectType.NewYearsDayHotPepperGreen or
+                 ClassicFxEffectType.NewYearsDayHotPepperRed) &&
+                Random.FpsCheck(2, Clock))
+                type = type == ClassicFxEffectType.NewYearsDayHotPepperGreen
+                    ? ClassicFxEffectType.NewYearsDayHotPepperRed
+                    : ClassicFxEffectType.NewYearsDayHotPepperGreen;
 
             bool additionalModel = TryGetAdditionalModelDefinition(
                 type, subType, out AdditionalEffectModelDefinition modelDefinition);
@@ -497,6 +519,10 @@ namespace Client.Main.ClassicFX.Core
                         ref effectHeading, ref effectVelocity,
                         ref effectMeshLight))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch18ModelType(type))
+                    InitializeS6Batch18Model(type, ref angle,
+                        ref effectScale, ref life, ref effectDirection,
+                        ref effectGravity, ref effectHeading);
             }
             else if (additionalTerrain)
             {

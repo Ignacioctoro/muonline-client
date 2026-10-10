@@ -57,7 +57,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch13QuakeType(type) ||
                 IsS6Batch15ModelType(type) ||
                 IsS6Batch16ModelType(type) ||
-                IsS6Batch17ModelType(type);
+                IsS6Batch17ModelType(type) ||
+                IsS6Batch18ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -149,7 +150,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch16ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch17ModelDefinition(type, subType,
+                    if (TryGetS6Batch17ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch18ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -287,6 +291,19 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.ArrowDrill:
                 case ClassicFxEffectType.ArrowRing:
                     return MoveS6Batch17Model(ref effect, f);
+                case ClassicFxEffectType.XmasEventBox:
+                case ClassicFxEffectType.XmasEventCandy:
+                case ClassicFxEffectType.XmasEventTree:
+                case ClassicFxEffectType.XmasEventSocks:
+                case ClassicFxEffectType.XmasEventIceHeart:
+                case ClassicFxEffectType.NewYearsDayBeksulki:
+                case ClassicFxEffectType.NewYearsDayCandy:
+                case ClassicFxEffectType.NewYearsDayMoney:
+                case ClassicFxEffectType.NewYearsDayHotPepperGreen:
+                case ClassicFxEffectType.NewYearsDayHotPepperRed:
+                case ClassicFxEffectType.NewYearsDayPig:
+                case ClassicFxEffectType.NewYearsDayYut:
+                    return MoveS6Batch18Model(ref effect, f);
                 default:
                     return false;
             }
