@@ -98,7 +98,10 @@ namespace Client.Main.ClassicFX.Core
         FuryQuake5 = 77,
         FuryQuake6 = 78,
         FuryQuake7 = 79,
-        FuryQuake8 = 80
+        FuryQuake8 = 80,
+        FenrirFootThunder = 81,
+        TwinTail = 82,
+        CloudGround = 83
     }
 
     public sealed partial class ClassicFxRuntime
@@ -127,6 +130,9 @@ namespace Client.Main.ClassicFX.Core
             public Vector3 StartPosition; // native MODEL_BLIZZARD StartPosition
             public Vector3 HeadAngle; // native projectile heading (Javelin)
             public float Phase;
+            // Native timed-bitmap texture frame. Used only by the timed
+            // Fenrir foot / TwinTail logical terrain effects.
+            public int NativeAnimationFrame;
             public byte TriggerMask;
             // Last native tick emitting children for BITMAP_MAGIC+1 subtypes 6/8.
             public int LastChildNativeTick;
@@ -187,6 +193,7 @@ namespace Client.Main.ClassicFX.Core
             // The original random subtype for radial placement lives in Phase.
             bool furyStrike = type == ClassicFxEffectType.FuryStrike &&
                 (subType is 0 or 2 or 3);
+            bool s6TimedTerrain = IsS6Batch14TerrainType(type, subType);
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -204,7 +211,8 @@ namespace Client.Main.ClassicFX.Core
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
-                magicGround2 || magicCircleGround || additionalTerrain || damage01Mono)
+                s6TimedTerrain || magicGround2 || magicCircleGround ||
+                additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
                 // If present, Owner still must belong to this world.
@@ -478,6 +486,12 @@ namespace Client.Main.ClassicFX.Core
                     effectPosition.Z += 100f * Clock.FrameFactor;
                 }
             }
+            else if (s6TimedTerrain)
+            {
+                InitializeS6Batch14Terrain(type, subType,
+                    ref effectPosition, ref angle, ref effectScale,
+                    ref effectAlpha, out life);
+            }
             else if (furyStrike)
             {
                 // Logical 20-tick carrier. Native RenderFuryStrike() draws
@@ -667,6 +681,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.FuryStrike)
                 {
                     if (!MoveS6FuryStrike(ref e, i, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsS6Batch14TerrainType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch14Terrain(ref e, f))
                     {
                         ReleaseEffectAt(i);
                         continue;
@@ -946,6 +968,11 @@ namespace Client.Main.ClassicFX.Core
                             out ClassicTextureResource flare))
                         QueueTerrainEffect(ref e, flare,
                             scaleOverride: e.SubType == 0 ? 4f : 6f);
+                    continue;
+                }
+                if (IsS6Batch14TerrainType(e.Type, e.SubType))
+                {
+                    RenderS6Batch14Terrain(ref e);
                     continue;
                 }
                 if (e.Type == ClassicFxEffectType.MagicCircleGround)

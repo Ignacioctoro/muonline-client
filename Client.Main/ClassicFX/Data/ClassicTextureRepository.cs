@@ -179,6 +179,19 @@ namespace Client.Main.ClassicFX.Data
                 new(ClassicTextureIds.BitmapTwlight,
                     "Skill/twlighthik01.jpg", SamplerState.LinearClamp),
 
+                // Main ZzzOpenData.cpp: eff_lightinga01..05.jpg.
+                // Data_Broyal has the matching OZJ files in Data/Effect.
+                new(ClassicTextureIds.BitmapFenrirFootThunder1,
+                    "Effect/eff_lightinga01.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapFenrirFootThunder2,
+                    "Effect/eff_lightinga02.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapFenrirFootThunder3,
+                    "Effect/eff_lightinga03.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapFenrirFootThunder4,
+                    "Effect/eff_lightinga04.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapFenrirFootThunder5,
+                    "Effect/eff_lightinga05.jpg", SamplerState.LinearClamp),
+
                 // Main ZzzOpenData.cpp: BITMAP_SHOCK_WAVE -> Effect/ShockWave.jpg.
                 // Physical Data_Broyal asset: Effect/Shockwave.OZJ.
                 new(ClassicTextureIds.BitmapShockWave,

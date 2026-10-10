@@ -159,6 +159,19 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapPlus =
             32242;
 
+        // _TextureIndex.h immediately after BITMAP_FENRIR_THUNDER 32250.
+        // Original five-frame terrain sequence, do not renumber.
+        public const int BitmapFenrirFootThunder1 =
+            32251;
+        public const int BitmapFenrirFootThunder2 =
+            32252;
+        public const int BitmapFenrirFootThunder3 =
+            32253;
+        public const int BitmapFenrirFootThunder4 =
+            32254;
+        public const int BitmapFenrirFootThunder5 =
+            32255;
+
         // Original _TextureIndex.h: scorpion tail precedes DS_EFFECT.
         public const int BitmapScolpionTail =
             32256;
