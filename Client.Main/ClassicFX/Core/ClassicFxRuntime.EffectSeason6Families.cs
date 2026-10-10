@@ -59,7 +59,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch16ModelType(type) ||
                 IsS6Batch17ModelType(type) ||
                 IsS6Batch18ModelType(type) ||
-                IsS6Batch19CrushModel(type);
+                IsS6Batch19CrushModel(type) ||
+                IsS6Batch20AvailableModel(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -157,7 +158,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch18ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch19ModelDefinition(type, subType,
+                    if (TryGetS6Batch19ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch20ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -325,6 +329,40 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.StatueCrushPiece03:
                 case ClassicFxEffectType.StatueCrushPiece04:
                     return MoveS6Batch19CrushModel(ref effect, f);
+                case ClassicFxEffectType.CondraArmL:
+                case ClassicFxEffectType.CondraArmL2:
+                case ClassicFxEffectType.CondraShoulder:
+                case ClassicFxEffectType.CondraArmR:
+                case ClassicFxEffectType.CondraArmR2:
+                case ClassicFxEffectType.CondraConeL:
+                case ClassicFxEffectType.CondraConeR:
+                case ClassicFxEffectType.NarCondraArmL:
+                case ClassicFxEffectType.NarCondraArmL2:
+                case ClassicFxEffectType.NarCondraShoulderL:
+                case ClassicFxEffectType.NarCondraShoulderR:
+                case ClassicFxEffectType.NarCondraArmR:
+                case ClassicFxEffectType.NarCondraArmR2:
+                case ClassicFxEffectType.NarCondraArmR3:
+                case ClassicFxEffectType.NarCondraCone1:
+                case ClassicFxEffectType.NarCondraCone2:
+                case ClassicFxEffectType.NarCondraCone3:
+                case ClassicFxEffectType.NarCondraCone4:
+                case ClassicFxEffectType.NarCondraCone5:
+                case ClassicFxEffectType.NarCondraCone6:
+                case ClassicFxEffectType.NarCondraPelvis:
+                case ClassicFxEffectType.NarCondraStomach:
+                case ClassicFxEffectType.NarCondraNeck:
+                case ClassicFxEffectType.CondraStone:
+                case ClassicFxEffectType.CondraStone1:
+                case ClassicFxEffectType.CondraStone2:
+                case ClassicFxEffectType.CondraStone3:
+                case ClassicFxEffectType.CondraStone4:
+                case ClassicFxEffectType.CondraStone5:
+                case ClassicFxEffectType.NarCondraStone:
+                case ClassicFxEffectType.NarCondraStone1:
+                case ClassicFxEffectType.NarCondraStone2:
+                case ClassicFxEffectType.NarCondraStone3:
+                    return MoveS6Batch20Model(ref effect, f);
                 default:
                     return false;
             }

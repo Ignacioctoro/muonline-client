@@ -186,7 +186,44 @@ namespace Client.Main.ClassicFX.Core
         StatueCrushPiece03 = 161,
         StatueCrushPiece04 = 162,
         DoorCrushCarrier = 163,
-        StatueCrushCarrier = 164
+        StatueCrushCarrier = 164,
+        // S6 Batch 20: Karutan Condra/NarCondra fragments and stones.
+        CondraArmL = 165,
+        CondraArmL2 = 166,
+        CondraShoulder = 167,
+        CondraArmR = 168,
+        CondraArmR2 = 169,
+        CondraConeL = 170,
+        CondraConeR = 171,
+        CondraPelvis = 172,
+        CondraStomach = 173,
+        CondraNeck = 174,
+        NarCondraArmL = 175,
+        NarCondraArmL2 = 176,
+        NarCondraShoulderL = 177,
+        NarCondraShoulderR = 178,
+        NarCondraArmR = 179,
+        NarCondraArmR2 = 180,
+        NarCondraArmR3 = 181,
+        NarCondraCone1 = 182,
+        NarCondraCone2 = 183,
+        NarCondraCone3 = 184,
+        NarCondraCone4 = 185,
+        NarCondraCone5 = 186,
+        NarCondraCone6 = 187,
+        NarCondraPelvis = 188,
+        NarCondraStomach = 189,
+        NarCondraNeck = 190,
+        CondraStone = 191,
+        CondraStone1 = 192,
+        CondraStone2 = 193,
+        CondraStone3 = 194,
+        CondraStone4 = 195,
+        CondraStone5 = 196,
+        NarCondraStone = 197,
+        NarCondraStone1 = 198,
+        NarCondraStone2 = 199,
+        NarCondraStone3 = 200
     }
 
     public sealed partial class ClassicFxRuntime
@@ -552,6 +589,11 @@ namespace Client.Main.ClassicFX.Core
                     InitializeS6Batch19CrushModel(type, ref subType,
                         ref angle, ref light, ref life, ref effectHeading,
                         ref effectDirection, ref effectVelocity, ref effectGravity);
+                if (IsS6Batch20AvailableModel(type))
+                    InitializeS6Batch20Model(type, ref subType,
+                        ref angle, ref light, ref effectScale, ref life,
+                        ref effectDirection, ref effectGravity,
+                        ref effectHeading, ref effectVelocity);
             }
             else if (additionalTerrain)
             {
