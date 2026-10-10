@@ -189,6 +189,11 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/Shiny01.jpg",
                     SamplerState.LinearClamp),
 
+                // Last native SHINY+5 texture binding in ZzzOpenData.cpp
+                // overrides the earlier shiny04.jpg with shiny05.jpg.
+                new(ClassicTextureIds.BitmapShiny + 5,
+                    "Effect/shiny05.jpg", SamplerState.LinearClamp),
+
                 new(
                     ClassicTextureIds.BitmapFlare,
                     "Effect/Flare.jpg",
