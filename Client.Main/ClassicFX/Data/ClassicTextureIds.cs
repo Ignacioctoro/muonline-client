@@ -197,6 +197,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapShockWave =
             32278;
 
+        // Adjacent native BITMAP_DAMAGE_01_MONO (_TextureIndex.h).
+        public const int BitmapDamage01Mono =
+            BitmapShockWave + 1;
+
         public const int BitmapSwordEffectMono =
             32280;
 

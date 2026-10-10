@@ -13,7 +13,8 @@ namespace Client.Main.ClassicFX.Core
     {
         private static bool IsS6Batch02ModelType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.CircleLight or
-                ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2;
+                ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2 or
+                ClassicFxEffectType.KnightPlancrackA;
 
         private static bool TryGetS6Batch02ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -31,6 +32,15 @@ namespace Client.Main.ClassicFX.Core
                         "Skill/Circle02.bmd",
                         subType == 3 ? 250f : subType == 4 ? 20f : 40f,
                         1f, useCallerScale: subType <= 1);
+                    return true;
+
+                case ClassicFxEffectType.KnightPlancrackA:
+                    if (subType != 0 && subType != 1)
+                        return false;
+                    definition = new Season6ModelDefinition(
+                        "Effect/knight_plancrack_a.bmd",
+                        subType == 0 ? 25f : 20f, 1f,
+                        useCallerScale: true);
                     return true;
 
                 case ClassicFxEffectType.Stone1:
@@ -53,6 +63,14 @@ namespace Client.Main.ClassicFX.Core
         {
             if (e.Type == ClassicFxEffectType.CircleLight)
                 return MoveCircleLight(ref e);
+            if (e.Type == ClassicFxEffectType.KnightPlancrackA)
+            {
+                if (e.SubType == 0)
+                    e.Alpha = MathF.Max(0f, e.Alpha - 0.04f * f);
+                else
+                    e.Alpha *= MathF.Pow(0.9f, f);
+                return true;
+            }
             if (e.Type is ClassicFxEffectType.Stone1 or
                 ClassicFxEffectType.Stone2)
                 return MoveStoneFragment(ref e, f);
