@@ -234,18 +234,32 @@ namespace Client.Main.ClassicFX.Core
                 if (type == ClassicFxEffectType.AliceBuffSkillEffect2 ||
                     (type == ClassicFxEffectType.AliceBuffSkillEffect && subType <= 2))
                     angle.Z = 0f;
-                // Native MODEL_STONE1/2 subtype 0: randomized stone size,
-                // direction, gravity, angle and lifetime at creation.
+                // The native MODEL_STONE1/2 init has a separate HeadAngle
+                // trajectory for subtypes 13/14 (Lightning Shock debris).
                 if (type is ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2)
                 {
-                    life = 32f + Random.Modulo(16);
-                    effectScale = (8f + Random.Modulo(4)) * 0.1f;
                     angle.Z = MathHelper.ToRadians(Random.Modulo(360));
-                    float speed = (64f + Random.Modulo(256)) * 0.1f;
-                    effectDirection = Vector3.TransformNormal(
-                        new Vector3(0f, speed, 0f),
-                        Matrix.CreateRotationZ(angle.Z));
-                    effectGravity = 8f + Random.Modulo(16);
+                    if (subType == 13 || subType == 14)
+                    {
+                        life = 20f + Random.Modulo(16);
+                        effectScale = (3f + Random.Modulo(13)) * 0.08f * scale;
+                        effectGravity = 3f + Random.Modulo(3);
+                        float speed = (64f + Random.Modulo(128)) * 0.1f;
+                        effectDirection = Vector3.TransformNormal(
+                            new Vector3(0f, speed, 0f),
+                            Matrix.CreateRotationZ(angle.Z));
+                        effectDirection.Z += 15f * Clock.FrameFactor;
+                    }
+                    else
+                    {
+                        life = 32f + Random.Modulo(16);
+                        effectScale = (8f + Random.Modulo(4)) * 0.1f;
+                        float speed = (64f + Random.Modulo(256)) * 0.1f;
+                        // Move_MODEL_ICE_SMALL rotates the unrotated
+                        // direction each frame; avoid applying yaw twice.
+                        effectDirection = new Vector3(0f, speed, 0f);
+                        effectGravity = 8f + Random.Modulo(16);
+                    }
                 }
                 if (type == ClassicFxEffectType.KnightPlancrackA)
                 {
