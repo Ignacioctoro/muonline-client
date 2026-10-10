@@ -5,6 +5,7 @@
 using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Models;
+using Client.Main.Controls;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -199,7 +200,7 @@ namespace Client.Main.ClassicFX.Core
             if (IsS6Batch16Arrow(e.Type))
             {
                 if (e.FirstMove && e.ModelView != null &&
-                    e.ModelView.Status == Client.Main.Models.GameControlStatus.Ready)
+                    e.ModelView.Status == GameControlStatus.Ready)
                 {
                     e.FirstMove = false;
                     if (e.Type == ClassicFxEffectType.ArrowSpark)
