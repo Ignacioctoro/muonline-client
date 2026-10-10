@@ -286,6 +286,20 @@ namespace Client.Main.ClassicFX.Core
         MayaStoneFire = 257,
         MayaHandSkill = 258,
         MayaStar = 259,
+        // S6 Batch 24: missing Summoner BMD families (casting 7 already exist).
+        SummonerWristRing = 260,
+        SummonerHeadSahamutt = 261,
+        SummonerHeadNeil = 262,
+        SummonerHeadLagul = 263,
+        SummonerSahamutt = 264,
+        SummonerNeil = 265,
+        SummonerLagul = 266,
+        SummonerNeilKnife1 = 267,
+        SummonerNeilKnife2 = 268,
+        SummonerNeilKnife3 = 269,
+        SummonerNeilGround1 = 270,
+        SummonerNeilGround2 = 271,
+        SummonerNeilGround3 = 272,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -482,6 +496,7 @@ namespace Client.Main.ClassicFX.Core
             Vector3 effectPosition = position;
             Vector3 s6Batch22StoredPosition = position;
             Vector3 s6Batch23StoredPosition = position;
+            Vector3 s6Batch24StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -686,6 +701,15 @@ namespace Client.Main.ClassicFX.Core
                         ref effectScale, ref life, ref effectAlpha,
                         ref effectDirection, ref effectGravity,
                         ref effectHeading);
+                if (IsS6Batch24ModelType(type))
+                {
+                    if (!InitializeS6Batch24Model(type, subType, owner,
+                            inputLight, ref effectPosition,
+                            ref s6Batch24StoredPosition, ref effectScale,
+                            ref life, ref effectAlpha, ref effectMeshLight,
+                            ref effectVelocity, ref light))
+                        return ClassicFxHandle.Invalid;
+                }
             }
             else if (additionalTerrain)
             {
@@ -853,6 +877,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch16ModelView(view, type);
                 if (IsS6Batch17ModelType(type))
                     ConfigureS6Batch17ModelView(view, type);
+                if (IsS6Batch24ModelType(type))
+                    ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -862,7 +888,9 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = IsS6Batch23Kundun(type) &&
+                StartPosition = IsS6Batch24ModelType(type)
+                    ? s6Batch24StoredPosition
+                    : IsS6Batch23Kundun(type) &&
                         subType is 2 or 3 or 4
                     ? s6Batch23StoredPosition
                     : type == ClassicFxEffectType.MayaHandSkill

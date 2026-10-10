@@ -63,7 +63,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch20AvailableModel(type) ||
                 IsS6Batch21ModelType(type) ||
                 IsS6Batch22ModelType(type) ||
-                IsS6Batch23ModelType(type);
+                IsS6Batch23ModelType(type) ||
+                IsS6Batch24ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -173,7 +174,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch22ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch23ModelDefinition(type, subType,
+                    if (TryGetS6Batch23ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch24ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -437,6 +441,20 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.MayaHandSkill:
                 case ClassicFxEffectType.MayaStar:
                     return MoveS6Batch23Model(ref effect, f);
+                case ClassicFxEffectType.SummonerWristRing:
+                case ClassicFxEffectType.SummonerHeadSahamutt:
+                case ClassicFxEffectType.SummonerHeadNeil:
+                case ClassicFxEffectType.SummonerHeadLagul:
+                case ClassicFxEffectType.SummonerSahamutt:
+                case ClassicFxEffectType.SummonerNeil:
+                case ClassicFxEffectType.SummonerLagul:
+                case ClassicFxEffectType.SummonerNeilKnife1:
+                case ClassicFxEffectType.SummonerNeilKnife2:
+                case ClassicFxEffectType.SummonerNeilKnife3:
+                case ClassicFxEffectType.SummonerNeilGround1:
+                case ClassicFxEffectType.SummonerNeilGround2:
+                case ClassicFxEffectType.SummonerNeilGround3:
+                    return MoveS6Batch24Model(ref effect, f);
                 default:
                     return false;
             }
