@@ -38,8 +38,8 @@ namespace Client.Main.ClassicFX.Core
             if (IsS6Batch17HarvestFruit(type) && subtype != 0) return false;
             if (type == ClassicFxEffectType.MoonHarvestMoon && subtype > 2) return false;
             if (type == ClassicFxEffectType.ChangeUpNasa && subtype > 3) return false;
-            if (type is ClassicFxEffectType.ChangeUpEffect or
-                ClassicFxEffectType.ChangeUpCylinder && subtype > 2) return false;
+            if ((type is ClassicFxEffectType.ChangeUpEffect or
+                ClassicFxEffectType.ChangeUpCylinder) && subtype > 2) return false;
             if (type == ClassicFxEffectType.ArrowDrill && subtype is not (0 or 2))
                 return false;
             if (IsS6Batch17Arrow(type) && subtype > 2) return false;
@@ -65,9 +65,9 @@ namespace Client.Main.ClassicFX.Core
                 _ => null
             };
             if (path == null) return false;
-            bool owner = subtype == 2 && type is
+            bool owner = subtype == 2 && (type is
                 ClassicFxEffectType.ChangeUpEffect or
-                ClassicFxEffectType.ChangeUpCylinder;
+                ClassicFxEffectType.ChangeUpCylinder);
             definition = new Season6ModelDefinition(path, 50f, 1f,
                 needsOwner: owner, useCallerScale: true);
             return true;
@@ -105,7 +105,7 @@ namespace Client.Main.ClassicFX.Core
                     MathHelper.ToRadians(Random.Modulo(360)));
                 gravity = 10f + Random.Modulo(10);
                 float dx = (Random.Modulo(candy ? 60 : 10) - (candy ? 30f : 5f)) * 0.1f;
-                float dy = (Random.Modulo(60) - (candy ? 30f : 30f)) * 0.1f;
+                float dy = (Random.Modulo(60) - 30f) * 0.1f;
                 float dz = candy && subtype == 1 ? -1f : 0f;
                 direction = Vector3.TransformNormal(
                     new Vector3(dx, dy, dz) * (candy
@@ -310,13 +310,12 @@ namespace Client.Main.ClassicFX.Core
                         Random.Modulo(3), e.Position, e.Angle, e.Light);
                     CreateParticle(ClassicTextureIds.BitmapSmoke,
                         e.Position, e.Angle, e.Light, 11);
-                    if (Random.Modulo(2) == 0)
-                    {
-                        CreateSprite(ClassicTextureIds.BitmapLight,
-                            e.Position, 5f, e.Light);
-                        CreateSprite(ClassicTextureIds.BitmapLight,
-                            e.Position, 3f, e.Light);
-                    }
+                    CreateSprite(ClassicTextureIds.BitmapLight,
+                        e.Position, 5f, e.Light);
+                    CreateSprite(ClassicTextureIds.BitmapLight,
+                        e.Position, 3f, e.Light);
+                    CreateSprite(ClassicTextureIds.BitmapLight,
+                        e.Position, 3f, e.Light);
                     CreateSprite(ClassicTextureIds.BitmapShiny + 6,
                         e.Position, 2f, e.Light);
                 }
@@ -442,7 +441,7 @@ namespace Client.Main.ClassicFX.Core
                 Vector3 purple = new Vector3(0f, 1f, 0.1f);
                 CreateEffect(ClassicFxEffectType.Waves,
                     e.Position, e.Angle, purple, ClassicFxOwner.None,
-                    subType: 4, boneIndex: 20);
+                    subType: 4, boneIndex: 0);
                 AddClassicTerrainLight(e.Position.X, e.Position.Y,
                     new Vector3(0.6f, 0.2f, 0.8f), 2f);
             }
