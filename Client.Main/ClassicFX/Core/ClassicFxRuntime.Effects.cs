@@ -86,7 +86,10 @@ namespace Client.Main.ClassicFX.Core
         BlowOfDestruction = 65,
         NightWater01 = 66,
         KnightPlancrackB = 67,
-        RaklionBossCrack = 68
+        RaklionBossCrack = 68,
+        LightningOrb = 69,
+        FenrirThunder = 70,
+        Magic2 = 71
     }
 
     public sealed partial class ClassicFxRuntime
@@ -169,6 +172,8 @@ namespace Client.Main.ClassicFX.Core
             // and sprite render paths, not another BMD renderer.
             bool blowOfDestruction = type == ClassicFxEffectType.BlowOfDestruction &&
                 (subType is 0 or 1);
+            bool lightningOrb = type == ClassicFxEffectType.LightningOrb &&
+                (subType is 0 or 1);
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -185,8 +190,8 @@ namespace Client.Main.ClassicFX.Core
             if (nativeGroundV8 && groundV8Definition.RequiresOwner &&
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
-            if (nativeGroundV8 || crater || blowOfDestruction || magicGround2 || magicCircleGround ||
-                additionalTerrain || damage01Mono)
+            if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb ||
+                magicGround2 || magicCircleGround || additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
                 // If present, Owner still must belong to this world.
@@ -383,6 +388,12 @@ namespace Client.Main.ClassicFX.Core
                     if (type == ClassicFxEffectType.RaklionBossCrack)
                         effectScale = scale + 1f;
                 }
+                if (IsS6Batch12ModelType(type) &&
+                    !InitializeS6Batch12Model(type, subType, owner,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectDirection))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -443,6 +454,15 @@ namespace Client.Main.ClassicFX.Core
                 }
                 light = new Vector3(1.2f);
             }
+            else if (lightningOrb)
+            {
+                life = subType == 0 ? 20f : 18f;
+                if (subType == 0)
+                {
+                    effectDirection = new Vector3(0f, -60f, 0f);
+                    effectPosition.Z += 100f * Clock.FrameFactor;
+                }
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -494,6 +514,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch09ModelView(view, type, subType);
                 if (IsS6Batch10ModelType(type))
                     ConfigureS6Batch10ModelView(view, type, subType);
+                if (IsS6Batch12ModelType(type))
+                    ConfigureS6Batch12ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -542,6 +564,8 @@ namespace Client.Main.ClassicFX.Core
             if (blowOfDestruction && subType == 0)
                 CreateEffect(ClassicFxEffectType.BlowOfDestruction,
                     inputLight, angle, light, owner, subType: 1);
+            if (type == ClassicFxEffectType.FenrirThunder)
+                StartS6FenrirThunderSprite(ref _effects[handle.Index]);
             return handle;
         }
 
@@ -609,6 +633,10 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.BlowOfDestruction)
                 {
                     MoveS6BlowOfDestruction(ref e, f);
+                }
+                else if (e.Type == ClassicFxEffectType.LightningOrb)
+                {
+                    MoveS6LightningOrb(ref e, i, f);
                 }
                 else if (e.Type == ClassicFxEffectType.Damage01Mono)
                 {
@@ -719,7 +747,8 @@ namespace Client.Main.ClassicFX.Core
                         IsS6Batch07ModelType(e.Type) ||
                         IsS6Batch08ModelType(e.Type) ||
                         IsS6Batch09ModelType(e.Type) ||
-                        IsS6Batch10ModelType(e.Type))
+                        IsS6Batch10ModelType(e.Type) ||
+                        IsS6Batch12ModelType(e.Type))
                         e.ModelView.Color = new Color(Vector3.Clamp(
                             e.Light, Vector3.Zero, Vector3.One));
                 }

@@ -52,7 +52,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch08ModelType(type) ||
                 IsS6Batch09ModelType(type) ||
                 IsS6Batch10ModelType(type) ||
-                IsS6Batch11ModelType(type);
+                IsS6Batch11ModelType(type) ||
+                IsS6Batch12ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -129,7 +130,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch10ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch11ModelDefinition(type, subType,
+                    if (TryGetS6Batch11ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch12ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -205,6 +209,9 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.KnightPlancrackB:
                 case ClassicFxEffectType.RaklionBossCrack:
                     return MoveS6Batch11Model(ref effect, f);
+                case ClassicFxEffectType.FenrirThunder:
+                case ClassicFxEffectType.Magic2:
+                    return MoveS6Batch12Model(ref effect, f);
                 default:
                     return false;
             }
