@@ -134,7 +134,10 @@ namespace Client.Main.ClassicFX.Core
 
         private bool MoveAliceBuffModel(ref EffectState e, float f)
         {
-            if (!TryGetOwnerSnapshot(e.Owner, out ClassicFxOwnerSnapshot owner))
+            if (!TryGetOwnerSnapshot(e.Owner, out ClassicFxOwnerSnapshot owner) ||
+                owner.WorldObject == null ||
+                !ReferenceEquals(owner.WorldObject.World, World) ||
+                owner.WorldObject.Status != GameControlStatus.Ready)
                 return false;
 
             if (e.SubType == 3 || e.SubType == 4)
