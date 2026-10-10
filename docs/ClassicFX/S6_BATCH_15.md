@@ -29,7 +29,7 @@ La totalidad de modelos BMD usa **ClassicFxEffectModelObject** / **ModelObject**
 - `SapitresAttack1` no duplica `CheckTargetRange` ni daño: se mantiene del lado de gameplay. Los fragmentos y proyectiles usan sus entradas visuales.
 - `SnowmanBody` usa la animación estándar BMD existente, sin duplicar un `PlayAnimation` manual.
 - Variantes existentes que emplean `WorldTime` y `FPS_ANIMATION_FACTOR` usan el reloj y factor de frame de ClassicFX.
-- **Se permiten duplicados temporales** a petición del usuario, pero este commit no redirige por sí solo todos los SkillVisualEffect adapters existentes al nuevo runtime: crea las familias completas registradas y sus hijos internos.
+- **Se permiten duplicados temporales** a petición del usuario. **Skill 42 Rageful Blow ya emite también FuryStrike nativo a ClassicFX**, manteniendo el RagefulBlowEffect anterior en paralelo hasta completar el render del arma. El resto de skill adapters permanece intacto: no se afirma que todas las familias estén activadas desde el gameplay.
 - La integración y el diff se verifican remotamente; **no se ejecutó** `dotnet build` de Windows ni pruebas visuales en tiempo real.
 
 ## Instalación segura
