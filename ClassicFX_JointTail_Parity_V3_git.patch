@@ -1,0 +1,27 @@
+--- a/Client.Main/ClassicFX/Rendering/ClassicJointRenderer.cs
++++ b/Client.Main/ClassicFX/Rendering/ClassicJointRenderer.cs
+@@ -94,4 +94,4 @@
+                 Vector3 n3 = joint.Tails[offset + 7];
+-                if (!Valid(c0) || !Valid(c1) || !Valid(c2) || !Valid(c3) ||
+-                    !Valid(n0) || !Valid(n1) || !Valid(n2) || !Valid(n3))
++                if (!ValidQuad(c0, c1, c2, c3) ||
++                    !ValidQuad(n0, n1, n2, n3))
+                     continue;
+@@ -225,3 +225,16 @@
+ 
+-        private static bool Valid(in Vector3 v) =>
++        // MuMain ZzzEffectJoint.cpp IsValidTailQuad():
++        // Reject tail quads whose midpoint is effectively world origin.
++        private static bool ValidQuad(
++            in Vector3 a, in Vector3 b, in Vector3 c, in Vector3 d)
++        {
++            if (!Finite(a) || !Finite(b) || !Finite(c) || !Finite(d))
++                return false;
++
++            Vector3 midpoint = (a + b) * 0.5f;
++            float lengthSquared = Vector3.Dot(midpoint, midpoint);
++            return float.IsFinite(lengthSquared) && lengthSquared >= 1f;
++        }
++
++        private static bool Finite(in Vector3 v) =>
+             float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
