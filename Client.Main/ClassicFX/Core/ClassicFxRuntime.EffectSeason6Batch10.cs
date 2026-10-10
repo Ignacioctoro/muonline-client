@@ -66,8 +66,12 @@ namespace Client.Main.ClassicFX.Core
                     life = 20f;
                     gravity = 0.1f;
                     meshLight = 1f;
+                    Vector3 incomingAngle = angle;
                     angle = Vector3.Zero;
                     position.Z += 50f * Clock.FrameFactor;
+                    // Native restores the incoming yaw for subtypes 1..6.
+                    if (subType != 0)
+                        angle.Z = incomingAngle.Z;
                     switch (subType)
                     {
                         case 1:
