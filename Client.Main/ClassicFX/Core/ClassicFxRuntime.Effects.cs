@@ -52,7 +52,10 @@ namespace Client.Main.ClassicFX.Core
         AliceDrainLife = 31,
         KnightPlancrackA = 32,
         Damage01Mono = 33,
-        LightningShock = 34
+        LightningShock = 34,
+        SkillBlast = 35,
+        SkillInferno = 36,
+        Circle = 37
     }
 
     public sealed partial class ClassicFxRuntime
@@ -127,6 +130,11 @@ namespace Client.Main.ClassicFX.Core
                 out V8GroundEffectDefinition groundV8Definition);
             bool damage01Mono = type == ClassicFxEffectType.Damage01Mono &&
                 (subType == 0 || subType == 1);
+            // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
+            if (type == ClassicFxEffectType.SkillInferno &&
+                (subType is 2 or 6 or 8 or 10) &&
+                (boneIndex < 0 || !float.IsFinite(scale) || scale <= 0f))
+                return ClassicFxHandle.Invalid;
             // Preserve already-ported Wizardry subtypes ShockWave 14 / Twlight 3.
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
@@ -267,6 +275,12 @@ namespace Client.Main.ClassicFX.Core
                     effectScale = scale + Random.Modulo(10) * 0.05f;
                     effectPosition.Z += 10f * Clock.FrameFactor;
                 }
+                if (IsS6Batch04ModelType(type))
+                    InitializeS6Batch04Spawn(type, subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref effectDirection,
+                        ref effectVelocity, ref effectGravity,
+                        ref effectMeshLight);
             }
             else if (additionalTerrain)
             {
@@ -327,6 +341,15 @@ namespace Client.Main.ClassicFX.Core
                 {
                     view.BlendMesh = effectBlendMesh;
                     view.HiddenMesh = effectHiddenMesh;
+                }
+                if (IsS6Batch04ModelType(type))
+                {
+                    view.BlendMesh = type == ClassicFxEffectType.SkillInferno ? -2 : 0;
+                    if (type == ClassicFxEffectType.SkillInferno)
+                    {
+                        view.HiddenMesh = subType == 4 ? 1 :
+                            (subType is 2 or 6 or 8 or 10) ? boneIndex : -1;
+                    }
                 }
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);

@@ -46,7 +46,8 @@ namespace Client.Main.ClassicFX.Core
             type is ClassicFxEffectType.AliceBuffSkillEffect or
                 ClassicFxEffectType.AliceBuffSkillEffect2 or
                 ClassicFxEffectType.ShockWaveGround01 or
-                ClassicFxEffectType.Wave || IsS6Batch02ModelType(type);
+                ClassicFxEffectType.Wave || IsS6Batch02ModelType(type) ||
+                IsS6Batch04ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -99,7 +100,10 @@ namespace Client.Main.ClassicFX.Core
                     return true;
 
                 default:
-                    return TryGetS6Batch02ModelDefinition(type, subType,
+                    if (TryGetS6Batch02ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch04ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -135,6 +139,10 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.Stone2:
                 case ClassicFxEffectType.KnightPlancrackA:
                     return MoveS6Batch02Model(ref effect, f);
+                case ClassicFxEffectType.SkillBlast:
+                case ClassicFxEffectType.SkillInferno:
+                case ClassicFxEffectType.Circle:
+                    return MoveS6Batch04Model(ref effect, f);
                 default:
                     return false;
             }
