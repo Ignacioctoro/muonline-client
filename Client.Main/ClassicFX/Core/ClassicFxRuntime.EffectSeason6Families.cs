@@ -49,7 +49,8 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.Wave || IsS6Batch02ModelType(type) ||
                 IsS6Batch04ModelType(type) || IsS6Batch05ModelType(type) ||
                 IsS6Batch06ModelType(type) || IsS6Batch07ModelType(type) ||
-                IsS6Batch08ModelType(type);
+                IsS6Batch08ModelType(type) ||
+                IsS6Batch09ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -117,7 +118,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch07ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch08ModelDefinition(type, subType,
+                    if (TryGetS6Batch08ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch09ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -180,6 +184,11 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.DarkScreamFire:
                 case ClassicFxEffectType.ManaRune:
                     return MoveS6Batch08Model(ref effect, f);
+                case ClassicFxEffectType.Javelin:
+                case ClassicFxEffectType.ArrowImpact:
+                case ClassicFxEffectType.SkinShell:
+                case ClassicFxEffectType.StunStone:
+                    return MoveS6Batch09Model(ref effect, f);
                 default:
                     return false;
             }

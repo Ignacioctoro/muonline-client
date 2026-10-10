@@ -74,7 +74,12 @@ namespace Client.Main.ClassicFX.Core
         Snow3 = 53,
         DarkScream = 54,
         DarkScreamFire = 55,
-        ManaRune = 56
+        ManaRune = 56,
+        Javelin = 57,
+        ArrowImpact = 58,
+        SkinShell = 59,
+        StunStone = 60,
+        Crater = 61
     }
 
     public sealed partial class ClassicFxRuntime
@@ -101,6 +106,7 @@ namespace Client.Main.ClassicFX.Core
             // luminous fade independently of the model's Alpha.
             public Vector3 BaseLight;
             public Vector3 StartPosition; // native MODEL_BLIZZARD StartPosition
+            public Vector3 HeadAngle; // native projectile heading (Javelin)
             public float Phase;
             public byte TriggerMask;
             // Last native tick emitting children for BITMAP_MAGIC+1 subtypes 6/8.
@@ -150,6 +156,8 @@ namespace Client.Main.ClassicFX.Core
                 out V8GroundEffectDefinition groundV8Definition);
             bool damage01Mono = type == ClassicFxEffectType.Damage01Mono &&
                 (subType == 0 || subType == 1);
+            bool crater = type == ClassicFxEffectType.Crater &&
+                (subType is >= 0 and <= 2);
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -166,7 +174,7 @@ namespace Client.Main.ClassicFX.Core
             if (nativeGroundV8 && groundV8Definition.RequiresOwner &&
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
-            if (nativeGroundV8 || magicGround2 || magicCircleGround ||
+            if (nativeGroundV8 || crater || magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
@@ -214,6 +222,7 @@ namespace Client.Main.ClassicFX.Core
             int effectBlendMesh = 0;
             int effectHiddenMesh = -1;
             Vector3 effectDirection = Vector3.Zero;
+            Vector3 effectHeading = angle;
             float effectVelocity = 0f;
             float effectGravity = 0f;
             Vector3 effectPosition = position;
@@ -337,6 +346,12 @@ namespace Client.Main.ClassicFX.Core
                         ref effectPosition, ref angle, ref light,
                         ref effectScale, ref effectDirection,
                         ref effectVelocity, ref effectGravity);
+                if (IsS6Batch09ModelType(type))
+                    InitializeS6Batch09Spawn(type, subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectMeshLight, ref effectDirection,
+                        ref effectVelocity, ref effectGravity, ref effectHeading);
             }
             else if (additionalTerrain)
             {
@@ -367,6 +382,13 @@ namespace Client.Main.ClassicFX.Core
                 life = groundV8Definition.LifeTime;
                 effectScale = InitializeV8GroundScale(in groundV8Definition, scale);
                 light *= groundV8Definition.LightMultiplier;
+            }
+            else if (crater)
+            {
+                life = subType == 0 ? 60f : subType == 1 ? 30f : 40f;
+                effectScale = subType == 0 ? 4.5f :
+                              subType == 1 ? 2.5f : 3f;
+                light = Vector3.One;
             }
             else if (damage01Mono)
             {
@@ -415,6 +437,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch07ModelView(view, type, subType);
                 if (IsS6Batch08ModelType(type))
                     ConfigureS6Batch08ModelView(view, type, subType);
+                if (IsS6Batch09ModelType(type))
+                    ConfigureS6Batch09ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -425,6 +449,7 @@ namespace Client.Main.ClassicFX.Core
                 Owner = owner,
                 Position = effectPosition,
                 StartPosition = effectPosition,
+                HeadAngle = effectHeading,
                 Angle = angle,
                 Light = light,
                 BaseLight = light,
@@ -515,6 +540,10 @@ namespace Client.Main.ClassicFX.Core
                         ReleaseEffectAt(i);
                         continue;
                     }
+                }
+                else if (e.Type == ClassicFxEffectType.Crater)
+                {
+                    MoveS6Crater(ref e, f);
                 }
                 else if (e.Type == ClassicFxEffectType.Damage01Mono)
                 {
@@ -623,7 +652,8 @@ namespace Client.Main.ClassicFX.Core
                     e.ModelView.ApplyNativeRenderState(e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
                     if (IsS6Batch05ModelType(e.Type) ||
                         IsS6Batch07ModelType(e.Type) ||
-                        IsS6Batch08ModelType(e.Type))
+                        IsS6Batch08ModelType(e.Type) ||
+                        IsS6Batch09ModelType(e.Type))
                         e.ModelView.Color = new Color(Vector3.Clamp(
                             e.Light, Vector3.Zero, Vector3.One));
                 }
@@ -795,13 +825,17 @@ namespace Client.Main.ClassicFX.Core
                     ClassicFxEffectType.ShockWave => ClassicTextureIds.BitmapShockWave,
                     ClassicFxEffectType.Twlight => ClassicTextureIds.BitmapTwlight,
                     ClassicFxEffectType.Damage01Mono => ClassicTextureIds.BitmapDamage01Mono,
+                    ClassicFxEffectType.Crater => ClassicTextureIds.BitmapCrater,
                     _ => -1
                 };
                 if (textureId < 0 || e.Scale <= 0f ||
                     !Textures.TryGet(textureId, out ClassicTextureResource tex))
                     continue;
 
-                QueueTerrainEffect(ref e, tex);
+                QueueTerrainEffect(ref e, tex,
+                    blendOverride: e.Type == ClassicFxEffectType.Crater
+                        ? ClassicBlendMode.AlphaTest
+                        : ClassicBlendMode.Glow);
             }
             _billboardRenderer.End();
         }
