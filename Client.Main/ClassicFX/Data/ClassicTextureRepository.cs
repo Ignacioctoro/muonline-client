@@ -184,10 +184,10 @@ namespace Client.Main.ClassicFX.Data
                 new(ClassicTextureIds.BitmapShockWave,
                     "Effect/Shockwave.jpg", SamplerState.LinearClamp),
 
-                // MuMain: LoadBitmap("Effect/Cratered.tga", BITMAP_CRATER).
+                // MuMain: LoadBitmap("Effect/cratered.tga", BITMAP_CRATER).
                 // Data_Broyal: Effect/Cratered.OZT.
                 new(ClassicTextureIds.BitmapCrater,
-                    "Effect/Cratered.tga", SamplerState.LinearClamp),
+                    "Effect/cratered.tga", SamplerState.LinearClamp),
 
                 new(
                     ClassicTextureIds.BitmapShiny,
