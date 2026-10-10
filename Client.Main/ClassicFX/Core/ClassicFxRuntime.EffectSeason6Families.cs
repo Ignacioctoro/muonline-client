@@ -50,7 +50,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch04ModelType(type) || IsS6Batch05ModelType(type) ||
                 IsS6Batch06ModelType(type) || IsS6Batch07ModelType(type) ||
                 IsS6Batch08ModelType(type) ||
-                IsS6Batch09ModelType(type);
+                IsS6Batch09ModelType(type) ||
+                IsS6Batch10ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -121,7 +122,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch08ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch09ModelDefinition(type, subType,
+                    if (TryGetS6Batch09ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch10ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -189,6 +193,10 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.SkinShell:
                 case ClassicFxEffectType.StunStone:
                     return MoveS6Batch09Model(ref effect, f);
+                case ClassicFxEffectType.Waves:
+                case ClassicFxEffectType.Piercing2:
+                case ClassicFxEffectType.PierPart:
+                    return MoveS6Batch10Model(ref effect, f);
                 default:
                     return false;
             }
