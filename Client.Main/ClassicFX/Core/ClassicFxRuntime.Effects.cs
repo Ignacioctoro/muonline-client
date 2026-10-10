@@ -116,7 +116,26 @@ namespace Client.Main.ClassicFX.Core
         SapitresAttack2 = 95,
         FlameStrike = 96,
         StarShine = 97,
-        SapitresAttackCarrier = 98
+        SapitresAttackCarrier = 98,
+        // S6 Batch 16: native model visuals and shared physical debris.
+        MultiShot1 = 99,
+        MultiShot2 = 100,
+        MultiShot3 = 101,
+        BigStonePart1 = 102,
+        BigStonePart2 = 103,
+        WallPart1 = 104,
+        WallPart2 = 105,
+        GatePart1 = 106,
+        GatePart2 = 107,
+        GatePart3 = 108,
+        GolemStone = 109,
+        ArrowSteel = 110,
+        ArrowThunder = 111,
+        ArrowLaser = 112,
+        ArrowV = 113,
+        ArrowSaw = 114,
+        ArrowSpark = 115,
+        ArrowGamble = 116
     }
 
     public sealed partial class ClassicFxRuntime
@@ -444,6 +463,12 @@ namespace Client.Main.ClassicFX.Core
                         ref effectHeading, ref effectVelocity,
                         ref effectMeshLight))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch16ModelType(type))
+                    InitializeS6Batch16Model(type, ref subType,
+                        ref effectPosition, ref angle, ref effectScale,
+                        ref life, ref effectAlpha, ref effectDirection,
+                        ref effectGravity, ref effectVelocity,
+                        ref effectMeshLight);
             }
             else if (additionalTerrain)
             {
@@ -597,6 +622,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch13ModelView(view, type, subType);
                 if (IsS6Batch15ModelType(type))
                     ConfigureS6Batch15ModelView(view, type, subType);
+                if (IsS6Batch16ModelType(type))
+                    ConfigureS6Batch16ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }

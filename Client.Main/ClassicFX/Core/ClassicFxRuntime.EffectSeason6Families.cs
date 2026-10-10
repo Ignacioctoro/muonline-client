@@ -55,7 +55,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch11ModelType(type) ||
                 IsS6Batch12ModelType(type) ||
                 IsS6Batch13QuakeType(type) ||
-                IsS6Batch15ModelType(type);
+                IsS6Batch15ModelType(type) ||
+                IsS6Batch16ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -141,7 +142,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch13ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch15ModelDefinition(type, subType,
+                    if (TryGetS6Batch15ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch16ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -243,6 +247,25 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.SapitresAttack2:
                 case ClassicFxEffectType.FlameStrike:
                     return MoveS6Batch15Model(ref effect, f);
+                case ClassicFxEffectType.MultiShot1:
+                case ClassicFxEffectType.MultiShot2:
+                case ClassicFxEffectType.MultiShot3:
+                case ClassicFxEffectType.BigStonePart1:
+                case ClassicFxEffectType.BigStonePart2:
+                case ClassicFxEffectType.WallPart1:
+                case ClassicFxEffectType.WallPart2:
+                case ClassicFxEffectType.GatePart1:
+                case ClassicFxEffectType.GatePart2:
+                case ClassicFxEffectType.GatePart3:
+                case ClassicFxEffectType.GolemStone:
+                case ClassicFxEffectType.ArrowSteel:
+                case ClassicFxEffectType.ArrowThunder:
+                case ClassicFxEffectType.ArrowLaser:
+                case ClassicFxEffectType.ArrowV:
+                case ClassicFxEffectType.ArrowSaw:
+                case ClassicFxEffectType.ArrowSpark:
+                case ClassicFxEffectType.ArrowGamble:
+                    return MoveS6Batch16Model(ref effect, f);
                 default:
                     return false;
             }
