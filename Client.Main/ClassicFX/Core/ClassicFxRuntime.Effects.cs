@@ -223,7 +223,35 @@ namespace Client.Main.ClassicFX.Core
         NarCondraStone = 197,
         NarCondraStone1 = 198,
         NarCondraStone2 = 199,
-        NarCondraStone3 = 200
+        NarCondraStone3 = 200,
+        // S6 Batch 21: Swamp of Quiet Shadow Pawn/Knight/Rook debris.
+        ShadowPawnAnkleLeft = 201,
+        ShadowPawnAnkleRight = 202,
+        ShadowPawnBelt = 203,
+        ShadowPawnChest = 204,
+        ShadowPawnHelmet = 205,
+        ShadowPawnKneeLeft = 206,
+        ShadowPawnKneeRight = 207,
+        ShadowPawnWristLeft = 208,
+        ShadowPawnWristRight = 209,
+        ShadowKnightAnkleLeft = 210,
+        ShadowKnightAnkleRight = 211,
+        ShadowKnightBelt = 212,
+        ShadowKnightChest = 213,
+        ShadowKnightHelmet = 214,
+        ShadowKnightKneeLeft = 215,
+        ShadowKnightKneeRight = 216,
+        ShadowKnightWristLeft = 217,
+        ShadowKnightWristRight = 218,
+        ShadowRookAnkleLeft = 219,
+        ShadowRookAnkleRight = 220,
+        ShadowRookBelt = 221,
+        ShadowRookChest = 222,
+        ShadowRookHelmet = 223,
+        ShadowRookKneeLeft = 224,
+        ShadowRookKneeRight = 225,
+        ShadowRookWristLeft = 226,
+        ShadowRookWristRight = 227,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -594,6 +622,12 @@ namespace Client.Main.ClassicFX.Core
                         ref angle, ref light, ref effectScale, ref life,
                         ref effectDirection, ref effectGravity,
                         ref effectHeading, ref effectVelocity);
+                if (IsS6Batch21ModelType(type))
+                    InitializeS6Batch21Model(ref subType, ref angle,
+                        ref light, ref effectScale, ref life,
+                        ref effectDirection, ref effectGravity,
+                        ref effectHeading, ref effectVelocity,
+                        type);
             }
             else if (additionalTerrain)
             {

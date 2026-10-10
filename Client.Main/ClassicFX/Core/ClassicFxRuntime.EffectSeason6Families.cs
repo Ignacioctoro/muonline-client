@@ -60,7 +60,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch17ModelType(type) ||
                 IsS6Batch18ModelType(type) ||
                 IsS6Batch19CrushModel(type) ||
-                IsS6Batch20AvailableModel(type);
+                IsS6Batch20AvailableModel(type) ||
+                IsS6Batch21ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -161,7 +162,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch19ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch20ModelDefinition(type, subType,
+                    if (TryGetS6Batch20ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch21ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -363,6 +367,34 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.NarCondraStone2:
                 case ClassicFxEffectType.NarCondraStone3:
                     return MoveS6Batch20Model(ref effect, f);
+                case ClassicFxEffectType.ShadowPawnAnkleLeft:
+                case ClassicFxEffectType.ShadowPawnAnkleRight:
+                case ClassicFxEffectType.ShadowPawnBelt:
+                case ClassicFxEffectType.ShadowPawnChest:
+                case ClassicFxEffectType.ShadowPawnHelmet:
+                case ClassicFxEffectType.ShadowPawnKneeLeft:
+                case ClassicFxEffectType.ShadowPawnKneeRight:
+                case ClassicFxEffectType.ShadowPawnWristLeft:
+                case ClassicFxEffectType.ShadowPawnWristRight:
+                case ClassicFxEffectType.ShadowKnightAnkleLeft:
+                case ClassicFxEffectType.ShadowKnightAnkleRight:
+                case ClassicFxEffectType.ShadowKnightBelt:
+                case ClassicFxEffectType.ShadowKnightChest:
+                case ClassicFxEffectType.ShadowKnightHelmet:
+                case ClassicFxEffectType.ShadowKnightKneeLeft:
+                case ClassicFxEffectType.ShadowKnightKneeRight:
+                case ClassicFxEffectType.ShadowKnightWristLeft:
+                case ClassicFxEffectType.ShadowKnightWristRight:
+                case ClassicFxEffectType.ShadowRookAnkleLeft:
+                case ClassicFxEffectType.ShadowRookAnkleRight:
+                case ClassicFxEffectType.ShadowRookBelt:
+                case ClassicFxEffectType.ShadowRookChest:
+                case ClassicFxEffectType.ShadowRookHelmet:
+                case ClassicFxEffectType.ShadowRookKneeLeft:
+                case ClassicFxEffectType.ShadowRookKneeRight:
+                case ClassicFxEffectType.ShadowRookWristLeft:
+                case ClassicFxEffectType.ShadowRookWristRight:
+                    return MoveS6Batch21Model(ref effect, f);
                 default:
                     return false;
             }
