@@ -15,7 +15,7 @@ Pinned Main: sven-n/MuMain@21728b1e5b03e0763b38ef9e23f79645e0df7ad2
 
 All model families use the existing MonoGame BMD effect object, pools,
 movement dispatcher and lighting. Crater reuses the existing terrain-quad
-renderer with the original Effect/Cratered.tga texture and AlphaTest blend
+renderer with the original Effect/cratered.tga texture and AlphaTest blend
 semantics. No new graphics pipeline, duplicate Skill renderer, scene handler,
 network event or combat damage code.
 
@@ -27,7 +27,7 @@ network event or combat damage code.
 - StunStone: Skill/GroundCrystal.bmd, BITMAP_ADV_SMOKE+1 and
   BITMAP_CRATER subtype 1; subtype-1 stone emitter creates subtype-0
   pieces at fixed logical intervals.
-- Crater: Effect/Cratered.tga from original Main; Data_Broyal contains
+- Crater: Effect/cratered.tga from original Main; Data_Broyal contains
   compressed Effect/Cratered.OZT.
 - All children are bounded by the existing shared pools.
 
