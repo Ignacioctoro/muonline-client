@@ -166,11 +166,14 @@ namespace Client.Main.ClassicFX.Core
                     ? 0.0
                     : ReferenceFps / Fps;
 
+            // CLOCK PARITY V1: el runtime puede usar float para la
+            // simulacion, pero el contador logico debe conservar double.
+            // El Main original limita el factor a 1 por debajo de 25 FPS.
+            double logicalFrameFactor =
+                Math.Clamp(fpsRatio, 0.0, 1.0);
+
             FrameFactor =
-                (float)Math.Clamp(
-                    fpsRatio,
-                    0.0,
-                    1.0);
+                (float)logicalFrameFactor;
 
             // ---------------------------------------------------------
             // Construir un contador lógico de 25 FPS.
@@ -183,17 +186,23 @@ namespace Client.Main.ClassicFX.Core
             // exactamente un frame lógico.
             // ---------------------------------------------------------
 
+            // Evitar que la conversion previa a float desplace los pulsos
+            // en el borde de un segundo a 30, 60, 120 o 240 FPS.
             _referenceFrameAccumulator +=
-                FrameFactor;
+                logicalFrameFactor;
 
             AdvancedReferenceFrame =
                 false;
 
+            // CLOCK PARITY V1: tolerar exclusivamente el ruido numerico
+            // (< 1e-10 de un frame de referencia). La tolerancia NO
+            // acelera la simulacion ni modifica FrameFactor.
+            const double referenceTickEpsilon = 1e-10;
             if (_referenceFrameAccumulator >=
-                1.0)
+                1.0 - referenceTickEpsilon)
             {
-                _referenceFrameAccumulator -=
-                    1.0;
+                _referenceFrameAccumulator =
+                    Math.Max(0.0, _referenceFrameAccumulator - 1.0);
 
                 ReferenceFrame++;
 
