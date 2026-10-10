@@ -96,14 +96,19 @@ namespace Client.Main.ClassicFX.Core
         private bool MoveLightningShockCaster(
             ref EffectState e, WorldObject owner, float f)
         {
-            if (e.LifeTime < 15f)
+            // Native: owner animation > 6 OR fallback to LifeTime < 15.
+            // MoveParticle(o, true) rotates Direction by the owner's angle
+            // and advances Position even before the descending phase.
+            if (e.LifeTime < 15f ||
+                (owner is ModelObject ownerModel && ownerModel.CurrentFrame > 6))
             {
-                // After cast animation, native direction descends into
-                // terrain; all speeds originate in Move_MODEL_LIGHTNING_SHOCK.
+                e.Direction = new Vector3(0f, -20f, -75f - e.Velocity);
                 e.Gravity += 0.1f * f;
                 e.Velocity += e.Gravity * f;
-                e.Position += new Vector3(0f, -20f, -75f - e.Velocity) * f;
             }
+            Vector3 velocity = Vector3.TransformNormal(e.Direction,
+                Matrix.CreateRotationZ(e.Angle.Z));
+            e.Position += velocity * f;
 
             if (Clock.AdvancedReferenceFrame)
             {
@@ -252,8 +257,11 @@ namespace Client.Main.ClassicFX.Core
             if (Random.Modulo(2) == 0)
                 CreateParticle(ClassicTextureIds.BitmapSmoke,
                     ground, e.Angle, red, 54, 2.8f);
-            CreateEffect(ClassicFxEffectType.Stone1, ground,
-                e.Angle, red, ClassicFxOwner.None, subType: 0);
+            // Native MODEL_STONE1 + rand()%2, subtype 13.
+            CreateEffect(Random.Modulo(2) == 0
+                    ? ClassicFxEffectType.Stone1
+                    : ClassicFxEffectType.Stone2,
+                ground, e.Angle, red, ClassicFxOwner.None, subType: 13);
         }
 
         private void EmitLightningShockTargetSparks(
