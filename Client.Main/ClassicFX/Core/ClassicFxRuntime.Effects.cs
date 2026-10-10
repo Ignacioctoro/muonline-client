@@ -82,7 +82,10 @@ namespace Client.Main.ClassicFX.Core
         Crater = 61,
         Waves = 62,
         Piercing2 = 63,
-        PierPart = 64
+        PierPart = 64,
+        BlowOfDestruction = 65,
+        NightWater01 = 66,
+        KnightPlancrackB = 67
     }
 
     public sealed partial class ClassicFxRuntime
@@ -161,6 +164,10 @@ namespace Client.Main.ClassicFX.Core
                 (subType == 0 || subType == 1);
             bool crater = type == ClassicFxEffectType.Crater &&
                 (subType is >= 0 and <= 2);
+            // Native BLOW_OF_DESTRUCTION is a logical Effect with terrain
+            // and sprite render paths, not another BMD renderer.
+            bool blowOfDestruction = type == ClassicFxEffectType.BlowOfDestruction &&
+                (subType is 0 or 1);
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -177,7 +184,7 @@ namespace Client.Main.ClassicFX.Core
             if (nativeGroundV8 && groundV8Definition.RequiresOwner &&
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
-            if (nativeGroundV8 || crater || magicGround2 || magicCircleGround ||
+            if (nativeGroundV8 || crater || blowOfDestruction || magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
@@ -369,6 +376,8 @@ namespace Client.Main.ClassicFX.Core
                     life = GetS6ParentEffectLifetime(owner);
                     effectAlpha = (20f - life) / 5f;
                 }
+                if (IsS6Batch11ModelType(type))
+                    InitializeS6Batch11Model(type, ref angle);
             }
             else if (additionalTerrain)
             {
@@ -406,6 +415,28 @@ namespace Client.Main.ClassicFX.Core
                 effectScale = subType == 0 ? 4.5f :
                               subType == 1 ? 2.5f : 3f;
                 light = Vector3.One;
+            }
+            else if (blowOfDestruction)
+            {
+                // Native both visible impact phases run for forty ticks.
+                life = 40f;
+                if (subType == 0)
+                {
+                    if (!TryGetOwnerSnapshot(owner,
+                            out ClassicFxOwnerSnapshot caster))
+                        return ClassicFxHandle.Invalid;
+                    Vector3 offset = Vector3.TransformNormal(
+                        new Vector3(-20f, -100f, 0f),
+                        Matrix.CreateFromYawPitchRoll(
+                            caster.Angle.Y, caster.Angle.X, caster.Angle.Z));
+                    effectPosition += offset;
+                }
+                else
+                {
+                    effectPosition.Z = 150f;
+                    effectScale = 5f;
+                }
+                light = new Vector3(1.2f);
             }
             else if (damage01Mono)
             {
@@ -467,7 +498,8 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = type == ClassicFxEffectType.PierPart && subType == 0
+                StartPosition = (type == ClassicFxEffectType.PierPart && subType == 0) ||
+                    (type == ClassicFxEffectType.BlowOfDestruction && subType == 0)
                     ? inputLight : effectPosition,
                 HeadAngle = effectHeading,
                 Angle = angle,
@@ -501,6 +533,10 @@ namespace Client.Main.ClassicFX.Core
                 ReleaseEffect(handle);
                 return ClassicFxHandle.Invalid;
             }
+            // Native CreateEffect immediately spawns phase 1.
+            if (blowOfDestruction && subType == 0)
+                CreateEffect(ClassicFxEffectType.BlowOfDestruction,
+                    inputLight, angle, light, owner, subType: 1);
             return handle;
         }
 
@@ -564,6 +600,10 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.Crater)
                 {
                     MoveS6Crater(ref e, f);
+                }
+                else if (e.Type == ClassicFxEffectType.BlowOfDestruction)
+                {
+                    MoveS6BlowOfDestruction(ref e, f);
                 }
                 else if (e.Type == ClassicFxEffectType.Damage01Mono)
                 {
@@ -829,6 +869,15 @@ namespace Client.Main.ClassicFX.Core
                 if (e.Type == ClassicFxEffectType.MagicGround2)
                 {
                     RenderMagicGround2(ref e);
+                    continue;
+                }
+                if (e.Type == ClassicFxEffectType.BlowOfDestruction)
+                {
+                    if (e.LifeTime <= 24f &&
+                        Textures.TryGet(ClassicTextureIds.BitmapFlareBlue,
+                            out ClassicTextureResource flare))
+                        QueueTerrainEffect(ref e, flare,
+                            scaleOverride: e.SubType == 0 ? 4f : 6f);
                     continue;
                 }
                 if (e.Type == ClassicFxEffectType.MagicCircleGround)

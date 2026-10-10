@@ -51,7 +51,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch06ModelType(type) || IsS6Batch07ModelType(type) ||
                 IsS6Batch08ModelType(type) ||
                 IsS6Batch09ModelType(type) ||
-                IsS6Batch10ModelType(type);
+                IsS6Batch10ModelType(type) ||
+                IsS6Batch11ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -125,7 +126,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch09ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch10ModelDefinition(type, subType,
+                    if (TryGetS6Batch10ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch11ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -197,6 +201,9 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.Piercing2:
                 case ClassicFxEffectType.PierPart:
                     return MoveS6Batch10Model(ref effect, f);
+                case ClassicFxEffectType.NightWater01:
+                case ClassicFxEffectType.KnightPlancrackB:
+                    return MoveS6Batch11Model(ref effect, f);
                 default:
                     return false;
             }
