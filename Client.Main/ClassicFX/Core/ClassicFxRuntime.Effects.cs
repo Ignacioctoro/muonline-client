@@ -311,6 +311,19 @@ namespace Client.Main.ClassicFX.Core
         ShockwaveSpin01 = 280,
         WindForce = 281,
         SdAura = 282,
+        // S6 Batch 26: physical combat effects and projectiles.
+        ShieldCrashModel = 283,
+        ShieldCrashRing = 284,
+        ComboModel = 285,
+        FissureModel = 286,
+        FissureLight = 287,
+        WaterWaveModel = 288,
+        IronRiderArrowModel = 289,
+        KentaurosArrowModel = 290,
+        DragonLowerDummy = 291,
+        BalgasSkillModel = 292,
+        DarkElfSkillModel = 293,
+        ArrowAutoLoadModel = 294,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -510,6 +523,7 @@ namespace Client.Main.ClassicFX.Core
             Vector3 s6Batch23StoredPosition = position;
             Vector3 s6Batch24StoredPosition = position;
             Vector3 s6Batch25StoredPosition = position;
+            Vector3 s6Batch26StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -731,6 +745,15 @@ namespace Client.Main.ClassicFX.Core
                         ref effectVelocity, ref effectGravity,
                         ref effectHeading))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch26ModelType(type) &&
+                    !InitializeS6Batch26Model(type, subType, owner,
+                        inputLight, ref effectPosition,
+                        ref s6Batch26StoredPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectMeshLight, ref effectDirection,
+                        ref effectHeading, ref effectVelocity,
+                        ref effectGravity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -898,6 +921,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch16ModelView(view, type);
                 if (IsS6Batch17ModelType(type))
                     ConfigureS6Batch17ModelView(view, type);
+                if (IsS6Batch26ModelType(type))
+                    ConfigureS6Batch26ModelView(view, type, subType);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
@@ -909,7 +934,9 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = IsS6Batch25ModelType(type)
+                StartPosition = IsS6Batch26ModelType(type)
+                    ? s6Batch26StoredPosition
+                    : IsS6Batch25ModelType(type)
                     ? s6Batch25StoredPosition
                     : IsS6Batch24ModelType(type)
                     ? s6Batch24StoredPosition
@@ -964,6 +991,16 @@ namespace Client.Main.ClassicFX.Core
                     inputLight, angle, light, owner, subType: 1);
             if (type == ClassicFxEffectType.FenrirThunder)
                 StartS6FenrirThunderSprite(ref _effects[handle.Index]);
+            if (type == ClassicFxEffectType.ShieldCrashModel &&
+                subType == 0 && owner.WorldObject != null)
+            {
+                // Original MODEL_SHIELD_CRASH subtype 0 spawns the model
+                // MODEL_SHIELD_CRASH2 once at creation, same WorldObject.
+                CreateEffect(ClassicFxEffectType.ShieldCrashRing,
+                    owner.WorldObject.WorldPosition.Translation,
+                    owner.WorldObject.Angle, new Vector3(0.5f, 0.5f, 1f),
+                    owner, subType: 0);
+            }
             if (type == ClassicFxEffectType.SapitresAttackCarrier)
             {
                 for (int n = 0; n < 10; n++)

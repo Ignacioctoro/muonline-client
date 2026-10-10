@@ -65,7 +65,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch22ModelType(type) ||
                 IsS6Batch23ModelType(type) ||
                 IsS6Batch24ModelType(type) ||
-                IsS6Batch25ModelType(type);
+                IsS6Batch25ModelType(type) ||
+                IsS6Batch26ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -181,7 +182,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch24ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch25ModelDefinition(type, subType,
+                    if (TryGetS6Batch25ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch26ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -470,6 +474,19 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.WindForce:
                 case ClassicFxEffectType.SdAura:
                     return MoveS6Batch25Model(ref effect, f);
+                case ClassicFxEffectType.ShieldCrashModel:
+                case ClassicFxEffectType.ShieldCrashRing:
+                case ClassicFxEffectType.ComboModel:
+                case ClassicFxEffectType.FissureModel:
+                case ClassicFxEffectType.FissureLight:
+                case ClassicFxEffectType.WaterWaveModel:
+                case ClassicFxEffectType.IronRiderArrowModel:
+                case ClassicFxEffectType.KentaurosArrowModel:
+                case ClassicFxEffectType.DragonLowerDummy:
+                case ClassicFxEffectType.BalgasSkillModel:
+                case ClassicFxEffectType.DarkElfSkillModel:
+                case ClassicFxEffectType.ArrowAutoLoadModel:
+                    return MoveS6Batch26Model(ref effect, f);
                 default:
                     return false;
             }
