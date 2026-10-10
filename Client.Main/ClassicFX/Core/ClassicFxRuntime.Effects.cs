@@ -45,7 +45,11 @@ namespace Client.Main.ClassicFX.Core
         AliceBuffSkillEffect = 24,
         AliceBuffSkillEffect2 = 25,
         ShockWaveGround01 = 26,
-        Wave = 27
+        Wave = 27,
+        CircleLight = 28,
+        Stone1 = 29,
+        Stone2 = 30,
+        AliceDrainLife = 31
     }
 
     public sealed partial class ClassicFxRuntime
@@ -61,6 +65,8 @@ namespace Client.Main.ClassicFX.Core
             public float Scale;
             public Vector3 Direction;
             public float Velocity;
+            public float Gravity;
+            public WorldObject TargetWorldObject;
             public float Alpha;
             public float LifeTime;
             public float BlendMeshLight;
@@ -172,6 +178,7 @@ namespace Client.Main.ClassicFX.Core
             int effectHiddenMesh = -1;
             Vector3 effectDirection = Vector3.Zero;
             float effectVelocity = 0f;
+            float effectGravity = 0f;
             Vector3 effectPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
@@ -221,6 +228,19 @@ namespace Client.Main.ClassicFX.Core
                 if (type == ClassicFxEffectType.AliceBuffSkillEffect2 ||
                     (type == ClassicFxEffectType.AliceBuffSkillEffect && subType <= 2))
                     angle.Z = 0f;
+                // Native MODEL_STONE1/2 subtype 0: randomized stone size,
+                // direction, gravity, angle and lifetime at creation.
+                if (type is ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2)
+                {
+                    life = 32f + Random.Modulo(16);
+                    effectScale = (8f + Random.Modulo(4)) * 0.1f;
+                    angle.Z = MathHelper.ToRadians(Random.Modulo(360));
+                    float speed = (64f + Random.Modulo(256)) * 0.1f;
+                    effectDirection = Vector3.TransformNormal(
+                        new Vector3(0f, speed, 0f),
+                        Matrix.CreateRotationZ(angle.Z));
+                    effectGravity = 8f + Random.Modulo(16);
+                }
             }
             else if (additionalTerrain)
             {
@@ -291,6 +311,7 @@ namespace Client.Main.ClassicFX.Core
                 Scale = effectScale,
                 Direction = effectDirection,
                 Velocity = effectVelocity,
+                Gravity = effectGravity,
                 Alpha = terrain ? 0f : effectAlpha,
                 BlendMeshLight = effectMeshLight,
                 LifeTime = life,
@@ -359,7 +380,15 @@ namespace Client.Main.ClassicFX.Core
                 ref EffectState e = ref _effects[i];
                 bool terrain = e.Type == ClassicFxEffectType.ShockWave ||
                                e.Type == ClassicFxEffectType.Twlight;
-                if (IsV5TerrainEffectType(e.Type))
+                if (e.Type == ClassicFxEffectType.AliceDrainLife)
+                {
+                    if (!MoveAliceDrainLife(ref e))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsV5TerrainEffectType(e.Type))
                 {
                     if (!MoveV5TerrainEffect(ref e, f))
                     {

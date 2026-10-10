@@ -46,7 +46,7 @@ namespace Client.Main.ClassicFX.Core
             type is ClassicFxEffectType.AliceBuffSkillEffect or
                 ClassicFxEffectType.AliceBuffSkillEffect2 or
                 ClassicFxEffectType.ShockWaveGround01 or
-                ClassicFxEffectType.Wave;
+                ClassicFxEffectType.Wave || IsS6Batch02ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -99,7 +99,8 @@ namespace Client.Main.ClassicFX.Core
                     return true;
 
                 default:
-                    return false;
+                    return TryGetS6Batch02ModelDefinition(type, subType,
+                        out definition);
             }
         }
 
@@ -129,6 +130,10 @@ namespace Client.Main.ClassicFX.Core
                     if (grown)
                         effect.BlendMeshLight = effect.LifeTime / 30f;
                     return true;
+                case ClassicFxEffectType.CircleLight:
+                case ClassicFxEffectType.Stone1:
+                case ClassicFxEffectType.Stone2:
+                    return MoveS6Batch02Model(ref effect, f);
                 default:
                     return false;
             }
