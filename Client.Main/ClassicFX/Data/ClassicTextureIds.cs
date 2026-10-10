@@ -149,6 +149,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapLava =
             32238;
 
+        // Native BITMAP_CRATER is immediately before FORMATION_MARK.
+        public const int BitmapCrater =
+            32240;
+
         public const int BitmapFormationMark =
             32241;
 
