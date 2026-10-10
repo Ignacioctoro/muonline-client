@@ -58,7 +58,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch15ModelType(type) ||
                 IsS6Batch16ModelType(type) ||
                 IsS6Batch17ModelType(type) ||
-                IsS6Batch18ModelType(type);
+                IsS6Batch18ModelType(type) ||
+                IsS6Batch19CrushModel(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -153,7 +154,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch17ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch18ModelDefinition(type, subType,
+                    if (TryGetS6Batch18ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch19ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -304,6 +308,23 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.NewYearsDayPig:
                 case ClassicFxEffectType.NewYearsDayYut:
                     return MoveS6Batch18Model(ref effect, f);
+                case ClassicFxEffectType.DoorCrushPiece01:
+                case ClassicFxEffectType.DoorCrushPiece02:
+                case ClassicFxEffectType.DoorCrushPiece03:
+                case ClassicFxEffectType.DoorCrushPiece04:
+                case ClassicFxEffectType.DoorCrushPiece05:
+                case ClassicFxEffectType.DoorCrushPiece06:
+                case ClassicFxEffectType.DoorCrushPiece07:
+                case ClassicFxEffectType.DoorCrushPiece08:
+                case ClassicFxEffectType.DoorCrushPiece10:
+                case ClassicFxEffectType.DoorCrushPiece11:
+                case ClassicFxEffectType.DoorCrushPiece12:
+                case ClassicFxEffectType.DoorCrushPiece13:
+                case ClassicFxEffectType.StatueCrushPiece01:
+                case ClassicFxEffectType.StatueCrushPiece02:
+                case ClassicFxEffectType.StatueCrushPiece03:
+                case ClassicFxEffectType.StatueCrushPiece04:
+                    return MoveS6Batch19CrushModel(ref effect, f);
                 default:
                     return false;
             }

@@ -166,7 +166,27 @@ namespace Client.Main.ClassicFX.Core
         NewYearsDayHotPepperGreen = 142,
         NewYearsDayHotPepperRed = 143,
         NewYearsDayPig = 144,
-        NewYearsDayYut = 145
+        NewYearsDayYut = 145,
+        // S6 Batch 19: Imperial Guardian door/statue breakage.
+        DoorCrushPiece01 = 146,
+        DoorCrushPiece02 = 147,
+        DoorCrushPiece03 = 148,
+        DoorCrushPiece04 = 149,
+        DoorCrushPiece05 = 150,
+        DoorCrushPiece06 = 151,
+        DoorCrushPiece07 = 152,
+        DoorCrushPiece08 = 153,
+        DoorCrushPiece09 = 154,
+        DoorCrushPiece10 = 155,
+        DoorCrushPiece11 = 156,
+        DoorCrushPiece12 = 157,
+        DoorCrushPiece13 = 158,
+        StatueCrushPiece01 = 159,
+        StatueCrushPiece02 = 160,
+        StatueCrushPiece03 = 161,
+        StatueCrushPiece04 = 162,
+        DoorCrushCarrier = 163,
+        StatueCrushCarrier = 164
     }
 
     public sealed partial class ClassicFxRuntime
@@ -273,6 +293,10 @@ namespace Client.Main.ClassicFX.Core
                 (type == ClassicFxEffectType.SapitresAttackCarrier && subType == 0);
             bool s6Batch17Logical =
                 type == ClassicFxEffectType.HalloweenEx && subType == 0;
+            bool s6Batch19Logical = IsS6Batch19CrushCarrier(type, subType);
+            // Source model is present in Main, but BMD is missing in Data_Broyal.
+            if (type == ClassicFxEffectType.DoorCrushPiece09)
+                return ClassicFxHandle.Invalid;
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -291,6 +315,7 @@ namespace Client.Main.ClassicFX.Core
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
                 s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
+                s6Batch19Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -523,6 +548,10 @@ namespace Client.Main.ClassicFX.Core
                     InitializeS6Batch18Model(type, ref angle,
                         ref effectScale, ref life, ref effectDirection,
                         ref effectGravity, ref effectHeading);
+                if (IsS6Batch19CrushModel(type))
+                    InitializeS6Batch19CrushModel(type, ref subType,
+                        ref angle, ref light, ref life, ref effectHeading,
+                        ref effectDirection, ref effectVelocity, ref effectGravity);
             }
             else if (additionalTerrain)
             {
@@ -601,6 +630,11 @@ namespace Client.Main.ClassicFX.Core
             else if (s6Batch17Logical)
             {
                 // MODEL_HALLOWEEN_EX is a zero-lifetime 24-candy carrier.
+                life = 0f;
+            }
+            else if (s6Batch19Logical)
+            {
+                // Native crush roots emit only their BMD children.
                 life = 0f;
             }
             else if (s6Batch15Logical)
@@ -745,6 +779,9 @@ namespace Client.Main.ClassicFX.Core
             }
             if (s6Batch17Logical)
                 EmitS6HalloweenEx(effectPosition, angle, light);
+            if (s6Batch19Logical)
+                EmitS6Batch19Crush(type, subType, effectPosition,
+                    angle, light, owner);
             return handle;
         }
 
@@ -833,9 +870,11 @@ namespace Client.Main.ClassicFX.Core
                 {
                     MoveS6SapitresCarrier(ref e, f);
                 }
-                else if (e.Type == ClassicFxEffectType.HalloweenEx)
+                else if (e.Type == ClassicFxEffectType.HalloweenEx ||
+                         e.Type == ClassicFxEffectType.DoorCrushCarrier ||
+                         e.Type == ClassicFxEffectType.StatueCrushCarrier)
                 {
-                    // Native carrier creates 24 children once, then expires.
+                    // Logical carriers emit their children only at creation.
                     ReleaseEffectAt(i);
                     continue;
                 }
