@@ -49,7 +49,10 @@ namespace Client.Main.ClassicFX.Core
         CircleLight = 28,
         Stone1 = 29,
         Stone2 = 30,
-        AliceDrainLife = 31
+        AliceDrainLife = 31,
+        KnightPlancrackA = 32,
+        Damage01Mono = 33,
+        LightningShock = 34
     }
 
     public sealed partial class ClassicFxRuntime
@@ -122,6 +125,8 @@ namespace Client.Main.ClassicFX.Core
                 TryGetMagicGround2Definition(subType, out magicCircleDefinition);
             bool nativeGroundV8 = TryGetV8GroundEffectDefinition(type, subType,
                 out V8GroundEffectDefinition groundV8Definition);
+            bool damage01Mono = type == ClassicFxEffectType.Damage01Mono &&
+                (subType == 0 || subType == 1);
             // Preserve already-ported Wizardry subtypes ShockWave 14 / Twlight 3.
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
@@ -130,7 +135,8 @@ namespace Client.Main.ClassicFX.Core
             if (nativeGroundV8 && groundV8Definition.RequiresOwner &&
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
-            if (nativeGroundV8 || magicGround2 || magicCircleGround || additionalTerrain)
+            if (nativeGroundV8 || magicGround2 || magicCircleGround ||
+                additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
                 // If present, Owner still must belong to this world.
@@ -228,18 +234,38 @@ namespace Client.Main.ClassicFX.Core
                 if (type == ClassicFxEffectType.AliceBuffSkillEffect2 ||
                     (type == ClassicFxEffectType.AliceBuffSkillEffect && subType <= 2))
                     angle.Z = 0f;
-                // Native MODEL_STONE1/2 subtype 0: randomized stone size,
-                // direction, gravity, angle and lifetime at creation.
+                // The native MODEL_STONE1/2 init has a separate HeadAngle
+                // trajectory for subtypes 13/14 (Lightning Shock debris).
                 if (type is ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2)
                 {
-                    life = 32f + Random.Modulo(16);
-                    effectScale = (8f + Random.Modulo(4)) * 0.1f;
                     angle.Z = MathHelper.ToRadians(Random.Modulo(360));
-                    float speed = (64f + Random.Modulo(256)) * 0.1f;
-                    effectDirection = Vector3.TransformNormal(
-                        new Vector3(0f, speed, 0f),
-                        Matrix.CreateRotationZ(angle.Z));
-                    effectGravity = 8f + Random.Modulo(16);
+                    if (subType == 13 || subType == 14)
+                    {
+                        life = 20f + Random.Modulo(16);
+                        effectScale = (3f + Random.Modulo(13)) * 0.08f * scale;
+                        effectGravity = 3f + Random.Modulo(3);
+                        float speed = (64f + Random.Modulo(128)) * 0.1f;
+                        effectDirection = Vector3.TransformNormal(
+                            new Vector3(0f, speed, 0f),
+                            Matrix.CreateRotationZ(angle.Z));
+                        effectDirection.Z += 15f * Clock.FrameFactor;
+                    }
+                    else
+                    {
+                        life = 32f + Random.Modulo(16);
+                        effectScale = (8f + Random.Modulo(4)) * 0.1f;
+                        float speed = (64f + Random.Modulo(256)) * 0.1f;
+                        // Move_MODEL_ICE_SMALL rotates the unrotated
+                        // direction each frame; avoid applying yaw twice.
+                        effectDirection = new Vector3(0f, speed, 0f);
+                        effectGravity = 8f + Random.Modulo(16);
+                    }
+                }
+                if (type == ClassicFxEffectType.KnightPlancrackA)
+                {
+                    angle.Z = MathHelper.ToRadians(Random.Modulo(360));
+                    effectScale = scale + Random.Modulo(10) * 0.05f;
+                    effectPosition.Z += 10f * Clock.FrameFactor;
                 }
             }
             else if (additionalTerrain)
@@ -271,6 +297,12 @@ namespace Client.Main.ClassicFX.Core
                 life = groundV8Definition.LifeTime;
                 effectScale = InitializeV8GroundScale(in groundV8Definition, scale);
                 light *= groundV8Definition.LightMultiplier;
+            }
+            else if (damage01Mono)
+            {
+                // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
+                life = subType == 0 ? 20f : 10f;
+                effectScale = subType == 0 ? scale : 0.1f;
             }
             else if (terrain)
             {
@@ -387,6 +419,18 @@ namespace Client.Main.ClassicFX.Core
                         ReleaseEffectAt(i);
                         continue;
                     }
+                }
+                else if (e.Type == ClassicFxEffectType.LightningShock)
+                {
+                    if (!MoveLightningShock(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (e.Type == ClassicFxEffectType.Damage01Mono)
+                {
+                    MoveDamage01Mono(ref e, f);
                 }
                 else if (IsV5TerrainEffectType(e.Type))
                 {
@@ -657,6 +701,7 @@ namespace Client.Main.ClassicFX.Core
                 {
                     ClassicFxEffectType.ShockWave => ClassicTextureIds.BitmapShockWave,
                     ClassicFxEffectType.Twlight => ClassicTextureIds.BitmapTwlight,
+                    ClassicFxEffectType.Damage01Mono => ClassicTextureIds.BitmapDamage01Mono,
                     _ => -1
                 };
                 if (textureId < 0 || e.Scale <= 0f ||

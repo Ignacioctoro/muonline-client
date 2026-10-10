@@ -412,6 +412,10 @@ namespace Client.Main.ClassicFX.Data
                     ClassicTextureIds.BitmapDamage1,
                     "Effect/Damage1.jpg",
                     SamplerState.LinearClamp),
+                new(
+                    ClassicTextureIds.BitmapDamage01Mono,
+                    "Effect/damage01mono.jpg",
+                    SamplerState.LinearClamp),
 
                 new(
                     ClassicTextureIds.BitmapDamage2,

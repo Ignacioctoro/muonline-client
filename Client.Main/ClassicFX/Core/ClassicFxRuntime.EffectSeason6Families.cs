@@ -133,6 +133,7 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.CircleLight:
                 case ClassicFxEffectType.Stone1:
                 case ClassicFxEffectType.Stone2:
+                case ClassicFxEffectType.KnightPlancrackA:
                     return MoveS6Batch02Model(ref effect, f);
                 default:
                     return false;

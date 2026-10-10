@@ -13,7 +13,8 @@ namespace Client.Main.ClassicFX.Core
     {
         private static bool IsS6Batch02ModelType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.CircleLight or
-                ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2;
+                ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2 or
+                ClassicFxEffectType.KnightPlancrackA;
 
         private static bool TryGetS6Batch02ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -33,11 +34,20 @@ namespace Client.Main.ClassicFX.Core
                         1f, useCallerScale: subType <= 1);
                     return true;
 
+                case ClassicFxEffectType.KnightPlancrackA:
+                    if (subType != 0 && subType != 1)
+                        return false;
+                    definition = new Season6ModelDefinition(
+                        "Effect/knight_plancrack_a.bmd",
+                        subType == 0 ? 25f : 20f, 1f,
+                        useCallerScale: true);
+                    return true;
+
                 case ClassicFxEffectType.Stone1:
                 case ClassicFxEffectType.Stone2:
-                    // Batch 02 implements the shared original subtype 0
-                    // thrown fragments. Other subtype physics are separate.
-                    if (subType != 0)
+                    // Source-backed native thrown fragment variants. Subtypes
+                    // 13/14 are required by Lightning Shock's aftermath.
+                    if (subType != 0 && subType != 13 && subType != 14)
                         return false;
                     definition = new Season6ModelDefinition(
                         type == ClassicFxEffectType.Stone1
@@ -53,6 +63,14 @@ namespace Client.Main.ClassicFX.Core
         {
             if (e.Type == ClassicFxEffectType.CircleLight)
                 return MoveCircleLight(ref e);
+            if (e.Type == ClassicFxEffectType.KnightPlancrackA)
+            {
+                if (e.SubType == 0)
+                    e.Alpha = MathF.Max(0f, e.Alpha - 0.04f * f);
+                else
+                    e.Alpha *= MathF.Pow(0.9f, f);
+                return true;
+            }
             if (e.Type is ClassicFxEffectType.Stone1 or
                 ClassicFxEffectType.Stone2)
                 return MoveStoneFragment(ref e, f);
@@ -120,6 +138,8 @@ namespace Client.Main.ClassicFX.Core
 
         private bool MoveStoneFragment(ref EffectState e, float f)
         {
+            if (e.SubType == 13 || e.SubType == 14)
+                return MoveStoneFragmentImpact(ref e, f);
             // Source: MODEL_STONE1/2 subtype 0 inherits native
             // Move_MODEL_ICE_SMALL. Direction decays, gravity bounces on
             // real terrain, and the object rotates during its descent.
@@ -150,6 +170,33 @@ namespace Client.Main.ClassicFX.Core
             if (Clock.AdvancedReferenceFrame && Random.Modulo(10) == 0)
                 CreateParticle(ClassicTextureIds.BitmapFire, e.Position,
                     e.Angle, e.Light, 1 + Random.Modulo(3));
+            return true;
+        }
+ 
+        // Native MODEL_STONE1/2 subtype 13/14: uses HeadAngle (stored in
+        // Direction), not the regular Model_ICE_SMALL gravity integrator.
+        // A single bounced stone remains in the shared BMD effect pool.
+        private bool MoveStoneFragmentImpact(ref EffectState e, float f)
+        {
+            e.Direction.Z -= e.Gravity * f;
+            e.Position += e.Direction * f;
+            e.Angle.X += MathHelper.ToRadians(0.5f * e.LifeTime * f);
+            e.Angle.Y += MathHelper.ToRadians(0.5f * e.LifeTime * f);
+            if (World?.Terrain == null)
+                return true;
+            float ground = World.Terrain.RequestTerrainRenderHeight(
+                e.Position.X, e.Position.Y);
+            if (e.Position.Z + e.Direction.Z <= ground)
+            {
+                e.Position.Z = ground;
+                float friction = MathF.Pow(0.6f, f);
+                e.Direction.X *= friction;
+                e.Direction.Y *= friction;
+                e.Direction.Z += e.LifeTime * f;
+                if (e.Direction.Z < 0.5f)
+                    e.Direction.Z = 0f;
+                e.Alpha = MathF.Max(0f, e.Alpha - 0.1f * f);
+            }
             return true;
         }
     }
