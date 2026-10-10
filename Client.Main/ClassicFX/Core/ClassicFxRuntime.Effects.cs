@@ -79,7 +79,10 @@ namespace Client.Main.ClassicFX.Core
         ArrowImpact = 58,
         SkinShell = 59,
         StunStone = 60,
-        Crater = 61
+        Crater = 61,
+        Waves = 62,
+        Piercing2 = 63,
+        PierPart = 64
     }
 
     public sealed partial class ClassicFxRuntime
@@ -214,6 +217,9 @@ namespace Client.Main.ClassicFX.Core
                 return ClassicFxHandle.Invalid;
             }
 
+            // Some native MODEL_PIER_PART variants store the input Light
+            // as a target-relative StartPosition before changing Light.
+            Vector3 inputLight = light;
             string modelPath = null;
             float life;
             float effectScale = scale;
@@ -352,6 +358,17 @@ namespace Client.Main.ClassicFX.Core
                         ref effectScale, ref life, ref effectAlpha,
                         ref effectMeshLight, ref effectDirection,
                         ref effectVelocity, ref effectGravity, ref effectHeading);
+                if (IsS6Batch10ModelType(type))
+                    InitializeS6Batch10Spawn(type, subType, boneIndex,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectMeshLight, ref effectDirection,
+                        ref effectVelocity, ref effectGravity, ref effectHeading);
+                if (type == ClassicFxEffectType.PierPart && subType == 1)
+                {
+                    life = GetS6ParentEffectLifetime(owner);
+                    effectAlpha = (20f - life) / 5f;
+                }
             }
             else if (additionalTerrain)
             {
@@ -439,6 +456,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch08ModelView(view, type, subType);
                 if (IsS6Batch09ModelType(type))
                     ConfigureS6Batch09ModelView(view, type, subType);
+                if (IsS6Batch10ModelType(type))
+                    ConfigureS6Batch10ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -448,7 +467,8 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = effectPosition,
+                StartPosition = type == ClassicFxEffectType.PierPart && subType == 0
+                    ? inputLight : effectPosition,
                 HeadAngle = effectHeading,
                 Angle = angle,
                 Light = light,
@@ -653,7 +673,8 @@ namespace Client.Main.ClassicFX.Core
                     if (IsS6Batch05ModelType(e.Type) ||
                         IsS6Batch07ModelType(e.Type) ||
                         IsS6Batch08ModelType(e.Type) ||
-                        IsS6Batch09ModelType(e.Type))
+                        IsS6Batch09ModelType(e.Type) ||
+                        IsS6Batch10ModelType(e.Type))
                         e.ModelView.Color = new Color(Vector3.Clamp(
                             e.Light, Vector3.Zero, Vector3.One));
                 }
