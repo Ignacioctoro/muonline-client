@@ -49,7 +49,6 @@ namespace Client.Main.Objects.Effects.Skills
             _started = true;
             if (World != null && World.ClassicFx != null &&
                 World.ClassicFx.Enabled &&
-                !_caster.IsDisposed &&
                 ReferenceEquals(_caster.World, World) &&
                 _caster.Status == GameControlStatus.Ready)
             {
