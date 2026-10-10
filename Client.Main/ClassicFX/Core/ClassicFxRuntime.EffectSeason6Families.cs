@@ -203,6 +203,7 @@ namespace Client.Main.ClassicFX.Core
                     return MoveS6Batch10Model(ref effect, f);
                 case ClassicFxEffectType.NightWater01:
                 case ClassicFxEffectType.KnightPlancrackB:
+                case ClassicFxEffectType.RaklionBossCrack:
                     return MoveS6Batch11Model(ref effect, f);
                 default:
                     return false;

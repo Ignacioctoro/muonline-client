@@ -12,7 +12,8 @@ namespace Client.Main.ClassicFX.Core
     {
         private static bool IsS6Batch11ModelType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.NightWater01 or
-                ClassicFxEffectType.KnightPlancrackB;
+                ClassicFxEffectType.KnightPlancrackB or
+                ClassicFxEffectType.RaklionBossCrack;
 
         private static bool TryGetS6Batch11ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -33,6 +34,13 @@ namespace Client.Main.ClassicFX.Core
                         "Effect/knight_plancrack_b.bmd", 25f, 1f,
                         offsetZ: 15f, useCallerScale: true);
                     return true;
+                case ClassicFxEffectType.RaklionBossCrack:
+                    // The original scale is caller Scale + 1, not a
+                    // replacement scale or separate postprocessing pass.
+                    definition = new Season6ModelDefinition(
+                        "Effect/knight_plancrack_grand.bmd", 40f, 1f,
+                        offsetZ: 30f, useCallerScale: true);
+                    return true;
                 default:
                     return false;
             }
@@ -45,12 +53,16 @@ namespace Client.Main.ClassicFX.Core
                 angle.Z = MathHelper.ToRadians(Random.Modulo(360));
             else if (type == ClassicFxEffectType.KnightPlancrackB)
                 angle.Z += MathHelper.ToRadians(90f * Clock.FrameFactor);
+            else if (type == ClassicFxEffectType.RaklionBossCrack)
+                angle.Z = MathHelper.ToRadians(Random.Modulo(360));
         }
 
         private bool MoveS6Batch11Model(ref EffectState effect, float f)
         {
-            // Original Nightwater01 and KnightPlancrackB share fade rate.
-            effect.Alpha = MathF.Max(0f, effect.Alpha - 0.04f * f);
+            // Raklion Boss Crack fades 0.03/tick; two other models 0.04.
+            float fade = effect.Type == ClassicFxEffectType.RaklionBossCrack
+                ? 0.03f : 0.04f;
+            effect.Alpha = MathF.Max(0f, effect.Alpha - fade * f);
             return true;
         }
 
@@ -103,8 +115,9 @@ namespace Client.Main.ClassicFX.Core
                     e.Position, e.Angle, blue, ClassicFxOwner.None,
                     scale: 1f);
 
-                // The original additionally spawns RaklionBossCrackEffect,
-                // which is not yet ported. Do not fabricate an alternative.
+                CreateEffect(ClassicFxEffectType.RaklionBossCrack,
+                    e.Position, e.Angle, blue, ClassicFxOwner.None,
+                    subType: 0, scale: 0.2f);
                 int count = 5 + Random.Modulo(3);
                 for (int i = 0; i < count; i++)
                 {

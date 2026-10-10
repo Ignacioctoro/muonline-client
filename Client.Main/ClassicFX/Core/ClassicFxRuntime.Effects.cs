@@ -85,7 +85,8 @@ namespace Client.Main.ClassicFX.Core
         PierPart = 64,
         BlowOfDestruction = 65,
         NightWater01 = 66,
-        KnightPlancrackB = 67
+        KnightPlancrackB = 67,
+        RaklionBossCrack = 68
     }
 
     public sealed partial class ClassicFxRuntime
@@ -377,7 +378,11 @@ namespace Client.Main.ClassicFX.Core
                     effectAlpha = (20f - life) / 5f;
                 }
                 if (IsS6Batch11ModelType(type))
+                {
                     InitializeS6Batch11Model(type, ref angle);
+                    if (type == ClassicFxEffectType.RaklionBossCrack)
+                        effectScale = scale + 1f;
+                }
             }
             else if (additionalTerrain)
             {
