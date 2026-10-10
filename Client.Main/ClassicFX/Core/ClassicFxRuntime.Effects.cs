@@ -55,7 +55,11 @@ namespace Client.Main.ClassicFX.Core
         LightningShock = 34,
         SkillBlast = 35,
         SkillInferno = 36,
-        Circle = 37
+        Circle = 37,
+        Storm = 38,
+        Summon = 39,
+        Tail = 40,
+        WaveForce = 41
     }
 
     public sealed partial class ClassicFxRuntime
@@ -134,6 +138,9 @@ namespace Client.Main.ClassicFX.Core
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
                 (boneIndex < 0 || !float.IsFinite(scale) || scale <= 0f))
+                return ClassicFxHandle.Invalid;
+            if (type == ClassicFxEffectType.WaveForce &&
+                (!float.IsFinite(scale) || scale <= 0f))
                 return ClassicFxHandle.Invalid;
             // Preserve already-ported Wizardry subtypes ShockWave 14 / Twlight 3.
             bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
@@ -247,7 +254,19 @@ namespace Client.Main.ClassicFX.Core
                 if (type is ClassicFxEffectType.Stone1 or ClassicFxEffectType.Stone2)
                 {
                     angle.Z = MathHelper.ToRadians(Random.Modulo(360));
-                    if (subType == 13 || subType == 14)
+                    if (subType == 10 || subType == 12)
+                    {
+                        life = 32f + Random.Modulo(16);
+                        effectScale = (15f + Random.Modulo(4)) *
+                            (subType == 10 ? 0.05f : 0.1f);
+                        float speed = (64f + Random.Modulo(256)) *
+                            (subType == 10 ? 0.2f : 0.1f);
+                        effectDirection = Vector3.TransformNormal(
+                            new Vector3(0f, speed, 0f),
+                            Matrix.CreateRotationZ(angle.Z));
+                        effectGravity = (subType == 10 ? 28f : 8f) + Random.Modulo(16);
+                    }
+                    else if (subType == 13 || subType == 14)
                     {
                         life = 20f + Random.Modulo(16);
                         effectScale = (3f + Random.Modulo(13)) * 0.08f * scale;
@@ -277,6 +296,12 @@ namespace Client.Main.ClassicFX.Core
                 }
                 if (IsS6Batch04ModelType(type))
                     InitializeS6Batch04Spawn(type, subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref effectDirection,
+                        ref effectVelocity, ref effectGravity,
+                        ref effectMeshLight);
+                if (IsS6Batch05ModelType(type))
+                    InitializeS6Batch05Spawn(type, subType,
                         ref effectPosition, ref angle, ref light,
                         ref effectScale, ref effectDirection,
                         ref effectVelocity, ref effectGravity,
@@ -351,6 +376,8 @@ namespace Client.Main.ClassicFX.Core
                             (subType is 2 or 6 or 8 or 10) ? boneIndex : -1;
                     }
                 }
+                if (IsS6Batch05ModelType(type))
+                    ConfigureS6Batch05ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -556,6 +583,9 @@ namespace Client.Main.ClassicFX.Core
                     e.ModelView.Position = e.Position;
                     e.ModelView.Angle = e.Angle;
                     e.ModelView.ApplyNativeRenderState(e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
+                    if (IsS6Batch05ModelType(e.Type))
+                        e.ModelView.Color = new Color(Vector3.Clamp(
+                            e.Light, Vector3.Zero, Vector3.One));
                 }
                 e.LifeTime -= f;
                 if (e.LifeTime <= 0f)

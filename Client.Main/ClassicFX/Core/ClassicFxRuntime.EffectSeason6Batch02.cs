@@ -47,7 +47,7 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.Stone2:
                     // Source-backed native thrown fragment variants. Subtypes
                     // 13/14 are required by Lightning Shock's aftermath.
-                    if (subType != 0 && subType != 13 && subType != 14)
+                    if (subType is not (0 or 2 or 10 or 12 or 13 or 14))
                         return false;
                     definition = new Season6ModelDefinition(
                         type == ClassicFxEffectType.Stone1
@@ -140,6 +140,10 @@ namespace Client.Main.ClassicFX.Core
         {
             if (e.SubType == 13 || e.SubType == 14)
                 return MoveStoneFragmentImpact(ref e, f);
+            if (e.SubType == 2)
+                return MoveS6Batch05StoneSubType2(ref e, f);
+            if (e.SubType == 10 || e.SubType == 12)
+                return MoveS6Batch05StoneSubType10Or12(ref e, f);
             // Source: MODEL_STONE1/2 subtype 0 inherits native
             // Move_MODEL_ICE_SMALL. Direction decays, gravity bounces on
             // real terrain, and the object rotates during its descent.

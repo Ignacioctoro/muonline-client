@@ -47,7 +47,7 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.AliceBuffSkillEffect2 or
                 ClassicFxEffectType.ShockWaveGround01 or
                 ClassicFxEffectType.Wave || IsS6Batch02ModelType(type) ||
-                IsS6Batch04ModelType(type);
+                IsS6Batch04ModelType(type) || IsS6Batch05ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -103,7 +103,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch02ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch04ModelDefinition(type, subType,
+                    if (TryGetS6Batch04ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch05ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -143,6 +146,11 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.SkillInferno:
                 case ClassicFxEffectType.Circle:
                     return MoveS6Batch04Model(ref effect, f);
+                case ClassicFxEffectType.Storm:
+                case ClassicFxEffectType.Summon:
+                case ClassicFxEffectType.Tail:
+                case ClassicFxEffectType.WaveForce:
+                    return MoveS6Batch05Model(ref effect, f);
                 default:
                     return false;
             }
