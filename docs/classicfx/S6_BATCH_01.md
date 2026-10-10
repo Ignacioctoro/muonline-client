@@ -56,3 +56,19 @@ git diff --check
 
 The branch has not been compiled with dotnet here (not available in this
 environment). No GPU parity or Android smoke test has been asserted.
+
+## Integrated Summoner cast handlers
+
+The existing attribute-based `SkillVisualEffectRegistry` now discovers
+`AliceBuffSkillEffect.cs` for numeric IDs 217 (Thorns), 218 (Berserker),
+219 (Sleep), 220 (Blind), 454 (strengthened Sleep) and 469
+(strengthened Berserker). The one-shot adapter creates the existing
+`BITMAP_MAGIC+1` cast decal and both native Alice BMD ring models;
+Sleep/Blind/Thorns anchor to the actual target, Berserker to the caster.
+The runtime fixes initial Alice yaw at creation and avoids double-FPS
+filtering inside the logical 25-Hz child spawn gate.
+
+Data_Broyal tree confirms resources `Effect/elshildring.bmd`,
+`Effect/elshildring2.bmd`, `Effect/shockwave_ground01.bmd`,
+`Skill/flashing.bmd` and `Effect/shiny05.OZJ` exist. This is asset
+existence, not a GPU rendering validation.

@@ -155,17 +155,17 @@ namespace Client.Main.ClassicFX.Core
 
                 if (e.SubType == 3)
                 {
-                    CreateParticleFpsChecked(ClassicTextureIds.BitmapLight + 2,
+                    CreateParticle(ClassicTextureIds.BitmapLight + 2,
                         location, e.Angle, e.Light, 6, e.Scale);
                     bone = Random.Modulo(bones.Length);
                     if (TryGetOwnerBonePosition(e.Owner, bone, out location))
-                        CreateParticleFpsChecked(ClassicTextureIds.BitmapLight + 2,
+                        CreateParticle(ClassicTextureIds.BitmapLight + 2,
                             location, e.Angle, e.Light, 6, e.Scale);
                 }
-                else if (Random.FpsCheck(2, Clock))
+                else if (Random.Modulo(2) == 0)
                 {
                     location.Z -= 20f;
-                    CreateParticleFpsChecked(ClassicTextureIds.BitmapTwinTailWater,
+                    CreateParticle(ClassicTextureIds.BitmapTwinTailWater,
                         location, e.Angle, e.Light, 2);
                 }
                 return true;
@@ -192,6 +192,8 @@ namespace Client.Main.ClassicFX.Core
 
             // Native: 2 flare sprites, 2 shiny sprites and 3 healing
             // joints every 25-FPS tick. Avoid high-refresh sprite floods.
+            // Already tick-gated: children use direct Create*, NOT FPS-checked
+            // overloads (which would double-filter them at high refresh).
             if (!Clock.AdvancedReferenceFrame) return true;
 
             ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
@@ -231,7 +233,7 @@ namespace Client.Main.ClassicFX.Core
                 Vector3 angle = new Vector3(Random.Modulo(90), 0f, Random.Modulo(360));
                 Vector3 radial = ClassicMath.VectorRotate(
                     new Vector3(0f, -200f, 0f), ClassicMath.AngleMatrix(angle));
-                CreateJointFpsChecked(ClassicTextureIds.BitmapJointHealing,
+                CreateJoint(ClassicTextureIds.BitmapJointHealing,
                     e.Position - radial, e.Position, angle,
                     subType: spriteSubtype == 1 ? 16 : 15,
                     target: source, scale: 5f, priorColor: jointLight);

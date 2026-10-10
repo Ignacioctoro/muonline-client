@@ -217,6 +217,10 @@ namespace Client.Main.ClassicFX.Core
                 effectMeshLight = season6Definition.MeshLight;
                 effectPosition.Z += season6Definition.OffsetZ * Clock.FrameFactor;
                 if (season6Definition.WhiteLight) light = Vector3.One;
+                // MuMain EffectTypes: ALICE rings reset the yaw to 0 on spawn.
+                if (type == ClassicFxEffectType.AliceBuffSkillEffect2 ||
+                    (type == ClassicFxEffectType.AliceBuffSkillEffect && subType <= 2))
+                    angle.Z = 0f;
             }
             else if (additionalTerrain)
             {
