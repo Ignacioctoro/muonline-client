@@ -18,6 +18,9 @@
   subtypes 0/1 with native 20/10 ticks and original scale/fade.
 - `MODEL_KNIGHT_PLANCRACK_A`: original `Effect/knight_plancrack_a.bmd`,
   subtype 0/1 with random yaw/size and 25/20-tick fading.
+- `MODEL_STONE1/2` subtype 13/14: true native impact fragments, with
+  HeadAngle/gravity bounce on terrain and per-frame rotation. Lightning Shock
+  subtype 1 now emits randomized Stone1/Stone2 subtype **13**, not subtype 0.
 - Skill 230 (Summoner Lightning Shock) registered in attribute-based
   dispatcher. Existing skills untouched. Effect owns its child instances.
 - Prefers native 25-Hz logical tick for sprites/particles to avoid 60/120-Hz
@@ -25,14 +28,14 @@
 
 ## Limits / remaining fidelity
 
-- The client lacks the original action animation-frame pointer for the
-  emitter; its downward motion begins at the native fallback `LifeTime < 15`
-  rather than testing `Owner->AnimationFrame > 6`.
+- The C# emitter checks the accessible `ModelObject.CurrentFrame > 6`
+  plus native fallback `LifeTime < 15`. These are not proven frame-for-frame
+  equivalent to original `Owner->AnimationFrame` without runtime profiling.
 - Native `BITMAP_DAMAGE_01_MONO` and `MODEL_KNIGHT_PLANCRACK_A` use existing
   MonoGame material/mesh presentation; visual parity not yet validated.
-- Native impact subtype 1 additionally emits other particle/effect subtypes;
-  only the currently supported ClassicFX primitives are used here, with
-  no invented textures or alternate renderer.
+- Native impact subtype 1 emits another set of effects; supported ClassicFX
+  textures, Stone13 and BMD plancrack are now connected. Native owner/action
+  animation timing, debris look, and per-FPS RNG still need on-device parity.
 - Subtype 2 is available through `CreateLightningShock(owner, position,
   angle, 2)` but is not yet hooked to a target-hit packet.
 - `CreateSprite`, `CreateParticle`, and `CreateJoint` allocations still
