@@ -43,11 +43,13 @@ namespace Client.Main.Objects.Effects
 
             public ClassicWeaponBuffShineEffect AttackShine;
             public ClassicGreaterFortitudeGlowEffect GreaterFortitudeGlow;
-            public ClassicCriticalDamageAuraEffect CriticalDamageAura;
+            public WorldObject CriticalDamageAura;
             public ClassicFxWizardryEnhancementVisual WizardryEnhancement;
         }
 
         private const bool UseClassicFxSpearJoints = true;
+        // Toggle de prueba: false vuelve al renderer anterior del aura DL.
+        private const bool UseClassicFxCriticalAura = true;
 
         private readonly Dictionary<
             ushort,
@@ -382,6 +384,16 @@ namespace Client.Main.Objects.Effects
                 world,
                 state.GreaterFortitudeGlow);
         }
+        private static bool IsUsableCriticalAura(WorldObject visual, PlayerObject target)
+        {
+            if (visual == null || visual.Status == GameControlStatus.Disposed)
+                return false;
+            if (visual is ClassicFxCriticalDamageAuraVisual classic)
+                return ReferenceEquals(classic.Owner, target);
+            if (visual is ClassicCriticalDamageAuraEffect legacy)
+                return ReferenceEquals(legacy.Owner, target);
+            return false;
+        }
         private static void EnsureCriticalDamageAura(
             WalkableWorldControl world,
             PlayerObject target,
@@ -396,9 +408,7 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
-            if (IsUsable(
-                    state.CriticalDamageAura,
-                    target))
+            if (IsUsableCriticalAura(state.CriticalDamageAura, target))
             {
                 return;
             }
@@ -406,9 +416,9 @@ namespace Client.Main.Objects.Effects
             RemoveVisual(
                 ref state.CriticalDamageAura);
 
-            state.CriticalDamageAura =
-                new ClassicCriticalDamageAuraEffect(
-                    target);
+            state.CriticalDamageAura = UseClassicFxCriticalAura
+                ? new ClassicFxCriticalDamageAuraVisual(target)
+                : new ClassicCriticalDamageAuraEffect(target);
 
             AddVisual(
                 world,

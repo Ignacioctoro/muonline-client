@@ -142,6 +142,10 @@ namespace Client.Main.ClassicFX.Core
                         out Matrix bone))
                     return false;
                 Vector3 direction = j.Direction;
+                // Native TransformPosition(..., true) scales the anchor with
+                // BodyScale; native VectorRotate(Direction, BoneTransform) does
+                // NOT scale the direction. Keep these separate in MonoGame.
+                Matrix boneRotation = JointBoneRotationOnly(in bone);
                 j.StartPosition = Vector3.Transform(new Vector3(0f, 20f, 0f), bone);
                 j.Position = j.StartPosition;
                 j.NumTails = 0;
@@ -152,16 +156,17 @@ namespace Client.Main.ClassicFX.Core
                 // the current joint Angle. TransformNormal rotates offsets.
                 if (!TryGetOwnerBoneWorldMatrix(j.Target, 0, out Matrix rootBone))
                     return false;
+                Matrix rootRotation = JointBoneRotationOnly(in rootBone);
                 for (int n = 0; n < count; n++)
                 {
-                    j.StartPosition += Vector3.TransformNormal(direction, bone) * f;
+                    j.StartPosition += Vector3.TransformNormal(direction, boneRotation) * f;
                     j.TargetPosition.Y += (j.SubType % 2 == 1 ? 40f : -40f);
                     Vector3 angle = new Vector3(j.TargetPosition.Y, 0f, 0f);
                     Vector3 offset = ClassicMath.VectorRotate(
                         new Vector3(0f, 0f, j.TargetPosition.X),
                         ClassicMath.AngleMatrix(angle));
                     j.Position = j.StartPosition + offset;
-                    AppendJointBoneTailD(ref j, rootBone);
+                    AppendJointBoneTailD(ref j, rootRotation);
                     j.TargetPosition.X -= 0.15f * f;
                     if (j.PKKey == -1) direction.Y -= 0.1f * f;
                     if (n % 2 == 0)
@@ -222,6 +227,22 @@ namespace Client.Main.ClassicFX.Core
                  (j.SubType >= 11 && j.SubType <= 13)) && j.LifeTime < 10f)
                 j.Light *= MathF.Pow(1f / 1.3f, f);
             return true;
+        }
+
+        /// <summary>
+        /// Reusable conversion for MU joints using VectorRotate() on a bone.
+        /// A world bone matrix includes WorldObject.Scale, which the Main
+        /// applies to TransformPosition(..., true) but not to VectorRotate().
+        /// Strip scale for ribbon orientation and direction; preserve full
+        /// world matrix separately for the starting anchor position.
+        /// </summary>
+        private static Matrix JointBoneRotationOnly(in Matrix boneWorld)
+        {
+            if (boneWorld.Decompose(out _, out Quaternion rotation, out _))
+                return Matrix.CreateFromQuaternion(rotation);
+            // Degenerate bone transforms are outside the supported native
+            // skeleton domain. Fall back rather than hiding an effect.
+            return boneWorld;
         }
 
         private static void AppendJointBoneTailD(ref ClassicJoint j,
