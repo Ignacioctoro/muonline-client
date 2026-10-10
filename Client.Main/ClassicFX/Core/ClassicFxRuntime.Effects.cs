@@ -59,7 +59,12 @@ namespace Client.Main.ClassicFX.Core
         Storm = 38,
         Summon = 39,
         Tail = 40,
-        WaveForce = 41
+        WaveForce = 41,
+        Piercing = 42,
+        ArrowBomb = 43,
+        ArrowNature = 44,
+        ArrowDouble = 45,
+        ArrowWing = 46
     }
 
     public sealed partial class ClassicFxRuntime
@@ -306,6 +311,11 @@ namespace Client.Main.ClassicFX.Core
                         ref effectScale, ref effectDirection,
                         ref effectVelocity, ref effectGravity,
                         ref effectMeshLight);
+                if (IsS6Batch06ModelType(type))
+                    InitializeS6Batch06Spawn(type, subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref effectDirection,
+                        ref effectVelocity, ref effectGravity);
             }
             else if (additionalTerrain)
             {
@@ -378,6 +388,8 @@ namespace Client.Main.ClassicFX.Core
                 }
                 if (IsS6Batch05ModelType(type))
                     ConfigureS6Batch05ModelView(view, type, subType);
+                if (IsS6Batch06ModelType(type))
+                    ConfigureS6Batch06ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
