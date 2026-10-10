@@ -62,7 +62,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch19CrushModel(type) ||
                 IsS6Batch20AvailableModel(type) ||
                 IsS6Batch21ModelType(type) ||
-                IsS6Batch22ModelType(type);
+                IsS6Batch22ModelType(type) ||
+                IsS6Batch23ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -169,7 +170,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch21ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch22ModelDefinition(type, subType,
+                    if (TryGetS6Batch22ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch23ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -416,6 +420,23 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.BigStone1:
                 case ClassicFxEffectType.BigStone2:
                     return MoveS6Batch22Model(ref effect, f);
+                case ClassicFxEffectType.KundunPart1:
+                case ClassicFxEffectType.KundunPart2:
+                case ClassicFxEffectType.KundunPart3:
+                case ClassicFxEffectType.KundunPart4:
+                case ClassicFxEffectType.KundunPart5:
+                case ClassicFxEffectType.KundunPart6:
+                case ClassicFxEffectType.KundunPart7:
+                case ClassicFxEffectType.KundunPart8:
+                case ClassicFxEffectType.MayaStone1:
+                case ClassicFxEffectType.MayaStone2:
+                case ClassicFxEffectType.MayaStone3:
+                case ClassicFxEffectType.MayaStone4:
+                case ClassicFxEffectType.MayaStone5:
+                case ClassicFxEffectType.MayaStoneFire:
+                case ClassicFxEffectType.MayaHandSkill:
+                case ClassicFxEffectType.MayaStar:
+                    return MoveS6Batch23Model(ref effect, f);
                 default:
                     return false;
             }

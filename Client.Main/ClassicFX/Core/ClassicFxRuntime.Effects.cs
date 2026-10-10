@@ -269,6 +269,23 @@ namespace Client.Main.ClassicFX.Core
         Bone2 = 241,
         BigStone1 = 242,
         BigStone2 = 243,
+        // S6 Batch 23: Kundun fragments and Kanturu Maya visual effects.
+        KundunPart1 = 244,
+        KundunPart2 = 245,
+        KundunPart3 = 246,
+        KundunPart4 = 247,
+        KundunPart5 = 248,
+        KundunPart6 = 249,
+        KundunPart7 = 250,
+        KundunPart8 = 251,
+        MayaStone1 = 252,
+        MayaStone2 = 253,
+        MayaStone3 = 254,
+        MayaStone4 = 255,
+        MayaStone5 = 256,
+        MayaStoneFire = 257,
+        MayaHandSkill = 258,
+        MayaStar = 259,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -296,6 +313,9 @@ namespace Client.Main.ClassicFX.Core
             public Vector3 BaseLight;
             public Vector3 StartPosition; // native MODEL_BLIZZARD StartPosition
             public Vector3 HeadAngle; // native projectile heading (Javelin)
+            // Original Kundun fragment timing and ground offset (visual only).
+            public int NativePkKey;
+            public int NativeSkillIndex;
             public float Phase;
             // Native timed-bitmap texture frame. Used only by the timed
             // Fenrir foot / TwinTail logical terrain effects.
@@ -324,7 +344,9 @@ namespace Client.Main.ClassicFX.Core
             ClassicFxOwner owner,
             int subType = 0,
             int boneIndex = -1,
-            float scale = 1f)
+            float scale = 1f,
+            int nativePkKey = 0,
+            int nativeSkillIndex = 0)
         {
             if (_disposed || !Enabled)
                 return ClassicFxHandle.Invalid;
@@ -459,6 +481,7 @@ namespace Client.Main.ClassicFX.Core
             float effectGravity = 0f;
             Vector3 effectPosition = position;
             Vector3 s6Batch22StoredPosition = position;
+            Vector3 s6Batch23StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -656,6 +679,13 @@ namespace Client.Main.ClassicFX.Core
                         ref effectDirection, ref effectGravity,
                         ref effectHeading, ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch23ModelType(type))
+                    InitializeS6Batch23Model(type, subType, scale,
+                        nativePkKey, ref effectPosition,
+                        ref s6Batch23StoredPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectDirection, ref effectGravity,
+                        ref effectHeading);
             }
             else if (additionalTerrain)
             {
@@ -832,8 +862,13 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = IsS6Batch22HeavyModel(type) && subType == 5
-                    ? s6Batch22StoredPosition
+                StartPosition = IsS6Batch23Kundun(type) &&
+                        subType is 2 or 3 or 4
+                    ? s6Batch23StoredPosition
+                    : type == ClassicFxEffectType.MayaHandSkill
+                        ? inputLight
+                    : IsS6Batch22HeavyModel(type) && subType == 5
+                        ? s6Batch22StoredPosition
                     : (type == ClassicFxEffectType.PierPart && subType == 0) ||
                       (type == ClassicFxEffectType.BlowOfDestruction && subType == 0)
                         ? inputLight : effectPosition,
@@ -850,6 +885,8 @@ namespace Client.Main.ClassicFX.Core
                 LifeTime = life,
                 BoneIndex = boneIndex,
                 FirstMove = true,
+                NativePkKey = nativePkKey,
+                NativeSkillIndex = nativeSkillIndex,
                 Phase = furyStrike ? Random.Modulo(100) : 0f,
                 LastChildNativeTick = -1,
                 ModelView = view
