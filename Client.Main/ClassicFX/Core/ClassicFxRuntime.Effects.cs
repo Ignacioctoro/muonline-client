@@ -89,7 +89,16 @@ namespace Client.Main.ClassicFX.Core
         RaklionBossCrack = 68,
         LightningOrb = 69,
         FenrirThunder = 70,
-        Magic2 = 71
+        Magic2 = 71,
+        FuryStrike = 72,
+        FuryQuake1 = 73,
+        FuryQuake2 = 74,
+        FuryQuake3 = 75,
+        FuryQuake4 = 76,
+        FuryQuake5 = 77,
+        FuryQuake6 = 78,
+        FuryQuake7 = 79,
+        FuryQuake8 = 80
     }
 
     public sealed partial class ClassicFxRuntime
@@ -174,6 +183,10 @@ namespace Client.Main.ClassicFX.Core
                 (subType is 0 or 1);
             bool lightningOrb = type == ClassicFxEffectType.LightningOrb &&
                 (subType is 0 or 1);
+            // Kind 0 / 2 / 3 is carried in subtype for the logical root.
+            // The original random subtype for radial placement lives in Phase.
+            bool furyStrike = type == ClassicFxEffectType.FuryStrike &&
+                (subType is 0 or 2 or 3);
             // Native SkillIndex and PKKey are mandatory for Inferno 2/6/8/10.
             if (type == ClassicFxEffectType.SkillInferno &&
                 (subType is 2 or 6 or 8 or 10) &&
@@ -190,7 +203,7 @@ namespace Client.Main.ClassicFX.Core
             if (nativeGroundV8 && groundV8Definition.RequiresOwner &&
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
-            if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb ||
+            if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
                 magicGround2 || magicCircleGround || additionalTerrain || damage01Mono)
             {
                 // Original terrain bitmaps can be spawned with a null Owner.
@@ -230,6 +243,8 @@ namespace Client.Main.ClassicFX.Core
                 return ClassicFxHandle.Invalid;
             }
 
+            if (furyStrike && owner.WorldObject == null)
+                return ClassicFxHandle.Invalid;
             // Some native MODEL_PIER_PART variants store the input Light
             // as a target-relative StartPosition before changing Light.
             Vector3 inputLight = light;
@@ -463,6 +478,14 @@ namespace Client.Main.ClassicFX.Core
                     effectPosition.Z += 100f * Clock.FrameFactor;
                 }
             }
+            else if (furyStrike)
+            {
+                // Logical 20-tick carrier. Native RenderFuryStrike() draws
+                // the equipped item; a fake stand-alone skill BMD is wrong.
+                life = 20f;
+                InitializeS6FuryStrike(ref angle,
+                    ref effectHeading, ref effectGravity);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -516,6 +539,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch10ModelView(view, type, subType);
                 if (IsS6Batch12ModelType(type))
                     ConfigureS6Batch12ModelView(view, type, subType);
+                if (IsS6Batch13QuakeType(type))
+                    ConfigureS6Batch13ModelView(view, type, subType);
                 // Translation from native Effect state to MonoGame BMD presentation.
                 view.ApplyNativeRenderState(effectScale, effectAlpha, effectMeshLight, light);
             }
@@ -541,6 +566,7 @@ namespace Client.Main.ClassicFX.Core
                 LifeTime = life,
                 BoneIndex = boneIndex,
                 FirstMove = true,
+                Phase = furyStrike ? Random.Modulo(100) : 0f,
                 LastChildNativeTick = -1,
                 ModelView = view
             };
@@ -637,6 +663,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.LightningOrb)
                 {
                     MoveS6LightningOrb(ref e, i, f);
+                }
+                else if (e.Type == ClassicFxEffectType.FuryStrike)
+                {
+                    if (!MoveS6FuryStrike(ref e, i, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
                 }
                 else if (e.Type == ClassicFxEffectType.Damage01Mono)
                 {

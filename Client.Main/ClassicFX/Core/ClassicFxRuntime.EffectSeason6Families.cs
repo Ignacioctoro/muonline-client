@@ -53,7 +53,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch09ModelType(type) ||
                 IsS6Batch10ModelType(type) ||
                 IsS6Batch11ModelType(type) ||
-                IsS6Batch12ModelType(type);
+                IsS6Batch12ModelType(type) ||
+                IsS6Batch13QuakeType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -133,7 +134,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch11ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch12ModelDefinition(type, subType,
+                    if (TryGetS6Batch12ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch13ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -212,6 +216,15 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.FenrirThunder:
                 case ClassicFxEffectType.Magic2:
                     return MoveS6Batch12Model(ref effect, f);
+                case ClassicFxEffectType.FuryQuake1:
+                case ClassicFxEffectType.FuryQuake2:
+                case ClassicFxEffectType.FuryQuake3:
+                case ClassicFxEffectType.FuryQuake4:
+                case ClassicFxEffectType.FuryQuake5:
+                case ClassicFxEffectType.FuryQuake6:
+                case ClassicFxEffectType.FuryQuake7:
+                case ClassicFxEffectType.FuryQuake8:
+                    return MoveS6Batch13Quake(ref effect, f);
                 default:
                     return false;
             }
