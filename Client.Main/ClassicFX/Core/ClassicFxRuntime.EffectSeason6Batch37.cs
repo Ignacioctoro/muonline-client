@@ -12,6 +12,9 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
+        private static readonly int[] S6Batch37FirecrackerTicks =
+            { 31, 24, 17, 9, 1 };
+
         private static bool IsS6Batch37LogicalType(ClassicFxEffectType t, int sub) =>
             t switch
             {
@@ -113,7 +116,7 @@ namespace Client.Main.ClassicFX.Core
             Vector3 pos, Vector3 angle, Vector3 light,
             ClassicFxOwner owner, int sub)
         {
-            CreateParticle(ClassicTextureIds.BitmapExplotion,
+            CreateParticle(ClassicTextureIds.BitmapExplotionMono,
                 pos, angle, light, 0, 0.6f);
             for (int i = 0; i < 60; i++)
                 CreateParticle(ClassicTextureIds.BitmapSpark + 1,
@@ -265,11 +268,11 @@ namespace Client.Main.ClassicFX.Core
         private void EmitS6Batch37Sequence(ref EffectState e)
         {
             // Original 31/24/17/9/1 ticks, one joint per crossing.
-            int[] ticks = {31, 24, 17, 9, 1};
-            for (int i = 0; i < ticks.Length; i++)
+            for (int i = 0; i < S6Batch37FirecrackerTicks.Length; i++)
             {
                 byte mask = (byte)(1 << i);
-                if (e.LifeTime > ticks[i] || (e.TriggerMask & mask) != 0)
+                if (e.LifeTime > S6Batch37FirecrackerTicks[i] ||
+                    (e.TriggerMask & mask) != 0)
                     continue;
                 e.TriggerMask |= mask;
                 Vector3 p = e.Position + new Vector3(
