@@ -273,7 +273,9 @@ namespace Client.Main.Objects
 
                     int prevTotal =
                         Math.Max(
-                            prevAction.NumAnimationKeys,
+                            prevAction.LockPositions
+                                ? prevAction.NumAnimationKeys - 1
+                                : prevAction.NumAnimationKeys,
                             1);
 
                     double pf =
@@ -790,151 +792,77 @@ namespace Client.Main.Objects
             Matrix[] output)
         {
             if (Model?.Bones == null ||
+                Model.Actions == null ||
+                Model.Actions.Length == 0 ||
                 output == null)
-            {
                 return;
-            }
 
-            var bones =
-                Model.Bones;
+            var bones = Model.Bones;
+            if (output.Length < bones.Length)
+                return;
 
-            if (actionIdx < 0 ||
-                actionIdx >=
-                Model.Actions.Length)
+            actionIdx = Math.Clamp(actionIdx, 0, Model.Actions.Length - 1);
+            var action = Model.Actions[actionIdx];
+
+            // This is the previous-action pose for idle/walk blending.
+            // Match GenerateBoneMatrix: never retain a transform from a
+            // previous blend, and clamp animation keys PER bone. Mutating
+            // frame0/frame1/t inside the loop used to corrupt subsequent
+            // bone positions when actions have different key counts.
+            for (int i = 0; i < bones.Length; i++)
             {
-                actionIdx = 0;
-            }
-
-            var action =
-                Model.Actions[actionIdx];
-
-            for (int i = 0;
-                 i < bones.Length;
-                 i++)
-            {
-                var bone =
-                    bones[i];
-
-                if (bone ==
-                        BMDTextureBone.Dummy ||
+                var bone = bones[i];
+                if (bone == BMDTextureBone.Dummy ||
                     bone.Matrixes == null ||
-                    actionIdx >=
-                        bone.Matrixes.Length)
+                    actionIdx >= bone.Matrixes.Length)
                 {
+                    output[i] = Matrix.Identity;
                     continue;
                 }
 
-                var bm =
-                    bone.Matrixes[
-                        actionIdx];
-
-                int numPosKeys =
-                    bm.Position?.Length ??
-                    0;
-
-                int numQuatKeys =
-                    bm.Quaternion?.Length ??
-                    0;
-
-                if (numPosKeys == 0 ||
-                    numQuatKeys == 0)
+                var bm = bone.Matrixes[actionIdx];
+                int numKeys = Math.Min(
+                    bm.Position?.Length ?? 0,
+                    bm.Quaternion?.Length ?? 0);
+                if (numKeys == 0)
                 {
+                    output[i] = Matrix.Identity;
                     continue;
                 }
 
-                if (frame0 < 0 ||
-                    frame1 < 0 ||
-                    frame0 >= numPosKeys ||
-                    frame1 >= numPosKeys ||
-                    frame0 >= numQuatKeys ||
-                    frame1 >= numQuatKeys)
+                int boneFrame0 = Math.Clamp(frame0, 0, numKeys - 1);
+                int boneFrame1 = Math.Clamp(frame1, 0, numKeys - 1);
+                float boneT = boneFrame0 == boneFrame1 ? 0f : t;
+
+                Matrix localTransform;
+                if (boneT == 0f)
                 {
-                    int maxValidIndex =
-                        Math.Min(
-                            numPosKeys,
-                            numQuatKeys) -
-                        1;
-
-                    if (maxValidIndex < 0)
-                    {
-                        maxValidIndex = 0;
-                    }
-
-                    frame0 =
-                        Math.Clamp(
-                            frame0,
-                            0,
-                            maxValidIndex);
-
-                    frame1 =
-                        Math.Clamp(
-                            frame1,
-                            0,
-                            maxValidIndex);
-
-                    if (frame0 == frame1)
-                    {
-                        t = 0f;
-                    }
+                    localTransform = Matrix.CreateFromQuaternion(
+                        bm.Quaternion[boneFrame0]);
+                    localTransform.Translation = bm.Position[boneFrame0];
+                }
+                else
+                {
+                    Quaternion rotation = Nlerp(
+                        bm.Quaternion[boneFrame0],
+                        bm.Quaternion[boneFrame1], boneT);
+                    localTransform = Matrix.CreateFromQuaternion(rotation);
+                    Vector3 p0 = bm.Position[boneFrame0];
+                    Vector3 p1 = bm.Position[boneFrame1];
+                    localTransform.Translation = Vector3.Lerp(p0, p1, boneT);
                 }
 
-                Quaternion q =
-                    Nlerp(
-                        bm.Quaternion[
-                            frame0],
-                        bm.Quaternion[
-                            frame1],
-                        t);
-
-                Matrix m =
-                    Matrix.CreateFromQuaternion(
-                        q);
-
-                Vector3 p0 =
-                    bm.Position[
-                        frame0];
-
-                Vector3 p1 =
-                    bm.Position[
-                        frame1];
-
-                m.M41 =
-                    p0.X +
-                    (p1.X - p0.X) *
-                    t;
-
-                m.M42 =
-                    p0.Y +
-                    (p1.Y - p0.Y) *
-                    t;
-
-                m.M43 =
-                    p0.Z +
-                    (p1.Z - p0.Z) *
-                    t;
-
-                if (i == 0 &&
-                    action.LockPositions)
+                if (i == 0 && action.LockPositions)
                 {
-                    m.Translation =
-                        new Vector3(
-                            bm.Position[0].X,
-                            bm.Position[0].Y,
-                            m.M43 +
-                            BodyHeight);
+                    Vector3 rootPos = bm.Position[0];
+                    localTransform.Translation = new Vector3(
+                        rootPos.X, rootPos.Y,
+                        localTransform.M43 + BodyHeight);
                 }
 
-                Matrix world =
-                    bone.Parent != -1 &&
-                    bone.Parent <
-                    output.Length
-                        ? m *
-                          output[
-                              bone.Parent]
-                        : m;
-
-                output[i] =
-                    world;
+                output[i] = bone.Parent >= 0 && bone.Parent < bones.Length
+                    ? localTransform * output[bone.Parent]
+                    : localTransform;
             }
         }
 
