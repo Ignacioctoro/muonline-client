@@ -336,6 +336,16 @@ namespace Client.Main.ClassicFX.Core
         DownAttackDummyL = 303,
         DownAttackDummyR = 304,
         DragonKickDummy = 305,
+        // Batch 28 — volcanic, event and combat BMD models.
+        PhoenixShotModel = 306,
+        WindSpin02Model = 307,
+        WindSpin03Model = 308,
+        VolcanoOfMonkModel = 309,
+        VolcanoStoneModel = 310,
+        MoveTargetPositionModel = 311,
+        SakuraEventItemModel = 312,
+        UmbrellaGoldModel = 313,
+        EmpireGuardianFrameStrikeModel = 314,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -773,6 +783,14 @@ namespace Client.Main.ClassicFX.Core
                         ref life, ref effectAlpha, ref effectMeshLight,
                         ref effectDirection, ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch28ModelType(type) &&
+                    !InitializeS6Batch28Model(type, subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectMeshLight, ref effectDirection,
+                        ref effectHeading, ref effectGravity,
+                        ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -945,6 +963,8 @@ namespace Client.Main.ClassicFX.Core
                 if (IsS6Batch27ModelType(type))
                     ConfigureS6Batch27ModelView(view, type, subType,
                         nativeAnimationSpeed);
+                if (IsS6Batch28ModelType(type))
+                    ConfigureS6Batch28ModelView(view, type);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.

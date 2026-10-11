@@ -67,7 +67,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch24ModelType(type) ||
                 IsS6Batch25ModelType(type) ||
                 IsS6Batch26ModelType(type) ||
-                IsS6Batch27ModelType(type);
+                IsS6Batch27ModelType(type) ||
+                IsS6Batch28ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -189,7 +190,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch26ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch27ModelDefinition(type, subType,
+                    if (TryGetS6Batch27ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch28ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -503,6 +507,16 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.DownAttackDummyR:
                 case ClassicFxEffectType.DragonKickDummy:
                     return MoveS6Batch27Model(ref effect, f);
+                case ClassicFxEffectType.PhoenixShotModel:
+                case ClassicFxEffectType.WindSpin02Model:
+                case ClassicFxEffectType.WindSpin03Model:
+                case ClassicFxEffectType.VolcanoOfMonkModel:
+                case ClassicFxEffectType.VolcanoStoneModel:
+                case ClassicFxEffectType.MoveTargetPositionModel:
+                case ClassicFxEffectType.SakuraEventItemModel:
+                case ClassicFxEffectType.UmbrellaGoldModel:
+                case ClassicFxEffectType.EmpireGuardianFrameStrikeModel:
+                    return MoveS6Batch28Model(ref effect, f);
                 default:
                     return false;
             }
