@@ -226,8 +226,25 @@ namespace Client.Main.Controls
         {
             await base.Load();
 
-            await ClassicFx
-                .LoadContentAsync();
+            // Login (world 95) and character selection (world 94) do not
+            // execute gameplay skills. Loading the entire ClassicFX texture
+            // catalogue here adds disk decoding + GPU uploads to menu entry.
+            // Gameplay worlds still initialize ClassicFX before use.
+            if (this is WalkableWorldControl)
+            {
+                var classicFxLoadTimer = Stopwatch.StartNew();
+                await ClassicFx.LoadContentAsync();
+                classicFxLoadTimer.Stop();
+                Console.WriteLine(
+                    $"[StartupPerf] ClassicFX textures in {GetType().Name}: " +
+                    $"{classicFxLoadTimer.ElapsedMilliseconds} ms, " +
+                    $"{ClassicFx.Textures.LoadedTextureCount} textures.");
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"[StartupPerf] Skipped ClassicFX texture preload in {GetType().Name}.");
+            }
 
             CreateMapTileObjects();
 
