@@ -481,6 +481,9 @@ namespace Client.Main.ClassicFX.Core
         FenrirDamageBlue = 434,
         FenrirDamageGreen = 435,
         WaterfallOrbit = 436,
+        FirePlusOneEmitter = 437,
+        DragonLoreLava = 438,
+        HolyArrowJointCarrier = 439,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -606,6 +609,10 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch40Logical = IsS6Batch40LogicalType(type, subType);
             bool s6Batch41Logical = IsS6Batch41LogicalType(type, subType);
             bool s6Batch42Logical = IsS6Batch42LogicalType(type, subType);
+            bool s6Batch43Logical = IsS6Batch43LogicalType(type, subType);
+            if (s6Batch43Logical &&
+                !ValidateS6Batch43Owner(type, owner))
+                return ClassicFxHandle.Invalid;
             if (s6Batch42Logical &&
                 (owner.WorldObject is not ModelObject ||
                  !ReferenceEquals(owner.WorldObject.World, World) ||
@@ -695,7 +702,7 @@ namespace Client.Main.ClassicFX.Core
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
                 s6Batch40Logical || s6Batch41Logical ||
-                s6Batch42Logical ||
+                s6Batch42Logical || s6Batch43Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -1208,6 +1215,12 @@ namespace Client.Main.ClassicFX.Core
                 InitializeS6Batch42Logical(ref angle, ref effectScale,
                     ref effectVelocity, out life);
             }
+            else if (s6Batch43Logical)
+            {
+                InitializeS6Batch43Logical(type, owner,
+                    ref effectPosition, angle, ref effectScale,
+                    ref effectVelocity, ref effectDirection, out life);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1302,7 +1315,9 @@ namespace Client.Main.ClassicFX.Core
                 Owner = owner,
                 TargetWorldObject = nativeTarget,
                 Position = effectPosition,
-                StartPosition = type is
+                StartPosition = type == ClassicFxEffectType.HolyArrowJointCarrier
+                    ? GetS6Batch43HolyStart(effectPosition, angle)
+                    : type is
                     ClassicFxEffectType.DeasulerBoomerang or
                     ClassicFxEffectType.ImperialProjectile
                     ? s6Batch32StoredPosition
@@ -1411,6 +1426,8 @@ namespace Client.Main.ClassicFX.Core
             if (s6Batch41Logical)
                 EmitS6Batch41OnCreate(type, handle, effectPosition,
                     angle, light, owner, effectScale);
+            if (s6Batch43Logical)
+                EmitS6Batch43OnCreate(type, handle, ref _effects[handle.Index]);
             return handle;
         }
 
@@ -1566,6 +1583,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (IsS6Batch42LogicalType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch42Logical(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsS6Batch43LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch43Logical(ref e, f))
                     {
                         ReleaseEffectAt(i);
                         continue;
