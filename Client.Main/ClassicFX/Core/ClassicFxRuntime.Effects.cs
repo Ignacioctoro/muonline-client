@@ -457,6 +457,17 @@ namespace Client.Main.ClassicFX.Core
         FlareForceJointBurst = 412,
         LightRedGround = 413,
         ChromeEnergyGround = 414,
+        // Batch 40: verified Main roots / effect carriers.
+        SkullEffect = 415,
+        FlareParticleEffect = 416,
+        SwordEffCarrier = 417,
+        JointForceCarrier = 418,
+        SbumbImpactEmitter = 419,
+        Damage1ImpactEmitter = 420,
+        IceBreathCloudCarrier = 421,
+        LavaGiantFootprintRed = 422,
+        LavaGiantFootprintViolet = 423,
+        FireHik3MonoCarrier = 424,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -579,6 +590,19 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch37Logical = IsS6Batch37LogicalType(type, subType);
             bool s6Batch38Logical = IsS6Batch38LogicalType(type, subType);
             bool s6Batch39Logical = IsS6Batch39LogicalType(type, subType);
+            bool s6Batch40Logical = IsS6Batch40LogicalType(type, subType);
+            if (s6Batch40Logical &&
+                ((S6Batch40NeedsOwner(type, subType) &&
+                  (owner.WorldObject == null ||
+                   !ReferenceEquals(owner.WorldObject.World, World) ||
+                   owner.WorldObject.Status != GameControlStatus.Ready)) ||
+                 (S6Batch40NeedsModelOwner(type) &&
+                  owner.WorldObject is not ModelObject) ||
+                 (S6Batch40NeedsTarget(type) &&
+                  (nativeTarget == null ||
+                   !ReferenceEquals(nativeTarget.World, World) ||
+                   nativeTarget.Status != GameControlStatus.Ready))))
+                return ClassicFxHandle.Invalid;
             if (s6Batch39Logical && S6Batch39NeedsOwner(type, subType) &&
                 (owner.WorldObject == null ||
                  !ReferenceEquals(owner.WorldObject.World, World) ||
@@ -638,6 +662,7 @@ namespace Client.Main.ClassicFX.Core
                 s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
+                s6Batch40Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -1134,6 +1159,13 @@ namespace Client.Main.ClassicFX.Core
                     ref angle, ref light, ref effectScale,
                     ref effectDirection, out life);
             }
+            else if (s6Batch40Logical)
+            {
+                InitializeS6Batch40Logical(type, subType, owner,
+                    ref effectPosition, ref angle, ref light,
+                    ref effectScale, ref effectDirection,
+                    ref effectVelocity, ref effectAlpha, out life);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1329,6 +1361,9 @@ namespace Client.Main.ClassicFX.Core
             if (s6Batch39Logical)
                 EmitS6Batch39OnCreate(type, effectPosition,
                     angle, light, owner, subType);
+            if (s6Batch40Logical)
+                EmitS6Batch40OnCreate(type, subType,
+                    effectPosition, angle, light, owner, effectScale);
             return handle;
         }
 
@@ -1460,6 +1495,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (IsS6Batch39LogicalType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch39Logical(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsS6Batch40LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch40Logical(ref e, f))
                     {
                         ReleaseEffectAt(i);
                         continue;
@@ -1774,6 +1817,11 @@ namespace Client.Main.ClassicFX.Core
                 if (IsS6Batch39TerrainType(e.Type))
                 {
                     RenderS6Batch39Terrain(ref e);
+                    continue;
+                }
+                if (IsS6Batch40TerrainType(e.Type))
+                {
+                    RenderS6Batch40Terrain(ref e);
                     continue;
                 }
                 if (e.Type == ClassicFxEffectType.MagicCircleGround)

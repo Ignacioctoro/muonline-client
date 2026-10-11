@@ -170,6 +170,15 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/flare01.jpg",
                     SamplerState.LinearClamp),
 
+                // Skill/Skull.OZJ and Effect/eff_magma_*.OZJ are
+                // present in Data_Broyal; names follow native LoadBitmap.
+                new(ClassicTextureIds.BitmapSkull,
+                    "Skill/Skull.jpg", SamplerState.PointClamp),
+                new(ClassicTextureIds.BitmapLavaGiantFootprintR,
+                    "Effect/eff_magma_red.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapLavaGiantFootprintV,
+                    "Effect/eff_magma_violet.jpg", SamplerState.LinearClamp),
+
                 // MuMain ZzzOpenData.cpp; Data_Broyal has flare01_red.OZJ.
                 new(ClassicTextureIds.BitmapLightRed,
                     "Effect/flare01_red.jpg", SamplerState.LinearClamp),

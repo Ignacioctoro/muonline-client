@@ -131,6 +131,9 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapJointHealing =
             32224;
 
+        // _TextureIndex.h: JANUSEXT 32225, SKULL 32226.
+        public const int BitmapSkull = 32226;
+
         public const int BitmapFlareBlue =
             32229;
 
@@ -344,6 +347,12 @@ namespace Client.Main.ClassicFX.Data
 
         // MuMain BITMAP_TWLIGHT (immediately before 2LINE_GHOST).
         public const int BitmapTwlight = 32402;
+
+        // MuMain fixed enum: 2LINE_GHOST=32403, FIRECRACKER0001..0007
+        // 32404..32410, GOOD_SANTA/BAGGAGE=32411/12, PKMON01..06
+        // 32413..32418, then footprint R/V.
+        public const int BitmapLavaGiantFootprintR = 32419;
+        public const int BitmapLavaGiantFootprintV = 32420;
 
         public const int Bitmap2LineGhost =
             32403;
