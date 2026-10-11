@@ -561,7 +561,8 @@ namespace Client.Main.ClassicFX.Core
                  owner.WorldObject.Status != GameControlStatus.Ready))
                 return ClassicFxHandle.Invalid;
             if (type == ClassicFxEffectType.PinLightEffect &&
-                subType is 1 or 2 or 4 && owner.WorldObject is not ModelObject)
+                (subType is 1 or 2 or 4) &&
+                owner.WorldObject is not ModelObject)
                 return ClassicFxHandle.Invalid;
             if (s6Batch36Logical && IsS6Batch36OwnerRequired(type) &&
                 (owner.WorldObject == null ||
