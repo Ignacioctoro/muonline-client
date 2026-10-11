@@ -66,7 +66,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch23ModelType(type) ||
                 IsS6Batch24ModelType(type) ||
                 IsS6Batch25ModelType(type) ||
-                IsS6Batch26ModelType(type);
+                IsS6Batch26ModelType(type) ||
+                IsS6Batch27ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -185,7 +186,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch25ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch26ModelDefinition(type, subType,
+                    if (TryGetS6Batch26ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch27ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -487,6 +491,18 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.DarkElfSkillModel:
                 case ClassicFxEffectType.ArrowAutoLoadModel:
                     return MoveS6Batch26Model(ref effect, f);
+                case ClassicFxEffectType.InfinityArrowCore:
+                case ClassicFxEffectType.InfinityArrow1:
+                case ClassicFxEffectType.InfinityArrow2:
+                case ClassicFxEffectType.InfinityArrow3:
+                case ClassicFxEffectType.InfinityArrow4:
+                case ClassicFxEffectType.BladeSkillModel:
+                case ClassicFxEffectType.WolfHeadEffect:
+                case ClassicFxEffectType.WolfHeadEffect2:
+                case ClassicFxEffectType.DownAttackDummyL:
+                case ClassicFxEffectType.DownAttackDummyR:
+                case ClassicFxEffectType.DragonKickDummy:
+                    return MoveS6Batch27Model(ref effect, f);
                 default:
                     return false;
             }

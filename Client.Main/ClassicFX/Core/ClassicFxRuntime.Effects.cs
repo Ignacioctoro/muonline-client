@@ -324,6 +324,18 @@ namespace Client.Main.ClassicFX.Core
         BalgasSkillModel = 292,
         DarkElfSkillModel = 293,
         ArrowAutoLoadModel = 294,
+        // S6 Batch 27: Infinity Arrow BMD chain, Blade and Rage Fighter models.
+        InfinityArrowCore = 295,
+        InfinityArrow1 = 296,
+        InfinityArrow2 = 297,
+        InfinityArrow3 = 298,
+        InfinityArrow4 = 299,
+        BladeSkillModel = 300,
+        WolfHeadEffect = 301,
+        WolfHeadEffect2 = 302,
+        DownAttackDummyL = 303,
+        DownAttackDummyR = 304,
+        DragonKickDummy = 305,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -754,6 +766,13 @@ namespace Client.Main.ClassicFX.Core
                         ref effectHeading, ref effectVelocity,
                         ref effectGravity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch27ModelType(type) &&
+                    !InitializeS6Batch27Model(type, subType, owner,
+                        nativeAnimationSpeed, ref effectPosition,
+                        ref angle, ref light, ref effectScale,
+                        ref life, ref effectAlpha, ref effectMeshLight,
+                        ref effectDirection, ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -923,6 +942,9 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch17ModelView(view, type);
                 if (IsS6Batch26ModelType(type))
                     ConfigureS6Batch26ModelView(view, type, subType);
+                if (IsS6Batch27ModelType(type))
+                    ConfigureS6Batch27ModelView(view, type, subType,
+                        nativeAnimationSpeed);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
