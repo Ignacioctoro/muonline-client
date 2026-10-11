@@ -29,7 +29,9 @@ All logical variant types accept Broyal caller subtype 0; the original subtype i
 
 - Original sound hooks, render-per-display-frame (now reference-tick child emissions), nonvisual combat checks and some animation state gates remain unported.
 - Sakura depends on the existing asynchronous model loader. If its bones are not ready, emissions at those bones are skipped, not fabricated. Render action/animation details require in-game check.
-- Fissure children keep a ClassicFx parent handle; exact animation phases and terrain interactions remain to verify.
+- Fissure child BMDs use the stable world owner because the logical emitter is released immediately after the final spawn; exact animation phases and terrain interactions remain to verify.
 - Source's random FPS checks are approximated by reference-clock emissions; Android draw budgets must be validated in gameplay.
 - No claim of completed parity or compilation. Build and push require local Windows `dotnet build`.
 
+
+Static tick threshold arrays are allocated once, not per effect update (Windows/Android).

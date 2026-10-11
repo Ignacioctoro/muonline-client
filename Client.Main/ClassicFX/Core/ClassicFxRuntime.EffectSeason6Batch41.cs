@@ -12,6 +12,10 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
+        // Shared arrays avoid per-frame allocations on Android.
+        private static readonly int[] S6Batch41UmbrellaTicks = { 28, 18, 8 };
+        private static readonly int[] S6Batch41SakuraTicks = { 30, 15, 4 };
+
         private static bool IsS6Batch41ModelType(ClassicFxEffectType t) =>
             t == ClassicFxEffectType.SakuraItemEffectModel;
 
@@ -132,11 +136,10 @@ namespace Client.Main.ClassicFX.Core
                     if (!Clock.AdvancedReferenceFrame) return true;
                     // Original exactly at remaining ticks 28,18,8.
                     // Mask prevents multiple emissions at higher refresh.
-                    int[] thresholds = { 28, 18, 8 };
-                    for (int i = 0; i < thresholds.Length; i++)
+                    for (int i = 0; i < S6Batch41UmbrellaTicks.Length; i++)
                     {
                         byte mask = (byte)(1 << i);
-                        if (e.LifeTime > thresholds[i] ||
+                        if (e.LifeTime > S6Batch41UmbrellaTicks[i] ||
                             (e.TriggerMask & mask) != 0) continue;
                         e.TriggerMask |= mask;
                         CreateEffect(ClassicFxEffectType.RingOfGradationEffect,
@@ -204,7 +207,9 @@ namespace Client.Main.ClassicFX.Core
                     {
                         e.TriggerMask |= 2;
                         Vector3 a = new Vector3(0f, 0f, Random.Modulo(360));
-                        ClassicFxOwner source = ClassicFxOwner.FromClassicFx(self);
+                        // The logical carrier is released this same tick.
+                        // Keep its child models attached to the stable world owner.
+                        ClassicFxOwner source = e.Owner;
                         CreateEffect(ClassicFxEffectType.FissureModel,
                             e.Position, a, e.Light, source);
                         CreateEffect(ClassicFxEffectType.FissureLight,
@@ -288,11 +293,11 @@ namespace Client.Main.ClassicFX.Core
                             : new Vector3(0.3f), 0, 0.5f);
                 }
             }
-            int[] moments = { 30, 15, 4 };
-            for (int j = 0; j < moments.Length; j++)
+            for (int j = 0; j < S6Batch41SakuraTicks.Length; j++)
             {
                 byte mask = (byte)(1 << j);
-                if (e.LifeTime > moments[j] || (e.TriggerMask & mask) != 0)
+                if (e.LifeTime > S6Batch41SakuraTicks[j] ||
+                    (e.TriggerMask & mask) != 0)
                     continue;
                 e.TriggerMask |= mask;
                 if (!TryGetOwnerBonePosition(e.Owner, 20,
