@@ -11,6 +11,12 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
+        // Native 14-bone marks. Shared arrays avoid 25 Hz per-effect allocations.
+        private static readonly int[] S6Batch36MarkBones =
+            { 20, 20, 19, 18, 17, 2, 35, 26, 36, 27, 37, 28, 39, 30 };
+        private static readonly float[] S6Batch36MarkScales =
+            { 1.5f, 1.5f, 0.6f, 1.1f, 0.9f, 0.8f, 0.6f,
+              0.6f, 0.8f, 0.8f, 0.8f, 0.8f, 0.7f, 0.7f };
         private static bool IsS6Batch36ModelType(ClassicFxEffectType t) =>
             t >= ClassicFxEffectType.BlizzardModel &&
             t <= ClassicFxEffectType.CursedTempleRestraintSkill;
@@ -131,7 +137,7 @@ namespace Client.Main.ClassicFX.Core
                     bones[2] * model.WorldPosition);
                 e.Alpha = 0.3f;
                 if (Clock.AdvancedReferenceFrame)
-                    CreateEffect(ClassicFxEffectType.ShockWave, 
+                    CreateEffect(ClassicFxEffectType.ShockWave,
                         o.WorldPosition.Translation, e.Angle, Vector3.One,
                         e.Owner, subType: 10);
             }
@@ -221,15 +227,12 @@ namespace Client.Main.ClassicFX.Core
             e.Light *= MathF.Pow(e.LifeTime >= 35f ?
                 1f / 1.035f : 1.035f, f);
             if (!Clock.AdvancedReferenceFrame) return true;
-            int[] boneIds = {20,20,19,18,17,2,35,26,36,27,37,28,39,30};
-            float[] scales = {1.5f,1.5f,0.6f,1.1f,0.9f,0.8f,0.6f,
-                0.6f,0.8f,0.8f,0.8f,0.8f,0.7f,0.7f};
-            for (int i = 0; i < boneIds.Length; ++i)
+            for (int i = 0; i < S6Batch36MarkBones.Length; ++i)
             {
-                if (TryGetOwnerBonePosition(e.Owner, boneIds[i],
+                if (TryGetOwnerBonePosition(e.Owner, S6Batch36MarkBones[i],
                     out Vector3 p))
                     CreateSprite(ClassicTextureIds.BitmapLightMarks,
-                        p, e.Scale * scales[i], e.Light, e.Owner);
+                        p, e.Scale * S6Batch36MarkScales[i], e.Light, e.Owner);
             }
             return true;
         }
