@@ -269,8 +269,8 @@ namespace Client.Main.ClassicFX.Core
                 e.Gravity += 1.9f * f;
                 if (Clock.AdvancedReferenceFrame)
                 {
-                    e.Angle.X += MathHelper.ToRadians(Random.Modulo(20) + 20f);
-                    e.Angle.Y += MathHelper.ToRadians(Random.Modulo(5));
+                    e.Angle.X += MathHelper.ToRadians(Random.Modulo(20) + 20f) * f;
+                    e.Angle.Y += MathHelper.ToRadians(Random.Modulo(5)) * f;
                 }
                 float height = RequestTerrainHeight(e.Position.X, e.Position.Y);
                 if (e.Position.Z < height)
