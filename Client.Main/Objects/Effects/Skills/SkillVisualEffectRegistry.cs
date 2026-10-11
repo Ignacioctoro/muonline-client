@@ -52,6 +52,14 @@ namespace Client.Main.Objects.Effects.Skills
             {
                 try
                 {
+                    // Direct ClassicFX emitters live in the pool, not World.Objects.
+                    if (factory is IClassicFxSkillVisualEffect native &&
+                        native.TryCreateClassicFx(context))
+                    {
+                        effect = null;
+                        return true;
+                    }
+
                     effect = factory.CreateEffect(context);
                     if (effect != null)
                     {

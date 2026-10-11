@@ -1249,7 +1249,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     if (activeScene?.Hero == null) return;
 
                     // Check if this is our player
-                    if (playerId == _characterState.Id)
+                    if ((playerId & 0x7FFF) == (_characterState.Id & 0x7FFF))
                     {
                         activeScene.NotifyLocalSkillAnimation(skillId);
 
@@ -1315,8 +1315,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                             if (Objects.Effects.Skills.SkillVisualEffectRegistry.TrySpawn(skillId, effectContext, out var effect))
                             {
-                                world.Objects.Add(effect!);
-                                _ = effect!.Load();
+                                if (effect != null)
+                            {
+                                world.Objects.Add(effect);
+                                _ = effect.Load();
+                            }
                             }
                         }
                     }
@@ -1367,11 +1370,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         // FENRIR_ATTACK_SKILL.
                         //
                         remotePlayer.TriggerVehicleSkillAnimation(skillId);
-
-                        // Remote player cast. Scope/buff status packets never
-                        // create this one-shot casting animation.
-                        if (ClassicFxWizardryEnhancementVisual.IsWizardryEnhancementSkill(skillId))
-                            ClassicFxWizardryEnhancementVisual.TriggerCast(remotePlayer);
+                    // All cast visuals go through SkillVisualEffectRegistry.
 
                         // =====================================================
                         // TARGET POSITION
@@ -1417,10 +1416,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                 effectContext,
                                 out var effect))
                         {
-                            world.Objects.Add(
-                                effect!);
-
-                            _ = effect!.Load();
+                            if (effect != null)
+                            {
+                                world.Objects.Add(effect);
+                                _ = effect.Load();
+                            }
                         }
 
 
@@ -1559,10 +1559,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                 effectContext,
                                 out var effect))
                         {
-                            world.Objects.Add(
-                                effect!);
-
-                            _ = effect!.Load();
+                            if (effect != null)
+                            {
+                                world.Objects.Add(effect);
+                                _ = effect.Load();
+                            }
                         }
 
                         return;
@@ -1603,12 +1604,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         (ushort)remoteAction);
 
                     remotePlayer.TriggerVehicleSkillAnimation(skillId);
-
-
-                    // A remote skill animation is an actual cast; a restored
-                    // active buff from scope/map change is not.
-                    if (ClassicFxWizardryEnhancementVisual.IsWizardryEnhancementSkill(skillId))
-                        ClassicFxWizardryEnhancementVisual.TriggerCast(remotePlayer);
+                    // All cast visuals go through SkillVisualEffectRegistry.
 
                     var remoteEffectContext =
                         new Objects.Effects.Skills
@@ -1637,10 +1633,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             remoteEffectContext,
                             out var remoteEffect))
                     {
-                        world.Objects.Add(
-                            remoteEffect!);
-
-                        _ = remoteEffect!.Load();
+                        if (remoteEffect != null)
+                            {
+                                world.Objects.Add(remoteEffect);
+                                _ = remoteEffect.Load();
+                            }
                     }
                 });
             }

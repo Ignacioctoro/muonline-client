@@ -440,14 +440,15 @@ namespace Client.Main.Objects.Effects
 
             if (state.WizardryEnhancement != null &&
                 state.WizardryEnhancement.Status != GameControlStatus.Disposed &&
-                ReferenceEquals(state.WizardryEnhancement.Owner, target))
+                ReferenceEquals(state.WizardryEnhancement.Owner, target) &&
+                ReferenceEquals(state.WizardryEnhancement.World, world))
                 return;
 
             RemoveVisual(ref state.WizardryEnhancement);
             state.WizardryEnhancement =
                 new ClassicFxWizardryEnhancementVisual(target);
             AddVisual(world, state.WizardryEnhancement);
-            Console.WriteLine("[ClassicFX] Wizardry Enhancement: buff MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF activo");
+            // On its first ready update, the adapter acquires the native carrier.
         }
 
         private static void EnsureAttackShine(
