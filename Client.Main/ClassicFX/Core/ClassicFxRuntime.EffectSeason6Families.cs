@@ -69,7 +69,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch26ModelType(type) ||
                 IsS6Batch27ModelType(type) ||
                 IsS6Batch28ModelType(type) ||
-                IsS6Batch29ModelType(type);
+                IsS6Batch29ModelType(type) ||
+                IsS6Batch30ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -197,7 +198,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch28ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch29ModelDefinition(type, subType,
+                    if (TryGetS6Batch29ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch30ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -532,6 +536,18 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.WoosiStoneModel:
                 case ClassicFxEffectType.DungeonStoneModel:
                     return MoveS6Batch29Model(ref effect, f);
+                case ClassicFxEffectType.CursedTempleStatuePart1:
+                case ClassicFxEffectType.CursedTempleStatuePart2:
+                case ClassicFxEffectType.PkFieldAssassinGreenHead:
+                case ClassicFxEffectType.PkFieldAssassinRedHead:
+                case ClassicFxEffectType.PkFieldAssassinGreenBody:
+                case ClassicFxEffectType.PkFieldAssassinRedBody:
+                case ClassicFxEffectType.StoneCoffin1:
+                case ClassicFxEffectType.StoneCoffin2:
+                case ClassicFxEffectType.FlyBigStone1:
+                case ClassicFxEffectType.FlyBigStone2:
+                case ClassicFxEffectType.FallStoneEffect:
+                    return MoveS6Batch30Model(ref effect, f);
                 default:
                     return false;
             }
