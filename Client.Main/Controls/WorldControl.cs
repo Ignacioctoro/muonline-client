@@ -224,6 +224,7 @@ namespace Client.Main.Controls
 
         public override async Task Load()
         {
+            var worldLoadTimer = Stopwatch.StartNew();
             await base.Load();
 
             // Login (world 95) and character selection (world 94) do not
@@ -346,6 +347,11 @@ namespace Client.Main.Controls
             {
                 SoundController.Instance.StopAmbientSound();
             }
+
+            worldLoadTimer.Stop();
+            Console.WriteLine(
+                $"[StartupPerf] WorldControl.Load {GetType().Name} " +
+                $"(World{WorldIndex}): {worldLoadTimer.ElapsedMilliseconds} ms.");
         }
         public override void AfterLoad()
         {
