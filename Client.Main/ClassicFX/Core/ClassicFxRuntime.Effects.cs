@@ -424,6 +424,17 @@ namespace Client.Main.ClassicFX.Core
         OurInfluenceGroundEffect = 382,
         EnemyInfluenceGroundEffect = 383,
         LightMarksEffect = 384,
+        // Batch 37: original BITMAP_* effect objects (no fake BMD).
+        FirecrackerRise = 385,
+        FirecrackerBurst = 386,
+        FirecrackerSequence = 387,
+        FirecrackerExplosion = 388,
+        FirecrackerFlash = 389,
+        CloudEffect = 390,
+        OroraEffect = 391,
+        GatheringEffect = 392,
+        FireHik2MonoEffect = 393,
+        PinLightEffect = 394,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -543,6 +554,15 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch19Logical = IsS6Batch19CrushCarrier(type, subType);
             bool s6Batch35Logical = IsS6Batch35LogicalType(type, subType);
             bool s6Batch36Logical = IsS6Batch36LogicalType(type, subType);
+            bool s6Batch37Logical = IsS6Batch37LogicalType(type, subType);
+            if (s6Batch37Logical && S6Batch37NeedsOwner(type, subType) &&
+                (owner.WorldObject == null ||
+                 !ReferenceEquals(owner.WorldObject.World, World) ||
+                 owner.WorldObject.Status != GameControlStatus.Ready))
+                return ClassicFxHandle.Invalid;
+            if (type == ClassicFxEffectType.PinLightEffect &&
+                subType is 1 or 2 or 4 && owner.WorldObject is not ModelObject)
+                return ClassicFxHandle.Invalid;
             if (s6Batch36Logical && IsS6Batch36OwnerRequired(type) &&
                 (owner.WorldObject == null ||
                  !ReferenceEquals(owner.WorldObject.World, World) ||
@@ -582,6 +602,7 @@ namespace Client.Main.ClassicFX.Core
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
                 s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
+                s6Batch37Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -1058,6 +1079,13 @@ namespace Client.Main.ClassicFX.Core
                 InitializeS6Batch36Logical(type, out life, ref effectScale,
                     ref effectAlpha, ref light, scale);
             }
+            else if (s6Batch37Logical)
+            {
+                InitializeS6Batch37Logical(type, subType, owner,
+                    ref effectPosition, ref angle, ref light,
+                    ref effectScale, ref effectAlpha,
+                    ref effectDirection, out life);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1359,6 +1387,14 @@ namespace Client.Main.ClassicFX.Core
                         continue;
                     }
                 }
+                else if (IsS6Batch37LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch37Logical(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
                 else if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch14Terrain(ref e, f))
@@ -1653,6 +1689,11 @@ namespace Client.Main.ClassicFX.Core
                 if (IsS6Batch36GroundType(e.Type))
                 {
                     RenderS6Batch36Ground(ref e);
+                    continue;
+                }
+                if (IsS6Batch37GroundType(e.Type))
+                {
+                    RenderS6Batch37Ground(ref e);
                     continue;
                 }
                 if (e.Type == ClassicFxEffectType.MagicCircleGround)
