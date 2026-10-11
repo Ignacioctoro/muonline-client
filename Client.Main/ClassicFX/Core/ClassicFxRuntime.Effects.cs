@@ -480,6 +480,7 @@ namespace Client.Main.ClassicFX.Core
         FenrirDamageRed = 433,
         FenrirDamageBlue = 434,
         FenrirDamageGreen = 435,
+        WaterfallOrbit = 436,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -604,6 +605,14 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch39Logical = IsS6Batch39LogicalType(type, subType);
             bool s6Batch40Logical = IsS6Batch40LogicalType(type, subType);
             bool s6Batch41Logical = IsS6Batch41LogicalType(type, subType);
+            bool s6Batch42Logical = IsS6Batch42LogicalType(type, subType);
+            if (s6Batch42Logical &&
+                (owner.WorldObject is not ModelObject ||
+                 !ReferenceEquals(owner.WorldObject.World, World) ||
+                 owner.WorldObject.Status != GameControlStatus.Ready ||
+                 nativePkKey < 0 ||
+                 !TryGetOwnerBonePosition(owner, nativePkKey, out _)))
+                return ClassicFxHandle.Invalid;
             if ((s6Batch41Logical || IsS6Batch41ModelType(type)) &&
                 S6Batch41NeedsOwner(type) &&
                 (owner.WorldObject == null ||
@@ -686,6 +695,7 @@ namespace Client.Main.ClassicFX.Core
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
                 s6Batch40Logical || s6Batch41Logical ||
+                s6Batch42Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -1193,6 +1203,11 @@ namespace Client.Main.ClassicFX.Core
             {
                 InitializeS6Batch41Logical(type, ref effectScale, out life);
             }
+            else if (s6Batch42Logical)
+            {
+                InitializeS6Batch42Logical(ref angle, ref effectScale,
+                    ref effectVelocity, out life);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1334,6 +1349,8 @@ namespace Client.Main.ClassicFX.Core
                     ? s6Batch32Phase
                     : type is ClassicFxEffectType.OurInfluenceGroundEffect or
                       ClassicFxEffectType.EnemyInfluenceGroundEffect ? 0.75f
+                    : type == ClassicFxEffectType.WaterfallOrbit
+                    ? Random.Modulo(360)
                     : furyStrike ? Random.Modulo(100) : 0f,
                 LastChildNativeTick = -1,
                 ModelView = view
@@ -1541,6 +1558,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (IsS6Batch41LogicalType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch41Logical(ref e, f, Pools.Effects.GetHandle(i)))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsS6Batch42LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch42Logical(ref e, f))
                     {
                         ReleaseEffectAt(i);
                         continue;
