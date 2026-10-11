@@ -17,7 +17,9 @@ namespace Client.Main.ClassicFX.Core
             type is ClassicFxEffectType.Warp1 or
                 ClassicFxEffectType.Warp2 or
                 ClassicFxEffectType.Warp4 or
-                ClassicFxEffectType.Warp5;
+                ClassicFxEffectType.Warp5 or
+                ClassicFxEffectType.Warp3 or
+                ClassicFxEffectType.Warp6;
 
         private static bool TryGetS6Batch31ModelDefinition(
             ClassicFxEffectType type, int subType,

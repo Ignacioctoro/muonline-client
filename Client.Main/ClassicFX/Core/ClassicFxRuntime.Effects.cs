@@ -389,6 +389,18 @@ namespace Client.Main.ClassicFX.Core
         SawSkillModel = 351,
         TreeAttackModel = 352,
         DesairModel = 353,
+        // S6 Batch 33: Swamp EX01 Shadow Master fragments and Warp03.
+        Ex01ShadowMasterAnkleLeft = 354,
+        Ex01ShadowMasterAnkleRight = 355,
+        Ex01ShadowMasterBelt = 356,
+        Ex01ShadowMasterChest = 357,
+        Ex01ShadowMasterHelmet = 358,
+        Ex01ShadowMasterKneeLeft = 359,
+        Ex01ShadowMasterKneeRight = 360,
+        Ex01ShadowMasterWristLeft = 361,
+        Ex01ShadowMasterWristRight = 362,
+        Warp3 = 363,
+        Warp6 = 364,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -1053,6 +1065,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch31ModelView(view, type);
                 if (IsS6Batch32ModelType(type))
                     ConfigureS6Batch32ModelView(view, type);
+                if (IsS6Batch33ModelType(type))
+                    ConfigureS6Batch33ModelView(view, type);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.

@@ -72,7 +72,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch29ModelType(type) ||
                 IsS6Batch30ModelType(type) ||
                 IsS6Batch31ModelType(type) ||
-                IsS6Batch32ModelType(type);
+                IsS6Batch32ModelType(type) ||
+                IsS6Batch33ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -209,7 +210,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch31ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch32ModelDefinition(type, subType,
+                    if (TryGetS6Batch32ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch33ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -576,6 +580,18 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.TreeAttackModel:
                 case ClassicFxEffectType.DesairModel:
                     return MoveS6Batch32Model(ref effect, f);
+                case ClassicFxEffectType.Ex01ShadowMasterAnkleLeft:
+                case ClassicFxEffectType.Ex01ShadowMasterAnkleRight:
+                case ClassicFxEffectType.Ex01ShadowMasterBelt:
+                case ClassicFxEffectType.Ex01ShadowMasterChest:
+                case ClassicFxEffectType.Ex01ShadowMasterHelmet:
+                case ClassicFxEffectType.Ex01ShadowMasterKneeLeft:
+                case ClassicFxEffectType.Ex01ShadowMasterKneeRight:
+                case ClassicFxEffectType.Ex01ShadowMasterWristLeft:
+                case ClassicFxEffectType.Ex01ShadowMasterWristRight:
+                case ClassicFxEffectType.Warp3:
+                case ClassicFxEffectType.Warp6:
+                    return MoveS6Batch33Model(ref effect, f);
                 default:
                     return false;
             }
