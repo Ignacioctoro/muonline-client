@@ -51,7 +51,10 @@ namespace Client.Main.ClassicFX.Core
                         // CreateEffect(BITMAP_JOINT_THUNDER+1) subtype zero.
                         position += ClassicMath.VectorRotate(
                             new Vector3(-25f, -80f, 0f),
-                            ClassicMath.AngleMatrix(owner.WorldObject.Angle));
+                            ClassicMath.AngleMatrix(new Vector3(
+                                MathHelper.ToDegrees(owner.WorldObject.Angle.X),
+                                MathHelper.ToDegrees(owner.WorldObject.Angle.Y),
+                                MathHelper.ToDegrees(owner.WorldObject.Angle.Z))));
                     }
                     return;
                 default:
@@ -169,7 +172,7 @@ namespace Client.Main.ClassicFX.Core
                 for (int i = 0; i < 10; i++)
                 {
                     Vector3 a = new Vector3(
-                        0f, 0f, e.Angle.Z + 320f + i * 8f);
+                        0f, 0f, MathHelper.ToRadians(e.Angle.Z + 320f + i * 8f));
                     CreateEffect(ClassicFxEffectType.KundunPhoenix,
                         e.Position, a, e.Light, ClassicFxOwner.None);
                 }
