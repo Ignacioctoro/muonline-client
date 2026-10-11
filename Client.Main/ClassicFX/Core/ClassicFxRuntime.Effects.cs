@@ -380,6 +380,15 @@ namespace Client.Main.ClassicFX.Core
         Warp2 = 343,
         Warp4 = 344,
         Warp5 = 345,
+        // S6 Batch 32: Kundun/Kalima, Aida and Imperial Guardian models.
+        KundunDragonHead = 346,
+        KundunPhoenix = 347,
+        KundunGhost = 348,
+        DeasulerBoomerang = 349,
+        ImperialProjectile = 350,
+        SawSkillModel = 351,
+        TreeAttackModel = 352,
+        DesairModel = 353,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -582,6 +591,8 @@ namespace Client.Main.ClassicFX.Core
             Vector3 s6Batch26StoredPosition = position;
             Vector3 s6Batch29StoredPosition = position;
             Vector3 s6Batch31StoredPosition = position;
+            Vector3 s6Batch32StoredPosition = position;
+            float s6Batch32Phase = 0f;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -851,6 +862,15 @@ namespace Client.Main.ClassicFX.Core
                         ref effectMeshLight, ref effectDirection,
                         ref effectGravity, ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch32ModelType(type) &&
+                    !InitializeS6Batch32Model(type, owner,
+                        inputLight, ref effectPosition,
+                        ref s6Batch32StoredPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectMeshLight, ref effectDirection,
+                        ref effectHeading, ref effectGravity,
+                        ref effectVelocity, ref s6Batch32Phase))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -1031,6 +1051,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch30ModelView(view, type);
                 if (IsS6Batch31ModelType(type))
                     ConfigureS6Batch31ModelView(view, type);
+                if (IsS6Batch32ModelType(type))
+                    ConfigureS6Batch32ModelView(view, type);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
@@ -1042,7 +1064,11 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = type == ClassicFxEffectType.KanturuStorm3
+                StartPosition = type is
+                    ClassicFxEffectType.DeasulerBoomerang or
+                    ClassicFxEffectType.ImperialProjectile
+                    ? s6Batch32StoredPosition
+                    : type == ClassicFxEffectType.KanturuStorm3
                     ? s6Batch31StoredPosition
                     : type is ClassicFxEffectType.DeathSpiSkillModel or
                       ClassicFxEffectType.ProtectGuildModel
@@ -1066,7 +1092,8 @@ namespace Client.Main.ClassicFX.Core
                 HeadAngle = effectHeading,
                 Angle = angle,
                 Light = light,
-                BaseLight = light,
+                BaseLight = type == ClassicFxEffectType.DeasulerBoomerang
+                    ? inputLight : light,
                 Scale = effectScale,
                 Direction = effectDirection,
                 Velocity = effectVelocity,
@@ -1078,7 +1105,9 @@ namespace Client.Main.ClassicFX.Core
                 FirstMove = true,
                 NativePkKey = nativePkKey,
                 NativeSkillIndex = nativeSkillIndex,
-                Phase = furyStrike ? Random.Modulo(100) : 0f,
+                Phase = type == ClassicFxEffectType.DeasulerBoomerang
+                    ? s6Batch32Phase
+                    : furyStrike ? Random.Modulo(100) : 0f,
                 LastChildNativeTick = -1,
                 ModelView = view
             };
