@@ -1,4 +1,5 @@
 #nullable enable
+using Client.Main.Core.Utilities;
 // Skill 42: keep the complete legacy presentation until the native
 // FuryStrike weapon/impact bridge is equivalent. Never draw both.
 namespace Client.Main.Objects.Effects.Skills
