@@ -71,7 +71,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch28ModelType(type) ||
                 IsS6Batch29ModelType(type) ||
                 IsS6Batch30ModelType(type) ||
-                IsS6Batch31ModelType(type);
+                IsS6Batch31ModelType(type) ||
+                IsS6Batch32ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -205,7 +206,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch30ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch31ModelDefinition(type, subType,
+                    if (TryGetS6Batch31ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch32ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -563,6 +567,15 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.Warp4:
                 case ClassicFxEffectType.Warp5:
                     return MoveS6Batch31Model(ref effect, f);
+                case ClassicFxEffectType.KundunDragonHead:
+                case ClassicFxEffectType.KundunPhoenix:
+                case ClassicFxEffectType.KundunGhost:
+                case ClassicFxEffectType.DeasulerBoomerang:
+                case ClassicFxEffectType.ImperialProjectile:
+                case ClassicFxEffectType.SawSkillModel:
+                case ClassicFxEffectType.TreeAttackModel:
+                case ClassicFxEffectType.DesairModel:
+                    return MoveS6Batch32Model(ref effect, f);
                 default:
                     return false;
             }
