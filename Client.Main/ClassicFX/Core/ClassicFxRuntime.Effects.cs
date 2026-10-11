@@ -790,7 +790,7 @@ namespace Client.Main.ClassicFX.Core
                 life = 45f;
             }
             else if (type == ClassicFxEffectType.ArrowsRe06 &&
-                subType is 0 or 1 && boneIndex >= 0)
+                (subType == 0 || subType == 1) && boneIndex >= 0)
             {
                 modelPath = "Effect/arrowsre06.bmd";
                 life = subType == 0 ? 30f : 40f;

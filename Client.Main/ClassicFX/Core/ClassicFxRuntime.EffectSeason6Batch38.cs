@@ -27,8 +27,8 @@ namespace Client.Main.ClassicFX.Core
             };
 
         private static bool S6Batch38NeedsOwner(ClassicFxEffectType type, int sub) =>
-            type is ClassicFxEffectType.SparkOwnerEmitter or
-                ClassicFxEffectType.ImpactEmitter ||
+            (type is ClassicFxEffectType.SparkOwnerEmitter or
+                ClassicFxEffectType.ImpactEmitter) ||
             (type == ClassicFxEffectType.CursedLichFireEmitter &&
                 sub is 0 or 2) ||
             (type == ClassicFxEffectType.ShinyScatterEmitter &&
@@ -60,6 +60,7 @@ namespace Client.Main.ClassicFX.Core
                     break;
                 case ClassicFxEffectType.CursedLichFireEmitter:
                     life = sub switch { 0 or 3 => 10f, 1 => 50f, _ => 20f };
+                    if (sub == 0) scale = 0.7f;
                     break;
                 case ClassicFxEffectType.SparkFountainEmitter:
                     life = 10f;
