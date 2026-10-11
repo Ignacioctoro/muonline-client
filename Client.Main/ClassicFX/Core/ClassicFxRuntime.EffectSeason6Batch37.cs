@@ -5,7 +5,7 @@
 using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controls;
-using Client.Main.Controllers;
+using Client.Main.Models;
 using Client.Main.Objects;
 using Microsoft.Xna.Framework;
 
