@@ -245,6 +245,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapWaterfall5 =
             32290;
 
+        // Native _TextureIndex.h: BITMAP_IMPACT between WATERFALL_5 and EFFECT.
+        public const int BitmapImpact =
+            32291;
+
         public const int BitmapEffect =
             32292;
 
