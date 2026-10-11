@@ -5,6 +5,7 @@
 // sprites and BMD effect models; no extra renderer or new texture alias.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Models;
 using Client.Main.Objects;
 using Microsoft.Xna.Framework;
 
@@ -111,7 +112,8 @@ namespace Client.Main.ClassicFX.Core
 
                 case ClassicFxEffectType.ShineFlareCarrier:
                     if (e.LifeTime > 10f && e.Owner.WorldObject != null &&
-                        ReferenceEquals(e.Owner.WorldObject.World, World))
+                        ReferenceEquals(e.Owner.WorldObject.World, World) &&
+                        e.Owner.WorldObject.Status == GameControlStatus.Ready)
                     {
                         // Move_MODEL_SHINE subtype 0: local X random -114..13;
                         // local Y is always local X + 100; Z = Owner.Z + 360.
@@ -172,7 +174,7 @@ namespace Client.Main.ClassicFX.Core
                 for (int i = 0; i < 10; i++)
                 {
                     Vector3 a = new Vector3(
-                        0f, 0f, MathHelper.ToRadians(e.Angle.Z + 320f + i * 8f));
+                        0f, 0f, e.Angle.Z + MathHelper.ToRadians(320f + i * 8f));
                     CreateEffect(ClassicFxEffectType.KundunPhoenix,
                         e.Position, a, e.Light, ClassicFxOwner.None);
                 }
