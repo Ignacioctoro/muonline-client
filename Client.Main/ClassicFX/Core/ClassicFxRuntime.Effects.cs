@@ -1081,7 +1081,7 @@ namespace Client.Main.ClassicFX.Core
             }
             else if (s6Batch37Logical)
             {
-                InitializeS6Batch37Logical(type, subType, owner,
+                InitializeS6Batch37Logical(type, subType,
                     ref effectPosition, ref angle, ref light,
                     ref effectScale, ref effectAlpha,
                     ref effectDirection, out life);
@@ -1275,6 +1275,9 @@ namespace Client.Main.ClassicFX.Core
             if (s6Batch19Logical)
                 EmitS6Batch19Crush(type, subType, effectPosition,
                     angle, light, owner);
+            if (s6Batch37Logical)
+                EmitS6Batch37OnCreate(type, effectPosition,
+                    angle, light, owner, subType);
             return handle;
         }
 
