@@ -484,6 +484,11 @@ namespace Client.Main.ClassicFX.Core
         FirePlusOneEmitter = 437,
         DragonLoreLava = 438,
         HolyArrowJointCarrier = 439,
+        // S6 Batch 44: genuine native logical emitters (no BMD stand-ins).
+        KundunSkillCarrier = 440,
+        ShineFlareCarrier = 441,
+        SpearHealingCarrier = 442,
+        ThunderPlusOneCarrier = 443,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -610,6 +615,7 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch41Logical = IsS6Batch41LogicalType(type, subType);
             bool s6Batch42Logical = IsS6Batch42LogicalType(type, subType);
             bool s6Batch43Logical = IsS6Batch43LogicalType(type, subType);
+            bool s6Batch44Logical = IsS6Batch44LogicalType(type, subType);
             if (s6Batch43Logical &&
                 !ValidateS6Batch43Owner(type, owner))
                 return ClassicFxHandle.Invalid;
@@ -702,7 +708,7 @@ namespace Client.Main.ClassicFX.Core
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
                 s6Batch40Logical || s6Batch41Logical ||
-                s6Batch42Logical || s6Batch43Logical ||
+                s6Batch42Logical || s6Batch43Logical || s6Batch44Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -1221,6 +1227,11 @@ namespace Client.Main.ClassicFX.Core
                     ref effectPosition, angle, ref effectScale,
                     ref effectVelocity, ref effectDirection, out life);
             }
+            else if (s6Batch44Logical)
+            {
+                InitializeS6Batch44Logical(type, owner, ref effectPosition,
+                    ref angle, subType, ref nativePkKey, out life);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1428,6 +1439,8 @@ namespace Client.Main.ClassicFX.Core
                     angle, light, owner, effectScale);
             if (s6Batch43Logical)
                 EmitS6Batch43OnCreate(type, handle, ref _effects[handle.Index]);
+            if (s6Batch44Logical)
+                EmitS6Batch44OnCreate(handle, ref _effects[handle.Index]);
             return handle;
         }
 
@@ -1591,6 +1604,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (IsS6Batch43LogicalType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch43Logical(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsS6Batch44LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch44Logical(ref e))
                     {
                         ReleaseEffectAt(i);
                         continue;
