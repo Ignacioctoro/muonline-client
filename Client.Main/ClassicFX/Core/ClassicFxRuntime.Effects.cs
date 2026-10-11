@@ -401,6 +401,14 @@ namespace Client.Main.ClassicFX.Core
         Ex01ShadowMasterWristRight = 362,
         Warp3 = 363,
         Warp6 = 364,
+        // S6 Batch 34: battlefield, support, siege and gate BMD effects.
+        MagicCircle1Model = 365,
+        ProtectModel = 366,
+        TowerGatePlaneModel = 367,
+        WarcraftModel = 368,
+        ShieldCrash2Model = 369,
+        GateDebris1 = 370,
+        GateDebris2 = 371,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -883,6 +891,13 @@ namespace Client.Main.ClassicFX.Core
                         ref effectHeading, ref effectGravity,
                         ref effectVelocity, ref s6Batch32Phase))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch34ModelType(type) &&
+                    !InitializeS6Batch34Model(type, ref subType, inputLight,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectMeshLight,
+                        ref effectDirection, ref effectGravity,
+                        ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -1067,6 +1082,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch32ModelView(view, type);
                 if (IsS6Batch33ModelType(type))
                     ConfigureS6Batch33ModelView(view, type);
+                if (IsS6Batch34ModelType(type))
+                    ConfigureS6Batch34ModelView(view, type, subType);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
