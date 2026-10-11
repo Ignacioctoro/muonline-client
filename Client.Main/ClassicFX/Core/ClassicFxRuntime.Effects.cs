@@ -1752,14 +1752,15 @@ namespace Client.Main.ClassicFX.Core
                                     e.Scale *= MathF.Pow(1.05f, f);
                                 else
                                     e.Scale *= MathF.Pow(0.95f, f);
-                                if (Clock.AdvancedReferenceFrame)
-                                {
-                                    ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
-                                    CreateSprite(ClassicTextureIds.BitmapLight,
-                                        pos, e.Scale, e.Light, source);
-                                    CreateSprite(ClassicTextureIds.BitmapLight,
-                                        pos, e.Scale * 0.8f, e.Light, source);
-                                }
+                                // Main ZzzEffect.cpp MODEL_ARROWSRE06 subtype 1:
+                                // both transient hand lights are emitted on every
+                                // update, not only on 25 Hz reference ticks.
+                                // RenderSprites consumes them on the same frame.
+                                ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
+                                CreateSprite(ClassicTextureIds.BitmapLight,
+                                    pos, e.Scale, e.Light, source);
+                                CreateSprite(ClassicTextureIds.BitmapLight,
+                                    pos, e.Scale * 0.8f, e.Light, source);
                                 if (e.LifeTime <= 10f)
                                     e.Alpha *= MathF.Pow(0.95f, f);
                             }
