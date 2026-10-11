@@ -170,6 +170,10 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/flare01.jpg",
                     SamplerState.LinearClamp),
 
+                // MuMain ZzzOpenData.cpp; Data_Broyal has flare01_red.OZJ.
+                new(ClassicTextureIds.BitmapLightRed,
+                    "Effect/flare01_red.jpg", SamplerState.LinearClamp),
+
                 // MuMain ZzzOpenData.cpp: BITMAP_MAGIC_ZIN -> mzine_typer2.jpg.
                 // Data_Broyal contains Effect/mzine_typer2.OZJ.
                 new(ClassicTextureIds.BitmapMagicZin,

@@ -382,6 +382,8 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapLightMarks = 32378;
         public const int BitmapTargetPositionEffect1 = 32379;
         public const int BitmapTargetPositionEffect2 = 32380;
+        // _TextureIndex.h: LIGHT_RED, GRA, RING_OF_GRADATION consecutive.
+        public const int BitmapLightRed = 32429;
         public const int BitmapRingOfGradation = 32431;
     }
 }
