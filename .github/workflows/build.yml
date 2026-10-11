@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - classicfx-nova-pilot
 
 permissions:
   contents: read
