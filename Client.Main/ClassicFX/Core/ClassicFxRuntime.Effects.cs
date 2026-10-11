@@ -468,6 +468,18 @@ namespace Client.Main.ClassicFX.Core
         LavaGiantFootprintRed = 422,
         LavaGiantFootprintViolet = 423,
         FireHik3MonoCarrier = 424,
+        // Season 6 Batch 41: real native carrier roots / distinct variants.
+        TraceEnergyJointCarrier = 425,
+        UmbrellaDeathRingCarrier = 426,
+        GuardianDefenderAttackCarrier = 427,
+        StreamBreathFireCarrier = 428,
+        ThunderNapinCore = 429,
+        ThunderNapinScatter = 430,
+        SkillFissureCarrier = 431,
+        SakuraItemEffectModel = 432,
+        FenrirDamageRed = 433,
+        FenrirDamageBlue = 434,
+        FenrirDamageGreen = 435,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -591,6 +603,17 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch38Logical = IsS6Batch38LogicalType(type, subType);
             bool s6Batch39Logical = IsS6Batch39LogicalType(type, subType);
             bool s6Batch40Logical = IsS6Batch40LogicalType(type, subType);
+            bool s6Batch41Logical = IsS6Batch41LogicalType(type, subType);
+            if ((s6Batch41Logical || IsS6Batch41ModelType(type)) &&
+                S6Batch41NeedsOwner(type) &&
+                (owner.WorldObject == null ||
+                 !ReferenceEquals(owner.WorldObject.World, World) ||
+                 owner.WorldObject.Status != GameControlStatus.Ready))
+                return ClassicFxHandle.Invalid;
+            if ((s6Batch41Logical || IsS6Batch41ModelType(type)) &&
+                S6Batch41NeedsModelOwner(type) &&
+                owner.WorldObject is not ModelObject)
+                return ClassicFxHandle.Invalid;
             if (s6Batch40Logical &&
                 ((S6Batch40NeedsOwner(type, subType) &&
                   (owner.WorldObject == null ||
@@ -662,7 +685,7 @@ namespace Client.Main.ClassicFX.Core
                 s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
-                s6Batch40Logical ||
+                s6Batch40Logical || s6Batch41Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -1166,6 +1189,10 @@ namespace Client.Main.ClassicFX.Core
                     ref effectScale, ref effectDirection,
                     ref effectVelocity, ref effectAlpha, out life);
             }
+            else if (s6Batch41Logical)
+            {
+                InitializeS6Batch41Logical(type, ref effectScale, out life);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1364,6 +1391,9 @@ namespace Client.Main.ClassicFX.Core
             if (s6Batch40Logical)
                 EmitS6Batch40OnCreate(type, subType,
                     effectPosition, angle, light, owner, effectScale);
+            if (s6Batch41Logical)
+                EmitS6Batch41OnCreate(type, handle, effectPosition,
+                    angle, light, owner, effectScale);
             return handle;
         }
 
@@ -1503,6 +1533,14 @@ namespace Client.Main.ClassicFX.Core
                 else if (IsS6Batch40LogicalType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch40Logical(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
+                else if (IsS6Batch41LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch41Logical(ref e, f, Pools.Effects.GetHandle(i)))
                     {
                         ReleaseEffectAt(i);
                         continue;

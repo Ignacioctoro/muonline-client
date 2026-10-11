@@ -76,7 +76,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch33ModelType(type) ||
                 IsS6Batch34ModelType(type) ||
                 IsS6Batch35ModelType(type) ||
-                IsS6Batch36ModelType(type);
+                IsS6Batch36ModelType(type) ||
+                IsS6Batch41ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -225,7 +226,9 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch35ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch36ModelDefinition(type, subType,
+                    if (TryGetS6Batch36ModelDefinition(type, subType,
+                            out definition)) return true;
+                    return TryGetS6Batch41ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -237,6 +240,8 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.AliceBuffSkillEffect:
                 case ClassicFxEffectType.AliceBuffSkillEffect2:
                     return MoveAliceBuffModel(ref effect, f);
+                case ClassicFxEffectType.SakuraItemEffectModel:
+                    return MoveS6Batch41SakuraModel(ref effect, f);
 
                 case ClassicFxEffectType.ShockWaveGround01:
                     // Move_MODEL_SHOCKWAVE_GROUND01: fade differs by subtype.
