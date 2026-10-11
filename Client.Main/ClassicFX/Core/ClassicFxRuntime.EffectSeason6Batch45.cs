@@ -76,11 +76,14 @@ namespace Client.Main.ClassicFX.Core
                         left, e.Angle, violet, e.Owner, subType: 1, boneIndex: 37);
             }
 
-            if (!Clock.AdvancedReferenceFrame) return true;
+            // RenderSprites() consumes and releases every transient sprite
+            // on EACH displayed frame. Sampling the buff at only 25 Hz left
+            // empty render frames at 60/120 FPS, causing severe flashing.
+            // Native RenderEffects emitted the bone lights every rendered
+            // frame, so keep this buff's emission in step with rendering.
+            // Other ClassicFX effects still use the 25 Hz reference clock.
 
             // Native RenderEffects: one violet BITMAP_LIGHT per player bone.
-            // At 60/120fps emit at the 25Hz classic clock to avoid duplicate
-            // transient sprites and preserve Android billboard budgets.
             float lum = (MathF.Abs(MathF.Sin(
                 (float)(Clock.WorldTimeMilliseconds * 0.001))) + 0.2f) * 0.5f;
             Vector3 color = new Vector3(lum * 0.7f, lum * 0.3f, lum * 0.9f);
