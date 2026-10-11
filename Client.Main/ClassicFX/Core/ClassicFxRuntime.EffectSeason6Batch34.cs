@@ -72,10 +72,12 @@ namespace Client.Main.ClassicFX.Core
                 _ => 1f
             };
 
-            bool needsOwner = type is
+            // Parenthesize the C# pattern before boolean ||:
+            // avoids precedence pitfalls from earlier Season 6 batches.
+            bool needsOwner = (type is
                 ClassicFxEffectType.ProtectModel or
                 ClassicFxEffectType.WarcraftModel or
-                ClassicFxEffectType.ShieldCrash2Model ||
+                ClassicFxEffectType.ShieldCrash2Model) ||
                 (type == ClassicFxEffectType.MagicCircle1Model &&
                     subType != 1);
 
