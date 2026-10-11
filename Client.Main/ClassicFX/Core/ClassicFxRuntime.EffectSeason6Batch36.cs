@@ -104,20 +104,24 @@ namespace Client.Main.ClassicFX.Core
             if (e.Type == ClassicFxEffectType.BlizzardModel)
             {
                 if (e.SubType == 1) return true;
-                if (!Clock.AdvancedReferenceFrame) return true;
-                e.Position.X = e.StartPosition.X +
-                    MathF.Sin(Random.Modulo(1000) * 0.01f) * 10f;
-                e.Position.Y = e.StartPosition.Y +
-                    MathF.Sin(Random.Modulo(1000) * 0.01f) * 10f;
+                // Physical movement is frame-factor-scaled at display Hz;
+                // only randomized native emissions are gated at 25 Hz.
                 e.Position.Z += e.Gravity * f;
-                e.Gravity -= Random.Modulo(5) * f;
                 e.StartPosition.X -= 10f * f;
                 e.Light += new Vector3(0.1f * f);
-                CreateParticle(ClassicTextureIds.BitmapSmoke,
-                    e.Position, e.Angle, Vector3.One, 0, 1.5f);
-                CreateSprite(ClassicTextureIds.BitmapShiny + 1,
-                    e.Position, (4f + Random.Modulo(4)) * 0.2f,
-                    e.Light, e.Owner, Random.Modulo(360));
+                if (Clock.AdvancedReferenceFrame)
+                {
+                    e.Position.X = e.StartPosition.X +
+                        MathF.Sin(Random.Modulo(1000) * 0.01f) * 10f;
+                    e.Position.Y = e.StartPosition.Y +
+                        MathF.Sin(Random.Modulo(1000) * 0.01f) * 10f;
+                    e.Gravity -= Random.Modulo(5);
+                    CreateParticle(ClassicTextureIds.BitmapSmoke,
+                        e.Position, e.Angle, Vector3.One, 0, 1.5f);
+                    CreateSprite(ClassicTextureIds.BitmapShiny + 1,
+                        e.Position, (4f + Random.Modulo(4)) * 0.2f,
+                        e.Light, e.Owner, Random.Modulo(360));
+                }
                 if (e.Position.Z < RequestTerrainHeight(e.Position.X, e.Position.Y))
                     return false; // Native collision emits secondary smoke.
                 return true;
@@ -227,12 +231,16 @@ namespace Client.Main.ClassicFX.Core
             e.Light *= MathF.Pow(e.LifeTime >= 35f ?
                 1f / 1.035f : 1.035f, f);
             if (!Clock.AdvancedReferenceFrame) return true;
+            Matrix[] bones = model.GetBoneTransforms();
+            if (bones == null) return true;
+            Matrix world = model.WorldPosition;
             for (int i = 0; i < S6Batch36MarkBones.Length; ++i)
             {
-                if (TryGetOwnerBonePosition(e.Owner, S6Batch36MarkBones[i],
-                    out Vector3 p))
-                    CreateSprite(ClassicTextureIds.BitmapLightMarks,
-                        p, e.Scale * S6Batch36MarkScales[i], e.Light, e.Owner);
+                int bone = S6Batch36MarkBones[i];
+                if ((uint)bone >= (uint)bones.Length) continue;
+                Vector3 p = (bones[bone] * world).Translation;
+                CreateSprite(ClassicTextureIds.BitmapLightMarks,
+                    p, e.Scale * S6Batch36MarkScales[i], e.Light, e.Owner);
             }
             return true;
         }
