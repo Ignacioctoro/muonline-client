@@ -344,6 +344,10 @@ namespace Client.Main.ClassicFX.Data
         public const int Bitmap2LineGhost =
             32403;
 
+        // Original contiguous Effect/firecracker0001..0007 textures.
+        public const int BitmapFirecrackerFrame1 =
+            Bitmap2LineGhost + 1;
+
         public const int BitmapAgAdditionEffect =
             32434;
 
