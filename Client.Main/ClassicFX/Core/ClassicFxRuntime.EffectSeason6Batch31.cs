@@ -282,7 +282,7 @@ namespace Client.Main.ClassicFX.Core
                             Random.Modulo(2000) - 1000f, 0f);
                         // Native leaves Pos2[2] uninitialized. Use source Z.
                         Vector3 to = new Vector3(
-                            from.X + Random.Modulo(200) - 100f,
+                            from.Y + Random.Modulo(200) - 100f,
                             from.Y + Random.Modulo(200) - 100f,
                             from.Z);
                         CreateJoint(ClassicTextureIds.BitmapJointThunder,
