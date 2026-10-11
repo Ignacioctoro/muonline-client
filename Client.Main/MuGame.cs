@@ -454,7 +454,11 @@ namespace Client.Main
 
         protected override void LoadContent()
         {
+            var startupGraphicsTimer = System.Diagnostics.Stopwatch.StartNew();
             GraphicsManager.Instance.Init(GraphicsDevice, Content);
+            startupGraphicsTimer.Stop();
+            _logger?.LogInformation("[StartupPerf] GraphicsManager.Init: {ElapsedMs} ms",
+                startupGraphicsTimer.ElapsedMilliseconds);
 
             // --- START NETWORK CONNECTION ---
             // Start connecting to the Connect Server when the game loads
@@ -518,6 +522,7 @@ namespace Client.Main
         // Private helper method for changing scenes
         private async void ChangeSceneInternal(BaseScene newScene)
         {
+            var sceneTransitionTimer = System.Diagnostics.Stopwatch.StartNew();
             _logger.LogInformation("--- ChangeSceneInternal: Starting scene change to {SceneType}...", newScene.GetType().Name);
 
             // Optional: Show loading screen before disposing the old scene
@@ -563,6 +568,9 @@ namespace Client.Main
 
             // Optional: Hide loading screen after the new scene is loaded
             // HideLoadingScreen();
+            sceneTransitionTimer.Stop();
+            _logger.LogInformation("[StartupPerf] Scene transition to {SceneType}: {ElapsedMs} ms",
+                ActiveScene.GetType().Name, sceneTransitionTimer.ElapsedMilliseconds);
             _logger.LogInformation("<<< ChangeSceneInternal: Scene change to {SceneType} complete.", ActiveScene.GetType().Name);
         }
 
@@ -597,9 +605,13 @@ namespace Client.Main
 
         private async Task ChangeSceneAsync(Type sceneType)
         {
+            var initialSceneTimer = System.Diagnostics.Stopwatch.StartNew();
             ActiveScene?.Dispose();
             ActiveScene = (BaseScene)Activator.CreateInstance(sceneType);
             await ActiveScene.Initialize();
+            initialSceneTimer.Stop();
+            _logger?.LogInformation("[StartupPerf] Initial scene {SceneType}: {ElapsedMs} ms",
+                sceneType.Name, initialSceneTimer.ElapsedMilliseconds);
         }
 
         private void UpdateInputInfo(GameTime gameTime)
