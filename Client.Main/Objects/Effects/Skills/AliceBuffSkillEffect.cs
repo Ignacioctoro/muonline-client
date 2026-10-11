@@ -11,7 +11,7 @@ using Microsoft.Xna.Framework;
 
 namespace Client.Main.Objects.Effects.Skills
 {
-    [SkillVisualEffect(217)] // Thorns, target
+    [SkillVisualEffect(217)] // Damage Reflection: native AT_SKILL_ALICE_THORNS
     [SkillVisualEffect(218)] // Berserker, self
     [SkillVisualEffect(219)] // Sleep, target
     [SkillVisualEffect(220)] // Blind, target
@@ -29,13 +29,21 @@ namespace Client.Main.Objects.Effects.Skills
 
             if (targeted)
             {
-                // Never spawn hostile debuff rings on the caster when the
-                // target packet is missing. It is safer to skip the effect.
-                if (context.TargetId == 0 ||
-                    !context.World.TryGetWalkerById(context.TargetId,
-                        out var resolved) || resolved == null)
-                    return null;
-                target = resolved;
+                // Native Thorns (skill 217) is the friendly Damage Reflection
+                // buff. TargetId==0 means self; hostile Sleep/Blind cannot
+                // silently fall back to the caster.
+                if (context.TargetId == 0)
+                {
+                    if (context.SkillId != 217)
+                        return null;
+                }
+                else
+                {
+                    if (!context.World.TryGetWalkerById(context.TargetId,
+                            out var resolved) || resolved == null)
+                        return null;
+                    target = resolved;
+                }
             }
 
             if (context.World.ClassicFx == null ||
