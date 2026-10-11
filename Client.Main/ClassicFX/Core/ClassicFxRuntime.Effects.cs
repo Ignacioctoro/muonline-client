@@ -1055,7 +1055,7 @@ namespace Client.Main.ClassicFX.Core
             }
             else if (s6Batch36Logical)
             {
-                InitializeS6Batch36Logical(type, ref life, ref effectScale,
+                InitializeS6Batch36Logical(type, out life, ref effectScale,
                     ref effectAlpha, ref light, scale);
             }
             else if (damage01Mono)
