@@ -1,8 +1,9 @@
-# BroyalMU - One-branch consolidation, safe for Windows PowerShell 5.1+.
+# BroyalMU - Clean temporary batch branches while preserving historical baselines (PowerShell 5.1+).
 # Prerequisites: git push access and GitHub CLI (gh) authenticated with admin rights.
 # Preview: powershell -ExecutionPolicy Bypass -File .\tools\consolidate-classicfx-branches.ps1 -DryRun
 # Execute: powershell -ExecutionPolicy Bypass -File .\tools\consolidate-classicfx-branches.ps1
 # Non-ancestor branches are backed up as remote tags before deletion.
+# PERMANENTLY PROTECTED: classicfx-nova-pilot, master and upstream-port-2026-09.
 [CmdletBinding()]
 param([switch]$DryRun)
 
@@ -11,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 
 $Repo = 'Ignacioctoro/muonline-client'
 $Keep = 'classicfx-nova-pilot'
+$ProtectedBranches = @('classicfx-nova-pilot', 'master', 'upstream-port-2026-09')
 $TagPrefix = 'archive/classicfx-consolidation-20261011'
 
 function Assert-Exit([string]$Operation) {
@@ -54,7 +56,7 @@ if (-not $heads.ContainsKey($Keep)) {
 }
 
 $originalPilotSha = $heads[$Keep]
-$others = @($heads.Keys | Where-Object { $_ -ne $Keep } | Sort-Object)
+$others = @($heads.Keys | Where-Object { $_ -notin $ProtectedBranches } | Sort-Object)
 $divergent = @()
 
 foreach ($name in $others) {
@@ -75,7 +77,8 @@ foreach ($name in $others) {
 }
 
 Write-Host "Repositorio: $Repo"
-Write-Host "Rama que se conserva: $Keep ($originalPilotSha)"
+Write-Host "Rama principal: $Keep ($originalPilotSha)"
+Write-Host ('Ramas históricas protegidas: ' + ($ProtectedBranches -join ', '))
 Write-Host "Ramas candidatas para borrar: $($others.Count)"
 Write-Host "Ramas NO ancestras que requieren tag de respaldo: $($divergent.Count)"
 foreach ($item in $divergent) {
@@ -165,10 +168,15 @@ Git-Checked @('fetch', 'origin', '--prune')
 
 $lastHeads = @(& git ls-remote --heads origin)
 Assert-Exit 'git ls-remote (final)'
-$expected = $originalPilotSha + [char]9 + 'refs/heads/' + $Keep
-if ($lastHeads.Count -ne 1 -or $lastHeads[0] -ne $expected) {
+$remainingNames = @($lastHeads | ForEach-Object {
+    if ($_ -match '^([0-9a-f]{40})\s+refs/heads/(.+)
+Write-Host "Se conservaron $($divergent.Count) tags de archivo para las ramas divergentes."
+) { $Matches[2] }
+})
+$unexpected = @($remainingNames | Where-Object { $_ -notin $ProtectedBranches })
+if ($unexpected.Count -gt 0 -or $remainingNames -notcontains $Keep) {
     throw 'Limpieza parcial: comprueba las ramas restantes en GitHub.'
 }
 
-Write-Host "LISTO: solo existe la rama $Keep ($originalPilotSha)."
+Write-Host ('LISTO: ramas conservadas: ' + ($remainingNames -join ', '))
 Write-Host "Se conservaron $($divergent.Count) tags de archivo para las ramas divergentes."
