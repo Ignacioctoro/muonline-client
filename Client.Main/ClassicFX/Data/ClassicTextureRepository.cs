@@ -858,7 +858,35 @@ namespace Client.Main.ClassicFX.Data
                 new(
                     ClassicTextureIds.BitmapWaterfall5,
                     "Effect/waterFall5.jpg",
-                    SamplerState.LinearClamp)
+                    SamplerState.LinearClamp),
+
+                // Native firecracker animated sprite frame 1.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 0,
+                    "Effect/firecracker0001.jpg", SamplerState.PointClamp),
+
+                // Native firecracker animated sprite frame 2.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 1,
+                    "Effect/firecracker0002.jpg", SamplerState.PointClamp),
+
+                // Native firecracker animated sprite frame 3.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 2,
+                    "Effect/firecracker0003.jpg", SamplerState.PointClamp),
+
+                // Native firecracker animated sprite frame 4.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 3,
+                    "Effect/firecracker0004.jpg", SamplerState.PointClamp),
+
+                // Native firecracker animated sprite frame 5.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 4,
+                    "Effect/firecracker0005.jpg", SamplerState.PointClamp),
+
+                // Native firecracker animated sprite frame 6.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 5,
+                    "Effect/firecracker0006.jpg", SamplerState.PointClamp),
+
+                // Native firecracker animated sprite frame 7.
+                new(ClassicTextureIds.BitmapFirecrackerFrame1 + 6,
+                    "Effect/firecracker0007.jpg", SamplerState.PointClamp)
             ];
 
         private readonly
