@@ -367,5 +367,13 @@ namespace Client.Main.ClassicFX.Data
 
         public const int BitmapGroundSmoke =
             32477;
+
+        // MuMain fixed _TextureIndex.h, exact native bitmap IDs.
+        public const int BitmapOurInfluenceGround = 32143;
+        public const int BitmapEnemyInfluenceGround = 32144;
+        public const int BitmapLightMarks = 32378;
+        public const int BitmapTargetPositionEffect1 = 32379;
+        public const int BitmapTargetPositionEffect2 = 32380;
+        public const int BitmapRingOfGradation = 32431;
     }
 }

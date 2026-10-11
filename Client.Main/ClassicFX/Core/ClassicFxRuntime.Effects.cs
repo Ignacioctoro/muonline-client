@@ -413,6 +413,17 @@ namespace Client.Main.ClassicFX.Core
         WindForceMirror = 372,
         ChainLightning = 373,
         TargetMonEffect = 374,
+        // Batch 36: native Cursed Temple/Blizzard BMDs and authentic bitmap effects.
+        BlizzardModel = 375,
+        CursedTempleProtectionSkill = 376,
+        CursedTempleRestraintSkill = 377,
+        EventCloudEffect = 378,
+        TargetPositionEffect1 = 379,
+        TargetPositionEffect2 = 380,
+        RingOfGradationEffect = 381,
+        OurInfluenceGroundEffect = 382,
+        EnemyInfluenceGroundEffect = 383,
+        LightMarksEffect = 384,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -531,6 +542,15 @@ namespace Client.Main.ClassicFX.Core
                 type == ClassicFxEffectType.HalloweenEx && subType == 0;
             bool s6Batch19Logical = IsS6Batch19CrushCarrier(type, subType);
             bool s6Batch35Logical = IsS6Batch35LogicalType(type, subType);
+            bool s6Batch36Logical = IsS6Batch36LogicalType(type, subType);
+            if (s6Batch36Logical && IsS6Batch36OwnerRequired(type) &&
+                (owner.WorldObject == null ||
+                 !ReferenceEquals(owner.WorldObject.World, World) ||
+                 owner.WorldObject.Status != GameControlStatus.Ready))
+                return ClassicFxHandle.Invalid;
+            if (type == ClassicFxEffectType.LightMarksEffect &&
+                owner.WorldObject is not ModelObject)
+                return ClassicFxHandle.Invalid;
             // Chain lightning references two actual client objects, not a BMD.
             if (type == ClassicFxEffectType.ChainLightning &&
                 (nativeTarget == null ||
@@ -561,7 +581,7 @@ namespace Client.Main.ClassicFX.Core
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
                 s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
-                s6Batch19Logical || s6Batch35Logical ||
+                s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -916,6 +936,10 @@ namespace Client.Main.ClassicFX.Core
                 if (IsS6Batch35ModelType(type) &&
                     !InitializeS6Batch35Model(owner))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch36ModelType(type))
+                    InitializeS6Batch36Model(type, subType, ref effectPosition,
+                        ref light, ref effectScale, ref life, ref effectGravity,
+                        ref effectVelocity, ref effectAlpha);
             }
             else if (additionalTerrain)
             {
@@ -1029,6 +1053,11 @@ namespace Client.Main.ClassicFX.Core
                 if (type == ClassicFxEffectType.TargetMonEffect)
                     effectScale = scale;
             }
+            else if (s6Batch36Logical)
+            {
+                InitializeS6Batch36Logical(type, ref life, ref effectScale,
+                    ref effectAlpha, ref light, scale);
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1109,6 +1138,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch33ModelView(view, type);
                 if (IsS6Batch34ModelType(type))
                     ConfigureS6Batch34ModelView(view, type, subType);
+                if (IsS6Batch36ModelType(type))
+                    ConfigureS6Batch36ModelView(view, type);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
@@ -1125,6 +1156,8 @@ namespace Client.Main.ClassicFX.Core
                     ClassicFxEffectType.DeasulerBoomerang or
                     ClassicFxEffectType.ImperialProjectile
                     ? s6Batch32StoredPosition
+                    : type == ClassicFxEffectType.BlizzardModel
+                    ? effectPosition
                     : type == ClassicFxEffectType.KanturuStorm3
                     ? s6Batch31StoredPosition
                     : type is ClassicFxEffectType.DeathSpiSkillModel or
@@ -1164,6 +1197,8 @@ namespace Client.Main.ClassicFX.Core
                 NativeSkillIndex = nativeSkillIndex,
                 Phase = type == ClassicFxEffectType.DeasulerBoomerang
                     ? s6Batch32Phase
+                    : type is ClassicFxEffectType.OurInfluenceGroundEffect or
+                      ClassicFxEffectType.EnemyInfluenceGroundEffect ? 0.75f
                     : furyStrike ? Random.Modulo(100) : 0f,
                 LastChildNativeTick = -1,
                 ModelView = view
@@ -1316,6 +1351,14 @@ namespace Client.Main.ClassicFX.Core
                         continue;
                     }
                 }
+                else if (IsS6Batch36LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch36Logical(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
                 else if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch14Terrain(ref e, f))
@@ -1435,7 +1478,8 @@ namespace Client.Main.ClassicFX.Core
                         IsS6Batch09ModelType(e.Type) ||
                         IsS6Batch10ModelType(e.Type) ||
                         IsS6Batch12ModelType(e.Type) ||
-                        IsS6Batch35ModelType(e.Type))
+                        IsS6Batch35ModelType(e.Type) ||
+                        IsS6Batch36ModelType(e.Type))
                         e.ModelView.Color = new Color(Vector3.Clamp(
                             e.Light, Vector3.Zero, Vector3.One));
                 }
@@ -1604,6 +1648,11 @@ namespace Client.Main.ClassicFX.Core
                 if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {
                     RenderS6Batch14Terrain(ref e);
+                    continue;
+                }
+                if (IsS6Batch36GroundType(e.Type))
+                {
+                    RenderS6Batch36Ground(ref e);
                     continue;
                 }
                 if (e.Type == ClassicFxEffectType.MagicCircleGround)

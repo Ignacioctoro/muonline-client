@@ -345,6 +345,19 @@ namespace Client.Main.ClassicFX.Data
                     ClassicTextureIds.BitmapEventCloud,
                     "Effect/clouds2.jpg",
                     SamplerState.LinearClamp),
+                // Batch 36: real LoadBitmap paths and original texture slots.
+                new(ClassicTextureIds.BitmapOurInfluenceGround,
+                    "Effect/guild_ring01.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapEnemyInfluenceGround,
+                    "Effect/enemy_ring02.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapLightMarks,
+                    "Effect/lightmarks.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapTargetPositionEffect1,
+                    "Effect/cursorpin01.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapTargetPositionEffect2,
+                    "Effect/cursorpin02.jpg", SamplerState.LinearClamp),
+                new(ClassicTextureIds.BitmapRingOfGradation,
+                    "Effect/ring_of_gradation.jpg", SamplerState.LinearClamp),
 
                 new(
                     ClassicTextureIds.BitmapChrome3,

@@ -75,7 +75,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch32ModelType(type) ||
                 IsS6Batch33ModelType(type) ||
                 IsS6Batch34ModelType(type) ||
-                IsS6Batch35ModelType(type);
+                IsS6Batch35ModelType(type) ||
+                IsS6Batch36ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -221,7 +222,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch34ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch35ModelDefinition(type, subType,
+                    if (TryGetS6Batch35ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch36ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -610,6 +614,10 @@ namespace Client.Main.ClassicFX.Core
                     return MoveS6Batch34Model(ref effect, f);
                 case ClassicFxEffectType.WindForceMirror:
                     return MoveS6Batch35Model(ref effect, f);
+                case ClassicFxEffectType.BlizzardModel:
+                case ClassicFxEffectType.CursedTempleProtectionSkill:
+                case ClassicFxEffectType.CursedTempleRestraintSkill:
+                    return MoveS6Batch36Model(ref effect, f);
                 default:
                     return false;
             }
