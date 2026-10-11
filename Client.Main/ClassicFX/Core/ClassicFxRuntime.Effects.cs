@@ -346,6 +346,17 @@ namespace Client.Main.ClassicFX.Core
         SakuraEventItemModel = 312,
         UmbrellaGoldModel = 313,
         EmpireGuardianFrameStrikeModel = 314,
+        // S6 Batch 29 — ranged and siege effect BMD families.
+        ArrowBasicModel = 315,
+        ArrowDarkStingerModel = 316,
+        LaceArrowModel = 317,
+        GroundStoneModel = 318,
+        GroundStone2Model = 319,
+        SkullModel = 320,
+        ProtectGuildModel = 321,
+        DeathSpiSkillModel = 322,
+        WoosiStoneModel = 323,
+        DungeonStoneModel = 324,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -546,6 +557,7 @@ namespace Client.Main.ClassicFX.Core
             Vector3 s6Batch24StoredPosition = position;
             Vector3 s6Batch25StoredPosition = position;
             Vector3 s6Batch26StoredPosition = position;
+            Vector3 s6Batch29StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -791,6 +803,15 @@ namespace Client.Main.ClassicFX.Core
                         ref effectHeading, ref effectGravity,
                         ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch29ModelType(type) &&
+                    !InitializeS6Batch29Model(type, subType, owner,
+                        inputLight, ref effectPosition,
+                        ref s6Batch29StoredPosition, ref angle,
+                        ref light, ref effectScale, ref life,
+                        ref effectAlpha, ref effectMeshLight,
+                        ref effectDirection, ref effectHeading,
+                        ref effectGravity, ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -965,6 +986,8 @@ namespace Client.Main.ClassicFX.Core
                         nativeAnimationSpeed);
                 if (IsS6Batch28ModelType(type))
                     ConfigureS6Batch28ModelView(view, type);
+                if (IsS6Batch29ModelType(type))
+                    ConfigureS6Batch29ModelView(view, type, subType);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
@@ -976,7 +999,10 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = IsS6Batch26ModelType(type)
+                StartPosition = type is ClassicFxEffectType.DeathSpiSkillModel or
+                    ClassicFxEffectType.ProtectGuildModel
+                    ? s6Batch29StoredPosition
+                    : IsS6Batch26ModelType(type)
                     ? s6Batch26StoredPosition
                     : IsS6Batch25ModelType(type)
                     ? s6Batch25StoredPosition

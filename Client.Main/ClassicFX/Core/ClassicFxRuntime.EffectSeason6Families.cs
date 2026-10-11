@@ -68,7 +68,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch25ModelType(type) ||
                 IsS6Batch26ModelType(type) ||
                 IsS6Batch27ModelType(type) ||
-                IsS6Batch28ModelType(type);
+                IsS6Batch28ModelType(type) ||
+                IsS6Batch29ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -193,7 +194,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch27ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch28ModelDefinition(type, subType,
+                    if (TryGetS6Batch28ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch29ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -517,6 +521,17 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.UmbrellaGoldModel:
                 case ClassicFxEffectType.EmpireGuardianFrameStrikeModel:
                     return MoveS6Batch28Model(ref effect, f);
+                case ClassicFxEffectType.ArrowBasicModel:
+                case ClassicFxEffectType.ArrowDarkStingerModel:
+                case ClassicFxEffectType.LaceArrowModel:
+                case ClassicFxEffectType.GroundStoneModel:
+                case ClassicFxEffectType.GroundStone2Model:
+                case ClassicFxEffectType.SkullModel:
+                case ClassicFxEffectType.ProtectGuildModel:
+                case ClassicFxEffectType.DeathSpiSkillModel:
+                case ClassicFxEffectType.WoosiStoneModel:
+                case ClassicFxEffectType.DungeonStoneModel:
+                    return MoveS6Batch29Model(ref effect, f);
                 default:
                     return false;
             }
