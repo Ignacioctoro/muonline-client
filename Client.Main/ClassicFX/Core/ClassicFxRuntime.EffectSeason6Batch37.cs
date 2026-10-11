@@ -42,12 +42,12 @@ namespace Client.Main.ClassicFX.Core
 
         // Out parameter guarantees definite assignment in CreateEffect().
         private void InitializeS6Batch37Logical(
-            ClassicFxEffectType type, int sub, ClassicFxOwner owner,
+            ClassicFxEffectType type, int sub,
             ref Vector3 pos, ref Vector3 angle, ref Vector3 light,
             ref float scale, ref float alpha, ref Vector3 direction,
             out float life)
         {
-            life = 30f; // Original Effect initializer's default lifetime.
+            life = 30f; // Conservative fallback where native lifespan is unspecified.
             switch (type)
             {
                 case ClassicFxEffectType.FirecrackerRise:
@@ -66,9 +66,7 @@ namespace Client.Main.ClassicFX.Core
                     break;
                 case ClassicFxEffectType.FirecrackerExplosion:
                     life = 30f;
-                    // Native creation burst: allocation bounded by existing
-                    // ClassicFX particle/sprite pools, not a new renderer.
-                    EmitS6Batch37Explosion(pos, angle, light, owner, sub);
+                    // One-shot burst is emitted after the pool accepts this effect.
                     break;
                 case ClassicFxEffectType.FirecrackerFlash:
                     life = 15f;
@@ -80,8 +78,7 @@ namespace Client.Main.ClassicFX.Core
                     break;
                 case ClassicFxEffectType.OroraEffect:
                     life = sub <= 1 ? 100f : 25f;
-                    CreateParticle(ClassicTextureIds.BitmapOrora,
-                        pos, angle, light, sub, 1f, owner);
+                    // Aurora particle is emitted after successful allocation.
                     break;
                 case ClassicFxEffectType.GatheringEffect:
                     life = sub is 1 or 2 ? 20f : 10f;
@@ -110,6 +107,17 @@ namespace Client.Main.ClassicFX.Core
                     }
                     break;
             }
+        }
+
+        private void EmitS6Batch37OnCreate(
+            ClassicFxEffectType type, Vector3 pos, Vector3 angle,
+            Vector3 light, ClassicFxOwner owner, int sub)
+        {
+            if (type == ClassicFxEffectType.FirecrackerExplosion)
+                EmitS6Batch37Explosion(pos, angle, light, owner, sub);
+            else if (type == ClassicFxEffectType.OroraEffect)
+                CreateParticle(ClassicTextureIds.BitmapOrora,
+                    pos, angle, light, sub, 1f, owner);
         }
 
         private void EmitS6Batch37Explosion(
