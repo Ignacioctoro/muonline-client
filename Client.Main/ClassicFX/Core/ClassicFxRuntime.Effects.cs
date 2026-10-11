@@ -409,6 +409,10 @@ namespace Client.Main.ClassicFX.Core
         ShieldCrash2Model = 369,
         GateDebris1 = 370,
         GateDebris2 = 371,
+        // Batch 35: mirror BMD and genuine model-less particle/joint carriers.
+        WindForceMirror = 372,
+        ChainLightning = 373,
+        TargetMonEffect = 374,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -470,7 +474,8 @@ namespace Client.Main.ClassicFX.Core
             float scale = 1f,
             int nativePkKey = 0,
             int nativeSkillIndex = 0,
-            float nativeAnimationSpeed = 0f)
+            float nativeAnimationSpeed = 0f,
+            WorldObject nativeTarget = null)
         {
             if (_disposed || !Enabled)
                 return ClassicFxHandle.Invalid;
@@ -525,6 +530,16 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch17Logical =
                 type == ClassicFxEffectType.HalloweenEx && subType == 0;
             bool s6Batch19Logical = IsS6Batch19CrushCarrier(type, subType);
+            bool s6Batch35Logical = IsS6Batch35LogicalType(type, subType);
+            // Chain lightning references two actual client objects, not a BMD.
+            if (type == ClassicFxEffectType.ChainLightning &&
+                (nativeTarget == null ||
+                 !ReferenceEquals(nativeTarget.World, World)))
+                return ClassicFxHandle.Invalid;
+            if (s6Batch35Logical &&
+                (owner.WorldObject is not ModelObject ||
+                 owner.WorldObject.Status != GameControlStatus.Ready))
+                return ClassicFxHandle.Invalid;
             // Source model is present in Main, but BMD is missing in Data_Broyal.
             if (type == ClassicFxEffectType.DoorCrushPiece09)
                 return ClassicFxHandle.Invalid;
@@ -546,7 +561,7 @@ namespace Client.Main.ClassicFX.Core
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
                 s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
-                s6Batch19Logical ||
+                s6Batch19Logical || s6Batch35Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -898,6 +913,9 @@ namespace Client.Main.ClassicFX.Core
                         ref effectDirection, ref effectGravity,
                         ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch35ModelType(type) &&
+                    !InitializeS6Batch35Model(owner))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -1004,6 +1022,13 @@ namespace Client.Main.ClassicFX.Core
                 InitializeS6FuryStrike(ref angle,
                     ref effectHeading, ref effectGravity);
             }
+            else if (s6Batch35Logical)
+            {
+                // No ModelView is created for these native emitters.
+                life = type == ClassicFxEffectType.ChainLightning ? 20f : 100f;
+                if (type == ClassicFxEffectType.TargetMonEffect)
+                    effectScale = scale;
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1094,6 +1119,7 @@ namespace Client.Main.ClassicFX.Core
                 Type = type,
                 SubType = subType,
                 Owner = owner,
+                TargetWorldObject = nativeTarget,
                 Position = effectPosition,
                 StartPosition = type is
                     ClassicFxEffectType.DeasulerBoomerang or
@@ -1281,6 +1307,14 @@ namespace Client.Main.ClassicFX.Core
                     // Logical carriers emit their children only at creation.
                     ReleaseEffectAt(i);
                     continue;
+                }
+                else if (IsS6Batch35LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch35Logical(ref e))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
                 }
                 else if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {

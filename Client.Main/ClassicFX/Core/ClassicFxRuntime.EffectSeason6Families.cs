@@ -74,7 +74,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch31ModelType(type) ||
                 IsS6Batch32ModelType(type) ||
                 IsS6Batch33ModelType(type) ||
-                IsS6Batch34ModelType(type);
+                IsS6Batch34ModelType(type) ||
+                IsS6Batch35ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -217,7 +218,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch33ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch34ModelDefinition(type, subType,
+                    if (TryGetS6Batch34ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch35ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -604,6 +608,8 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.GateDebris1:
                 case ClassicFxEffectType.GateDebris2:
                     return MoveS6Batch34Model(ref effect, f);
+                case ClassicFxEffectType.WindForceMirror:
+                    return MoveS6Batch35Model(ref effect, f);
                 default:
                     return false;
             }
