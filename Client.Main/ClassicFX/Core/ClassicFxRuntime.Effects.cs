@@ -357,6 +357,18 @@ namespace Client.Main.ClassicFX.Core
         DeathSpiSkillModel = 322,
         WoosiStoneModel = 323,
         DungeonStoneModel = 324,
+        // S6 Batch 30: Cursed Temple, PK field and physical stone debris.
+        CursedTempleStatuePart1 = 325,
+        CursedTempleStatuePart2 = 326,
+        PkFieldAssassinGreenHead = 327,
+        PkFieldAssassinRedHead = 328,
+        PkFieldAssassinGreenBody = 329,
+        PkFieldAssassinRedBody = 330,
+        StoneCoffin1 = 331,
+        StoneCoffin2 = 332,
+        FlyBigStone1 = 333,
+        FlyBigStone2 = 334,
+        FallStoneEffect = 335,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -812,6 +824,13 @@ namespace Client.Main.ClassicFX.Core
                         ref effectDirection, ref effectHeading,
                         ref effectGravity, ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch30ModelType(type) &&
+                    !InitializeS6Batch30Model(type, ref subType,
+                        ref effectPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectDirection, ref effectHeading,
+                        ref effectGravity, ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -988,6 +1007,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch28ModelView(view, type);
                 if (IsS6Batch29ModelType(type))
                     ConfigureS6Batch29ModelView(view, type, subType);
+                if (IsS6Batch30ModelType(type))
+                    ConfigureS6Batch30ModelView(view, type);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
