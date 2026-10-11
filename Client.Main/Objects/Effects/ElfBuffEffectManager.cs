@@ -57,7 +57,14 @@ namespace Client.Main.Objects.Effects
 
             if (_visuals.TryGetValue(playerId, out var existing))
             {
-                if (IsAlive(existing.Left) && IsAlive(existing.Right) && AreAlive(existing.Orbits))
+                // Map transitions retain this manager but dispose the old
+                // WorldObjects. Never reuse emitters attached to another world.
+                if (MuGame.Instance?.ActiveScene is GameScene scene &&
+                    scene.World is WalkableWorldControl activeWorld &&
+                    ReferenceEquals(existing.Left?.World, activeWorld) &&
+                    ReferenceEquals(existing.Right?.World, activeWorld) &&
+                    existing.Orbits.TrueForAll(o => ReferenceEquals(o.World, activeWorld)) &&
+                    IsAlive(existing.Left) && IsAlive(existing.Right) && AreAlive(existing.Orbits))
                     return;
 
                 Detach(playerId);

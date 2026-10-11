@@ -499,7 +499,8 @@ namespace Client.Main.Objects.Effects
             WorldObject effect,
             PlayerObject target)
         {
-            if (effect == null || effect.Status == GameControlStatus.Disposed)
+            if (effect == null || effect.Status == GameControlStatus.Disposed ||
+                target.World == null || !ReferenceEquals(effect.World, target.World))
                 return false;
             if (UseClassicFxSpearJoints && effect is ClassicFxSpearJointVisual classic)
                 return ReferenceEquals(classic.Owner, target);

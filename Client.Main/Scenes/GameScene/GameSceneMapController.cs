@@ -7,6 +7,7 @@ using Client.Main.Controls.UI.Game;
 using Client.Main.Controls.UI.Game.Map;
 using Client.Main.Models;
 using Client.Main.Objects;
+using Client.Main.Objects.Effects;
 using Client.Main.Objects.Player;
 using Client.Main.Worlds;
 using Microsoft.Extensions.Logging;
@@ -143,6 +144,17 @@ namespace Client.Main.Scenes
                 await (_scopeImportController?.ImportPendingRemotePlayersAsync() ?? Task.CompletedTask);
                 await (_scopeImportController?.ImportPendingNpcsMonstersAsync() ?? Task.CompletedTask);
                 await (_scopeImportController?.ImportPendingDroppedItemsAsync() ?? Task.CompletedTask);
+
+                // The old world's effect objects were disposed during warp,
+                // while MagicEffectStatus buff state remains active. Rebind
+                // the local player's persistent auras to the NEW world.
+                // No need to recast the skill or duplicate network effects.
+                if (_scene.Hero != null)
+                {
+                    ushort heroId = (ushort)(_scene.Hero.NetworkId & 0x7FFF);
+                    BuffVisualManager.Instance.EnsureBuffsForPlayer(heroId);
+                    ElfBuffEffectManager.Instance?.EnsureBuffsForPlayer(heroId);
+                }
             }
             else
             {
