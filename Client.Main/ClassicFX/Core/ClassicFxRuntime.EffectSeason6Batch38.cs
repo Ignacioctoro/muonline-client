@@ -14,21 +14,25 @@ namespace Client.Main.ClassicFX.Core
             type switch
             {
                 ClassicFxEffectType.FlameEmitter => sub is 0 or 1 or 2 or 3 or 5 or 6,
-                ClassicFxEffectType.CursedLichFireEmitter => sub is 1 or 12,
+                ClassicFxEffectType.CursedLichFireEmitter => sub is 0 or 1 or 2 or 3 or 12,
                 ClassicFxEffectType.SparkFountainEmitter => sub == 0,
                 ClassicFxEffectType.SparkOwnerEmitter => sub == 0,
                 ClassicFxEffectType.EnergyEmitter => sub == 0,
                 ClassicFxEffectType.ShinyRingEmitter => sub == 0,
-                ClassicFxEffectType.ShinyScatterEmitter => sub == 0,
+                ClassicFxEffectType.ShinyScatterEmitter => sub is >= 0 and <= 3,
                 ClassicFxEffectType.LightningTerrain2Emitter => sub is 0 or 1,
                 ClassicFxEffectType.SwordMonoEmitter => sub is 0 or 1 or 2,
                 ClassicFxEffectType.ImpactEmitter => sub == 0,
                 _ => false
             };
 
-        private static bool S6Batch38NeedsOwner(ClassicFxEffectType type) =>
+        private static bool S6Batch38NeedsOwner(ClassicFxEffectType type, int sub) =>
             type is ClassicFxEffectType.SparkOwnerEmitter or
-                ClassicFxEffectType.ImpactEmitter;
+                ClassicFxEffectType.ImpactEmitter ||
+            (type == ClassicFxEffectType.CursedLichFireEmitter &&
+                sub is 0 or 2) ||
+            (type == ClassicFxEffectType.ShinyScatterEmitter &&
+                sub is 1 or 2 or 3);
 
         private static bool IsS6Batch38TerrainType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.FlameEmitter or
@@ -55,7 +59,7 @@ namespace Client.Main.ClassicFX.Core
                     if (sub is 1 or 2) angle = Vector3.Zero;
                     break;
                 case ClassicFxEffectType.CursedLichFireEmitter:
-                    life = sub == 1 ? 50f : 20f;
+                    life = sub switch { 0 or 3 => 10f, 1 => 50f, _ => 20f };
                     break;
                 case ClassicFxEffectType.SparkFountainEmitter:
                     life = 10f;
@@ -72,7 +76,7 @@ namespace Client.Main.ClassicFX.Core
                     life = 16f;
                     break;
                 case ClassicFxEffectType.ShinyScatterEmitter:
-                    life = 24f;
+                    life = sub is 1 or 2 ? 100f : 24f;
                     break;
                 case ClassicFxEffectType.LightningTerrain2Emitter:
                     life = sub == 0 ? 10f : 50f;
@@ -99,28 +103,7 @@ namespace Client.Main.ClassicFX.Core
                     return true;
 
                 case ClassicFxEffectType.CursedLichFireEmitter:
-                    if (Clock.AdvancedReferenceFrame)
-                    {
-                        Vector3 p = e.Position + new Vector3(
-                            Random.Modulo(e.SubType == 12 ? 50 : 100) -
-                                (e.SubType == 12 ? 25 : 50),
-                            Random.Modulo(e.SubType == 12 ? 50 : 100) -
-                                (e.SubType == 12 ? 25 : 50),
-                            5 + Random.Modulo(10));
-                        float scale = e.SubType == 12
-                            ? (13 + Random.Modulo(5)) * 0.05f * e.Scale
-                            : (13 + Random.Modulo(5)) * 0.1f;
-                        int tex = Random.Modulo(3) switch
-                        {
-                            0 => ClassicTextureIds.BitmapFireHik1,
-                            1 => ClassicTextureIds.BitmapFireCursedLich,
-                            _ => ClassicTextureIds.BitmapFireHik3
-                        };
-                        CreateParticle(tex, p, e.Angle, e.Light,
-                            tex == ClassicTextureIds.BitmapFireCursedLich
-                                ? 5 : 1, scale);
-                    }
-                    return true;
+                    return MoveS6Batch45CursedLich(ref e);
 
                 case ClassicFxEffectType.SparkFountainEmitter:
                     if (Clock.AdvancedReferenceFrame)
@@ -172,16 +155,7 @@ namespace Client.Main.ClassicFX.Core
                     return true;
 
                 case ClassicFxEffectType.ShinyScatterEmitter:
-                    if (Clock.AdvancedReferenceFrame)
-                    {
-                        Vector3 p = e.Position + new Vector3(
-                            Random.Modulo(500) - 250,
-                            Random.Modulo(500) - 250,
-                            150f - Random.Modulo(100));
-                        CreateParticle(ClassicTextureIds.BitmapShiny + 6,
-                            p, e.Angle, e.Light, 0, e.Scale);
-                    }
-                    return true;
+                    return MoveS6Batch45Shiny(ref e);
 
                 case ClassicFxEffectType.LightningTerrain2Emitter:
                     e.Scale += 0.2f * f;

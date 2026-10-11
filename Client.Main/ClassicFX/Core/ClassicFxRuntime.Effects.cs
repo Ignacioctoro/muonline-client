@@ -489,6 +489,8 @@ namespace Client.Main.ClassicFX.Core
         ShineFlareCarrier = 441,
         SpearHealingCarrier = 442,
         ThunderPlusOneCarrier = 443,
+        // S6 Batch 45: native invisible six-second buff emitter.
+        SwellMagicBuffCarrier = 444,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -616,6 +618,12 @@ namespace Client.Main.ClassicFX.Core
             bool s6Batch42Logical = IsS6Batch42LogicalType(type, subType);
             bool s6Batch43Logical = IsS6Batch43LogicalType(type, subType);
             bool s6Batch44Logical = IsS6Batch44LogicalType(type, subType);
+            bool s6Batch45Logical = IsS6Batch45LogicalType(type, subType);
+            if (s6Batch45Logical && !IsS6Batch45BuffOwnerValid(owner))
+                return ClassicFxHandle.Invalid;
+            if (s6Batch38Logical && !ValidateS6Batch45Variants(
+                    type, subType, owner, nativeSkillIndex))
+                return ClassicFxHandle.Invalid;
             if (s6Batch43Logical &&
                 !ValidateS6Batch43Owner(type, owner))
                 return ClassicFxHandle.Invalid;
@@ -653,7 +661,7 @@ namespace Client.Main.ClassicFX.Core
                  !ReferenceEquals(owner.WorldObject.World, World) ||
                  owner.WorldObject.Status != GameControlStatus.Ready))
                 return ClassicFxHandle.Invalid;
-            if (s6Batch38Logical && S6Batch38NeedsOwner(type) &&
+            if (s6Batch38Logical && S6Batch38NeedsOwner(type, subType) &&
                 (owner.WorldObject == null ||
                  !ReferenceEquals(owner.WorldObject.World, World) ||
                  owner.WorldObject.Status != GameControlStatus.Ready))
@@ -709,6 +717,7 @@ namespace Client.Main.ClassicFX.Core
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
                 s6Batch40Logical || s6Batch41Logical ||
                 s6Batch42Logical || s6Batch43Logical || s6Batch44Logical ||
+                s6Batch45Logical ||
                 magicGround2 || magicCircleGround ||
                 additionalTerrain || damage01Mono)
             {
@@ -780,10 +789,11 @@ namespace Client.Main.ClassicFX.Core
                 modelPath = "Effect/magic_powerup.bmd";
                 life = 45f;
             }
-            else if (type == ClassicFxEffectType.ArrowsRe06 && subType == 1 && boneIndex >= 0)
+            else if (type == ClassicFxEffectType.ArrowsRe06 &&
+                subType is 0 or 1 && boneIndex >= 0)
             {
                 modelPath = "Effect/arrowsre06.bmd";
-                life = 40f;
+                life = subType == 0 ? 30f : 40f;
             }
             else if (additionalModel)
             {
@@ -1232,6 +1242,12 @@ namespace Client.Main.ClassicFX.Core
                 InitializeS6Batch44Logical(type, owner, ref effectPosition,
                     ref angle, subType, ref nativePkKey, out life);
             }
+            else if (s6Batch45Logical)
+            {
+                // MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF is a model-less owner
+                // carrier. Native renews 999-tick lifespan every MoveEffects.
+                life = 999f;
+            }
             else if (damage01Mono)
             {
                 // BITMAP_DAMAGE_01_MONO native 0 / 1 initializers.
@@ -1617,6 +1633,14 @@ namespace Client.Main.ClassicFX.Core
                         continue;
                     }
                 }
+                else if (IsS6Batch45LogicalType(e.Type, e.SubType))
+                {
+                    if (!MoveS6Batch45Buff(ref e))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
+                }
                 else if (IsS6Batch14TerrainType(e.Type, e.SubType))
                 {
                     if (!MoveS6Batch14Terrain(ref e, f))
@@ -1714,17 +1738,31 @@ namespace Client.Main.ClassicFX.Core
                             if (!TryPlayerBonePosition(player, e.BoneIndex, out Vector3 pos))
                                 continue;
                             e.Position = pos;
-                            if (e.LifeTime >= 15f)
-                                e.Scale *= MathF.Pow(1.05f, f);
+                            if (e.SubType == 0)
+                            {
+                                // Native MODEL_ARROWSRE06 subtype 0: bone
+                                // anchored shrinking ring, no light sprites.
+                                e.Scale -= 1f * f;
+                                if (e.LifeTime <= 15f)
+                                    e.Scale += 0.5f * f;
+                            }
                             else
-                                e.Scale *= MathF.Pow(0.95f, f);
-                            ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
-                            CreateSprite(ClassicTextureIds.BitmapLight, pos,
-                                e.Scale, e.Light, source);
-                            CreateSprite(ClassicTextureIds.BitmapLight, pos,
-                                e.Scale * 0.8f, e.Light, source);
-                            if (e.LifeTime <= 10f)
-                                e.Alpha *= MathF.Pow(0.95f, f);
+                            {
+                                if (e.LifeTime >= 15f)
+                                    e.Scale *= MathF.Pow(1.05f, f);
+                                else
+                                    e.Scale *= MathF.Pow(0.95f, f);
+                                if (Clock.AdvancedReferenceFrame)
+                                {
+                                    ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
+                                    CreateSprite(ClassicTextureIds.BitmapLight,
+                                        pos, e.Scale, e.Light, source);
+                                    CreateSprite(ClassicTextureIds.BitmapLight,
+                                        pos, e.Scale * 0.8f, e.Light, source);
+                                }
+                                if (e.LifeTime <= 10f)
+                                    e.Alpha *= MathF.Pow(0.95f, f);
+                            }
                         }
                     }
                     e.ModelView.Position = e.Position;
