@@ -369,6 +369,17 @@ namespace Client.Main.ClassicFX.Core
         FlyBigStone1 = 333,
         FlyBigStone2 = 334,
         FallStoneEffect = 335,
+        // S6 Batch 31: Kanturu storms, ambient models and skill visual BMDs.
+        KanturuStorm2 = 336,
+        KanturuStorm3 = 337,
+        AuroraModel = 338,
+        ButterflyModel = 339,
+        LaserSkillModel = 340,
+        RidingSpearModel = 341,
+        Warp1 = 342,
+        Warp2 = 343,
+        Warp4 = 344,
+        Warp5 = 345,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -570,6 +581,7 @@ namespace Client.Main.ClassicFX.Core
             Vector3 s6Batch25StoredPosition = position;
             Vector3 s6Batch26StoredPosition = position;
             Vector3 s6Batch29StoredPosition = position;
+            Vector3 s6Batch31StoredPosition = position;
             if (type == ClassicFxEffectType.SwellOfMagicPower && subType == 0)
             {
                 modelPath = "Effect/magic_powerup.bmd";
@@ -831,6 +843,14 @@ namespace Client.Main.ClassicFX.Core
                         ref effectDirection, ref effectHeading,
                         ref effectGravity, ref effectVelocity))
                     return ClassicFxHandle.Invalid;
+                if (IsS6Batch31ModelType(type) &&
+                    !InitializeS6Batch31Model(type, subType, owner,
+                        nativePkKey, ref effectPosition,
+                        ref s6Batch31StoredPosition, ref angle, ref light,
+                        ref effectScale, ref life, ref effectAlpha,
+                        ref effectMeshLight, ref effectDirection,
+                        ref effectGravity, ref effectVelocity))
+                    return ClassicFxHandle.Invalid;
             }
             else if (additionalTerrain)
             {
@@ -1009,6 +1029,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch29ModelView(view, type, subType);
                 if (IsS6Batch30ModelType(type))
                     ConfigureS6Batch30ModelView(view, type);
+                if (IsS6Batch31ModelType(type))
+                    ConfigureS6Batch31ModelView(view, type);
                 if (IsS6Batch24ModelType(type))
                     ConfigureS6Batch24ModelView(view, type);
                 // Translation from native Effect state to MonoGame BMD presentation.
@@ -1020,8 +1042,10 @@ namespace Client.Main.ClassicFX.Core
                 SubType = subType,
                 Owner = owner,
                 Position = effectPosition,
-                StartPosition = type is ClassicFxEffectType.DeathSpiSkillModel or
-                    ClassicFxEffectType.ProtectGuildModel
+                StartPosition = type == ClassicFxEffectType.KanturuStorm3
+                    ? s6Batch31StoredPosition
+                    : type is ClassicFxEffectType.DeathSpiSkillModel or
+                      ClassicFxEffectType.ProtectGuildModel
                     ? s6Batch29StoredPosition
                     : IsS6Batch26ModelType(type)
                     ? s6Batch26StoredPosition
