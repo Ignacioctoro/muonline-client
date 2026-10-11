@@ -109,25 +109,33 @@ foreach ($item in $divergent) {
     Git-Checked @('push', 'origin', ($tagRef + ':' + $tagRef))
 }
 
-# Only GitHub repository administration can change default_branch.
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw @'
-Falta GitHub CLI (gh). Los tags de respaldo ya se guardaron.
-Instálalo con: winget install --id GitHub.cli
-Inicia sesión con: gh auth login
-Después ejecuta este mismo script nuevamente.
+# Switch default branch with gh, or verify a manual change through GitHub API.
+if (Get-Command gh -ErrorAction SilentlyContinue) {
+    $default = (& gh repo view $Repo --json defaultBranchRef --jq '.defaultBranchRef.name').Trim()
+    Assert-Exit 'gh repo view'
+    if ($default -ne $Keep) {
+        & gh repo edit $Repo --default-branch $Keep
+        Assert-Exit 'gh repo edit --default-branch'
+    }
+    $default = (& gh repo view $Repo --json defaultBranchRef --jq '.defaultBranchRef.name').Trim()
+    Assert-Exit 'gh repo view (verificación)'
+}
+else {
+    # No GitHub CLI: user can set the default via Settings > Branches.
+    $response = Invoke-RestMethod -Uri ('https://api.github.com/repos/' + $Repo) -Headers @{
+        'User-Agent' = 'BroyalMU-BranchConsolidation'
+    }
+    $default = [string]$response.default_branch
+    if ($default -ne $Keep) {
+        throw @'
+La rama predeterminada aún no se cambió. Los tags de respaldo ya se guardaron.
+Abre https://github.com/Ignacioctoro/muonline-client/settings/branches
+Selecciona classicfx-nova-pilot como Default branch y ejecuta este script otra vez.
+Opcionalmente instala gh: winget install --id GitHub.cli ; gh auth login
 No se borró ninguna rama.
 '@
+    }
 }
-
-$default = (& gh repo view $Repo --json defaultBranchRef --jq '.defaultBranchRef.name').Trim()
-Assert-Exit 'gh repo view'
-if ($default -ne $Keep) {
-    & gh repo edit $Repo --default-branch $Keep
-    Assert-Exit 'gh repo edit --default-branch'
-}
-$default = (& gh repo view $Repo --json defaultBranchRef --jq '.defaultBranchRef.name').Trim()
-Assert-Exit 'gh repo view (verificación)'
 if ($default -ne $Keep) {
     throw "La rama predeterminada todavía es $default; no se borró ninguna rama."
 }
