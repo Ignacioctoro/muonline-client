@@ -1927,6 +1927,13 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (!Pools.Effects.IsActive(i)) continue;
                 ref EffectState e = ref _effects[i];
+                if (e.Type == ClassicFxEffectType.SwellMagicBuffCarrier)
+                {
+                    // Sprite pool is consumed in WorldControl.Draw after
+                    // RenderEffects, so emission matches the drawn frame.
+                    RenderS6Batch45Buff(ref e);
+                    continue;
+                }
                 if (e.Type == ClassicFxEffectType.MagicGround2)
                 {
                     RenderMagicGround2(ref e);

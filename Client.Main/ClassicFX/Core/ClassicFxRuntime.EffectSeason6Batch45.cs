@@ -22,14 +22,7 @@ namespace Client.Main.ClassicFX.Core
             owner.WorldObject is PlayerObject player &&
             ReferenceEquals(player.World, World) &&
             player.Status == GameControlStatus.Ready &&
-            !player.IsDead &&
-            HasS6Batch45PlayerHands(player);
-
-        private static bool HasS6Batch45PlayerHands(PlayerObject player)
-        {
-            Matrix[] bones = player.GetBoneTransforms();
-            return bones != null && bones.Length > 37;
-        }
+            !player.IsDead;
 
         private bool ValidateS6Batch45Variants(
             ClassicFxEffectType type, int sub, ClassicFxOwner owner, int skillIndex)
@@ -76,18 +69,28 @@ namespace Client.Main.ClassicFX.Core
                         left, e.Angle, violet, e.Owner, subType: 1, boneIndex: 37);
             }
 
-            // RenderSprites() consumes and releases every transient sprite
-            // on EACH displayed frame. Sampling the buff at only 25 Hz left
-            // empty render frames at 60/120 FPS, causing severe flashing.
-            // Native RenderEffects emitted the bone lights every rendered
-            // frame, so keep this buff's emission in step with rendering.
-            // Other ClassicFX effects still use the 25 Hz reference clock.
+            return true;
+        }
 
-            // Native RenderEffects: one violet BITMAP_LIGHT per player bone.
+        // Native ZzzEffect.cpp RenderEffects(MODEL_SWELL_OF_MAGICPOWER_BUFF_EFF):
+        // render the bone lights during the render pass, never in MoveEffects.
+        // RenderSprites() consumes these sprites immediately afterward.
+        private void RenderS6Batch45Buff(ref EffectState e)
+        {
+            if (!IsS6Batch45BuffOwnerValid(e.Owner))
+                return;
+
+            PlayerObject player = (PlayerObject)e.Owner.WorldObject;
+            if (player.Hidden)
+                return;
+
+            Matrix[] bones = player.GetBoneTransforms();
+            if (bones == null || bones.Length == 0)
+                return; // Temporary missing bones must not destroy buff state.
+
             float lum = (MathF.Abs(MathF.Sin(
                 (float)(Clock.WorldTimeMilliseconds * 0.001))) + 0.2f) * 0.5f;
             Vector3 color = new Vector3(lum * 0.7f, lum * 0.3f, lum * 0.9f);
-            Matrix[] bones = player.GetBoneTransforms();
             Matrix world = player.WorldPosition;
             for (int i = 0; i < bones.Length; i++)
             {
@@ -95,7 +98,6 @@ namespace Client.Main.ClassicFX.Core
                 CreateSprite(ClassicTextureIds.BitmapLight,
                     p, 1.8f, color, e.Owner);
             }
-            return true;
         }
 
         private bool MoveS6Batch45CursedLich(ref EffectState e)
