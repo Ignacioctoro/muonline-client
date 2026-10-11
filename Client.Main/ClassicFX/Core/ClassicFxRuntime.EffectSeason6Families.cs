@@ -70,7 +70,8 @@ namespace Client.Main.ClassicFX.Core
                 IsS6Batch27ModelType(type) ||
                 IsS6Batch28ModelType(type) ||
                 IsS6Batch29ModelType(type) ||
-                IsS6Batch30ModelType(type);
+                IsS6Batch30ModelType(type) ||
+                IsS6Batch31ModelType(type);
 
         private static bool TryGetSeason6ModelDefinition(
             ClassicFxEffectType type, int subType,
@@ -201,7 +202,10 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetS6Batch29ModelDefinition(type, subType,
                             out definition))
                         return true;
-                    return TryGetS6Batch30ModelDefinition(type, subType,
+                    if (TryGetS6Batch30ModelDefinition(type, subType,
+                            out definition))
+                        return true;
+                    return TryGetS6Batch31ModelDefinition(type, subType,
                         out definition);
             }
         }
@@ -548,6 +552,17 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.FlyBigStone2:
                 case ClassicFxEffectType.FallStoneEffect:
                     return MoveS6Batch30Model(ref effect, f);
+                case ClassicFxEffectType.KanturuStorm2:
+                case ClassicFxEffectType.KanturuStorm3:
+                case ClassicFxEffectType.AuroraModel:
+                case ClassicFxEffectType.ButterflyModel:
+                case ClassicFxEffectType.LaserSkillModel:
+                case ClassicFxEffectType.RidingSpearModel:
+                case ClassicFxEffectType.Warp1:
+                case ClassicFxEffectType.Warp2:
+                case ClassicFxEffectType.Warp4:
+                case ClassicFxEffectType.Warp5:
+                    return MoveS6Batch31Model(ref effect, f);
                 default:
                     return false;
             }
