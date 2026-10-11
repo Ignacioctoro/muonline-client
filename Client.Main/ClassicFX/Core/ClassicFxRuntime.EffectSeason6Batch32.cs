@@ -269,10 +269,10 @@ namespace Client.Main.ClassicFX.Core
             const float total = 55f;
             float rate = MathHelper.Clamp(1f - e.LifeTime / total, 0f, 1f);
             float first = e.Phase;
-            float distance = Vector3.Distance(e.BaseLight,
-                e.StartPosition);
+            // Phase already encodes the native first-distance ratio
+            // computed before moving the Z start plane at creation.
             Vector3 firstPosition = e.StartPosition +
-                e.Direction * (distance * 0.3f);
+                e.Direction * (1700f * first);
             Vector3 finalPosition = e.StartPosition + e.Direction * 1700f;
 
             Vector3 relativeAngle;
