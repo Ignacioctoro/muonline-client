@@ -5,6 +5,7 @@ using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controls;
 using Client.Main.Models;
+using Client.Main.Objects;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -157,9 +158,12 @@ namespace Client.Main.ClassicFX.Core
         }
 
         private void InitializeS6Batch36Logical(
-            ClassicFxEffectType type, ref float life, ref float scale,
+            ClassicFxEffectType type, out float life, ref float scale,
             ref float alpha, ref Vector3 light, float callerScale)
         {
+            // Always assign the native lifetime for every accepted logical type.
+            // The CreateEffect caller can now use an out parameter safely.
+            life = 0f;
             switch (type)
             {
                 case ClassicFxEffectType.EventCloudEffect:
