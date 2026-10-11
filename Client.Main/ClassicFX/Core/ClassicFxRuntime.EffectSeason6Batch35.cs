@@ -89,6 +89,12 @@ namespace Client.Main.ClassicFX.Core
                 target.Status != GameControlStatus.Ready)
                 return false;
 
+            // Native Move_MODEL_CHAIN_LIGHTNING subtypes 1/2 skip
+            // their entire emission path when source and target are the same.
+            if ((e.SubType == 1 || e.SubType == 2) &&
+                ReferenceEquals(source, target))
+                return true;
+
             if (!Clock.AdvancedReferenceFrame)
                 return true;
             ClassicFxOwner targetOwner = ClassicFxOwner.FromWorldObject(target);

@@ -1434,7 +1434,8 @@ namespace Client.Main.ClassicFX.Core
                         IsS6Batch08ModelType(e.Type) ||
                         IsS6Batch09ModelType(e.Type) ||
                         IsS6Batch10ModelType(e.Type) ||
-                        IsS6Batch12ModelType(e.Type))
+                        IsS6Batch12ModelType(e.Type) ||
+                        IsS6Batch35ModelType(e.Type))
                         e.ModelView.Color = new Color(Vector3.Clamp(
                             e.Light, Vector3.Zero, Vector3.One));
                 }

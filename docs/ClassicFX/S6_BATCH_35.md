@@ -20,3 +20,9 @@ Base: `779e20a75efaf3c0951d11ecb16bfbfa1a9e1aa5`.
 - The chain-lightning target-bone burst samples up to 24 bones to bound Android spikes; original emits across all bones. The owner/target validation and continuous joints are implemented, but **not full parity**.
 - Missing MODEL_ARROW_HOLY, MODEL_ARROW_TANKER(_HIT), MODEL_BIG_METEO1–3 assets/mappings were not substituted with unrelated BMDs; they are **not claimed completed**.
 - Native joint texture activation/render parity and world/gameplay triggers must be verified in-game. No local `dotnet build` has been executed here (SDK unavailable); use the guarded integration script.
+
+## Batch 35 review fix (2026-10-11)
+
+- Update the existing ModelView.Color from the WindForceMirror native fading Light each frame (it was only assigned at spawn).
+- Match native ChainLightning subtype 1/2 rule: source == target yields no joints or target-bone burst; effect still ages normally.
+- No new IDs or gameplay trigger changes; compile and verify on the guarded local merge before pushing main.
