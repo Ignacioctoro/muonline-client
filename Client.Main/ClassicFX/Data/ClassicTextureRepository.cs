@@ -859,6 +859,10 @@ namespace Client.Main.ClassicFX.Data
                 new(ClassicTextureIds.BitmapDsShock,
                     "Effect/Shockwave.jpg", SamplerState.LinearClamp),
 
+                // Original ZzzOpenData.cpp: BITMAP_IMPACT -> Impack03.jpg.
+                new(ClassicTextureIds.BitmapImpact,
+                    "Effect/Impack03.jpg", SamplerState.LinearClamp),
+
                 new(
                     ClassicTextureIds.BitmapWaterfall5,
                     "Effect/waterFall5.jpg",
