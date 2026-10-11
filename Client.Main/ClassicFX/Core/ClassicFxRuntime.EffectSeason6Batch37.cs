@@ -5,6 +5,7 @@
 using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controls;
+using Client.Main.Controllers;
 using Client.Main.Objects;
 using Microsoft.Xna.Framework;
 
@@ -345,7 +346,7 @@ namespace Client.Main.ClassicFX.Core
                             p, e.Angle, e.Light, 11, 1.4f);
                     if (Random.Modulo(8) == 0)
                         CreateEffect(ClassicFxEffectType.IceSmall,
-                            p, e.Angle, e.Light);
+                            p, e.Angle, e.Light, ClassicFxOwner.None);
                 }
             }
             else
