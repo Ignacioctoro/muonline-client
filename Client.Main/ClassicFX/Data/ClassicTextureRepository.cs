@@ -855,6 +855,10 @@ namespace Client.Main.ClassicFX.Data
                     "Effect/waterFall4.jpg",
                     SamplerState.LinearClamp),
 
+                // Native BITMAP_DS_SHOCK is the separately indexed shockwave slot.
+                new(ClassicTextureIds.BitmapDsShock,
+                    "Effect/Shockwave.jpg", SamplerState.LinearClamp),
+
                 new(
                     ClassicTextureIds.BitmapWaterfall5,
                     "Effect/waterFall5.jpg",
