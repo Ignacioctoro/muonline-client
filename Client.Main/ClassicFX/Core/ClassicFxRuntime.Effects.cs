@@ -1490,9 +1490,8 @@ namespace Client.Main.ClassicFX.Core
                 ReleaseEffect(handle);
                 return ClassicFxHandle.Invalid;
             }
-            // Native phase 1 is anchored at the target and emits the grand
-            // ground-crack BMD. It must remain alive in the diagnostic.
-            // Its smoke, water, sprites and floor flare stay disabled.
+            // Native phase 1 is anchored at the target, where it emits
+            // the grand crack, NightWater, particles and terrain flare.
             if (blowOfDestruction && subType == 0)
                 CreateEffect(ClassicFxEffectType.BlowOfDestruction,
                     inputLight, angle, light, owner, subType: 1);
@@ -2036,10 +2035,7 @@ namespace Client.Main.ClassicFX.Core
                 }
                 if (e.Type == ClassicFxEffectType.BlowOfDestruction)
                 {
-                    // This is the BITMAP_FLARE_BLUE floor flash, not a BMD
-                    // crack. Disable it to see Plancrack A/B alone.
-                    if (StrikeDestructionCracksOnlyProbe)
-                        continue;
+                    // Restore BITMAP_FLARE_BLUE for both native impact phases.
                     if (e.LifeTime <= 24f &&
                         Textures.TryGet(ClassicTextureIds.BitmapFlareBlue,
                             out ClassicTextureResource flare))
@@ -2222,10 +2218,9 @@ namespace Client.Main.ClassicFX.Core
         private readonly bool _renderRagefulBlendOnLowQuality;
         private readonly bool _nativeRagefulBmdLighting;
         private readonly bool _nativeKnightPlancrackLighting;
-        private readonly bool _strikeProbeGrand;
+        private readonly bool _nativeGrandCrackDepthBypass;
         private readonly bool _nativeDestructionBmdLighting;
         private bool _nativeRagefulStoneLighting;
-        private bool _strikeProbeDrawLogged;
 
         private bool NeedsRagefulBmdLighting =>
             _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
@@ -2252,11 +2247,12 @@ namespace Client.Main.ClassicFX.Core
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
 
-        // TEMPORARY diagnostic, not a gameplay rendering setting.
-        // A/B and the target's grand-crack BMD ignore terrain depth;
-        // other models preserve the normal read-only depth behavior.
+        // Preserve the verified visible floor cracks from the isolation
+        // test: the ground depth test otherwise hides substantial geometry
+        // of A/B and the grand impact BMD in the NeffisDev renderer.
+        // Other models continue using the normal read-only depth test.
         protected override DepthStencilState GetBlendMeshDepthState() =>
-            _nativeKnightPlancrackLighting || _strikeProbeGrand
+            _nativeKnightPlancrackLighting || _nativeGrandCrackDepthBypass
                 ? DepthStencilState.None
                 : base.GetBlendMeshDepthState();
 
@@ -2279,26 +2275,15 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
 
-            // Even the fast grouped DrawMeshFastAlpha path must keep depth
-            // testing but NEVER write depth for bright floor effects.
-            // DrawMesh() already uses this state for blend meshes; this
-            // closes the accelerated grouped path for the whole BMD.
-            if ((_nativeKnightPlancrackLighting || _strikeProbeGrand) &&
-                !_strikeProbeDrawLogged)
-            {
-                _strikeProbeDrawLogged = true;
-                Console.WriteLine(
-                    $"[StrikeCracksOnly] DRAW {_bmdPath} status={Status} " +
-                    $"meshes={Model?.Meshes?.Length ?? 0} depthTest=OFF");
-            }
+            // Keep grouped and per-mesh paths consistent for the
+            // visible ground-crack geometry, without affecting other BMDs.
             var device = GraphicsDevice;
             var previousDepth = device.DepthStencilState;
             var previousSampler = device.SamplerStates[0];
             try
             {
-                // Isolate the entire model from terrain occlusion,
-                // including the fast grouped path. DrawMesh's per-mesh
-                // path uses GetBlendMeshDepthState() above.
+                // Grouped rendering uses the same scoped depth policy
+                // as the per-mesh DrawMesh path.
                 device.DepthStencilState = GetBlendMeshDepthState();
                 // The original lines2.jpg BMD UVs go from about -2.067 to
                 // +4.587 in V (grand/plancrack A), using GL_REPEAT.
@@ -2389,7 +2374,7 @@ namespace Client.Main.ClassicFX.Core
             _nativeKnightPlancrackLighting =
                 type is ClassicFxEffectType.KnightPlancrackA or
                     ClassicFxEffectType.KnightPlancrackB;
-            _strikeProbeGrand = ClassicFxRuntime.StrikeDestructionCracksOnlyProbe &&
+            _nativeGrandCrackDepthBypass =
                 type == ClassicFxEffectType.RaklionBossCrack;
             // Main ZzzObject.cpp sets BodyLight = Light * Alpha for
             // NightWater, both plancrack models and the grand crack.
@@ -2511,12 +2496,6 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (Model == null)
                     Model = await BMDLoader.Instance.Prepare(_bmdPath);
-                if (_nativeKnightPlancrackLighting || _strikeProbeGrand)
-                    Console.WriteLine(
-                        $"[StrikeCracksOnly] BMD {_bmdPath}: " +
-                        (Model?.Meshes == null
-                            ? "MODEL MISSING"
-                            : $"{Model.Meshes.Length} mesh(es)"));
             }
             catch (Exception ex)
             {
@@ -2526,30 +2505,6 @@ namespace Client.Main.ClassicFX.Core
             }
             await base.Load();
         }
-
-        public override async Task LoadContent()
-        {
-            await base.LoadContent();
-            if (!_nativeKnightPlancrackLighting && !_strikeProbeGrand)
-                return;
-
-            if (Model?.Meshes == null)
-            {
-                Console.WriteLine($"[StrikeCracksOnly] {_bmdPath}: no meshes");
-                return;
-            }
-
-            // Diagnostic only: this checks whether texture data was loaded.
-            // It does NOT claim the GPU rendered the mesh successfully.
-            for (int mesh = 0; mesh < Model.Meshes.Length; mesh++)
-            {
-                string name = Model.Meshes[mesh].TexturePath;
-                string resolved = BMDLoader.Instance.GetTexturePath(Model, name);
-                bool loaded = TextureLoader.Instance.Get(resolved) != null;
-                Console.WriteLine(
-                    $"[StrikeCracksOnly] {_bmdPath} mesh={mesh} " +
-                    $"texture='{name}' resolved='{resolved}' loaded={loaded}");
-            }
         }
     }
 }
