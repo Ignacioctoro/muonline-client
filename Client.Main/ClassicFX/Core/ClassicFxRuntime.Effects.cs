@@ -2271,8 +2271,11 @@ namespace Client.Main.ClassicFX.Core
                 type is ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&
                  type <= ClassicFxEffectType.FuryQuake8);
+            // The native wheel uses RenderPartObject for the equipped
+            // weapon, including its blend-material meshes at Medium quality.
             _renderRagefulBlendOnLowQuality =
-                type is ClassicFxEffectType.FuryStrike or
+                type is ClassicFxEffectType.SkillWheel2 or
+                    ClassicFxEffectType.FuryStrike or
                     ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&
                  type <= ClassicFxEffectType.FuryQuake8);
