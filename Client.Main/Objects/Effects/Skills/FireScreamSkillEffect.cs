@@ -1,5 +1,5 @@
 #nullable enable
-// BroyalMU: MU S6 Dark Lord Fire Scream (skill 78).
+// BroyalMU: MU S6 Dark Lord Fire Scream (skills 78 and 518).
 // Native ZzzCharacter.cpp emits 3 DarkScream + 3 DarkScreamFire
 // without a separate gameplay projectile. One-shot ClassicFX cast.
 using System;
@@ -11,6 +11,7 @@ using Microsoft.Xna.Framework;
 namespace Client.Main.Objects.Effects.Skills
 {
     [SkillVisualEffect(78)]
+    [SkillVisualEffect(518)] // AT_SKILL_FIRE_SCREAM_STR
     public sealed class FireScreamSkillEffect : ISkillVisualEffect
     {
         public WorldObject? CreateEffect(SkillEffectContext context)
