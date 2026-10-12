@@ -2336,10 +2336,15 @@ namespace Client.Main.ClassicFX.Core
                 type == ClassicFxEffectType.DarkLordSkill;
             IsTransparent = true;
             AffectedByTransparency = true;
-            // Native plancrack: textured non-blend meshes and additive mesh 1.
-            // NightWater/Raklion keep native BlendMesh=-1 (not generic mesh 0).
-            BlendState = _nativeKnightPlancrackLighting
-                ? BlendState.AlphaBlend : BlendState.Additive;
+            // MuMain ZzzObject.cpp uses RENDER_TEXTURE | RENDER_BRIGHT
+            // for the ENTIRE Plancrack A/B RenderBody, not just mesh 1.
+            // AlphaBlend on the non-blend meshes exposed opaque black
+            // pixels in their original OZJ textures as a black rectangle.
+            // Use additive for both the textured base and bright mesh 1,
+            // matching the Rageful Blow BMD bridge without altering it.
+            // NightWater/Raklion keep native BlendMesh=-1.
+            BlendState = BlendState.Additive;
+            BlendMeshState = BlendState.Additive;
             BlendMesh = _nativeKnightPlancrackLighting ? 1 :
                 _nativeDestructionBmdLighting ? -1 : 0;
             BlendMeshLight = 1f;
