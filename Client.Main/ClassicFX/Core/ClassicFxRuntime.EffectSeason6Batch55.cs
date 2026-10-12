@@ -137,7 +137,7 @@ namespace Client.Main.ClassicFX.Core
             // (special index 36). Its water branch uses the light sprite
             // sixty units above the wheel, not twenty.
             bool kalima = World != null &&
-                (World.MapId is >= 24 and <= 30 or 36);
+                (World.MapId is >= 24 and <= 29 or 36);
             CreateSprite(ClassicTextureIds.BitmapLight,
                 e.Position + new Vector3(0f, 0f, kalima ? 60f : 20f),
                 2f, new Vector3(1f, 0.8f, 0.6f));
