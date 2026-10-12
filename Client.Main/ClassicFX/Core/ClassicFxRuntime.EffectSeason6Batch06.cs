@@ -195,7 +195,8 @@ namespace Client.Main.ClassicFX.Core
                 for (int i = 0; i < 4; i++)
                     CreateJoint(ClassicTextureIds.BitmapFlare + 1,
                         e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), i,
-                        source, jointScale);
+                        source, jointScale, pkKey: 30,
+                        skillIndex: (ushort)e.SubType);
             }
 
             e.Gravity += 90f * f;

@@ -410,10 +410,16 @@ namespace Client.Main.ClassicFX.Core
                     CreateJoint(ClassicTextureIds.BitmapJointEnergy,
                         e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 5,
                         carrier, 100f);
-                if (e.SubType != 0 &&
-                    e.Type != ClassicFxEffectType.ArrowRing)
+                // In CreateEffect, all three BMD arrow families use a
+                // MODEL_PIERCING child when subtype == 2 (Penetration).
+                // ArrowBestCrossbow/Drill also use it for subtype 1, while
+                // ArrowRing only has the native subtype-2 variant.
+                if (e.SubType == 2 ||
+                    (e.SubType == 1 &&
+                     e.Type != ClassicFxEffectType.ArrowRing))
                     CreateEffect(ClassicFxEffectType.Piercing,
-                        e.Position, e.Angle, e.Light, carrier);
+                        e.Position, e.Angle, e.Light, carrier,
+                        subType: 0);
             }
 
             // CheckClientArrow and server hit/skill damage are intentionally

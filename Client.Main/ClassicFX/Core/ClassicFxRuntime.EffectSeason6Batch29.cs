@@ -3,6 +3,7 @@
 // Port of native CreateEffect/MoveEffect with explicitly deferred owner/game hooks.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Models;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -287,6 +288,24 @@ namespace Client.Main.ClassicFX.Core
             var spriteOwner = e.ModelView == null
                 ? ClassicFxOwner.None
                 : ClassicFxOwner.FromWorldObject(e.ModelView);
+
+            // Native CreateEffect(MODEL_ARROW / MODEL_LACEARROW /
+            // MODEL_ARROW_DARKSTINGER) creates MODEL_PIERCING subtype 0
+            // as an owned child for Penetration subtype 2. These three
+            // were missing the call, unlike Batch 6/16 arrow families.
+            // Bit 1 is independently reserved for the arrow's flare trail.
+            if (e.SubType == 2 && (e.TriggerMask & 2) == 0 &&
+                e.ModelView != null &&
+                e.ModelView.Status == GameControlStatus.Ready)
+            {
+                ClassicFxHandle child = CreateEffect(
+                    ClassicFxEffectType.Piercing,
+                    e.Position, e.Angle, e.Light,
+                    spriteOwner, subType: 0);
+                if (child.IsValid)
+                    e.TriggerMask |= 2;
+            }
+
             if (e.Type == ClassicFxEffectType.ArrowDarkStingerModel)
             {
                 if (TryGetOwnerBonePosition(spriteOwner, 0,

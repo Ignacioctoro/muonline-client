@@ -3,7 +3,9 @@
 // MuMain@21728b1e5b03e0763b38ef9e23f79645e0df7ad2
 // ZzzEffectMagicSkill.cpp CreateArrow/CreateArrows and _enum.h MODEL_BOW+N.
 // Visuals are emitted on authoritative 0x19 only; no damage/packet changes.
+using System;
 using Client.Main.ClassicFX.Core;
+using Client.Main.ClassicFX.Data;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
 using Client.Main.Objects.Player;
@@ -42,8 +44,20 @@ namespace Client.Main.Objects.Effects.Skills
 
             if (!triple)
             {
-                return fx.CreateEffect(model, origin, angle, Vector3.One,
+                bool shot = fx.CreateEffect(model, origin, angle, Vector3.One,
                     owner, subType: subType).IsValid;
+                if (shot)
+                {
+                    // ZzzCharacter.cpp AT_SKILL_PENETRATION:
+                    // CreateEffect(BITMAP_GATHERING, subtype 0) while the
+                    // animation charges. The native emitter already exists
+                    // in the shared ClassicFX pool (Batch 37).
+                    if (subType == 2)
+                        fx.CreateEffect(ClassicFxEffectType.GatheringEffect,
+                            origin, angle, Vector3.One, owner);
+                    EmitGreatReignBowSparks(fx, caster);
+                }
+                return shot;
             }
 
             // Native CreateArrows(Skill==1): 3 arrows at 0/+15/-15 degrees,
@@ -61,7 +75,36 @@ namespace Client.Main.Objects.Effects.Skills
                 Emit(fx, model, origin, angle, owner, 15f);
                 Emit(fx, model, origin, angle, owner, -15f);
             }
+            EmitGreatReignBowSparks(fx, caster);
             return true;
+        }
+
+        // MuMain CreateArrows(): Great Reign Crossbow adds fifteen native
+        // BITMAP_SPARK particles, with a 1-in-2 JOINT_SPARK chance each.
+        // The native origin is the right-hand weapon link bone transformed
+        // by (0, 10, -130), NOT the player's world origin. This is emitted
+        // once per CreateArrows call, not for Multi Shot's CreateArrow path.
+        private static void EmitGreatReignBowSparks(
+            ClassicFxRuntime fx, PlayerObject caster)
+        {
+            if (caster.Weapon2?.ItemGroup != 4 ||
+                caster.Weapon2.ItemNumber != 19 ||
+                !caster.TryGetHandWorldMatrix(
+                    isLeftHand: false, out Matrix hand))
+                return;
+
+            Vector3 muzzle = Vector3.Transform(
+                new Vector3(0f, 10f, -130f), hand);
+            for (int i = 0; i < 15; ++i)
+            {
+                Vector3 nativeAngle = new Vector3(
+                    Random.Shared.NextSingle() * 360f, 0f, 0f);
+                if (Random.Shared.Next(2) == 0)
+                    fx.CreateJoint(ClassicTextureIds.BitmapJointSpark,
+                        muzzle, muzzle, nativeAngle, subType: 3);
+                fx.CreateParticle(ClassicTextureIds.BitmapSpark,
+                    muzzle, nativeAngle, Vector3.One, subType: 0);
+            }
         }
 
         private static void Emit(ClassicFxRuntime fx,
