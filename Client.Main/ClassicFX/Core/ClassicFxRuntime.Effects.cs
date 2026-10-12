@@ -532,6 +532,7 @@ namespace Client.Main.ClassicFX.Core
             public byte TriggerMask;
             // Last native tick emitting children for BITMAP_MAGIC+1 subtypes 6/8.
             public int LastChildNativeTick;
+            public ClassicFxWheelWeaponSnapshot WheelWeapon;
             public ClassicFxEffectModelObject ModelView;
         }
 
@@ -557,7 +558,8 @@ namespace Client.Main.ClassicFX.Core
             int nativePkKey = 0,
             int nativeSkillIndex = 0,
             float nativeAnimationSpeed = 0f,
-            WorldObject nativeTarget = null)
+            WorldObject nativeTarget = null,
+            ClassicFxWheelWeaponSnapshot skillWheelWeapon = default)
         {
             if (_disposed || !Enabled)
                 return ClassicFxHandle.Invalid;
@@ -771,6 +773,7 @@ namespace Client.Main.ClassicFX.Core
             // as a target-relative StartPosition before changing Light.
             Vector3 inputLight = light;
             string modelPath = null;
+            ClassicFxWheelWeaponSnapshot wheelSnapshot = default;
             float life;
             float effectScale = scale;
             float effectMeshLight = 1f;
@@ -1184,18 +1187,15 @@ namespace Client.Main.ClassicFX.Core
             }
             else if (s6SkillWheel)
             {
+                wheelSnapshot = skillWheelWeapon.IsValid
+                    ? skillWheelWeapon : CaptureS6SkillWheelWeapon(owner);
+                if (!wheelSnapshot.IsValid)
+                    return ClassicFxHandle.Invalid;
                 life = type == ClassicFxEffectType.SkillWheel1 ? 5f : 25f;
                 if (type == ClassicFxEffectType.SkillWheel2)
-                    effectHeading = Vector3.Zero; // independent render spin
-                if (type == ClassicFxEffectType.SkillWheel2 &&
-                    owner.WorldObject is PlayerObject wheelCaster)
                 {
-                    WeaponObject weapon =
-                        wheelCaster.Weapon1?.Model != null ? wheelCaster.Weapon1 :
-                        wheelCaster.Weapon2?.Model != null ? wheelCaster.Weapon2 : null;
-                    if (weapon == null)
-                        return ClassicFxHandle.Invalid;
-                    modelPath = weapon.ModelAssetPath;
+                    effectHeading = Vector3.Zero; // independent render spin
+                    modelPath = wheelSnapshot.ModelPath;
                 }
             }
             else if (furyStrike)
@@ -1337,8 +1337,23 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch12ModelView(view, type, subType);
                 if (IsS6Batch13QuakeType(type))
                     ConfigureS6Batch13ModelView(view, type, subType);
-                if ((furyStrike || type == ClassicFxEffectType.SkillWheel2) &&
-                    owner.WorldObject is PlayerObject fighter)
+                if (type == ClassicFxEffectType.SkillWheel2 &&
+                    wheelSnapshot.IsValid)
+                {
+                    view.ItemGroup = wheelSnapshot.ItemGroup;
+                    view.ItemNumber = wheelSnapshot.ItemNumber;
+                    view.ItemLevel = wheelSnapshot.ItemLevel;
+                    view.IsExcellentItem = wheelSnapshot.Excellent;
+                    view.IsAncientItem = wheelSnapshot.Ancient;
+                    view.BlendMesh = -2;
+                    view.BlendState = BlendState.AlphaBlend;
+                    view.BlendMeshState = BlendState.AlphaBlend;
+                    view.Color = Color.White;
+                    view.Light = RequestTerrainLight(effectPosition.X,
+                        effectPosition.Y) + light;
+                    view.ContinuousAnimation = false;
+                }
+                if (furyStrike && owner.WorldObject is PlayerObject fighter)
                 {
                     WeaponObject weapon =
                         fighter.Weapon1?.Model != null ? fighter.Weapon1 :
@@ -1452,6 +1467,7 @@ namespace Client.Main.ClassicFX.Core
                     ? Random.Modulo(360)
                     : furyStrike ? Random.Modulo(100) : 0f,
                 LastChildNativeTick = -1,
+                WheelWeapon = wheelSnapshot,
                 ModelView = view
             };
             try
