@@ -491,6 +491,9 @@ namespace Client.Main.ClassicFX.Core
         ThunderPlusOneCarrier = 443,
         // S6 Batch 45: native invisible six-second buff emitter.
         SwellMagicBuffCarrier = 444,
+        // BK Twisting Slash: native MODEL_SKILL_WHEEL1 / MODEL_SKILL_WHEEL2.
+        SkillWheel1 = 445,
+        SkillWheel2 = 446,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -601,6 +604,9 @@ namespace Client.Main.ClassicFX.Core
             // The original random subtype for radial placement lives in Phase.
             bool furyStrike = type == ClassicFxEffectType.FuryStrike &&
                 (subType is 0 or 2 or 3);
+            bool s6SkillWheel = (type == ClassicFxEffectType.SkillWheel1 &&
+                subType == 0) || (type == ClassicFxEffectType.SkillWheel2 &&
+                subType is >= -1 and <= 4);
             bool s6TimedTerrain = IsS6Batch14TerrainType(type, subType);
             bool s6Batch15Logical =
                 (type == ClassicFxEffectType.StarShine && subType == 0) ||
@@ -712,7 +718,7 @@ namespace Client.Main.ClassicFX.Core
                 owner.WorldObject == null)
                 return ClassicFxHandle.Invalid;
             if (nativeGroundV8 || crater || blowOfDestruction || lightningOrb || furyStrike ||
-                s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
+                s6SkillWheel || s6TimedTerrain || s6Batch15Logical || s6Batch17Logical ||
                 s6Batch19Logical || s6Batch35Logical || s6Batch36Logical ||
                 s6Batch37Logical || s6Batch38Logical || s6Batch39Logical ||
                 s6Batch40Logical || s6Batch41Logical ||
@@ -1175,6 +1181,20 @@ namespace Client.Main.ClassicFX.Core
                     return ClassicFxHandle.Invalid;
                 }
             }
+            else if (s6SkillWheel)
+            {
+                life = type == ClassicFxEffectType.SkillWheel1 ? 5f : 25f;
+                if (type == ClassicFxEffectType.SkillWheel2 &&
+                    owner.WorldObject is PlayerObject wheelCaster)
+                {
+                    WeaponObject weapon =
+                        wheelCaster.Weapon1?.Model != null ? wheelCaster.Weapon1 :
+                        wheelCaster.Weapon2?.Model != null ? wheelCaster.Weapon2 : null;
+                    if (weapon == null)
+                        return ClassicFxHandle.Invalid;
+                    modelPath = weapon.ModelAssetPath;
+                }
+            }
             else if (furyStrike)
             {
                 // Logical 20-tick carrier. Native RenderFuryStrike() draws
@@ -1314,7 +1334,8 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch12ModelView(view, type, subType);
                 if (IsS6Batch13QuakeType(type))
                     ConfigureS6Batch13ModelView(view, type, subType);
-                if (furyStrike && owner.WorldObject is PlayerObject fighter)
+                if ((furyStrike || type == ClassicFxEffectType.SkillWheel2) &&
+                    owner.WorldObject is PlayerObject fighter)
                 {
                     WeaponObject weapon =
                         fighter.Weapon1?.Model != null ? fighter.Weapon1 :
@@ -1557,6 +1578,15 @@ namespace Client.Main.ClassicFX.Core
                 else if (e.Type == ClassicFxEffectType.LightningOrb)
                 {
                     MoveS6LightningOrb(ref e, i, f);
+                }
+                else if (e.Type is ClassicFxEffectType.SkillWheel1 or
+                         ClassicFxEffectType.SkillWheel2)
+                {
+                    if (!MoveS6SkillWheel(ref e, f))
+                    {
+                        ReleaseEffectAt(i);
+                        continue;
+                    }
                 }
                 else if (e.Type == ClassicFxEffectType.FuryStrike)
                 {
