@@ -40,6 +40,10 @@ namespace Client.Main.Objects.Player
         public bool IsRightHand { get; set; }
         public string TexturePath { get; set; }
 
+        // Set only by BuffVisualManager from server 0x07/0x1B status.
+        // Uses the existing ModelObject material passes; no extra emitter.
+        public bool InfinityArrowBuffActive { get; set; }
+
         public WeaponObject()
         {
             RenderShadow = true;
@@ -156,6 +160,18 @@ namespace Client.Main.Objects.Player
         }
         public override void DrawMesh(int mesh)
         {
+            // MuMain RenderAmmunition: arrows (4,15) and bolts (4,7)
+            // gain gold tint and an extra bright chrome pass while
+            // eBuff_InfinityArrow is present. Reuse the proven existing
+            // item-material path instead of creating a second renderer.
+            if (InfinityArrowBuffActive &&
+                ItemGroup == 4 && (ItemNumber == 7 || ItemNumber == 15))
+            {
+                DrawClassicBrightDiffuseWithChrome(
+                    mesh, new Vector3(1f, 0.8f, 0.2f));
+                return;
+            }
+
             if (IsClassicFlamberge)
             {
                 // ============================================================

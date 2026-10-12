@@ -468,6 +468,13 @@ namespace Client.Main.Core.Utilities
                 PlayerAction.PlayerRush1);
 
             Add(
+                441,
+                "Infinity Arrow Strengthener",
+                SkillType.Self,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerRush1);
+
+            Add(
                 234,
                 "Recovery",
                 SkillType.Friendly,

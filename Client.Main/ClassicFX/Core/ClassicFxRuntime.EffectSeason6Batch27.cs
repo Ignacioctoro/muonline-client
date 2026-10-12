@@ -109,7 +109,8 @@ namespace Client.Main.ClassicFX.Core
             if (IsS6Batch27Infinity(type))
             {
                 if (owner.WorldObject == null) return false;
-                light = Vector3.One;
+                light = type == ClassicFxEffectType.InfinityArrow4
+                    ? new Vector3(1f, 0.5f, 0.3f) : Vector3.One;
                 direction = light;
                 life = type == ClassicFxEffectType.InfinityArrow4 ? 15f :
                     type == ClassicFxEffectType.InfinityArrowCore ||
@@ -234,7 +235,16 @@ namespace Client.Main.ClassicFX.Core
                     return true;
                 }
                 if (e.Type == ClassicFxEffectType.InfinityArrow4)
-                    return true; // No native Move handler for this BMD.
+                {
+                    // EffectBehaviors.cpp MoveInfinityArrow4(): grows, fades
+                    // and follows the player's hand bone 29.
+                    e.Scale *= MathF.Pow(1.2f, f);
+                    e.Light *= MathF.Pow(0.9f, f);
+                    if (TryGetOwnerBonePosition(e.Owner, 29, out Vector3 hand))
+                        e.Position = hand;
+                    e.Angle = owner.Angle;
+                    return true;
+                }
                 e.Light *= MathF.Pow(
                     e.SubType == 0 ? 0.95f : 0.98f, f);
                 // Main copies the owner position for types 1/2/3.

@@ -215,6 +215,16 @@ namespace Client.Main.Objects.Effects
             bool soulBarrier =
                 state.ActiveEffects.Contains(
                     Season6BuffMapping.SoulBarrier);
+
+            // Native RenderAmmunition() applies gold/chrome only while
+            // eBuff_InfinityArrow is authoritative from the server.
+            // No persistent particles or duplicate WorldObjects.
+            bool infinityArrow =
+                state.ActiveEffects.Contains(Season6BuffMapping.InfinityArrow);
+            if (target.Weapon1 != null)
+                target.Weapon1.InfinityArrowBuffActive = infinityArrow;
+            if (target.Weapon2 != null)
+                target.Weapon2.InfinityArrowBuffActive = infinityArrow;
             bool greaterFortitude =
                 state.ActiveEffects.Contains(
                     Season6BuffMapping.GreaterFortitude);

@@ -210,6 +210,7 @@ namespace Client.Main.Objects.Effects
             return effectId is
                 GreaterDamage or
                 GreaterDefense or
+                InfinityArrow or
                 ElfSoldierBuff or
                 SoulBarrier or
                 GreaterFortitude or
