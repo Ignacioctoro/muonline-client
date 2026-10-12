@@ -180,12 +180,12 @@ namespace Client.Main.Objects
             return HiddenMesh == mesh || HiddenMesh == -2 || _meshHiddenByScript[mesh];
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         // Original MU skill overlays must remain visible when the general
         // low-quality mesh simplification is active. Other actors keep the
         // existing GPU draw-call optimization.
         protected virtual bool RenderBlendMeshOnLowQuality => false;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected virtual bool IsBlendMesh(int mesh)
         {
             if (_meshBlendByScript == null || (uint)mesh >= (uint)_meshBlendByScript.Length)
