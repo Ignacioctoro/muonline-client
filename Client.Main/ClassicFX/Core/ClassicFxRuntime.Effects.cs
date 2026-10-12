@@ -1490,10 +1490,10 @@ namespace Client.Main.ClassicFX.Core
                 ReleaseEffect(handle);
                 return ClassicFxHandle.Invalid;
             }
-            // Probe: skip the secondary explosion phase entirely.
-            // It creates water, debris, smoke and the second floor flare.
-            if (blowOfDestruction && subType == 0 &&
-                !StrikeDestructionCracksOnlyProbe)
+            // Native phase 1 is anchored at the target and emits the grand
+            // ground-crack BMD. It must remain alive in the diagnostic.
+            // Its smoke, water, sprites and floor flare stay disabled.
+            if (blowOfDestruction && subType == 0)
                 CreateEffect(ClassicFxEffectType.BlowOfDestruction,
                     inputLight, angle, light, owner, subType: 1);
             if (type == ClassicFxEffectType.FenrirThunder)
@@ -2222,6 +2222,7 @@ namespace Client.Main.ClassicFX.Core
         private readonly bool _renderRagefulBlendOnLowQuality;
         private readonly bool _nativeRagefulBmdLighting;
         private readonly bool _nativeKnightPlancrackLighting;
+        private readonly bool _strikeProbeGrand;
         private readonly bool _nativeDestructionBmdLighting;
         private bool _nativeRagefulStoneLighting;
         private bool _strikeProbeDrawLogged;
@@ -2251,11 +2252,11 @@ namespace Client.Main.ClassicFX.Core
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
 
-        // TEMPORARY A/B diagnostic, never a gameplay rendering setting.
-        // Only KnightPlancrack A/B ignore the terrain depth test. Every
-        // other model retains the same read-only depth behavior as before.
+        // TEMPORARY diagnostic, not a gameplay rendering setting.
+        // A/B and the target's grand-crack BMD ignore terrain depth;
+        // other models preserve the normal read-only depth behavior.
         protected override DepthStencilState GetBlendMeshDepthState() =>
-            _nativeKnightPlancrackLighting
+            _nativeKnightPlancrackLighting || _strikeProbeGrand
                 ? DepthStencilState.None
                 : base.GetBlendMeshDepthState();
 
@@ -2282,7 +2283,8 @@ namespace Client.Main.ClassicFX.Core
             // testing but NEVER write depth for bright floor effects.
             // DrawMesh() already uses this state for blend meshes; this
             // closes the accelerated grouped path for the whole BMD.
-            if (_nativeKnightPlancrackLighting && !_strikeProbeDrawLogged)
+            if ((_nativeKnightPlancrackLighting || _strikeProbeGrand) &&
+                !_strikeProbeDrawLogged)
             {
                 _strikeProbeDrawLogged = true;
                 Console.WriteLine(
@@ -2387,6 +2389,8 @@ namespace Client.Main.ClassicFX.Core
             _nativeKnightPlancrackLighting =
                 type is ClassicFxEffectType.KnightPlancrackA or
                     ClassicFxEffectType.KnightPlancrackB;
+            _strikeProbeGrand = StrikeDestructionCracksOnlyProbe &&
+                type == ClassicFxEffectType.RaklionBossCrack;
             // Main ZzzObject.cpp sets BodyLight = Light * Alpha for
             // NightWater, both plancrack models and the grand crack.
             _nativeDestructionBmdLighting = _nativeKnightPlancrackLighting ||
@@ -2507,7 +2511,7 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (Model == null)
                     Model = await BMDLoader.Instance.Prepare(_bmdPath);
-                if (_nativeKnightPlancrackLighting)
+                if (_nativeKnightPlancrackLighting || _strikeProbeGrand)
                     Console.WriteLine(
                         $"[StrikeCracksOnly] BMD {_bmdPath}: " +
                         (Model?.Meshes == null
@@ -2526,7 +2530,7 @@ namespace Client.Main.ClassicFX.Core
         public override async Task LoadContent()
         {
             await base.LoadContent();
-            if (!_nativeKnightPlancrackLighting)
+            if (!_nativeKnightPlancrackLighting && !_strikeProbeGrand)
                 return;
 
             if (Model?.Meshes == null)
