@@ -188,10 +188,13 @@ namespace Client.Main.Objects
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected virtual bool IsBlendMesh(int mesh)
         {
+            if (IsNativeFlambergeEffectMesh(mesh))
+                return true;
             if (_meshBlendByScript == null || (uint)mesh >= (uint)_meshBlendByScript.Length)
                 return false;
 
-            return BlendMesh == mesh || BlendMesh == -2 || _meshBlendByScript[mesh];
+            return IsNativeFlambergeEffectMesh(mesh) ||
+                   BlendMesh == mesh || BlendMesh == -2 || _meshBlendByScript[mesh];
         }
 
         /// <summary>
@@ -217,9 +220,9 @@ namespace Client.Main.Objects
         /// </summary>
         protected virtual bool ShouldApplyItemMaterial(int meshIndex)
         {
-            // By default, apply to all meshes
-            // Override in specific classes to exclude certain meshes
-            return true;
+            // Native Flamberge effect planes are rendered with BRIGHT/CHROME,
+            // never with the generic +7/+15 material pass.
+            return !IsNativeFlambergeEffectMesh(meshIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -254,7 +257,10 @@ namespace Client.Main.Objects
         // Determines if this mesh needs special shader path and cannot use fast alpha path
         private bool NeedsSpecialShaderForMesh(int mesh)
         {
-            return DetermineShaderForMesh(mesh).NeedsSpecialShader;
+            // Special weapon meshes must not enter DrawMeshFastAlpha(): that
+            // path bypasses the native Flamberge UV and glow materials.
+            return IsNativeFlambergeEffectMesh(mesh) ||
+                   DetermineShaderForMesh(mesh).NeedsSpecialShader;
         }
 
         public override void Draw(GameTime gameTime)
@@ -465,7 +471,8 @@ namespace Client.Main.Objects
                 bool isRGBA = _meshIsRGBA != null && i < _meshIsRGBA.Length && _meshIsRGBA[i];
 
                 // Skip based on pass and low quality settings
-                if (LowQuality && isBlend && !RenderBlendMeshOnLowQuality) continue;
+                if (LowQuality && isBlend && !RenderBlendMeshOnLowQuality &&
+                    !IsNativeFlambergeEffectMesh(i)) continue;
                 bool shouldDraw = isAfterDraw ? (isRGBA || isBlend) : (!isRGBA && !isBlend);
                 if (!shouldDraw) continue;
 
@@ -513,6 +520,12 @@ namespace Client.Main.Objects
 
         public virtual void DrawMesh(int mesh)
         {
+            if (IsNativeFlambergeEffectMesh(mesh))
+            {
+                DrawNativeFlambergeEffectMesh(mesh);
+                return;
+            }
+
             if (Model?.Meshes == null || mesh < 0 || mesh >= Model.Meshes.Length)
                 return;
             if (_boneVertexBuffers?[mesh] == null ||
