@@ -7,6 +7,7 @@ using System;
 using Client.Data.ATT;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controllers;
+using Client.Main.Worlds;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -339,6 +340,7 @@ namespace Client.Main.ClassicFX.Core
                 int id = n == 1 ? 3 : n == 2 ? 1 : 2;
                 CreateFuryQuake(id, 150, impact, zero, e.Light, parent);
             }
+            float quakeGroundOffset = IsS6FuryHellasWorld() ? 100f : 3f;
             for (int i = 0; i < 5; i++)
             {
                 float direction = MathHelper.ToRadians(e.Phase + i * 72f);
@@ -348,7 +350,7 @@ namespace Client.Main.ClassicFX.Core
                 Vector3 pos = impact + spread;
                 if (!IsS6FuryQuakeTileAllowed(pos, primary: true))
                     continue;
-                pos.Z = RequestTerrainHeight(pos.X, pos.Y) + 3f;
+                pos.Z = RequestTerrainHeight(pos.X, pos.Y) + quakeGroundOffset;
                 Vector3 tilt = new Vector3(
                     0f, 0f, MathHelper.ToRadians(45f + Random.Modulo(30) - 15f));
                 int pk = 40 + Random.Modulo(50);
@@ -356,6 +358,12 @@ namespace Client.Main.ClassicFX.Core
                 CreateFuryQuake(5, pk, pos, tilt, e.Light, e.Owner);
             }
         }
+
+        // Original gMapManager.InHellas(): Kalima 1..7 (24..29, 36).
+        // Their secondary crack pieces use terrain height +100, not +3.
+        private bool IsS6FuryHellasWorld() =>
+            World is Kalima1World or Kalima2World or Kalima3World or
+                Kalima4World or Kalima5World or Kalima6World or Kalima7World;
 
         // Native wall rules deliberately differ between the two phases:
         // life 11 uses AND on NoMove/NoGround/Water exclusions;
@@ -385,6 +393,7 @@ namespace Client.Main.ClassicFX.Core
             for (int i = 0; i < 5; i++)
                 locations[i] = e.StartPosition;
 
+            float quakeGroundOffset = IsS6FuryHellasWorld() ? 100f : 3f;
             for (int step = 0; step < 4; step++)
             {
                 // Native chooses one segment length per step, reused across
@@ -407,7 +416,7 @@ namespace Client.Main.ClassicFX.Core
                     Vector3 point = locations[track];
                     if (!IsS6FuryQuakeTileAllowed(point, primary: false))
                         continue;
-                    point.Z = RequestTerrainHeight(point.X, point.Y) + 3f;
+                    point.Z = RequestTerrainHeight(point.X, point.Y) + quakeGroundOffset;
                     locations[track] = point;
 
                     Vector3 facing = new Vector3(0f, 0f,
