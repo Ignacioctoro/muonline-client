@@ -4,6 +4,7 @@
 // Reuses the existing effect pool, ModelObject BMD renderer and owner/bone bridge.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Controls;
 using Client.Main.Objects.Effects.Skills;
 using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
@@ -339,12 +340,12 @@ namespace Client.Main.ClassicFX.Core
                         {
                             if (bone == 5 ||
                                 !TryGetOwnerBonePosition(source, bone,
-                                    out Vector3 at))
+                                    out Vector3 flareBonePosition))
                                 continue;
 
                             CreateJointFpsChecked(
                                 ClassicTextureIds.BitmapFlare + 1,
-                                at, e.Position, jointAngle,
+                                flareBonePosition, e.Position, jointAngle,
                                 subType: 16, target: source, scale: 20f);
                         }
                     }
