@@ -1490,8 +1490,10 @@ namespace Client.Main.ClassicFX.Core
                 ReleaseEffect(handle);
                 return ClassicFxHandle.Invalid;
             }
-            // Native CreateEffect immediately spawns phase 1.
-            if (blowOfDestruction && subType == 0)
+            // Probe: skip the secondary explosion phase entirely.
+            // It creates water, debris, smoke and the second floor flare.
+            if (blowOfDestruction && subType == 0 &&
+                !StrikeDestructionCracksOnlyProbe)
                 CreateEffect(ClassicFxEffectType.BlowOfDestruction,
                     inputLight, angle, light, owner, subType: 1);
             if (type == ClassicFxEffectType.FenrirThunder)
@@ -2034,6 +2036,10 @@ namespace Client.Main.ClassicFX.Core
                 }
                 if (e.Type == ClassicFxEffectType.BlowOfDestruction)
                 {
+                    // This is the BITMAP_FLARE_BLUE floor flash, not a BMD
+                    // crack. Disable it to see Plancrack A/B alone.
+                    if (StrikeDestructionCracksOnlyProbe)
+                        continue;
                     if (e.LifeTime <= 24f &&
                         Textures.TryGet(ClassicTextureIds.BitmapFlareBlue,
                             out ClassicTextureResource flare))
@@ -2482,6 +2488,12 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (Model == null)
                     Model = await BMDLoader.Instance.Prepare(_bmdPath);
+                if (_nativeKnightPlancrackLighting)
+                    Console.WriteLine(
+                        $"[StrikeCracksOnly] BMD {_bmdPath}: " +
+                        (Model?.Meshes == null
+                            ? "MODEL MISSING"
+                            : $"{Model.Meshes.Length} mesh(es)"));
             }
             catch (Exception ex)
             {
@@ -2490,6 +2502,31 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
             await base.Load();
+        }
+
+        public override async Task LoadContent()
+        {
+            await base.LoadContent();
+            if (!_nativeKnightPlancrackLighting)
+                return;
+
+            if (Model?.Meshes == null)
+            {
+                Console.WriteLine($"[StrikeCracksOnly] {_bmdPath}: no meshes");
+                return;
+            }
+
+            // Diagnostic only: this checks whether texture data was loaded.
+            // It does NOT claim the GPU rendered the mesh successfully.
+            for (int mesh = 0; mesh < Model.Meshes.Length; mesh++)
+            {
+                string name = Model.Meshes[mesh].TexturePath;
+                string resolved = BMDLoader.Instance.GetTexturePath(Model, name);
+                bool loaded = TextureLoader.Instance.Get(resolved) != null;
+                Console.WriteLine(
+                    $"[StrikeCracksOnly] {_bmdPath} mesh={mesh} " +
+                    $"texture='{name}' resolved='{resolved}' loaded={loaded}");
+            }
         }
     }
 }
