@@ -1678,6 +1678,12 @@ namespace Client.Main.Objects.Player
             ushort skillId,
             bool isInSafeZone)
         {
+            // ClassAttack.cpp: Infinity Arrow uses PLAYER_RUSH1 on foot,
+            // but SetPlayerMagic on a rideable mount. Reuse the existing
+            // mounted magic action rather than forcing the ground animation.
+            if ((skillId == 77 || skillId == 441) && _isRiding)
+                return GetDefaultSkillAction(isInSafeZone);
+
             if (Season6SkillActionDatabase.TryGet(
                     skillId,
                     out var route))

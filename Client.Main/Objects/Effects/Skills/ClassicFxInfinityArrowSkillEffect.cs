@@ -7,6 +7,7 @@
 // persistent ammunition chrome is driven by MagicEffectStatus (0x07).
 using Client.Main.ClassicFX.Core;
 using Client.Main.Core.Utilities;
+using Client.Main.Controllers;
 using Client.Main.Models;
 using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
@@ -55,6 +56,13 @@ namespace Client.Main.Objects.Effects.Skills
             emitted |= fx.CreateEffect(
                 ClassicFxEffectType.InfinityArrow4, origin, angle,
                 new Vector3(1f, 0.5f, 0.3f), owner).IsValid;
+
+            // The pinned Main registers SOUND_INFINITYARROW but does not
+            // call PlayBuffer for it. The original audio file is present
+            // in Data_Broyal; play it once on the server-confirmed cast,
+            // not every frame or for the persistent 0x07 buff state.
+            if (emitted)
+                SoundController.Instance.PlayBuffer("Sound/infinityArrow.wav");
 
             return emitted;
         }

@@ -318,6 +318,36 @@ namespace Client.Main.ClassicFX.Core
                     if (TryGetOwnerBonePosition(e.Owner, 29, out Vector3 at))
                         e.Position = at;
                     e.Angle = owner.Angle;
+
+                    // ZzzObject.cpp RenderObject(MODEL_INFINITY_ARROW):
+                    // original emits eight FLARE+1 subtype 16 joints at
+                    // BMD bones 1..9 (except 5), targeting the effect model.
+                    // Batch 50 drew the five BMDs but omitted this cast aura.
+                    // Use actual animated bone matrices and ClassicFX joint
+                    // pools; do not invent billboard positions.
+                    if (Clock.AdvancedReferenceFrame &&
+                        e.ModelView != null &&
+                        e.ModelView.Status == GameControlStatus.Ready)
+                    {
+                        ClassicFxOwner source =
+                            ClassicFxOwner.FromWorldObject(e.ModelView);
+                        Vector3 jointAngle = new Vector3(
+                            MathHelper.ToDegrees(e.Angle.X),
+                            MathHelper.ToDegrees(e.Angle.Y),
+                            MathHelper.ToDegrees(e.Angle.Z));
+                        for (int bone = 1; bone <= 9; ++bone)
+                        {
+                            if (bone == 5 ||
+                                !TryGetOwnerBonePosition(source, bone,
+                                    out Vector3 at))
+                                continue;
+
+                            CreateJointFpsChecked(
+                                ClassicTextureIds.BitmapFlare + 1,
+                                at, e.Position, jointAngle,
+                                subType: 16, target: source, scale: 20f);
+                        }
+                    }
                     return true;
                 }
                 if (e.Type == ClassicFxEffectType.InfinityArrow4)
