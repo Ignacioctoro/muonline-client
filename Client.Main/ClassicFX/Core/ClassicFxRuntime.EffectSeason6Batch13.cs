@@ -165,11 +165,15 @@ namespace Client.Main.ClassicFX.Core
 
         private void AddS6FuryQuakeLight(ref EffectState e)
         {
-            // Original uses terrain-light red on standard characters, blue
-            // on WerewolfHero. No WerewolfHero character-type bridge yet.
-            // Standard Season 6 player branch only.
+            // MoveEffect() samples native Luminosity in [0.7,1.0] and
+            // fades in the last five ticks. Quake 2/5/8 use red terrain
+            // lighting for ordinary BK players (blue is WerewolfHero only).
+            float luminosity = (Random.Modulo(4) + 7) * 0.1f;
+            if (e.LifeTime < 5f)
+                luminosity = MathF.Max(0f,
+                    luminosity - (5f - e.LifeTime) * 0.2f);
             AddClassicTerrainLight(e.Position.X, e.Position.Y,
-                new Vector3(1f, 0f, 0f), 1f);
+                new Vector3(luminosity, 0f, 0f), 1f);
         }
 
         private void InitializeS6FuryStrike(ref Vector3 angle,
@@ -241,6 +245,8 @@ namespace Client.Main.ClassicFX.Core
                 e.ModelView.Hidden = e.SubType != 0 || e.LifeTime <= 10f;
                 e.ModelView.Position = e.Position;
                 e.ModelView.Angle = e.Angle;
+                e.ModelView.Light = RequestTerrainLight(e.Position.X,
+                    e.Position.Y) + e.Light;
                 e.ModelView.ApplyNativeRenderState(
                     e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
             }
@@ -290,14 +296,20 @@ namespace Client.Main.ClassicFX.Core
             {
                 for (int j = 0; j < 8; j++)
                 {
-                    Vector3 spin = e.Angle + new Vector3(
-                        MathHelper.ToRadians(Random.Modulo(60) - 60f),
-                        0f, MathHelper.ToRadians(Random.Modulo(30) + 90f));
+                    // Native CreateJoint() / CreateParticle() consume angles
+                    // in DEGREES. The parent's EffectState stores radians.
+                    Vector3 spin = new Vector3(
+                        MathHelper.ToDegrees(e.Angle.X) +
+                            Random.Modulo(60) - 60f,
+                        MathHelper.ToDegrees(e.Angle.Y),
+                        MathHelper.ToDegrees(e.Angle.Z) +
+                            Random.Modulo(30) + 90f);
                     Vector3 burst = impact + new Vector3(
                         Random.Modulo(20) - 10f,
                         Random.Modulo(20) - 10f, 0f);
-                    CreateJointFpsChecked(ClassicTextureIds.BitmapJointSpark,
-                        burst, burst, spin, 0, ClassicFxOwner.None, 10f);
+                    CreateJoint(ClassicTextureIds.BitmapJointSpark,
+                        burst, burst, spin, subType: 0,
+                        scale: 10f);
                     if (Random.FpsCheck(8, Clock))
                         CreateParticle(ClassicTextureIds.BitmapSpark,
                             burst, spin, Vector3.One);
@@ -334,26 +346,38 @@ namespace Client.Main.ClassicFX.Core
 
         private void EmitS6FuryOutwardCracks(ref EffectState e)
         {
-            for (int path = 0; path < 5; path++)
+            // MuMain Move_MODEL_SKILL_FURY_STRIKE LifeTime 10:
+            // five evolving paths, four segments each, not five isolated
+            // spokes. Every segment emits two genuine EarthQuake BMDs.
+            Vector3[] locations = new Vector3[5];
+            float[] headings = new float[5];
+            for (int i = 0; i < 5; i++)
+                locations[i] = e.StartPosition;
+
+            for (int step = 0; step < 4; step++)
             {
-                Vector3 pos = e.StartPosition;
-                float yaw = 0f;
-                int direction = path & 1;
-                for (int n = 0; n < 4; n++)
+                bool positive = step == 3
+                    ? Random.Modulo(2) == 0
+                    : (step & 1) == 0;
+
+                for (int track = 0; track < 5; track++)
                 {
-                    float twist = 50f + Random.Modulo(30);
-                    yaw += direction == 0 ? twist : -twist;
-                    float heading = MathHelper.ToRadians(
-                        yaw + path * (62f + Random.Modulo(10)));
-                    Vector3 displacement = Vector3.TransformNormal(
-                        new Vector3(0f, 85f + Random.Modulo(15), 0f),
-                        Matrix.CreateRotationZ(heading));
-                    pos += displacement;
-                    pos.Z = RequestTerrainHeight(pos.X, pos.Y) + 3f;
+                    float twist = Random.Modulo(30) + 50f;
+                    headings[track] += positive ? twist : -twist;
+                    float angle = MathHelper.ToRadians(
+                        headings[track] + track *
+                        (Random.Modulo(10) + 62f));
+                    locations[track] += Vector3.TransformNormal(
+                        new Vector3(0f, Random.Modulo(15) + 85f, 0f),
+                        Matrix.CreateRotationZ(angle));
+                    Vector3 point = locations[track];
+                    point.Z = RequestTerrainHeight(point.X, point.Y) + 3f;
+                    locations[track] = point;
+
                     Vector3 facing = new Vector3(0f, 0f,
-                        heading + MathHelper.ToRadians(270f));
-                    CreateFuryQuake(7, 100, pos, facing, e.Light, e.Owner);
-                    CreateFuryQuake(8, 100, pos, facing, e.Light, e.Owner);
+                        angle + MathHelper.ToRadians(270f));
+                    CreateFuryQuake(7, 100, point, facing, e.Light, e.Owner);
+                    CreateFuryQuake(8, 100, point, facing, e.Light, e.Owner);
                 }
             }
         }

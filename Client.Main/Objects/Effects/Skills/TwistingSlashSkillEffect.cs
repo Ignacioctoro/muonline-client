@@ -3,6 +3,7 @@
 // MuMain@21728b1e5b03e0763b38ef9e23f79645e0df7ad2.
 // Old additive slash arcs remain disabled while ClassicFX is active.
 using Client.Main.ClassicFX.Core;
+using Client.Main.Controllers;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
 using Client.Main.Objects.Player;
@@ -28,10 +29,13 @@ namespace Client.Main.Objects.Effects.Skills
             if (fx == null || !fx.Enabled || fx.IsDisposed)
                 return false;
 
-            return fx.CreateEffect(
+            bool created = fx.CreateEffect(
                 ClassicFxEffectType.SkillWheel1,
                 caster.WorldPosition.Translation, caster.TotalAngle,
                 Vector3.One, ClassicFxOwner.FromWorldObject(caster)).IsValid;
+            if (created)
+                SoundController.Instance.PlayBuffer("Sound/sKnightSkill4.wav");
+            return created;
         }
 
         public WorldObject? CreateEffect(SkillEffectContext context)

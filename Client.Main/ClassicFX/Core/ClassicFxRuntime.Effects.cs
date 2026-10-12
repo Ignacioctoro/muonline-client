@@ -1184,6 +1184,8 @@ namespace Client.Main.ClassicFX.Core
             else if (s6SkillWheel)
             {
                 life = type == ClassicFxEffectType.SkillWheel1 ? 5f : 25f;
+                if (type == ClassicFxEffectType.SkillWheel2)
+                    effectHeading = Vector3.Zero; // independent render spin
                 if (type == ClassicFxEffectType.SkillWheel2 &&
                     owner.WorldObject is PlayerObject wheelCaster)
                 {
@@ -1342,6 +1344,8 @@ namespace Client.Main.ClassicFX.Core
                         fighter.Weapon2?.Model != null ? fighter.Weapon2 : null;
                     if (weapon != null)
                     {
+                        view.ItemGroup = weapon.ItemGroup;
+                        view.ItemNumber = weapon.ItemNumber;
                         view.ItemLevel = weapon.ItemLevel;
                         view.IsExcellentItem = weapon.IsExcellentItem;
                         view.IsAncientItem = weapon.IsAncientItem;
@@ -1351,6 +1355,8 @@ namespace Client.Main.ClassicFX.Core
                         view.Color = Color.White;
                         view.Light = Vector3.One;
                         view.ContinuousAnimation = false;
+                        view.Light = RequestTerrainLight(effectPosition.X,
+                            effectPosition.Y) + light;
                     }
                 }
                 if (IsS6Batch15ModelType(type))

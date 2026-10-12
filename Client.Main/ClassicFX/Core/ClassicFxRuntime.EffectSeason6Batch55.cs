@@ -1,8 +1,11 @@
-// ClassicFX Season 6 Batch 55 — native Twisting Slash wheel carrier.
-// Main ZzzEffect.cpp CreateEffect(MODEL_SKILL_WHEEL1/2),
-// Behaviors/MoveHandlers.cpp Move_MODEL_SKILL_WHEEL1/2,
-// RenderWheelWeapon() — equipped BMD, not a fabricated slash texture.
-// Model views are owned by the shared Effect pool. No gameplay hit changes.
+// ClassicFX Season 6 — full BK/MG Twisting Slash visual sequence.
+// MuMain@21728b1e5b03e0763b38ef9e23f79645e0df7ad2
+// ZzzEffect.cpp CreateEffect / RenderWheelWeapon;
+// Behaviors/MoveHandlers.cpp Move_MODEL_SKILL_WHEEL1/2.
+// Five native wheel copies, model-based weapon rendering, smoke,
+// JOINT_SPARK trails, SPARK particles, BITMAP_LIGHT and terrain lights.
+// This contains no collision, damage, input, or packet handling.
+using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
@@ -15,28 +18,41 @@ namespace Client.Main.ClassicFX.Core
         {
             if (e.Type == ClassicFxEffectType.SkillWheel1)
             {
-                // Five 25-Hz native pulses, 4-LifeTime is the literal
-                // original subtype passed to MODEL_SKILL_WHEEL2.
+                // MODEL_SKILL_WHEEL1 has a five-tick lifetime and creates
+                // MODEL_SKILL_WHEEL2 with native subtype -1,0,1,2,3.
+                // The last emitted native frame is stored per carrier.
+                // Catching crossed 25-Hz ticks avoids missing weapon copies
+                // when the MonoGame frame rate drops below the native rate.
                 if (Clock.AdvancedReferenceFrame)
-                    CreateEffect(ClassicFxEffectType.SkillWheel2,
-                        e.Position, e.Angle, e.Light, e.Owner,
-                        subType: 4 - (int)System.MathF.Ceiling(e.LifeTime));
+                {
+                    int index = Math.Clamp(
+                        5 - (int)MathF.Ceiling(e.LifeTime), 0, 4);
+                    for (int tick = e.LastChildNativeTick + 1;
+                         tick <= index; tick++)
+                    {
+                        CreateEffect(ClassicFxEffectType.SkillWheel2,
+                            e.Position, e.Angle, e.Light, e.Owner,
+                            subType: tick - 1);
+                    }
+                    e.LastChildNativeTick = index;
+                }
                 return true;
             }
 
             if (e.Owner.WorldObject is not PlayerObject fighter ||
                 !TryGetOwnerSnapshot(e.Owner,
-                    out ClassicFxOwnerSnapshot caster))
+                    out ClassicFxOwnerSnapshot caster) ||
+                e.ModelView == null)
                 return false;
 
-            // MODEL_SKILL_WHEEL2 moves 180 behind a spear and 150
-            // behind other equipped weapon models.
+            // Native rotation always uses the weapon captured at cast time;
+            // the equipped-model echo carries that BMD and its materials.
             bool spear = fighter.Weapon1?.Model != null
                 ? fighter.Weapon1.ItemGroup == 3
                 : fighter.Weapon2?.ItemGroup == 3;
-            float distance = spear ? -180f : -150f;
+            float rearOffset = spear ? -180f : -150f;
             Vector3 offset = Vector3.TransformNormal(
-                new Vector3(0f, distance, 0f),
+                new Vector3(0f, rearOffset, 0f),
                 Matrix.CreateFromYawPitchRoll(
                     e.Angle.Y, e.Angle.X, e.Angle.Z));
             e.Position = caster.Position + offset;
@@ -50,51 +66,63 @@ namespace Client.Main.ClassicFX.Core
                 _ => 1f
             };
 
-            // RenderWheelWeapon(): temporary weapon pitch of 90 degrees
-            // and native -30-degree accelerating spin. No owner mutation.
+            // RenderWheelWeapon updates Direction.Z, then adds it to the
+            // rendered weapon angle. Acceleration must accumulate across
+            // frames; using only Direction.Z skips nearly all its spin.
             e.Direction.Z -= MathHelper.ToRadians(30f) * f;
-            if (e.ModelView != null)
-            {
-                e.ModelView.Position = e.Position +
-                    new Vector3(0f, 0f, 100f * f);
-                e.ModelView.Angle = new Vector3(
-                    e.Angle.X, MathHelper.PiOver2,
-                    e.Angle.Z + e.Direction.Z);
-                e.ModelView.ApplyNativeRenderState(
-                    e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
-            }
+            e.HeadAngle.Z += e.Direction.Z;
+            e.ModelView.Position = e.Position +
+                new Vector3(0f, 0f, 100f * f);
+            e.ModelView.Angle = new Vector3(
+                e.Angle.X, MathHelper.PiOver2,
+                e.Angle.Z + e.HeadAngle.Z);
+            e.ModelView.Light = RequestTerrainLight(e.Position.X,
+                e.Position.Y) + e.Light;
+            e.ModelView.ApplyNativeRenderState(
+                e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
 
+            // Native MoveEffect() adds a single warm BITMAP_LIGHT sprite
+            // EVERY update. At 60 FPS this must not be gated by the 25-Hz
+            // particle/joint reference tick or the visible light will flicker.
+            CreateSprite(ClassicTextureIds.BitmapLight,
+                e.Position + new Vector3(0f, 0f, 20f), 2f,
+                new Vector3(1f, 0.8f, 0.6f));
+
+            // Smoke, sparks, joints and terrain light share the 25-Hz
+            // source clock; we do not spawn four uncontrolled bursts at
+            // every display refresh on mobile devices.
             if (!Clock.AdvancedReferenceFrame)
                 return true;
 
-            // Native wheel smoke, joint sparks, occasional spark
-            // particles, ground light, and one orange tip light.
+            float luminosity = (Random.Modulo(4) + 7) * 0.1f;
+            if (e.LifeTime < 5f)
+                luminosity = MathF.Max(0f,
+                    luminosity - (5f - e.LifeTime) * 0.2f);
+
             CreateParticle(ClassicTextureIds.BitmapSmoke,
                 e.Position, e.Angle, e.Light, subType: 3);
             AddClassicTerrainLight(e.Position.X, e.Position.Y,
-                new Vector3(0.3f), 3f);
+                new Vector3(luminosity * 0.3f), 3f);
+
             for (int j = 0; j < 4; j++)
             {
-                Vector3 angle = new Vector3(
+                // MuMain joint angles are degrees. EffectState angles
+                // are MonoGame radians. Do not mix the two systems.
+                Vector3 spin = new Vector3(
                     MathHelper.ToDegrees(e.Angle.X) +
                         Random.Modulo(60) - 30f,
                     MathHelper.ToDegrees(e.Angle.Y),
                     MathHelper.ToDegrees(e.Angle.Z) +
                         Random.Modulo(30) + 90f);
-                Vector3 position = e.Position + new Vector3(
+                Vector3 pos = e.Position + new Vector3(
                     Random.Modulo(20) - 10f,
                     Random.Modulo(20) - 10f, 0f);
-                CreateJointFpsChecked(
-                    ClassicTextureIds.BitmapJointSpark,
-                    position, position, angle);
+                CreateJoint(ClassicTextureIds.BitmapJointSpark,
+                    pos, pos, spin);
                 if (Random.FpsCheck(4, Clock))
                     CreateParticle(ClassicTextureIds.BitmapSpark,
-                        position, angle, Vector3.One);
+                        pos, spin, Vector3.One);
             }
-
-            CreateSprite(ClassicTextureIds.BitmapLight,
-                e.Position + new Vector3(0f, 0f, 20f), 2f,
-                new Vector3(1f, 0.8f, 0.6f));
             return true;
         }
     }
