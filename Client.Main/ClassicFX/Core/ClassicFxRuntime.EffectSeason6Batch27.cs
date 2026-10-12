@@ -4,6 +4,8 @@
 // Reuses the existing effect pool, ModelObject BMD renderer and owner/bone bridge.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Objects.Effects.Skills;
+using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -215,9 +217,59 @@ namespace Client.Main.ClassicFX.Core
                 {
                     e.BlendMeshLight = e.LifeTime / 14f;
                     e.Alpha = e.BlendMeshLight;
-                    // Native also moves the caster and emits six shiny
-                    // sprites / 3 spark joints on alternate ticks. That
-                    // target/caster mutation remains a callsite concern.
+                    // Native Move_MODEL_BLADE_SKILL subtype 1 emits one
+                    // CreateArrow every second reference tick while the
+                    // cast is alive. Earlier batches ported only the wind
+                    // BMDs; those are not the outgoing arrow projectiles.
+                    // Mutating the PlayerObject's combat angle is unnecessary:
+                    // rotate only the emitted projectile.
+                    if (e.NativeSkillIndex == 235 &&
+                        Clock.AdvancedReferenceFrame &&
+                        e.Owner.WorldObject is PlayerObject caster &&
+                        ReferenceEquals(caster.World, World))
+                    {
+                        int tick = (int)MathF.Ceiling(e.LifeTime);
+                        if (tick >= 4 && tick <= 14 && (tick & 1) == 0)
+                        {
+                            int bit = 1 << ((tick - 4) / 2);
+                            if ((e.TriggerMask & bit) == 0)
+                            {
+                                e.TriggerMask |= (byte)bit;
+                                if (ElfArrowSkillEffect.TryGetArrowModel(
+                                        caster, out ClassicFxEffectType arrowType,
+                                        out _))
+                                {
+                                    // Main randomly chooses one of six aim
+                                    // offsets, never repeating the previous.
+                                    // LastChildNativeTick starts at -1.
+                                    int chosen = Random.Modulo(6);
+                                    if (chosen == e.LastChildNativeTick)
+                                        chosen = (chosen + 1 + Random.Modulo(5)) % 6;
+                                    e.LastChildNativeTick = chosen;
+
+                                    float spread = chosen switch
+                                    {
+                                        0 => 7f,
+                                        1 => 21f,
+                                        2 => 35f,
+                                        3 => -7f,
+                                        4 => -21f,
+                                        _ => -35f
+                                    };
+                                    Vector3 shotAngle = caster.TotalAngle;
+                                    shotAngle.Z += MathHelper.ToRadians(spread);
+                                    CreateEffect(arrowType,
+                                        caster.WorldPosition.Translation,
+                                        shotAngle, Vector3.One,
+                                        ClassicFxOwner.FromWorldObject(caster),
+                                        nativeSkillIndex: 235);
+                                }
+                            }
+                        }
+                    }
+                    // Native also emits shiny sprites and spark joints at
+                    // each tick; these remain separate from actual arrows.
+                    // Combat facing and server damage remain untouched.
                 }
                 return true;
             }

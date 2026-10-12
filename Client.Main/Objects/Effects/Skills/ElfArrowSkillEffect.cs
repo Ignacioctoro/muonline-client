@@ -73,7 +73,7 @@ namespace Client.Main.Objects.Effects.Skills
             fx.CreateEffect(model, origin, spread, Vector3.One, owner);
         }
 
-        private static bool TryGetArrowModel(PlayerObject caster,
+        internal static bool TryGetArrowModel(PlayerObject caster,
             out ClassicFxEffectType model, out bool specialTripleShot)
         {
             model = default;
@@ -83,12 +83,16 @@ namespace Client.Main.Objects.Effects.Skills
             // crossbow. Both carry native item group/number (not BMD name).
             // Exclude arrows (4,15) and bolts (4,7).
             int item = -1;
+            // Arrow (4,15) and Bolt (4,7) occupy the other hand:
+            // never mistake ammunition for the equipped shooting weapon.
             if (caster.Weapon2 != null && caster.Weapon2.ItemGroup == 4 &&
-                caster.Weapon2.Model != null)
+                caster.Weapon2.Model != null &&
+                caster.Weapon2.ItemNumber != 7 && caster.Weapon2.ItemNumber != 15)
                 item = caster.Weapon2.ItemNumber;
             else if (caster.Weapon1 != null &&
                      caster.Weapon1.ItemGroup == 4 &&
-                     caster.Weapon1.Model != null)
+                     caster.Weapon1.Model != null &&
+                     caster.Weapon1.ItemNumber != 7 && caster.Weapon1.ItemNumber != 15)
                 item = caster.Weapon1.ItemNumber;
 
             // Main model enums: MODEL_BOW + item. Unsupported original

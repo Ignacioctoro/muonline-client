@@ -49,9 +49,13 @@ namespace Client.Main.Objects.Effects.Skills
 
             Vector3 bladeOffset = Vector3.TransformNormal(
                 new Vector3(0f, -120f, 145f), rotation);
+            // MODEL_BLADE_SKILL subtype 1 is the native timed shot emitter.
+            // Batch 47 only drew the backwards wind: without the skill
+            // identity the runtime cannot dispatch CreateArrow on ticks
+            // 14, 12, 10, 8, 6, 4.
             return fx.CreateEffect(ClassicFxEffectType.BladeSkillModel,
-                origin + bladeOffset, angle, light, owner, subType: 1)
-                .IsValid;
+                origin + bladeOffset, angle, light, owner,
+                subType: 1, nativeSkillIndex: 235).IsValid;
         }
 
         public WorldObject? CreateEffect(SkillEffectContext context) => null;
