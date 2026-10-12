@@ -2269,13 +2269,21 @@ namespace Client.Main.ClassicFX.Core
             // closes the accelerated grouped path for the whole BMD.
             var device = GraphicsDevice;
             var previousDepth = device.DepthStencilState;
+            var previousSampler = device.SamplerStates[0];
             try
             {
                 device.DepthStencilState = Client.Main.Controllers.GraphicsManager.ReadOnlyDepth;
+                // The original lines2.jpg BMD UVs go from about -2.067 to
+                // +4.587 in V (grand/plancrack A), using GL_REPEAT.
+                // Clamp collapses repeated lightning into a flat edge
+                // color instead of drawing the branching ground cracks.
+                // Apply only to these four native destruction BMD views.
+                device.SamplerStates[0] = SamplerState.LinearWrap;
                 base.DrawModel(true);
             }
             finally
             {
+                device.SamplerStates[0] = previousSampler;
                 device.DepthStencilState = previousDepth;
             }
         }
