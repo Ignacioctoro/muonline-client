@@ -2455,11 +2455,16 @@ namespace Client.Main.ClassicFX.Core
                 }
                 Scale = nativeScale;
                 Alpha = MathHelper.Clamp(nativeAlpha, 0f, 1f);
-                // The original crack bright mesh uses BodyLight = Light * Alpha.
-                // Shared ModelObject's blend mesh skips the RGB alpha factor.
-                BlendMeshLight = _nativeKnightPlancrackLighting
-                    ? nativeBlendMeshLight * MathHelper.Clamp(nativeAlpha, 0f, 1f)
-                    : nativeBlendMeshLight;
+                // Native RenderBody(RENDER_TEXTURE | RENDER_BRIGHT) fades
+                // the crack geometry once. In our MonoGame bridge the mesh
+                // is already sent to the additive/alpha-tested pass, which
+                // applies TotalAlpha through AlphaTestEffect.Alpha.
+                // Multiplying BlendMeshLight by nativeAlpha AGAIN used to
+                // fade the blue lines as alpha squared (0.5 -> 0.25,
+                // 0.25 -> 0.0625), making them disappear long before the
+                // native 25-tick lifetime. Preserve native model lifetime
+                // and UV movement; let the existing shader fade it once.
+                BlendMeshLight = nativeBlendMeshLight;
             }
         }
 
