@@ -329,6 +329,23 @@ namespace Client.Main.Content
 
                 // for custom blending from json
                 var relativePath = Path.GetRelativePath(Constants.DataPath, path).Replace("\\", "/");
+
+                // MuMain's native knight_plancrack_a BMD has trailing ASCII
+                // garbage in mesh 1's 32-byte texture-name field after
+                // "lines2.jpg". ReadString(32) preserves that garbage when
+                // there is no NUL terminator, so TextureLoader cannot resolve
+                // the lightning mesh and only the grandmark base is drawn.
+                // Normalize this single known Season 6 asset before mapping
+                // and loading textures. Do not alter any other BMD/mesh.
+                if (relativePath.Equals("Effect/knight_plancrack_a.bmd",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    asset.Meshes.Length > 1 &&
+                    asset.Meshes[1].TexturePath.StartsWith("lines2.jpg",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    asset.Meshes[1].TexturePath = "lines2.jpg";
+                }
+
                 if (_blendingConfig.TryGetValue(relativePath, out var meshConfig))
                 {
                     for (int i = 0; i < asset.Meshes.Length; i++)
