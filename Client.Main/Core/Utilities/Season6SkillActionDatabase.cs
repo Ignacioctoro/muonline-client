@@ -375,6 +375,14 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerSkillBlowOfDestruction);
 
+            // Native strengthened variant uses the same action and target tile.
+            Add(
+                337,
+                "Strike of Destruction (Strengthened)",
+                SkillType.Area,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerSkillBlowOfDestruction);
+
             // =========================================================
             // ELF
             // =========================================================

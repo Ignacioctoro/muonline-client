@@ -32,7 +32,7 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.KnightPlancrackB:
                     definition = new Season6ModelDefinition(
                         "Effect/knight_plancrack_b.bmd", 25f, 1f,
-                        offsetZ: 15f, useCallerScale: true);
+                        useCallerScale: true);
                     return true;
                 case ClassicFxEffectType.RaklionBossCrack:
                     // The original scale is caller Scale + 1, not a
@@ -51,8 +51,6 @@ namespace Client.Main.ClassicFX.Core
         {
             if (type == ClassicFxEffectType.NightWater01)
                 angle.Z = MathHelper.ToRadians(Random.Modulo(360));
-            else if (type == ClassicFxEffectType.KnightPlancrackB)
-                angle.Z += MathHelper.ToRadians(90f * Clock.FrameFactor);
             else if (type == ClassicFxEffectType.RaklionBossCrack)
                 angle.Z = MathHelper.ToRadians(Random.Modulo(360));
         }
@@ -82,17 +80,17 @@ namespace Client.Main.ClassicFX.Core
                 // the vector toward the original incoming Light/target.
                 Vector3 delta = e.StartPosition - e.Position;
                 float length = delta.Length();
-                if (length > 0.001f)
                 {
-                    Vector3 direction = delta / length;
+                    Vector3 direction = length > 0.001f
+                        ? delta / length : Vector3.Zero;
                     Vector3 casterAngle = e.Angle;
                     if (TryGetOwnerSnapshot(e.Owner,
                             out ClassicFxOwnerSnapshot owner))
                         casterAngle = owner.Angle;
 
-                    // Native count is (int)(length/100)+1. Cap pathological
-                    // targets to preserve fixed pools on Android.
-                    int count = Math.Min(32, (int)(length / 100f) + 1);
+                    // Native count is (int)(length/100)+1, including
+                    // one crack even for a zero-length target direction.
+                    int count = (int)(length / 100f) + 1;
                     for (int i = 0; i < count; i++)
                     {
                         Vector3 position = e.Position + direction * (55f * i);

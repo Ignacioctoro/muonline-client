@@ -341,6 +341,7 @@ namespace Client.Data.BMD
             map[238] = "Sound/caotic.wav";               // Chaotic Diseier (ID 238)
             map[233] = "Sound/SwellofMagicPower.wav";    // Swell of Magicpower (ID 233)
             map[232] = "Sound/BLOW_OF_DESTRUCTION.wav";  // Destruction (ID 232)
+            map[337] = "Sound/BLOW_OF_DESTRUCTION.wav";  // Strengthened (ID 337)
             map[235] = "Sound/multi_shot.wav";           // Multi-Shot (ID 235)
             map[234] = "Sound/recover.wav";              // Recovery (ID 234)
 

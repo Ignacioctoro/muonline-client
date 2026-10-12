@@ -932,6 +932,14 @@ namespace Client.Main.ClassicFX.Core
                     life = GetS6ParentEffectLifetime(owner);
                     effectAlpha = (20f - life) / 5f;
                 }
+                if (type == ClassicFxEffectType.KnightPlancrackA)
+                {
+                    // Native CreateEffect sets random yaw, small scale
+                    // variation and +10 units in the initial Z position.
+                    effectScale = scale + Random.Modulo(10) * 0.05f;
+                    angle.Z = MathHelper.ToRadians(Random.Modulo(360));
+                    effectPosition.Z += 10f * Clock.FrameFactor;
+                }
                 if (IsS6Batch11ModelType(type))
                 {
                     InitializeS6Batch11Model(type, ref angle);
