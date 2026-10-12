@@ -324,6 +324,7 @@ namespace Client.Data.BMD
             map[62] = "Sound/sDarkEarthQuake.wav";       // Earthshake (ID 62)
             map[61] = "Sound/eFirebust.wav";             // Fire Burst (ID 61)
             map[78] = "Sound/Darklord_firescream.wav";   // Fire Scream (ID 78)
+            map[518] = "Sound/Darklord_firescream.wav";  // Fire Scream Strengthener
 
             // SUMMONER SKILLS
             map[214] = "Sound/SE_Ch_summoner_skill07_lifedrain.wav";      // Drain Life (ID 214)
