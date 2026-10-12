@@ -1083,64 +1083,74 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         return;
                     }
 
-                    var headPos = target.WorldPosition.Translation
-                                + Vector3.UnitZ * (target.BoundingBoxWorld.Max.Z - target.WorldPosition.Translation.Z + 30f);
-
-                    if (target is MonsterObject monster)
+                    Action presentHit = () =>
                     {
-                        monster.UpdateHealthFractions(healthFraction, shieldFraction, healthDmg, shieldDmg);
-                    }
-
-                    // Use server-provided damage type for authentic MU Online colors
-                    Color dmgColor;
-                    string dmgText;
-
-                    if (totalDmg == 0)
-                    {
-                        dmgColor = Color.White;
-                        dmgText = "Miss";
-                    }
-                    else
-                    {
-                        // Local player damage is always red, others use server-provided damage type colors
-                        if (maskedId == _characterState.Id)
+                        var headPos = target.WorldPosition.Translation
+                                    + Vector3.UnitZ * (target.BoundingBoxWorld.Max.Z - target.WorldPosition.Translation.Z + 30f);
+    
+                        if (target is MonsterObject monster)
                         {
-                            dmgColor = Color.Red;
+                            monster.UpdateHealthFractions(healthFraction, shieldFraction, healthDmg, shieldDmg);
+                        }
+    
+                        // Use server-provided damage type for authentic MU Online colors
+                        Color dmgColor;
+                        string dmgText;
+    
+                        if (totalDmg == 0)
+                        {
+                            dmgColor = Color.White;
+                            dmgText = "Miss";
                         }
                         else
                         {
-                            // Map DamageKind to colors for other players/monsters
-                            dmgColor = damageKind switch
+                            // Local player damage is always red, others use server-provided damage type colors
+                            if (maskedId == _characterState.Id)
                             {
-                                DamageKind.NormalRed => Color.Orange,
-                                DamageKind.IgnoreDefenseCyan => Color.Cyan,
-                                DamageKind.ExcellentLightGreen => Color.LightGreen,
-                                DamageKind.CriticalBlue => Color.DeepSkyBlue,
-                                DamageKind.LightPink => Color.LightPink,
-                                DamageKind.PoisonDarkGreen => Color.DarkGreen,
-                                DamageKind.ReflectedDarkPink => Color.DeepPink,
-                                DamageKind.White => Color.White,
-                                _ => Color.Red // fallback to normal red
-                            };
+                                dmgColor = Color.Red;
+                            }
+                            else
+                            {
+                                // Map DamageKind to colors for other players/monsters
+                                dmgColor = damageKind switch
+                                {
+                                    DamageKind.NormalRed => Color.Orange,
+                                    DamageKind.IgnoreDefenseCyan => Color.Cyan,
+                                    DamageKind.ExcellentLightGreen => Color.LightGreen,
+                                    DamageKind.CriticalBlue => Color.DeepSkyBlue,
+                                    DamageKind.LightPink => Color.LightPink,
+                                    DamageKind.PoisonDarkGreen => Color.DarkGreen,
+                                    DamageKind.ReflectedDarkPink => Color.DeepPink,
+                                    DamageKind.White => Color.White,
+                                    _ => Color.Red // fallback to normal red
+                                };
+                            }
+    
+                            // Add damage multiplier indicators for double/triple damage
+                            string multiplier = "";
+                            if (isTripleDamage)
+                                multiplier = "!!!";
+                            else if (isDoubleDamage)
+                                multiplier = "!!";
+    
+                            dmgText = $"{totalDmg}{multiplier}";
                         }
+    
+                        var txt = DamageTextObject.Rent(
+                            dmgText,
+                            maskedId,
+                            dmgColor
+                        );
+                        world.Objects.Add(txt);
+                        _logger.LogDebug("Spawned DamageTextObject '{Text}' for {Id:X4}", txt.Text, maskedId);
+                    };
 
-                        // Add damage multiplier indicators for double/triple damage
-                        string multiplier = "";
-                        if (isTripleDamage)
-                            multiplier = "!!!";
-                        else if (isDoubleDamage)
-                            multiplier = "!!";
-
-                        dmgText = $"{totalDmg}{multiplier}";
-                    }
-
-                    var txt = DamageTextObject.Rent(
-                        dmgText,
-                        maskedId,
-                        dmgColor
-                    );
-                    world.Objects.Add(txt);
-                    _logger.LogDebug("Spawned DamageTextObject '{Text}' for {Id:X4}", txt.Text, maskedId);
+                    // 0x11 has no attacker ID: only nearby, active slams qualify.
+                    if (target is MonsterObject hitMonster &&
+                        MuGame.Instance.ActiveScene is GameScene damageScene &&
+                        damageScene.GroundImpacts.TryDeferHit(world, hitMonster, presentHit))
+                        return;
+                    presentHit();
                 });
 
                 // Update local player's health/shield
@@ -1191,9 +1201,17 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         if (MuGame.Instance.ActiveScene?.World is WorldControl world
                           && world.TryGetWalkerById(maskedId, out var walker) && walker is MonsterObject monster)
                         {
-                            monster.OnReceiveDamage();
-                            monster.PlayAction((byte)MonsterActionType.Shock);
-                            _logger.LogDebug("Triggering hit animation for {Type} {Id:X4}", walker.GetType().Name, maskedId);
+                            Action presentReaction = () =>
+                            {
+                                if (monster.IsDead) return;
+                                monster.OnReceiveDamage();
+                                monster.PlayAction((byte)MonsterActionType.Shock);
+                                _logger.LogDebug("Triggering hit animation for {Type} {Id:X4}", walker.GetType().Name, maskedId);
+                            };
+                            if (MuGame.Instance.ActiveScene is GameScene hitScene &&
+                                hitScene.GroundImpacts.TryDeferHit(world, monster, presentReaction))
+                                return;
+                            presentReaction();
                         }
                     });
                 }
@@ -1831,9 +1849,19 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         // Handle monster death
                         else if (walker is MonsterObject monster)
                         {
-                            monster.PlayAction((byte)MonsterActionType.Die);
-                            monster.StartDeathFade();
-                            _logger.LogDebug("💀 Monster {Id:X4} death animation started", killed);
+                            Action presentDeath = () =>
+                            {
+                                monster.PlayAction((byte)MonsterActionType.Die);
+                                monster.StartDeathFade();
+                                _logger.LogDebug("💀 Monster {Id:X4} death animation started", killed);
+                            };
+                            if (MuGame.Instance.ActiveScene is GameScene deathScene &&
+                                deathScene.GroundImpacts.TryDeferDeath(world, monster, killer, presentDeath))
+                            {
+                                monster.Interactive = false;
+                                return;
+                            }
+                            presentDeath();
                         }
                     }
                 });

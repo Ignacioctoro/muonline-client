@@ -336,6 +336,14 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerAttackSkillFuryStrike);
 
+            // Native strengthened/mastery Rageful Blow share the Fury action.
+            Add(331, "Strengthened Rageful Blow",
+                SkillType.Area, Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackSkillFuryStrike);
+            Add(333, "Rageful Blow Mastery",
+                SkillType.Area, Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackSkillFuryStrike);
+
             Add(
                 43,
                 "Death Stab",

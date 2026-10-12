@@ -68,6 +68,8 @@ namespace Client.Main.Scenes
         private Texture2D _backgroundTexture;
         private ProgressBarControl _progressBar;
         private GameSceneSkillController _skillController;
+        private readonly GroundImpactPresentation _groundImpacts = new();
+        internal GroundImpactPresentation GroundImpacts => _groundImpacts;
         private GameSceneNotificationController _notificationController;
         private GameScenePlayerMenuController _playerMenuController;
         private GameSceneHotkeys _hotkeys;
@@ -2689,6 +2691,7 @@ namespace Client.Main.Scenes
             var prevUiMouse = MuGame.Instance.PrevUiMouseState;
             _playerMenuController?.Update(gameTime, currentKeyboardState, uiMouse, prevUiMouse);
             _skillController?.Update();
+            _groundImpacts.Update(World as WorldControl);
 
             // Handle attack clicks on monsters with proper validation
             if (!IsMouseInputConsumedThisFrame &&

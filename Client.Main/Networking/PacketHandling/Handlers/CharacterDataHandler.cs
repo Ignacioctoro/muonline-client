@@ -1265,7 +1265,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         // Trigger vehicle skill animation if riding
                         activeScene.Hero.TriggerVehicleSkillAnimation(skillId);
 
-                        if (animationId > 0)
+                        // A targeted echo can accompany an area slam.
+                        // Do not restart its predicted local contact animation.
+                        if (animationId > 0 &&
+                            !activeScene.GroundImpacts.IsLocalCastAwaitingEcho(
+                                activeScene.Hero, skillId))
                         {
                             activeScene.Hero.PlayAction((ushort)animationId);
                             _logger.LogInformation(
@@ -1525,7 +1529,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                         activeScene.Hero.TriggerVehicleSkillAnimation(skillId);
 
-                        if (animationId > 0)
+                        // Server echo must not restart the locally running slam.
+                        if (animationId > 0 &&
+                            !activeScene.GroundImpacts.IsLocalCastAwaitingEcho(
+                                activeScene.Hero, skillId))
                         {
                             activeScene.Hero
                                 .PlayAction(
@@ -1604,6 +1611,9 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                     remotePlayer.PlayAction(
                         (ushort)remoteAction);
+                    activeScene.GroundImpacts.RegisterCast(
+                        world, remotePlayer, skillId,
+                        new Vector2(targetX, targetY));
 
                     remotePlayer.TriggerVehicleSkillAnimation(skillId);
                     // All cast visuals go through SkillVisualEffectRegistry.

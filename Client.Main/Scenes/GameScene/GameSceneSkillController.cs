@@ -1546,6 +1546,12 @@ namespace Client.Main.Scenes
                     MathHelper.TwoPi *
                     256f);
 
+            // The original sends 0x1E when the cast starts. Keep that
+            // protocol unchanged; delay only the resulting visual feedback.
+            _scene.GroundImpacts.RegisterCast(
+                _scene.World as WorldControl, hero, skill.SkillId,
+                new Vector2(requestTargetX, requestTargetY));
+
             _ = MuGame.Network
                 .GetCharacterService()
                 .SendAreaSkillRequestAsync(
