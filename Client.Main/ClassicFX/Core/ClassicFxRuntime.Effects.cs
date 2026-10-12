@@ -2225,10 +2225,16 @@ namespace Client.Main.ClassicFX.Core
         private bool NeedsNativeBmdLighting =>
             NeedsRagefulBmdLighting || _nativeDestructionBmdLighting;
 
-        public void EnableNativeFuryStoneLighting(in Vector3 light)
+        // Preserve the existing Rageful Blow call site. The original
+        // Strike of Destruction impact emits the same Stone01/Stone02
+        // models (subtype 13) and requires the same native vertex lighting.
+        public void EnableNativeFuryStoneLighting(in Vector3 light) =>
+            EnableNativeImpactStoneLighting(light);
+
+        public void EnableNativeImpactStoneLighting(in Vector3 light)
         {
-            // Only stones emitted by the FuryQuake2/5 parents use this path.
-            // Do not change generic Stone1/Stone2 rendering for other skills.
+            // Apply only to stones explicitly emitted by these native
+            // skill sequences; generic stones keep their own materials.
             _nativeRagefulStoneLighting = true;
             Light = light;
             Color = Color.White;

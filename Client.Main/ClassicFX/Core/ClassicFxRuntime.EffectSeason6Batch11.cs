@@ -127,11 +127,17 @@ namespace Client.Main.ClassicFX.Core
                     Vector3 displacement = Vector3.TransformNormal(
                         new Vector3(0f, Random.Modulo(150), 0f),
                         Matrix.CreateRotationZ(yaw));
-                    CreateEffect(Random.Modulo(2) == 0
+                    ClassicFxHandle stone = CreateEffect(Random.Modulo(2) == 0
                             ? ClassicFxEffectType.Stone1
                             : ClassicFxEffectType.Stone2,
                         e.Position + displacement, e.Angle, e.Light,
                         ClassicFxOwner.None, subType: 13);
+                    // Same native Stone01/02 BMD materials used by
+                    // Rageful Blow. Without the explicit light bridge,
+                    // the generic model view tints these debris nearly black.
+                    if (stone.IsValid)
+                        _effects[stone.Index].ModelView?
+                            .EnableNativeImpactStoneLighting(e.Light);
                 }
             }
         }
