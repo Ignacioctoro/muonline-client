@@ -10,10 +10,6 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
-        // TEMPORARY DIAGNOSTIC: render ONLY Strike of Destruction's
-        // KnightPlancrack A/B BMD models. Revert this branch after testing.
-        internal static readonly bool StrikeDestructionCracksOnlyProbe = true;
-
         private static bool IsS6Batch11ModelType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.NightWater01 or
                 ClassicFxEffectType.KnightPlancrackB or
@@ -86,20 +82,15 @@ namespace Client.Main.ClassicFX.Core
             Vector3 blue = new Vector3(0.3f, 0.3f, 1f);
             if (e.SubType == 0)
             {
-                if (!StrikeDestructionCracksOnlyProbe)
-                {
-                    for (int i = 0; i < 2; i++)
-                        CreateEffect(ClassicFxEffectType.NightWater01,
-                            e.Position, e.Angle, blue, ClassicFxOwner.None);
-                }
+                for (int i = 0; i < 2; i++)
+                    CreateEffect(ClassicFxEffectType.NightWater01,
+                        e.Position, e.Angle, blue, ClassicFxOwner.None);
                 Vector3 crackCenter = e.Position;
                 crackCenter.Z = RequestS6DestructionVisualTerrainHeight(
                     crackCenter.X, crackCenter.Y);
-                ClassicFxHandle centerCrack = CreateEffect(
-                    ClassicFxEffectType.KnightPlancrackA,
+                CreateEffect(ClassicFxEffectType.KnightPlancrackA,
                     crackCenter, e.Angle, blue, ClassicFxOwner.None,
                     subType: 0, scale: 1.2f);
-                int loadedCracks = centerCrack.IsValid ? 1 : 0;
 
                 // Native creates a sequence of BMD ground cracks along
                 // the vector toward the original incoming Light/target.
@@ -127,44 +118,25 @@ namespace Client.Main.ClassicFX.Core
                         float yaw = Random.Modulo(20) + 10f;
                         rotation.Z += MathHelper.ToRadians(
                             i % 2 == 0 ? yaw : -yaw);
-                        ClassicFxHandle segment = CreateEffect(
-                            ClassicFxEffectType.KnightPlancrackB,
+                        CreateEffect(ClassicFxEffectType.KnightPlancrackB,
                             position, rotation, blue, ClassicFxOwner.None,
                             subType: 0, scale: 1f);
-                        if (segment.IsValid)
-                            loadedCracks++;
                     }
-                    if (StrikeDestructionCracksOnlyProbe)
-                        Console.WriteLine(
-                            $"[StrikeCracksOnly] Spawned {loadedCracks}/{count + 1} BMD instances, targetDistance={length:0.0}.");
                 }
             }
             else if (e.SubType == 1)
             {
-                // The true impact is the original grand Plancrack BMD,
-                // created at the target point. Keep it in the cracks-only
-                // probe; removing this entire subtype hid the main impact.
-                if (!StrikeDestructionCracksOnlyProbe)
-                {
-                    CreateEffect(ClassicFxEffectType.NightWater01,
-                        e.Position, e.Angle, blue, ClassicFxOwner.None,
-                        scale: 2f);
-                    CreateEffect(ClassicFxEffectType.NightWater01,
-                        e.Position, e.Angle, blue, ClassicFxOwner.None,
-                        scale: 1f);
-                }
-                ClassicFxHandle grand = CreateEffect(
-                    ClassicFxEffectType.RaklionBossCrack,
+                // The original impact keeps its grand ground-crack BMD at
+                // the target, alongside NightWater and the stone fragments.
+                CreateEffect(ClassicFxEffectType.NightWater01,
+                    e.Position, e.Angle, blue, ClassicFxOwner.None,
+                    scale: 2f);
+                CreateEffect(ClassicFxEffectType.NightWater01,
+                    e.Position, e.Angle, blue, ClassicFxOwner.None,
+                    scale: 1f);
+                CreateEffect(ClassicFxEffectType.RaklionBossCrack,
                     e.Position, e.Angle, blue, ClassicFxOwner.None,
                     subType: 0, scale: 0.2f);
-                if (StrikeDestructionCracksOnlyProbe)
-                {
-                    Console.WriteLine(
-                        $"[StrikeCracksOnly] GRAND target=({e.Position.X:0.0}," +
-                        $"{e.Position.Y:0.0},{e.Position.Z:0.0}) " +
-                        $"created={grand.IsValid}");
-                    return;
-                }
                 int count = 5 + Random.Modulo(3);
                 for (int i = 0; i < count; i++)
                 {
@@ -233,20 +205,6 @@ namespace Client.Main.ClassicFX.Core
 
         private void MoveS6BlowOfDestruction(ref EffectState e, float f)
         {
-            // In this diagnostic branch, the logical root remains alive but
-            // emits no sprites, waterfall particles, smoke or other visuals.
-            // Only the native A/B crack models are spawned at tick 23.
-            if (StrikeDestructionCracksOnlyProbe)
-            {
-                if (Clock.AdvancedReferenceFrame &&
-                    e.LifeTime <= 23f && (e.TriggerMask & 1) == 0)
-                {
-                    e.TriggerMask |= 1;
-                    EmitS6BlowOfDestructionImpact(ref e);
-                }
-                return;
-            }
-
             if (e.LifeTime > 24f)
                 return;
 
