@@ -2186,6 +2186,10 @@ namespace Client.Main.ClassicFX.Core
     {
         private readonly string _bmdPath;
         private readonly FuryQuakeUvDeformer _furyQuakeUvDeformer;
+        private readonly bool _renderRagefulBlendOnLowQuality;
+
+        protected override bool RenderBlendMeshOnLowQuality =>
+            _renderRagefulBlendOnLowQuality;
 
         // The original quakes 2, 5 and 8 scroll the UV of BlendMesh 0.
         // Per-instance deformer avoids modifying the shared BMD resource.
@@ -2228,6 +2232,11 @@ namespace Client.Main.ClassicFX.Core
         public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
         {
             _bmdPath = bmdPath;
+            _renderRagefulBlendOnLowQuality =
+                type is ClassicFxEffectType.FuryStrike or
+                    ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
+                (type >= ClassicFxEffectType.FuryQuake1 &&
+                 type <= ClassicFxEffectType.FuryQuake8);
             if (type is ClassicFxEffectType.FuryQuake2 or
                 ClassicFxEffectType.FuryQuake5 or
                 ClassicFxEffectType.FuryQuake8)

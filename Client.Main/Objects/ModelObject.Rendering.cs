@@ -181,6 +181,11 @@ namespace Client.Main.Objects
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // Original MU skill overlays must remain visible when the general
+        // low-quality mesh simplification is active. Other actors keep the
+        // existing GPU draw-call optimization.
+        protected virtual bool RenderBlendMeshOnLowQuality => false;
+
         protected virtual bool IsBlendMesh(int mesh)
         {
             if (_meshBlendByScript == null || (uint)mesh >= (uint)_meshBlendByScript.Length)
@@ -460,7 +465,7 @@ namespace Client.Main.Objects
                 bool isRGBA = _meshIsRGBA != null && i < _meshIsRGBA.Length && _meshIsRGBA[i];
 
                 // Skip based on pass and low quality settings
-                if (LowQuality && isBlend) continue;
+                if (LowQuality && isBlend && !RenderBlendMeshOnLowQuality) continue;
                 bool shouldDraw = isAfterDraw ? (isRGBA || isBlend) : (!isRGBA && !isBlend);
                 if (!shouldDraw) continue;
 
