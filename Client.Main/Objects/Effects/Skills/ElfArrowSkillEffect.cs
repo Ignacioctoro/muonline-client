@@ -55,7 +55,9 @@ namespace Client.Main.Objects.Effects.Skills
                     if (subType == 2)
                         fx.CreateEffect(ClassicFxEffectType.GatheringEffect,
                             origin, angle, Vector3.One, owner);
-                    EmitGreatReignBowSparks(fx, caster);
+                    // CreateArrows enters a separate native branch for
+                    // Penetration and Ice Arrow: Great Reign's 15 spark
+                    // particles are emitted only by the normal/triple branch.
                 }
                 return shot;
             }

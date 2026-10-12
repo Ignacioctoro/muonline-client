@@ -89,8 +89,13 @@ namespace Client.Main.ClassicFX.Core
                             ? new Vector3(0f, -100f, 0f)
                             : new Vector3(-10f, 10f, 0f);
                         pos += Vector3.TransformNormal(offset,
+                            // ClassicFX stores object angles in radians.
+                            // Use the same yaw/pitch/roll convention as the
+                            // original arrow launch model bridge; the old
+                            // Z/X/Y permutation displaced Penetration's
+                            // gathering cloud when turning the character.
                             Matrix.CreateFromYawPitchRoll(
-                                angle.Z, angle.X, angle.Y)) *
+                                angle.Y, angle.X, angle.Z)) *
                             Clock.FrameFactor;
                         if (sub == 0) pos.Z += 150f * Clock.FrameFactor;
                     }
