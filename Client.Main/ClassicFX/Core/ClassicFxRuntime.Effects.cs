@@ -2251,6 +2251,14 @@ namespace Client.Main.ClassicFX.Core
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
 
+        // TEMPORARY A/B diagnostic, never a gameplay rendering setting.
+        // Only KnightPlancrack A/B ignore the terrain depth test. Every
+        // other model retains the same read-only depth behavior as before.
+        protected override DepthStencilState GetBlendMeshDepthState() =>
+            _nativeKnightPlancrackLighting
+                ? DepthStencilState.None
+                : base.GetBlendMeshDepthState();
+
         // MODEL_NIGHTWATER_01, MODEL_KNIGHT_PLANCRACK_A/B and
         // MODEL_RAKLION_BOSS_CRACKEFFECT are all rendered by native
         // RenderBody(RENDER_TEXTURE | RENDER_BRIGHT), for EVERY mesh.
@@ -2279,14 +2287,17 @@ namespace Client.Main.ClassicFX.Core
                 _strikeProbeDrawLogged = true;
                 Console.WriteLine(
                     $"[StrikeCracksOnly] DRAW {_bmdPath} status={Status} " +
-                    $"meshes={Model?.Meshes?.Length ?? 0}");
+                    $"meshes={Model?.Meshes?.Length ?? 0} depthTest=OFF");
             }
             var device = GraphicsDevice;
             var previousDepth = device.DepthStencilState;
             var previousSampler = device.SamplerStates[0];
             try
             {
-                device.DepthStencilState = Client.Main.Controllers.GraphicsManager.ReadOnlyDepth;
+                // Isolate the entire model from terrain occlusion,
+                // including the fast grouped path. DrawMesh's per-mesh
+                // path uses GetBlendMeshDepthState() above.
+                device.DepthStencilState = GetBlendMeshDepthState();
                 // The original lines2.jpg BMD UVs go from about -2.067 to
                 // +4.587 in V (grand/plancrack A), using GL_REPEAT.
                 // Clamp collapses repeated lightning into a flat edge
