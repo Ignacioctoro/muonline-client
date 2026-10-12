@@ -404,11 +404,11 @@ namespace Client.Main.ClassicFX.Core
                     ClassicFxOwner.FromWorldObject(e.ModelView);
                 if (e.Type == ClassicFxEffectType.ArrowRing)
                     CreateJoint(ClassicTextureIds.BitmapFlare + 1,
-                        e.Position, e.Position, e.Angle, 15,
+                        e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 15,
                         carrier, 50f, pkKey: 40);
                 else
                     CreateJoint(ClassicTextureIds.BitmapJointEnergy,
-                        e.Position, e.Position, e.Angle, 5,
+                        e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 5,
                         carrier, 100f);
                 if (e.SubType != 0 &&
                     e.Type != ClassicFxEffectType.ArrowRing)

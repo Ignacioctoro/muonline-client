@@ -233,7 +233,8 @@ namespace Client.Main.ClassicFX.Core
                 Vector3 sparkAt = shotOrigin;
                 sparkAt.Z += Random.Modulo(80) - 40f + 200f;
                 CreateJointFpsChecked(ClassicTextureIds.BitmapSpark + 1,
-                    sparkAt, sparkAt, shotAngle, subType: 1,
+                    sparkAt, sparkAt, ToS6ArrowJointDegrees(shotAngle),
+                    subType: 1,
                     target: owner, scale: 18.7f);
             }
         }

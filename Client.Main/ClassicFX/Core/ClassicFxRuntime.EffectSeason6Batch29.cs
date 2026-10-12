@@ -323,7 +323,8 @@ namespace Client.Main.ClassicFX.Core
                 {
                     ClassicFxHandle trail = CreateJoint(
                         ClassicTextureIds.BitmapFlare + 1,
-                        trailRoot, trailRoot, e.Angle, subType: 18,
+                        trailRoot, trailRoot, ToS6ArrowJointDegrees(e.Angle),
+                        subType: 18,
                         target: spriteOwner, scale: 90f, pkKey: 40,
                         priorColor: new Vector3(0.4f, 0.4f, 0.9f));
                     if (trail.IsValid)
@@ -337,7 +338,8 @@ namespace Client.Main.ClassicFX.Core
                 if ((e.TriggerMask & 1) == 0 && spriteOwner.HasOwner)
                 {
                     if (CreateJoint(ClassicTextureIds.BitmapFlare + 1,
-                        e.Position, e.Position, e.Angle, subType: 12,
+                        e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle),
+                        subType: 12,
                         target: spriteOwner, scale: 40f, pkKey: 80).IsValid)
                         e.TriggerMask |= 1;
                 }

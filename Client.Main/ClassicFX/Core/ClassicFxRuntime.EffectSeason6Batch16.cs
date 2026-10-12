@@ -205,7 +205,7 @@ namespace Client.Main.ClassicFX.Core
                     e.FirstMove = false;
                     if (e.Type == ClassicFxEffectType.ArrowSpark)
                         CreateJoint(ClassicTextureIds.BitmapFlare + 1,
-                            e.Position, e.Position, e.Angle, 14,
+                            e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 14,
                             ClassicFxOwner.FromWorldObject(e.ModelView),
                             50f, pkKey: 40);
                     // Native subtype 2 creates a Piercing carrier; use the

@@ -194,7 +194,7 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxOwner source = ClassicFxOwner.FromWorldObject(e.ModelView);
                 for (int i = 0; i < 4; i++)
                     CreateJoint(ClassicTextureIds.BitmapFlare + 1,
-                        e.Position, e.Position, e.Angle, i,
+                        e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), i,
                         source, jointScale);
             }
 
@@ -204,7 +204,7 @@ namespace Client.Main.ClassicFX.Core
             if (e.SubType == 1 && Clock.AdvancedReferenceFrame)
             {
                 CreateJoint(ClassicTextureIds.BitmapJointThunder,
-                    e.Position, e.Position, e.Angle, 3,
+                    e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 3,
                     ClassicFxOwner.None, 20f);
                 CreateSprite(ClassicTextureIds.BitmapShiny + 1,
                     e.Position, (8f + Random.Modulo(8)) * 0.2f,
@@ -212,6 +212,15 @@ namespace Client.Main.ClassicFX.Core
             }
             return true;
         }
+
+        // ClassicFX joints retain the Main's degree-based AngleMatrix.
+        // Effect BMDs / PlayerObject angles are MonoGame radians. Convert at
+        // this boundary rather than changing the shared joint runtime.
+        private static Vector3 ToS6ArrowJointDegrees(Vector3 radians) =>
+            new Vector3(
+                MathHelper.ToDegrees(radians.X),
+                MathHelper.ToDegrees(radians.Y),
+                MathHelper.ToDegrees(radians.Z));
 
         // This moves visual projectiles only. Native CheckClientArrow and
         // AttackCharacterRange MUST stay in gameplay / server protocol code.
@@ -230,7 +239,7 @@ namespace Client.Main.ClassicFX.Core
                 e.FirstMove = false;
                 if (e.SubType == 1)
                     CreateJoint(ClassicTextureIds.BitmapFlare + 1,
-                        e.Position, e.Position, e.Angle, 13,
+                        e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 13,
                         ClassicFxOwner.FromWorldObject(e.ModelView),
                         20f, pkKey: 40);
             }
@@ -318,7 +327,7 @@ namespace Client.Main.ClassicFX.Core
             {
                 e.FirstMove = false;
                 CreateJoint(ClassicTextureIds.BitmapJointEnergy,
-                    e.Position, e.Position, e.Angle, 5,
+                    e.Position, e.Position, ToS6ArrowJointDegrees(e.Angle), 5,
                     ClassicFxOwner.FromWorldObject(e.ModelView), 100f);
             }
             AdvanceS6Arrow(ref e, f);
