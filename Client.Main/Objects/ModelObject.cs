@@ -176,7 +176,6 @@ namespace Client.Main.Objects
         private readonly DynamicLightGpuUploader _dynamicLightUploader = new();
 
         private int _drawModelInvocationId = 0;
-        private int _dynamicLightingPreparedInvocationId = -1;
 
         #endregion
 

@@ -5,7 +5,7 @@ using Client.Main;
 Constants.DataPath = @"C:\Games\MU_Red_1_20_61_Full\Data";
 #endif
 
-Application.SetHighDpiMode(HighDpiMode.SystemAware);
+Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 
 using var game = new MuGame();
 game.Run();

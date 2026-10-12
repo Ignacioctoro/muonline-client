@@ -40,8 +40,6 @@ namespace Client.Main.Objects.Effects
         private readonly float[,] _offsets =
             new float[BoltCount, MaxSegments + 1];
 
-        private readonly Vector3 _colorA;
-        private readonly Vector3 _colorB;
 
         private Texture2D? _thunderTexture;
         private Texture2D? _flashTexture;

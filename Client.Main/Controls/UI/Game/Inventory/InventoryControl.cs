@@ -320,10 +320,6 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private bool _extendedButtonHovered;
         private bool _repairButtonHovered;
 
-        // Legacy hover flags kept for old inactive helpers.
-        private bool _leftFooterHovered;
-        private bool _rightFooterHovered;
-
         private bool _isRepairMode;
         private int _repairEnableLevel = 50;
 
