@@ -12,7 +12,7 @@ namespace Client.Main.ClassicFX.Core
     {
         // TEMPORARY DIAGNOSTIC: render ONLY Strike of Destruction's
         // KnightPlancrack A/B BMD models. Revert this branch after testing.
-        private const bool StrikeDestructionCracksOnlyProbe = true;
+        internal static readonly bool StrikeDestructionCracksOnlyProbe = true;
 
         private static bool IsS6Batch11ModelType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.NightWater01 or
