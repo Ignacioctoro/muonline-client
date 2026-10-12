@@ -2271,7 +2271,7 @@ namespace Client.Main.ClassicFX.Core
         // Classic spell BMDs may require a different shader/material path
         // than world actors. The first measured profile concerns DarkLordSkill.
         protected override bool AllowDynamicLightingShader =>
-            !_useDarkLordModelProfile;
+            !_useDarkLordModelProfile && !_nativeRagefulBmdLighting;
 
         // Keep original EffectState math unmodified. Translation happens only
         // when state enters the MonoGame renderer. All non-profiled models

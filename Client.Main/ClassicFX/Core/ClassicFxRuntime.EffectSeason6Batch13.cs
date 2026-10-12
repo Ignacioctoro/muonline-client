@@ -56,9 +56,16 @@ namespace Client.Main.ClassicFX.Core
         {
             if (!IsS6Batch13QuakeType(type)) return;
             int n = (int)type - (int)ClassicFxEffectType.FuryQuake1 + 1;
-            // Native CreateEffect(): meshes 1,2,4,5,7,8 use BlendMesh 0.
+            // Native CreateEffect() leaves +3 and +6 with BlendMesh -1;
+            // those are regular textured meshes, not additive bright overlays.
+            // The other six native variants explicitly select mesh 0.
             if (n is 1 or 2 or 4 or 5 or 7 or 8)
                 view.BlendMesh = 0;
+            else
+            {
+                view.BlendMesh = -1;
+                view.BlendState = Microsoft.Xna.Framework.Graphics.BlendState.AlphaBlend;
+            }
         }
 
         /// <summary>
