@@ -141,16 +141,30 @@ namespace Client.Main.ClassicFX.Core
             }
             else if (e.SubType == 1)
             {
-                CreateEffect(ClassicFxEffectType.NightWater01,
-                    e.Position, e.Angle, blue, ClassicFxOwner.None,
-                    scale: 2f);
-                CreateEffect(ClassicFxEffectType.NightWater01,
-                    e.Position, e.Angle, blue, ClassicFxOwner.None,
-                    scale: 1f);
-
-                CreateEffect(ClassicFxEffectType.RaklionBossCrack,
+                // The true impact is the original grand Plancrack BMD,
+                // created at the target point. Keep it in the cracks-only
+                // probe; removing this entire subtype hid the main impact.
+                if (!StrikeDestructionCracksOnlyProbe)
+                {
+                    CreateEffect(ClassicFxEffectType.NightWater01,
+                        e.Position, e.Angle, blue, ClassicFxOwner.None,
+                        scale: 2f);
+                    CreateEffect(ClassicFxEffectType.NightWater01,
+                        e.Position, e.Angle, blue, ClassicFxOwner.None,
+                        scale: 1f);
+                }
+                ClassicFxHandle grand = CreateEffect(
+                    ClassicFxEffectType.RaklionBossCrack,
                     e.Position, e.Angle, blue, ClassicFxOwner.None,
                     subType: 0, scale: 0.2f);
+                if (StrikeDestructionCracksOnlyProbe)
+                {
+                    Console.WriteLine(
+                        $"[StrikeCracksOnly] GRAND target=({e.Position.X:0.0}," +
+                        $"{e.Position.Y:0.0},{e.Position.Z:0.0}) " +
+                        $"created={grand.IsValid}");
+                    return;
+                }
                 int count = 5 + Random.Modulo(3);
                 for (int i = 0; i < count; i++)
                 {
@@ -224,7 +238,7 @@ namespace Client.Main.ClassicFX.Core
             // Only the native A/B crack models are spawned at tick 23.
             if (StrikeDestructionCracksOnlyProbe)
             {
-                if (e.SubType == 0 && Clock.AdvancedReferenceFrame &&
+                if (Clock.AdvancedReferenceFrame &&
                     e.LifeTime <= 23f && (e.TriggerMask & 1) == 0)
                 {
                     e.TriggerMask |= 1;
