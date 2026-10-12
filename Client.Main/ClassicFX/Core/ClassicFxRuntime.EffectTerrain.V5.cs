@@ -1,6 +1,6 @@
 // ClassicFX terrain effect families V5 (MuMain native CreateEffect/MoveEffect/RenderEffects).
 // BITMAP_MAGIC_ZIN (0/1/2), BITMAP_LIGHTNING+1 (0/1),
-// BITMAP_MAGIC (1/8/12/13/14).
+// BITMAP_MAGIC (1/8/9/10/12/13/14); Batch 49 native Summoner 9/10.
 // Uses the shared terrain tessellator in ClassicFxRuntime.Effects.cs.
 using System;
 using Client.Main.ClassicFX.Data;
@@ -61,6 +61,9 @@ namespace Client.Main.ClassicFX.Core
                     {
                         case 1: definition = new(20f, 0.5f); return true;
                         case 8: definition = new(30f, 1f); return true;
+                        // Summoner CreateCastingEffect(): native BITMAP_MAGIC.
+                        case 9: definition = new(40f, 2.4f); return true;
+                        case 10: definition = new(44f, 12f, alpha: 0f); return true;
                         case 12: definition = new(20f, 0.1f, callerScale: true); return true;
                         case 13:
                         case 14: definition = new(30f, 1f); return true;
@@ -112,6 +115,21 @@ namespace Client.Main.ClassicFX.Core
                         case 8:
                             e.Scale += 1.8f * f;
                             break;
+                        case 9:
+                            // MuMain Move_BITMAP_MAGIC: native 25-FPS alpha
+                            // fade and rotating impact overlays.
+                            if (e.LifeTime < 20f)
+                                e.Alpha = MathF.Max(0f, e.Alpha - 0.05f * f);
+                            else if (e.Alpha < 1f)
+                                e.Alpha = MathF.Min(1f, e.Alpha + 0.05f * f);
+                            e.Phase += f; // HeadAngle[1]=-8*t, [2]=+4*t
+                            break;
+                        case 10:
+                            if (e.LifeTime < 20f)
+                                e.Alpha = MathF.Max(0f, e.Alpha - 0.03f * f);
+                            else if (e.Alpha < 1f)
+                                e.Alpha = MathF.Min(1f, e.Alpha + 0.05f * f);
+                            break;
                         case 12:
                             e.Alpha = MathF.Max(0f, e.Alpha - 0.05f * f);
                             e.Scale += e.Alpha * f;
@@ -141,6 +159,10 @@ namespace Client.Main.ClassicFX.Core
             {
                 ClassicFxEffectType.MagicZin => ClassicTextureIds.BitmapMagicZin,
                 ClassicFxEffectType.LightningGround => ClassicTextureIds.BitmapLightning + 1,
+                ClassicFxEffectType.MagicGround when e.SubType == 9 =>
+                    ClassicTextureIds.BitmapSummonImpact,
+                ClassicFxEffectType.MagicGround when e.SubType == 10 =>
+                    ClassicTextureIds.BitmapLight,
                 ClassicFxEffectType.MagicGround => ClassicTextureIds.BitmapMagic,
                 _ => -1
             };
@@ -182,6 +204,34 @@ namespace Client.Main.ClassicFX.Core
                         QueueTerrainEffect(ref e, texture);
                         QueueTerrainEffect(ref e, texture, scaleOverride: e.Scale * 0.8f);
                         QueueTerrainEffect(ref e, texture, scaleOverride: e.Scale * 1.2f);
+                    }
+                    else if (e.SubType == 9)
+                    {
+                        // Main renders BITMAP_SUMMON_IMPACT twice, with
+                        // rotating HeadAngle[1] / HeadAngle[2] (degrees).
+                        // QueueTerrainEffect negates angleZOverride internally.
+                        Vector3 light = e.Light * e.Alpha;
+                        QueueTerrainEffect(ref e, texture,
+                            lightOverride: light,
+                            angleZOverride: 8f * e.Phase);
+                        QueueTerrainEffect(ref e, texture,
+                            scaleOverride: e.Scale * 1.2f,
+                            lightOverride: light,
+                            angleZOverride: -4f * e.Phase);
+                    }
+                    else if (e.SubType == 10)
+                    {
+                        // Native EnableAlphaBlendMinus and five identical
+                        // BITMAP_LIGHT layers, culled progressively near end.
+                        int layers = e.LifeTime < 3f ? 1 :
+                                     e.LifeTime < 6f ? 2 :
+                                     e.LifeTime < 9f ? 3 :
+                                     e.LifeTime < 12f ? 4 : 5;
+                        Vector3 light = e.Light * e.Alpha;
+                        for (int i = 0; i < layers; ++i)
+                            QueueTerrainEffect(ref e, texture,
+                                lightOverride: light,
+                                blendOverride: ClassicBlendMode.Subtract);
                     }
                     else if (e.SubType == 12 || e.SubType == 13 || e.SubType == 14)
                     {

@@ -2,7 +2,8 @@
 // BroyalMU ClassicFX S6 Batch 48: native Summoner book cast chain.
 // MuMain@21728b1e5b03e0763b38ef9e23f79645e0df7ad2
 // GameLogic/Skills/SummonSystem.cpp: CreateCastingEffect / CreateSummonObject.
-// One network AreaSkillAnimation emits one 7-BMD cast and one native summon.
+// One network AreaSkillAnimation emits two native bitmap layers,
+// a 7-BMD cast and one native summon.
 // No persistent status effects, damage or server-owned logic are changed.
 using System;
 using Client.Main.ClassicFX.Core;
@@ -42,6 +43,21 @@ namespace Client.Main.Objects.Effects.Skills
             Vector3 angle = caster.TotalAngle;
             ClassicFxOwner none = ClassicFxOwner.None;
 
+            // MuMain CreateCastingEffect() starts with BITMAP_MAGIC 10/9.
+            // These are native ground primitives, not made-up billboards.
+            Vector3 impactLight = context.SkillId switch
+            {
+                223 => new Vector3(1f, 0.6f, 0.4f),
+                224 => new Vector3(0.7f, 0.7f, 1f),
+                _ => new Vector3(0.6f, 0.6f, 0.9f)
+            };
+            bool castGround =
+                fx.CreateEffect(ClassicFxEffectType.MagicGround,
+                    origin, angle, Vector3.One, none, subType: 10).IsValid;
+            castGround |=
+                fx.CreateEffect(ClassicFxEffectType.MagicGround,
+                    origin, angle, impactLight, none, subType: 9).IsValid;
+
             // Native CreateCastingEffect(): six layered rotating BMDs
             // and a growing seventh layer; three fixed palettes.
             Vector3 firstLight = context.SkillId switch
@@ -79,9 +95,6 @@ namespace Client.Main.Objects.Effects.Skills
             emitted |= fx.CreateEffect(ClassicFxEffectType.SummonerCasting4,
                 origin, angle, outerLight, none).IsValid;
 
-            // Original BITMAP_MAGIC subtypes 10/9 have no dedicated
-            // ClassicFX implementation yet. Do not replace with another
-            // type or a made-up billboard.
             int tier = GetBookTier(caster);
             ClassicFxHandle summoned = context.SkillId switch
             {
@@ -92,7 +105,7 @@ namespace Client.Main.Objects.Effects.Skills
                     nativePkKey: tier),
                 _ => ClassicFxHandle.Invalid
             };
-            return emitted || summoned.IsValid;
+            return castGround || emitted || summoned.IsValid;
         }
 
         private static ClassicFxHandle SpawnSahamutt(

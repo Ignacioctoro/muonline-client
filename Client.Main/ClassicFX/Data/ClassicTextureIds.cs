@@ -289,6 +289,10 @@ namespace Client.Main.ClassicFX.Data
         public const int BitmapLeafTotemGolem =
             32370;
 
+        // MuMain _TextureIndex.h: BITMAP_SUMMON_IMPACT -> empact01.jpg.
+        public const int BitmapSummonImpact =
+            32371;
+
         public const int BitmapSummonSahamuttExplosion =
             32372;
 

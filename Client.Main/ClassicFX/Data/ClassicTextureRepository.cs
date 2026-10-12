@@ -819,6 +819,11 @@ namespace Client.Main.ClassicFX.Data
                     SamplerState.LinearClamp),
 
                 new(
+                    ClassicTextureIds.BitmapSummonImpact,
+                    "Effect/empact01.jpg",
+                    SamplerState.LinearClamp),
+
+                new(
                     ClassicTextureIds.BitmapSummonSahamuttExplosion,
                     "Effect/loungexflow.jpg",
                     SamplerState.LinearClamp),
