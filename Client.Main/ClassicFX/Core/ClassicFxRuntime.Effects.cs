@@ -3,6 +3,7 @@
 // MonoGame's existing ModelObject is the only BMD renderer.
 using System;
 using System.Threading.Tasks;
+using Client.Data.BMD;
 using Client.Main.ClassicFX.Data;
 using Client.Main.ClassicFX.Rendering;
 using Client.Main.Content;
@@ -2184,6 +2185,37 @@ namespace Client.Main.ClassicFX.Core
     internal sealed class ClassicFxEffectModelObject : ModelObject
     {
         private readonly string _bmdPath;
+        private readonly FuryQuakeUvDeformer _furyQuakeUvDeformer;
+
+        // The original quakes 2, 5 and 8 scroll the UV of BlendMesh 0.
+        // Per-instance deformer avoids modifying the shared BMD resource.
+        private sealed class FuryQuakeUvDeformer : IVertexDeformer, IMeshTexCoordDeformer
+        {
+            public float OffsetU;
+
+            public Vector3 DeformVertex(in BMDTextureVertex vertex,
+                in Vector3 transformedPosition) => transformedPosition;
+
+            public Vector2 DeformTexCoord(float u, float v) => new Vector2(u, v);
+
+            public Vector2 DeformTexCoord(int meshIndex, float u, float v) =>
+                new Vector2(meshIndex == 0 ? u + OffsetU : u, v);
+        }
+
+        protected override IVertexDeformer GetVertexDeformer() =>
+            _furyQuakeUvDeformer ?? base.GetVertexDeformer();
+
+        public void SetFuryQuakeUvScroll(float offsetU)
+        {
+            if (_furyQuakeUvDeformer == null ||
+                MathF.Abs(_furyQuakeUvDeformer.OffsetU - offsetU) < 0.00001f)
+                return;
+            _furyQuakeUvDeformer.OffsetU = offsetU;
+            // Force a fresh per-instance CPU mesh only once per native tick.
+            // FlagAnimation bypasses the color-only cache early exit.
+            InvalidateBuffers(BufferFlagTexture | BufferFlagAnimation);
+        }
+
         // This is a model-asset renderer profile, not skill-logic scale tuning.
         // Values are grounded in the previous DarkLordCriticalHandEffect renderer.
         // Disable for a side-by-side A/B comparison of the generic model bridge.
@@ -2196,6 +2228,10 @@ namespace Client.Main.ClassicFX.Core
         public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
         {
             _bmdPath = bmdPath;
+            if (type is ClassicFxEffectType.FuryQuake2 or
+                ClassicFxEffectType.FuryQuake5 or
+                ClassicFxEffectType.FuryQuake8)
+                _furyQuakeUvDeformer = new FuryQuakeUvDeformer();
             _useDarkLordModelProfile = EnableDarkLordModelProfile &&
                 type == ClassicFxEffectType.DarkLordSkill;
             IsTransparent = true;

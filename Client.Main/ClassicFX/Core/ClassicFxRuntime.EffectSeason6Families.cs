@@ -260,6 +260,15 @@ namespace Client.Main.ClassicFX.Core
                     effect.Position.Z -= (grown ? 1.5f : 1.8f) * f;
                     if (grown)
                         effect.BlendMeshLight = effect.LifeTime / 30f;
+                    // Move_MODEL_WAVE: negative RGB terrain illumination,
+                    // radius 5. The native wave darkens the impact area.
+                    float waveLuminosity = (Random.Modulo(4) + 7) * 0.1f;
+                    if (effect.LifeTime < 5f)
+                        waveLuminosity = MathF.Max(0f, waveLuminosity -
+                            (5f - effect.LifeTime) * 0.2f);
+                    AddClassicTerrainLight(effect.Position.X,
+                        effect.Position.Y,
+                        new Vector3(-0.5f * waveLuminosity), 5f);
                     return true;
                 case ClassicFxEffectType.CircleLight:
                 case ClassicFxEffectType.Stone1:

@@ -648,9 +648,11 @@ namespace Client.Main.Content
                         int ti = tri.TexCoordIndex[j];
                         var uv = mesh.TexCoords[ti];
 
-                        Vector2 texCoord = texCoordDeformer != null
-                            ? texCoordDeformer.DeformTexCoord(uv.U, uv.V)
-                            : new Vector2(uv.U, uv.V);
+                        Vector2 texCoord = texCoordDeformer is IMeshTexCoordDeformer meshDeformer
+                            ? meshDeformer.DeformTexCoord(meshIndex, uv.U, uv.V)
+                            : texCoordDeformer != null
+                                ? texCoordDeformer.DeformTexCoord(uv.U, uv.V)
+                                : new Vector2(uv.U, uv.V);
 
                         vertices[v] = new VertexPositionColorNormalTexture(
                             posCache[vi],

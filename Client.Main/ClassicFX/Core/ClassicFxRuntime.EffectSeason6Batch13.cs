@@ -4,6 +4,7 @@
 // Existing MonoGame BMD ModelObject + fixed ClassicFX Effect/Joint/Particle
 // pools only. No second mesh renderer, no damage or network logic.
 using System;
+using Client.Data.ATT;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controllers;
 using Microsoft.Xna.Framework;
@@ -117,6 +118,7 @@ namespace Client.Main.ClassicFX.Core
                             SpawnS6FuryQuakeStones(ref e, 10);
                     }
                     AddS6FuryQuakeLight(ref e);
+                    ApplyS6FuryQuakeUv(ref e);
                     return true;
 
                 case 5:
@@ -131,6 +133,7 @@ namespace Client.Main.ClassicFX.Core
                             SpawnS6FuryQuakeStones(ref e, 15);
                     }
                     AddS6FuryQuakeLight(ref e);
+                    ApplyS6FuryQuakeUv(ref e);
                     return true;
 
                 case 8:
@@ -139,10 +142,18 @@ namespace Client.Main.ClassicFX.Core
                     if (life < 15f)
                         e.Position.Z -= 0.5f * f;
                     AddS6FuryQuakeLight(ref e);
+                    ApplyS6FuryQuakeUv(ref e);
                     return true;
                 default:
                     return false;
             }
+        }
+
+        // The native BlendMeshTexCoordU = -(int)LifeTime * 0.01f applies
+        // only to the BlendMesh (mesh 0), not to all meshes in the BMD.
+        private static void ApplyS6FuryQuakeUv(ref EffectState e)
+        {
+            e.ModelView?.SetFuryQuakeUvScroll(-MathF.Truncate(e.LifeTime) * 0.01f);
         }
 
         private void SpawnS6FuryQuakeStones(ref EffectState e, int divisor)
@@ -335,6 +346,8 @@ namespace Client.Main.ClassicFX.Core
                     new Vector3(0f, 100f + Random.Modulo(150), 0f),
                     Matrix.CreateRotationZ(direction));
                 Vector3 pos = impact + spread;
+                if (!IsS6FuryQuakeTileAllowed(pos, primary: true))
+                    continue;
                 pos.Z = RequestTerrainHeight(pos.X, pos.Y) + 3f;
                 Vector3 tilt = new Vector3(
                     0f, 0f, MathHelper.ToRadians(45f + Random.Modulo(30) - 15f));
@@ -342,6 +355,24 @@ namespace Client.Main.ClassicFX.Core
                 CreateFuryQuake(4, pk, pos, tilt, e.Light, e.Owner);
                 CreateFuryQuake(5, pk, pos, tilt, e.Light, e.Owner);
             }
+        }
+
+        // Native wall rules deliberately differ between the two phases:
+        // life 11 uses AND on NoMove/NoGround/Water exclusions;
+        // life 10 uses OR (allowed unless all three flags coexist).
+        private bool IsS6FuryQuakeTileAllowed(in Vector3 point, bool primary)
+        {
+            if (World?.Terrain == null)
+                return true;
+            int tx = (int)(point.X / Constants.TERRAIN_SCALE);
+            int ty = (int)(point.Y / Constants.TERRAIN_SCALE);
+            if ((uint)tx >= (uint)Constants.TERRAIN_SIZE ||
+                (uint)ty >= (uint)Constants.TERRAIN_SIZE)
+                return false;
+            TWFlags wall = World.Terrain.RequestTerrainFlag(tx, ty);
+            const TWFlags exclusions = TWFlags.NoMove | TWFlags.NoGround | TWFlags.Water;
+            return primary ? (wall & exclusions) == TWFlags.None
+                           : (wall & exclusions) != exclusions;
         }
 
         private void EmitS6FuryOutwardCracks(ref EffectState e)
@@ -371,6 +402,8 @@ namespace Client.Main.ClassicFX.Core
                         new Vector3(0f, Random.Modulo(15) + 85f, 0f),
                         Matrix.CreateRotationZ(angle));
                     Vector3 point = locations[track];
+                    if (!IsS6FuryQuakeTileAllowed(point, primary: false))
+                        continue;
                     point.Z = RequestTerrainHeight(point.X, point.Y) + 3f;
                     locations[track] = point;
 
