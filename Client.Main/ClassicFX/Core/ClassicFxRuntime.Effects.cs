@@ -2224,6 +2224,7 @@ namespace Client.Main.ClassicFX.Core
         private readonly bool _nativeKnightPlancrackLighting;
         private readonly bool _nativeDestructionBmdLighting;
         private bool _nativeRagefulStoneLighting;
+        private bool _strikeProbeDrawLogged;
 
         private bool NeedsRagefulBmdLighting =>
             _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
@@ -2273,6 +2274,13 @@ namespace Client.Main.ClassicFX.Core
             // testing but NEVER write depth for bright floor effects.
             // DrawMesh() already uses this state for blend meshes; this
             // closes the accelerated grouped path for the whole BMD.
+            if (_nativeKnightPlancrackLighting && !_strikeProbeDrawLogged)
+            {
+                _strikeProbeDrawLogged = true;
+                Console.WriteLine(
+                    $"[StrikeCracksOnly] DRAW {_bmdPath} status={Status} " +
+                    $"meshes={Model?.Meshes?.Length ?? 0}");
+            }
             var device = GraphicsDevice;
             var previousDepth = device.DepthStencilState;
             var previousSampler = device.SamplerStates[0];
