@@ -84,9 +84,14 @@ namespace Client.Main.ClassicFX.Core
             // Native MoveEffect() adds a single warm BITMAP_LIGHT sprite
             // EVERY update. At 60 FPS this must not be gated by the 25-Hz
             // particle/joint reference tick or the visible light will flicker.
+            // Native InHellas(): Kalima 1-6 (24..29), plus Kalima 7
+            // (special index 36). Its water branch uses the light sprite
+            // sixty units above the wheel, not twenty.
+            bool kalima = World != null &&
+                (World.MapId is >= 24 and <= 30 or 36);
             CreateSprite(ClassicTextureIds.BitmapLight,
-                e.Position + new Vector3(0f, 0f, 20f), 2f,
-                new Vector3(1f, 0.8f, 0.6f));
+                e.Position + new Vector3(0f, 0f, kalima ? 60f : 20f),
+                2f, new Vector3(1f, 0.8f, 0.6f));
 
             // Smoke, sparks, joints and terrain light share the 25-Hz
             // source clock; we do not spawn four uncontrolled bursts at
@@ -103,6 +108,26 @@ namespace Client.Main.ClassicFX.Core
                 e.Position, e.Angle, e.Light, subType: 3);
             AddClassicTerrainLight(e.Position.X, e.Position.Y,
                 new Vector3(luminosity * 0.3f), 3f);
+
+            if (kalima)
+            {
+                // Main's water-map branch replaces the four JOINT_SPARK
+                // chains with exactly one WATERFALL_5 particle subtype 3.
+                // No invented joints are rendered above Kalima water.
+                Vector3 spray = new Vector3(
+                    MathHelper.ToDegrees(e.Angle.X) +
+                        Random.Modulo(60) - 30f,
+                    MathHelper.ToDegrees(e.Angle.Y),
+                    MathHelper.ToDegrees(e.Angle.Z) +
+                        Random.Modulo(30) + 90f);
+                Vector3 waterPosition = e.Position + new Vector3(
+                    Random.Modulo(20) - 10f,
+                    Random.Modulo(20) - 10f, 120f);
+                CreateParticle(ClassicTextureIds.BitmapWaterfall5,
+                    waterPosition, spray, new Vector3(0.5f),
+                    subType: 3);
+                return true;
+            }
 
             for (int j = 0; j < 4; j++)
             {
