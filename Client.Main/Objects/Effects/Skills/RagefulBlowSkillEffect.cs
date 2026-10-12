@@ -4,7 +4,9 @@ using Client.Main.Core.Utilities;
 // FuryStrike weapon/impact bridge is equivalent. Never draw both.
 namespace Client.Main.Objects.Effects.Skills
 {
-    [SkillVisualEffect(42)]
+    [SkillVisualEffect(42)]  // Rageful Blow
+    [SkillVisualEffect(331)] // Strengthened
+    [SkillVisualEffect(333)] // Mastery
     public sealed class RagefulBlowSkillEffect : ISkillVisualEffect
     {
         public WorldObject? CreateEffect(SkillEffectContext context)

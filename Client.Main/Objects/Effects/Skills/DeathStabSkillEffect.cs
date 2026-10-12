@@ -6,7 +6,8 @@ namespace Client.Main.Objects.Effects.Skills
     /// <summary>
     /// Factory for Death Stab (Orb of Blow) skill visual effect (Skill ID 43).
     /// </summary>
-    [SkillVisualEffect(43)]
+    [SkillVisualEffect(43)]  // Death Stab
+    [SkillVisualEffect(336)] // Strengthened
     public sealed class DeathStabSkillEffect : ISkillVisualEffect
     {
         public WorldObject? CreateEffect(SkillEffectContext context)
