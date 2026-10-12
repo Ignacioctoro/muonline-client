@@ -5,6 +5,7 @@
 using System;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controls;
+using Client.Main.Models;
 using Client.Main.Objects.Effects.Skills;
 using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
