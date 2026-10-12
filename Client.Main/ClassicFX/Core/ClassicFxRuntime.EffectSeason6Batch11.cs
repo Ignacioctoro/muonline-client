@@ -10,6 +10,10 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
+        // TEMPORARY DIAGNOSTIC: render ONLY Strike of Destruction's
+        // KnightPlancrack A/B BMD models. Revert this branch after testing.
+        private const bool StrikeDestructionCracksOnlyProbe = true;
+
         private static bool IsS6Batch11ModelType(ClassicFxEffectType type) =>
             type is ClassicFxEffectType.NightWater01 or
                 ClassicFxEffectType.KnightPlancrackB or
@@ -82,15 +86,20 @@ namespace Client.Main.ClassicFX.Core
             Vector3 blue = new Vector3(0.3f, 0.3f, 1f);
             if (e.SubType == 0)
             {
-                for (int i = 0; i < 2; i++)
-                    CreateEffect(ClassicFxEffectType.NightWater01,
-                        e.Position, e.Angle, blue, ClassicFxOwner.None);
+                if (!StrikeDestructionCracksOnlyProbe)
+                {
+                    for (int i = 0; i < 2; i++)
+                        CreateEffect(ClassicFxEffectType.NightWater01,
+                            e.Position, e.Angle, blue, ClassicFxOwner.None);
+                }
                 Vector3 crackCenter = e.Position;
                 crackCenter.Z = RequestS6DestructionVisualTerrainHeight(
                     crackCenter.X, crackCenter.Y);
-                CreateEffect(ClassicFxEffectType.KnightPlancrackA,
+                ClassicFxHandle centerCrack = CreateEffect(
+                    ClassicFxEffectType.KnightPlancrackA,
                     crackCenter, e.Angle, blue, ClassicFxOwner.None,
                     subType: 0, scale: 1.2f);
+                int loadedCracks = centerCrack.IsValid ? 1 : 0;
 
                 // Native creates a sequence of BMD ground cracks along
                 // the vector toward the original incoming Light/target.
@@ -118,10 +127,16 @@ namespace Client.Main.ClassicFX.Core
                         float yaw = Random.Modulo(20) + 10f;
                         rotation.Z += MathHelper.ToRadians(
                             i % 2 == 0 ? yaw : -yaw);
-                        CreateEffect(ClassicFxEffectType.KnightPlancrackB,
+                        ClassicFxHandle segment = CreateEffect(
+                            ClassicFxEffectType.KnightPlancrackB,
                             position, rotation, blue, ClassicFxOwner.None,
                             subType: 0, scale: 1f);
+                        if (segment.IsValid)
+                            loadedCracks++;
                     }
+                    if (StrikeDestructionCracksOnlyProbe)
+                        Console.WriteLine(
+                            $"[StrikeCracksOnly] Spawned {loadedCracks}/{count + 1} BMD instances, targetDistance={length:0.0}.");
                 }
             }
             else if (e.SubType == 1)
@@ -204,6 +219,20 @@ namespace Client.Main.ClassicFX.Core
 
         private void MoveS6BlowOfDestruction(ref EffectState e, float f)
         {
+            // In this diagnostic branch, the logical root remains alive but
+            // emits no sprites, waterfall particles, smoke or other visuals.
+            // Only the native A/B crack models are spawned at tick 23.
+            if (StrikeDestructionCracksOnlyProbe)
+            {
+                if (e.SubType == 0 && Clock.AdvancedReferenceFrame &&
+                    e.LifeTime <= 23f && (e.TriggerMask & 1) == 0)
+                {
+                    e.TriggerMask |= 1;
+                    EmitS6BlowOfDestructionImpact(ref e);
+                }
+                return;
+            }
+
             if (e.LifeTime > 24f)
                 return;
 
