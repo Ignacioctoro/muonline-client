@@ -181,11 +181,17 @@ namespace Client.Main.ClassicFX.Core
             Vector3 offset = Vector3.TransformNormal(
                 new Vector3(0f, distance, 0f),
                 Matrix.CreateRotationZ(theta));
-            CreateEffect(Random.Modulo(2) == 0
+            ClassicFxHandle stoneHandle = CreateEffect(Random.Modulo(2) == 0
                     ? ClassicFxEffectType.Stone1
                     : ClassicFxEffectType.Stone2,
                 e.Position + offset, e.Angle, e.Light,
                 ClassicFxOwner.None, subType: 0);
+            // These original Stone01/Stone02 BMDs have a fire02 texture.
+            // Preserve the quake's white native vertex illumination; the
+            // generic BMD bridge otherwise initializes Light at black.
+            if (stoneHandle.IsValid)
+                _effects[stoneHandle.Index].ModelView?
+                    .EnableNativeFuryStoneLighting(e.Light);
         }
 
         private void AddS6FuryQuakeLight(ref EffectState e)

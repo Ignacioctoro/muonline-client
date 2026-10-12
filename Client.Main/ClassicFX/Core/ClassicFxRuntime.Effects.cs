@@ -2188,6 +2188,20 @@ namespace Client.Main.ClassicFX.Core
         private readonly FuryQuakeUvDeformer _furyQuakeUvDeformer;
         private readonly bool _renderRagefulBlendOnLowQuality;
         private readonly bool _nativeRagefulBmdLighting;
+        private bool _nativeRagefulStoneLighting;
+
+        private bool NeedsRagefulBmdLighting =>
+            _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
+
+        public void EnableNativeFuryStoneLighting(in Vector3 light)
+        {
+            // Only stones emitted by the FuryQuake2/5 parents use this path.
+            // Do not change generic Stone1/Stone2 rendering for other skills.
+            _nativeRagefulStoneLighting = true;
+            Light = light;
+            Color = Color.White;
+            InvalidateBuffers(BufferFlagLighting);
+        }
 
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
@@ -2271,7 +2285,7 @@ namespace Client.Main.ClassicFX.Core
         // Classic spell BMDs may require a different shader/material path
         // than world actors. The first measured profile concerns DarkLordSkill.
         protected override bool AllowDynamicLightingShader =>
-            !_useDarkLordModelProfile && !_nativeRagefulBmdLighting;
+            !_useDarkLordModelProfile && !NeedsRagefulBmdLighting;
 
         // Keep original EffectState math unmodified. Translation happens only
         // when state enters the MonoGame renderer. All non-profiled models
@@ -2298,7 +2312,7 @@ namespace Client.Main.ClassicFX.Core
             }
             else
             {
-                if (_nativeRagefulBmdLighting)
+                if (NeedsRagefulBmdLighting)
                 {
                     // Fury Strike quakes, wave and tail render their actual BMD
                     // textures. LightEnabled is disabled for the skill bridge;
