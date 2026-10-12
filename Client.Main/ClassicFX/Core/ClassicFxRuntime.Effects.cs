@@ -932,14 +932,6 @@ namespace Client.Main.ClassicFX.Core
                     life = GetS6ParentEffectLifetime(owner);
                     effectAlpha = (20f - life) / 5f;
                 }
-                if (type == ClassicFxEffectType.KnightPlancrackA)
-                {
-                    // Native CreateEffect sets random yaw, small scale
-                    // variation and +10 units in the initial Z position.
-                    effectScale = scale + Random.Modulo(10) * 0.05f;
-                    angle.Z = MathHelper.ToRadians(Random.Modulo(360));
-                    effectPosition.Z += 10f * Clock.FrameFactor;
-                }
                 if (IsS6Batch11ModelType(type))
                 {
                     InitializeS6Batch11Model(type, ref angle);
@@ -1863,6 +1855,12 @@ namespace Client.Main.ClassicFX.Core
                     e.ModelView.Position = e.Position;
                     e.ModelView.Angle = e.Angle;
                     e.ModelView.ApplyNativeRenderState(e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
+                    // Main: both knight_plancrack models animate the UV V
+                    // of BlendMesh 1 using world time, not animation frame.
+                    if (e.Type is ClassicFxEffectType.KnightPlancrackA or
+                        ClassicFxEffectType.KnightPlancrackB)
+                        e.ModelView.SetKnightPlancrackUvScroll(
+                            -((int)(Clock.WorldTimeMilliseconds % 2000)) * 0.0001f);
                     if (IsS6Batch05ModelType(e.Type) ||
                         IsS6Batch07ModelType(e.Type) ||
                         IsS6Batch08ModelType(e.Type) ||
@@ -2214,12 +2212,17 @@ namespace Client.Main.ClassicFX.Core
     {
         private readonly string _bmdPath;
         private readonly FuryQuakeUvDeformer _furyQuakeUvDeformer;
+        private readonly KnightPlancrackUvDeformer _knightPlancrackUvDeformer;
         private readonly bool _renderRagefulBlendOnLowQuality;
         private readonly bool _nativeRagefulBmdLighting;
+        private readonly bool _nativeKnightPlancrackLighting;
         private bool _nativeRagefulStoneLighting;
 
         private bool NeedsRagefulBmdLighting =>
             _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
+
+        private bool NeedsNativeBmdLighting =>
+            NeedsRagefulBmdLighting || _nativeKnightPlancrackLighting;
 
         public void EnableNativeFuryStoneLighting(in Vector3 light)
         {
@@ -2249,8 +2252,34 @@ namespace Client.Main.ClassicFX.Core
                 new Vector2(meshIndex == 0 ? u + OffsetU : u, v);
         }
 
+        // Main ZzzObject.cpp draws the two KnightPlancrack models with
+        // RENDER_TEXTURE | RENDER_BRIGHT, BlendMesh 1 and animated V UV.
+        // Per-instance deformation preserves the shared BMD resource.
+        private sealed class KnightPlancrackUvDeformer : IVertexDeformer, IMeshTexCoordDeformer
+        {
+            public float OffsetV;
+
+            public Vector3 DeformVertex(in BMDTextureVertex vertex,
+                in Vector3 transformedPosition) => transformedPosition;
+
+            public Vector2 DeformTexCoord(float u, float v) => new Vector2(u, v);
+
+            public Vector2 DeformTexCoord(int meshIndex, float u, float v) =>
+                new Vector2(u, meshIndex == 1 ? v + OffsetV : v);
+        }
+
         protected override IVertexDeformer GetVertexDeformer() =>
-            _furyQuakeUvDeformer ?? base.GetVertexDeformer();
+            _knightPlancrackUvDeformer ?? _furyQuakeUvDeformer ??
+            base.GetVertexDeformer();
+
+        public void SetKnightPlancrackUvScroll(float offsetV)
+        {
+            if (_knightPlancrackUvDeformer == null ||
+                MathF.Abs(_knightPlancrackUvDeformer.OffsetV - offsetV) < 0.00001f)
+                return;
+            _knightPlancrackUvDeformer.OffsetV = offsetV;
+            InvalidateBuffers(BufferFlagTexture | BufferFlagAnimation);
+        }
 
         public void SetFuryQuakeUvScroll(float offsetU)
         {
@@ -2279,6 +2308,11 @@ namespace Client.Main.ClassicFX.Core
                 type is ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&
                  type <= ClassicFxEffectType.FuryQuake8);
+            _nativeKnightPlancrackLighting =
+                type is ClassicFxEffectType.KnightPlancrackA or
+                    ClassicFxEffectType.KnightPlancrackB;
+            if (_nativeKnightPlancrackLighting)
+                _knightPlancrackUvDeformer = new KnightPlancrackUvDeformer();
             // The native wheel uses RenderPartObject for the equipped
             // weapon, including its blend-material meshes at Medium quality.
             _renderRagefulBlendOnLowQuality =
@@ -2286,7 +2320,8 @@ namespace Client.Main.ClassicFX.Core
                     ClassicFxEffectType.FuryStrike or
                     ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&
-                 type <= ClassicFxEffectType.FuryQuake8);
+                 type <= ClassicFxEffectType.FuryQuake8) ||
+                _nativeKnightPlancrackLighting;
             if (type is ClassicFxEffectType.FuryQuake2 or
                 ClassicFxEffectType.FuryQuake5 or
                 ClassicFxEffectType.FuryQuake8)
@@ -2296,7 +2331,7 @@ namespace Client.Main.ClassicFX.Core
             IsTransparent = true;
             AffectedByTransparency = true;
             BlendState = BlendState.Additive;
-            BlendMesh = 0;
+            BlendMesh = _nativeKnightPlancrackLighting ? 1 : 0;
             BlendMeshLight = 1f;
             DepthState = DepthStencilState.DepthRead;
             RenderShadow = false;
@@ -2316,7 +2351,7 @@ namespace Client.Main.ClassicFX.Core
         // Classic spell BMDs may require a different shader/material path
         // than world actors. The first measured profile concerns DarkLordSkill.
         protected override bool AllowDynamicLightingShader =>
-            !_useDarkLordModelProfile && !NeedsRagefulBmdLighting;
+            !_useDarkLordModelProfile && !NeedsNativeBmdLighting;
 
         // Keep original EffectState math unmodified. Translation happens only
         // when state enters the MonoGame renderer. All non-profiled models
@@ -2343,9 +2378,9 @@ namespace Client.Main.ClassicFX.Core
             }
             else
             {
-                if (NeedsRagefulBmdLighting)
+                if (NeedsNativeBmdLighting)
                 {
-                    // Fury Strike quakes, wave and tail render their actual BMD
+                    // Fury Strike and Strike of Destruction render their actual BMD
                     // textures. LightEnabled is disabled for the skill bridge;
                     // without a native Light value CPU vertex colors become
                     // black even though the BMD and its texture are loaded.
@@ -2359,7 +2394,11 @@ namespace Client.Main.ClassicFX.Core
                 }
                 Scale = nativeScale;
                 Alpha = MathHelper.Clamp(nativeAlpha, 0f, 1f);
-                BlendMeshLight = nativeBlendMeshLight;
+                // The original crack bright mesh uses BodyLight = Light * Alpha.
+                // Shared ModelObject's blend mesh skips the RGB alpha factor.
+                BlendMeshLight = _nativeKnightPlancrackLighting
+                    ? nativeBlendMeshLight * MathHelper.Clamp(nativeAlpha, 0f, 1f)
+                    : nativeBlendMeshLight;
             }
         }
 
