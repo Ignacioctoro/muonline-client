@@ -68,6 +68,15 @@ namespace Client.Main.ClassicFX.Core
             return true;
         }
 
+        // MU's native effect positions are based on the visual terrain height.
+        // NeffisDev's RequestTerrainHeight uses the gameplay heightmap,
+        // while its rendered terrain applies a different vertical scale.
+        // Follow the visible surface, as Rageful Blow already does, without
+        // changing the native +10 (A) / +15 (B) creation offsets.
+        private float RequestS6DestructionVisualTerrainHeight(float x, float y) =>
+            World?.Terrain?.RequestTerrainRenderHeight(x, y) ??
+            RequestTerrainHeight(x, y);
+
         private void EmitS6BlowOfDestructionImpact(ref EffectState e)
         {
             Vector3 blue = new Vector3(0.3f, 0.3f, 1f);
@@ -76,8 +85,11 @@ namespace Client.Main.ClassicFX.Core
                 for (int i = 0; i < 2; i++)
                     CreateEffect(ClassicFxEffectType.NightWater01,
                         e.Position, e.Angle, blue, ClassicFxOwner.None);
+                Vector3 crackCenter = e.Position;
+                crackCenter.Z = RequestS6DestructionVisualTerrainHeight(
+                    crackCenter.X, crackCenter.Y);
                 CreateEffect(ClassicFxEffectType.KnightPlancrackA,
-                    e.Position, e.Angle, blue, ClassicFxOwner.None,
+                    crackCenter, e.Angle, blue, ClassicFxOwner.None,
                     subType: 0, scale: 1.2f);
 
                 // Native creates a sequence of BMD ground cracks along
@@ -98,6 +110,10 @@ namespace Client.Main.ClassicFX.Core
                     for (int i = 0; i < count; i++)
                     {
                         Vector3 position = e.Position + direction * (55f * i);
+                        // Each segment samples its own rendered-terrain height;
+                        // sharing the caster Z can bury long cracks on slopes.
+                        position.Z = RequestS6DestructionVisualTerrainHeight(
+                            position.X, position.Y);
                         Vector3 rotation = casterAngle;
                         float yaw = Random.Modulo(20) + 10f;
                         rotation.Z += MathHelper.ToRadians(
