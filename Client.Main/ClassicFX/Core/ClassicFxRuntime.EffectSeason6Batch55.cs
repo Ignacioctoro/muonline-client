@@ -12,8 +12,54 @@ using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
 {
+    /// <summary>
+    /// Immutable weapon identity captured when MODEL_SKILL_WHEEL1 is created.
+    /// Main stores the primary equipped item in Owner->Weapon/WeaponLevel;
+    /// descendants must never switch BMD or material during the 25-tick echo.
+    /// </summary>
+    public readonly struct ClassicFxWheelWeaponSnapshot
+    {
+        public readonly string ModelPath;
+        public readonly int ItemGroup;
+        public readonly int ItemNumber;
+        public readonly int ItemLevel;
+        public readonly bool Excellent;
+        public readonly bool Ancient;
+
+        public bool IsValid => !string.IsNullOrWhiteSpace(ModelPath);
+
+        public ClassicFxWheelWeaponSnapshot(WeaponObject weapon, string modelPath)
+        {
+            ModelPath = modelPath;
+            ItemGroup = weapon.ItemGroup;
+            ItemNumber = weapon.ItemNumber;
+            ItemLevel = weapon.ItemLevel;
+            Excellent = weapon.IsExcellentItem;
+            Ancient = weapon.IsAncientItem;
+        }
+    }
+
     public sealed partial class ClassicFxRuntime
     {
+        private static ClassicFxWheelWeaponSnapshot CaptureS6SkillWheelWeapon(
+            ClassicFxOwner owner)
+        {
+            if (owner.WorldObject is not PlayerObject caster)
+                return default;
+
+            // ZzzCharacter.cpp: c->Weapon[0], not the secondary hand.
+            WeaponObject weapon = caster.Weapon1;
+            if (weapon?.Model == null || weapon.ItemNumber < 0)
+                return default;
+
+            // PlayerObject loads Weapon1.Model directly from the item
+            // definition's TexturePath; WeaponObject.Type is NOT updated
+            // in those flows, so ModelAssetPath can point at Sword01.bmd.
+            string path = !string.IsNullOrWhiteSpace(weapon.TexturePath)
+                ? weapon.TexturePath : weapon.ModelAssetPath;
+            return new ClassicFxWheelWeaponSnapshot(weapon, path);
+        }
+
         private bool MoveS6SkillWheel(ref EffectState e, float f)
         {
             if (e.Type == ClassicFxEffectType.SkillWheel1)
@@ -32,14 +78,15 @@ namespace Client.Main.ClassicFX.Core
                     {
                         CreateEffect(ClassicFxEffectType.SkillWheel2,
                             e.Position, e.Angle, e.Light, e.Owner,
-                            subType: tick - 1);
+                            subType: tick - 1,
+                            skillWheelWeapon: e.WheelWeapon);
                     }
                     e.LastChildNativeTick = index;
                 }
                 return true;
             }
 
-            if (e.Owner.WorldObject is not PlayerObject fighter ||
+            if (!e.WheelWeapon.IsValid ||
                 !TryGetOwnerSnapshot(e.Owner,
                     out ClassicFxOwnerSnapshot caster) ||
                 e.ModelView == null)
@@ -47,9 +94,7 @@ namespace Client.Main.ClassicFX.Core
 
             // Native rotation always uses the weapon captured at cast time;
             // the equipped-model echo carries that BMD and its materials.
-            bool spear = fighter.Weapon1?.Model != null
-                ? fighter.Weapon1.ItemGroup == 3
-                : fighter.Weapon2?.ItemGroup == 3;
+            bool spear = e.WheelWeapon.ItemGroup == 3;
             float rearOffset = spear ? -180f : -150f;
             Vector3 offset = Vector3.TransformNormal(
                 new Vector3(0f, rearOffset, 0f),
