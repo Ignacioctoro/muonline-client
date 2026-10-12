@@ -2187,6 +2187,7 @@ namespace Client.Main.ClassicFX.Core
         private readonly string _bmdPath;
         private readonly FuryQuakeUvDeformer _furyQuakeUvDeformer;
         private readonly bool _renderRagefulBlendOnLowQuality;
+        private readonly bool _nativeRagefulBmdLighting;
 
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
@@ -2232,6 +2233,10 @@ namespace Client.Main.ClassicFX.Core
         public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
         {
             _bmdPath = bmdPath;
+            _nativeRagefulBmdLighting =
+                type is ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
+                (type >= ClassicFxEffectType.FuryQuake1 &&
+                 type <= ClassicFxEffectType.FuryQuake8);
             _renderRagefulBlendOnLowQuality =
                 type is ClassicFxEffectType.FuryStrike or
                     ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
@@ -2293,6 +2298,20 @@ namespace Client.Main.ClassicFX.Core
             }
             else
             {
+                if (_nativeRagefulBmdLighting)
+                {
+                    // Fury Strike quakes, wave and tail render their actual BMD
+                    // textures. LightEnabled is disabled for the skill bridge;
+                    // without a native Light value CPU vertex colors become
+                    // black even though the BMD and its texture are loaded.
+                    // BlendMeshLight changes require a LIGHTING invalidation,
+                    // not just ModelObject's default MATERIAL invalidation.
+                    if (Vector3.DistanceSquared(Light, nativeLight) > 0.000001f ||
+                        MathF.Abs(BlendMeshLight - nativeBlendMeshLight) > 0.000001f)
+                        InvalidateBuffers(BufferFlagLighting);
+                    Light = nativeLight;
+                    Color = Color.White;
+                }
                 Scale = nativeScale;
                 Alpha = MathHelper.Clamp(nativeAlpha, 0f, 1f);
                 BlendMeshLight = nativeBlendMeshLight;
