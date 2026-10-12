@@ -115,16 +115,15 @@ namespace Client.Main.ClassicFX.Core
                 _ => 1f
             };
 
-            // RenderWheelWeapon updates Direction.Z, then adds it to the
-            // rendered weapon angle. Acceleration must accumulate across
-            // frames; using only Direction.Z skips nearly all its spin.
+            // RenderWheelWeapon() temporarily applies Direction.Z to Angle.Z
+            // and restores the stored angle after RenderPartObject(). Native
+            // acceleration accumulates in Direction, NOT in the render angle.
             e.Direction.Z -= MathHelper.ToRadians(30f) * f;
-            e.HeadAngle.Z += e.Direction.Z;
             e.ModelView.Position = e.Position +
                 new Vector3(0f, 0f, 100f * f);
             e.ModelView.Angle = new Vector3(
                 e.Angle.X, MathHelper.PiOver2,
-                e.Angle.Z + e.HeadAngle.Z);
+                e.Angle.Z + e.Direction.Z);
             e.ModelView.Light = RequestTerrainLight(e.Position.X,
                 e.Position.Y) + e.Light;
             e.ModelView.ApplyNativeRenderState(
