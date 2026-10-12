@@ -2505,6 +2505,5 @@ namespace Client.Main.ClassicFX.Core
             }
             await base.Load();
         }
-        }
     }
 }
