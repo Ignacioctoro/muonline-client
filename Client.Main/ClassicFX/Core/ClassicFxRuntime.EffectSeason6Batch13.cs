@@ -306,6 +306,17 @@ namespace Client.Main.ClassicFX.Core
                     Vector3.Zero, e.Light, ClassicFxOwner.None);
         }
 
+        // The original MU terrain height and the drawn terrain surface coincide.
+        // This MonoGame client's gameplay RequestTerrainHeight samples raw
+        // HeightMap.R, but its rendered mesh uses HeightMap.R * 1.5f and
+        // triangle interpolation. Ground-bound Fury sprites/BMDs must follow
+        // the *visible* surface or the original explosion is depth-occluded.
+        // This conversion is limited to Rageful visual anchors: do not
+        // change the game's terrain collision height or native +25/+3/+100.
+        private float RequestS6FuryVisualTerrainHeight(float x, float y) =>
+            World?.Terrain?.RequestTerrainRenderHeight(x, y) ??
+            RequestTerrainHeight(x, y);
+
         private void EmitS6FuryImpact(ref EffectState e, int effectIndex)
         {
             Vector3 impact = e.StartPosition;
@@ -319,7 +330,7 @@ namespace Client.Main.ClassicFX.Core
                 impact = e.Position + offset;
             }
 
-            impact.Z = RequestTerrainHeight(impact.X, impact.Y) + 25f;
+            impact.Z = RequestS6FuryVisualTerrainHeight(impact.X, impact.Y) + 25f;
             CreateParticle(ClassicTextureIds.BitmapExplotion,
                 impact, zero, Vector3.One, subType: 0, scale: 0.5f);
 
@@ -369,7 +380,7 @@ namespace Client.Main.ClassicFX.Core
                 Vector3 pos = impact + spread;
                 if (!IsS6FuryQuakeTileAllowed(pos, primary: true))
                     continue;
-                pos.Z = RequestTerrainHeight(pos.X, pos.Y) + quakeGroundOffset;
+                pos.Z = RequestS6FuryVisualTerrainHeight(pos.X, pos.Y) + quakeGroundOffset;
                 Vector3 tilt = new Vector3(
                     0f, 0f, MathHelper.ToRadians(45f + Random.Modulo(30) - 15f));
                 int pk = 40 + Random.Modulo(50);
@@ -435,7 +446,7 @@ namespace Client.Main.ClassicFX.Core
                     Vector3 point = locations[track];
                     if (!IsS6FuryQuakeTileAllowed(point, primary: false))
                         continue;
-                    point.Z = RequestTerrainHeight(point.X, point.Y) + quakeGroundOffset;
+                    point.Z = RequestS6FuryVisualTerrainHeight(point.X, point.Y) + quakeGroundOffset;
                     locations[track] = point;
 
                     Vector3 facing = new Vector3(0f, 0f,
