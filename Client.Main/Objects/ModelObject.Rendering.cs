@@ -185,6 +185,11 @@ namespace Client.Main.Objects
         // existing GPU draw-call optimization.
         protected virtual bool RenderBlendMeshOnLowQuality => false;
 
+        // Default depth is unchanged. A/B Plancrack diagnostic overrides
+        // this so we can distinguish terrain occlusion from small geometry.
+        protected virtual DepthStencilState GetBlendMeshDepthState() =>
+            GraphicsManager.ReadOnlyDepth;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected virtual bool IsBlendMesh(int mesh)
         {
@@ -606,7 +611,7 @@ namespace Client.Main.Objects
 
                     if (isBlendMesh)
                     {
-                        gd.DepthStencilState = GraphicsManager.ReadOnlyDepth;
+                        gd.DepthStencilState = GetBlendMeshDepthState();
                         depthStateChanged = true;
                     }
 
@@ -707,7 +712,7 @@ namespace Client.Main.Objects
 
                     if (isBlendMesh)
                     {
-                        gd.DepthStencilState = GraphicsManager.ReadOnlyDepth;
+                        gd.DepthStencilState = GetBlendMeshDepthState();
                         depthStateChanged = true;
                     }
 
