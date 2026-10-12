@@ -1548,6 +1548,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                 TargetPosition =
                                     targetPosition,
 
+                                IsAreaSkillAnimation = true,
+
                                 World =
                                     world
                             };
@@ -1621,6 +1623,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                             TargetPosition =
                                 targetPosition,
+
+                            IsAreaSkillAnimation = true,
 
                             World =
                                 world

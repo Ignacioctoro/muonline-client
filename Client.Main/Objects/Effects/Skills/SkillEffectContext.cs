@@ -29,6 +29,12 @@ namespace Client.Main.Objects.Effects.Skills
         public Vector3? TargetPosition { get; init; }
 
         /// <summary>
+        /// True only when invoked by a server 0x1E area animation.
+        /// Prevents dual visual casts when 0x19 also arrives.
+        /// </summary>
+        public bool IsAreaSkillAnimation { get; init; }
+
+        /// <summary>
         /// The world control where the effect will be spawned.
         /// </summary>
         public WalkableWorldControl World { get; init; }

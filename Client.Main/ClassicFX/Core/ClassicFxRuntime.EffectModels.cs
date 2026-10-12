@@ -59,10 +59,14 @@ namespace Client.Main.ClassicFX.Core
                 return true;
             }
 
-            // Main: these seven BMDs use the same MoveEffects dispatcher,
-            // but individual rotation directions and lifetime are preserved.
-            // Only subtype 0 is defined by native creation metadata.
-            if (subType != 0)
+            // Source ZzzCharacter.cpp calls the 2/22/222 Summoner casting
+            // models with subtype 1 and scale 0.6 for Weakness/Innovation.
+            // The other four casting BMDs only support subtype 0.
+            bool isDebuffModel = type is
+                ClassicFxEffectType.SummonerCasting2 or
+                ClassicFxEffectType.SummonerCasting22 or
+                ClassicFxEffectType.SummonerCasting222;
+            if (subType != 0 && !(subType == 1 && isDebuffModel))
                 return false;
 
             string path = type switch
@@ -80,7 +84,7 @@ namespace Client.Main.ClassicFX.Core
                 return false;
             definition = new AdditionalEffectModelDefinition(
                 path, type == ClassicFxEffectType.SummonerCasting4 ? 25f : 40f,
-                1f, 0f);
+                subType == 1 ? 0.6f : 1f, 0f);
             return true;
         }
 
