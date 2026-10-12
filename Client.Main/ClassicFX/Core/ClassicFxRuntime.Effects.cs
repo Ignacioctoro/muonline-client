@@ -1490,6 +1490,12 @@ namespace Client.Main.ClassicFX.Core
                 ReleaseEffect(handle);
                 return ClassicFxHandle.Invalid;
             }
+            // Native Fire Scream creates its FORCE joint and BLUE_BLUR
+            // particle at cast time, not after the BMD finishes loading.
+            // The joint subtype 7/20 can initialize without a loaded mesh;
+            // waiting for Ready could skip the entire 19-tick effect.
+            if (type == ClassicFxEffectType.DarkScream)
+                StartS6DarkScreamChildren(ref _effects[handle.Index]);
             // Native phase 1 is anchored at the target, where it emits
             // the grand crack, NightWater, particles and terrain flare.
             if (blowOfDestruction && subType == 0)
