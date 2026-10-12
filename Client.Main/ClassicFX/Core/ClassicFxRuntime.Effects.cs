@@ -2389,7 +2389,7 @@ namespace Client.Main.ClassicFX.Core
             _nativeKnightPlancrackLighting =
                 type is ClassicFxEffectType.KnightPlancrackA or
                     ClassicFxEffectType.KnightPlancrackB;
-            _strikeProbeGrand = StrikeDestructionCracksOnlyProbe &&
+            _strikeProbeGrand = ClassicFxRuntime.StrikeDestructionCracksOnlyProbe &&
                 type == ClassicFxEffectType.RaklionBossCrack;
             // Main ZzzObject.cpp sets BodyLight = Light * Alpha for
             // NightWater, both plancrack models and the grand crack.
