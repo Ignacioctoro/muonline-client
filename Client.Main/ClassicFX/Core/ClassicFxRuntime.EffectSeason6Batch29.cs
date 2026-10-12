@@ -314,16 +314,33 @@ namespace Client.Main.ClassicFX.Core
                                 subType: variant, scale: 0.6f);
                     }
                 }
-                if (tick == 30 && (e.TriggerMask & 1) == 0)
+                // Native Stinger: FLARE+1 subtype 18, blue-violet,
+                // scale 90, PKKey/lifetime 40, emitted from arrow bone 1.
+                // Previous code used the root and lifetime -1, so no trail.
+                if (tick >= 24 && (e.TriggerMask & 1) == 0 &&
+                    TryGetOwnerBonePosition(spriteOwner, 1,
+                        out Vector3 trailRoot))
                 {
-                    e.TriggerMask |= 1;
-                    CreateJoint(ClassicTextureIds.BitmapFlare + 1,
-                        e.Position, e.Position, e.Angle, 18,
-                        spriteOwner, 90f);
+                    ClassicFxHandle trail = CreateJoint(
+                        ClassicTextureIds.BitmapFlare + 1,
+                        trailRoot, trailRoot, e.Angle, subType: 18,
+                        target: spriteOwner, scale: 90f, pkKey: 40,
+                        priorColor: new Vector3(0.4f, 0.4f, 0.9f));
+                    if (trail.IsValid)
+                        e.TriggerMask |= 1;
                 }
             }
             else if (e.Type == ClassicFxEffectType.LaceArrowModel)
             {
+                // ZzzEffect.cpp CreateEffect: native Viper/LaceArrow
+                // FLARE+1 subtype 12, 40 scale, PKKey/lifetime 80.
+                if ((e.TriggerMask & 1) == 0 && spriteOwner.HasOwner)
+                {
+                    if (CreateJoint(ClassicTextureIds.BitmapFlare + 1,
+                        e.Position, e.Position, e.Angle, subType: 12,
+                        target: spriteOwner, scale: 40f, pkKey: 80).IsValid)
+                        e.TriggerMask |= 1;
+                }
                 if ((int)MathF.Ceiling(e.LifeTime) % 2 == 0)
                 {
                     for (int j = 0; j < 3; j++)

@@ -405,7 +405,7 @@ namespace Client.Main.ClassicFX.Core
                 if (e.Type == ClassicFxEffectType.ArrowRing)
                     CreateJoint(ClassicTextureIds.BitmapFlare + 1,
                         e.Position, e.Position, e.Angle, 15,
-                        carrier, 50f);
+                        carrier, 50f, pkKey: 40);
                 else
                     CreateJoint(ClassicTextureIds.BitmapJointEnergy,
                         e.Position, e.Position, e.Angle, 5,

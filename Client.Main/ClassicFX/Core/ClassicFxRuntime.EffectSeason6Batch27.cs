@@ -211,11 +211,11 @@ namespace Client.Main.ClassicFX.Core
         // Three blue/white flashes and three BITMAP_SPARK+1 joints per
         // shot; all use the shared Sprite/Joint pools (no WorldObjects).
         private void EmitS6MultiShotLaunchSparks(
-            Vector3 emitterPosition, PlayerObject caster)
+            Vector3 emitterPosition, PlayerObject caster,
+            Vector3 shotAngle)
         {
             ClassicFxOwner owner = ClassicFxOwner.FromWorldObject(caster);
             Vector3 shotOrigin = caster.WorldPosition.Translation;
-            Vector3 shotAngle = caster.TotalAngle;
             Vector3 blue = new Vector3(0.2f, 0.3f, 1f);
 
             for (int i = 0; i < 3; ++i)
@@ -266,11 +266,6 @@ namespace Client.Main.ClassicFX.Core
                             if ((e.TriggerMask & bit) == 0)
                             {
                                 e.TriggerMask |= (byte)bit;
-                                // Original Move_MODEL_BLADE_SKILL emits two
-                                // crossed shiny sprites and one spark trail
-                                // three times, before calling CreateArrow.
-                                EmitS6MultiShotLaunchSparks(
-                                    e.Position, caster);
                                 if (ElfArrowSkillEffect.TryGetArrowModel(
                                         caster, out ClassicFxEffectType arrowType,
                                         out _))
@@ -294,6 +289,10 @@ namespace Client.Main.ClassicFX.Core
                                     };
                                     Vector3 shotAngle = caster.TotalAngle;
                                     shotAngle.Z += MathHelper.ToRadians(spread);
+                                    // Native spark joints are fired with
+                                    // this arrow's spread, not base facing.
+                                    EmitS6MultiShotLaunchSparks(
+                                        e.Position, caster, shotAngle);
                                     CreateEffect(arrowType,
                                         caster.WorldPosition.Translation,
                                         shotAngle, Vector3.One,

@@ -231,7 +231,8 @@ namespace Client.Main.ClassicFX.Core
                 if (e.SubType == 1)
                     CreateJoint(ClassicTextureIds.BitmapFlare + 1,
                         e.Position, e.Position, e.Angle, 13,
-                        ClassicFxOwner.FromWorldObject(e.ModelView), 20f);
+                        ClassicFxOwner.FromWorldObject(e.ModelView),
+                        20f, pkKey: 40);
             }
             AdvanceS6Arrow(ref e, f);
             e.Angle.Y += MathHelper.ToRadians(e.SubType == 1 ? 60f : 30f) * f;
