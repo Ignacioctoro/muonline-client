@@ -30,6 +30,11 @@ namespace Client.Main.Graphics
         private float _shakeElapsed;
         private readonly Random _shakeRng = new();
 
+        // Main's global EarthQuake is an additive CAMERA PITCH (degrees),
+        // independent of the modern positional screen shake.
+        // Scope this bridge to MODEL_SKILL_FURY_STRIKE + 1 only.
+        private float _nativeFuryStrikePitchDegrees;
+
         // Public Properties
         public float AspectRatio
         {
@@ -104,12 +109,39 @@ namespace Client.Main.Graphics
         }
 
         /// <summary>
+        /// Main ZzzEffect.cpp MODEL_SKILL_FURY_STRIKE + 1 writes EarthQuake
+        /// as (rand()%8 - 4) * 0.1f. DefaultCamera::SetCameraAngle applies
+        /// that value to pitch, not to camera position.
+        /// </summary>
+        public void SetNativeFuryStrikePitch(float pitchDegrees)
+        {
+            if (!float.IsFinite(pitchDegrees))
+                return;
+            _nativeFuryStrikePitchDegrees = pitchDegrees;
+            UpdateView();
+        }
+
+        /// <summary>
         /// Call once per frame from the main update loop to advance shake timer.
         /// </summary>
         public void UpdateShake(float dt)
         {
+            // MainScene::InitializeSceneFrame does EarthQuake *= 0.2f.
+            // Keep the 25-FPS reference decay stable at other frame rates.
+            bool furyPitchChanged = _nativeFuryStrikePitchDegrees != 0f;
+            if (furyPitchChanged)
+            {
+                _nativeFuryStrikePitchDegrees *=
+                    MathF.Pow(0.2f, MathF.Max(0f, dt) * 25f);
+                if (MathF.Abs(_nativeFuryStrikePitchDegrees) < 0.00001f)
+                    _nativeFuryStrikePitchDegrees = 0f;
+            }
             if (_shakeTimeLeft <= 0f)
+            {
+                if (furyPitchChanged)
+                    UpdateView();
                 return;
+            }
 
             _shakeElapsed += dt;
             _shakeTimeLeft -= dt;
@@ -153,6 +185,26 @@ namespace Client.Main.Graphics
                 var offset = new Vector3(ox, oy, oz);
                 pos += offset;
                 tgt += offset;
+            }
+
+            if (_nativeFuryStrikePitchDegrees != 0f)
+            {
+                // Native DefaultCamera modifies angle[0] after establishing
+                // the camera position. Rotate forward around its local right
+                // axis: position stays fixed, unlike Camera.Shake().
+                Vector3 forward = tgt - pos;
+                if (forward.LengthSquared() > 0.00001f)
+                {
+                    Vector3 right = Vector3.Cross(Vector3.Normalize(forward),
+                        Vector3.UnitZ);
+                    if (right.LengthSquared() > 0.00001f)
+                    {
+                        right.Normalize();
+                        tgt = pos + Vector3.Transform(forward,
+                            Matrix.CreateFromAxisAngle(right,
+                                MathHelper.ToRadians(-_nativeFuryStrikePitchDegrees)));
+                    }
+                }
             }
 
             Vector3 cameraDirection = Vector3.Normalize(tgt - pos);

@@ -7,6 +7,7 @@ using System;
 using Client.Data.ATT;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Controllers;
+using Client.Main.Graphics;
 using Client.Main.Worlds;
 using Microsoft.Xna.Framework;
 
@@ -100,7 +101,12 @@ namespace Client.Main.ClassicFX.Core
                     e.BlendMeshLight = life * 0.1f / 3f;
                     if (life < 10f)
                         e.Position.Z -= 0.5f * f;
-                    // Native subtype 1 camera earthquake belongs to camera.
+                    // Native EarthQuake occurs on the unowned quake +1,
+                    // while LifeTime > 15 and integer LifeTime is divisible by 3.
+                    if (n == 1 && life > 15f &&
+                        ((int)life % 3) == 0 && Clock.AdvancedReferenceFrame)
+                        Camera.Instance.SetNativeFuryStrikePitch(
+                            (Random.Modulo(8) - 4) * 0.1f);
                     return true;
 
                 case 3:
