@@ -2271,7 +2271,7 @@ namespace Client.Main.ClassicFX.Core
             var previousDepth = device.DepthStencilState;
             try
             {
-                device.DepthStencilState = Client.Main.Graphics.GraphicsManager.ReadOnlyDepth;
+                device.DepthStencilState = Client.Main.Controllers.GraphicsManager.ReadOnlyDepth;
                 base.DrawModel(true);
             }
             finally
