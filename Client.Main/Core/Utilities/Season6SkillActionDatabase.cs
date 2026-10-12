@@ -306,6 +306,29 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerAttackSkillWheel);
 
+            // ClassAttack.cpp: strengthened, mastery and MG variations
+            // share the original PLAYER_ATTACK_SKILL_WHEEL action.
+            Add(
+                330,
+                "Strengthened Twisting Slash",
+                SkillType.Area,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackSkillWheel);
+
+            Add(
+                332,
+                "Twisting Slash Mastery",
+                SkillType.Area,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackSkillWheel);
+
+            Add(
+                481,
+                "Strengthened Twisting Slash MG",
+                SkillType.Area,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackSkillWheel);
+
             Add(
                 42,
                 "Rageful Blow",
