@@ -387,6 +387,9 @@ namespace Client.Main.ClassicFX.Core
 
             for (int step = 0; step < 4; step++)
             {
+                // Native chooses one segment length per step, reused across
+                // all five crack tracks; not one random length per track.
+                float stepLength = Random.Modulo(15) + 85f;
                 bool positive = step == 3
                     ? Random.Modulo(2) == 0
                     : (step & 1) == 0;
@@ -399,7 +402,7 @@ namespace Client.Main.ClassicFX.Core
                         headings[track] + track *
                         (Random.Modulo(10) + 62f));
                     locations[track] += Vector3.TransformNormal(
-                        new Vector3(0f, Random.Modulo(15) + 85f, 0f),
+                        new Vector3(0f, stepLength, 0f),
                         Matrix.CreateRotationZ(angle));
                     Vector3 point = locations[track];
                     if (!IsS6FuryQuakeTileAllowed(point, primary: false))
