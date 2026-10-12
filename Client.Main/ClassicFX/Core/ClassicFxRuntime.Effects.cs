@@ -2216,13 +2216,14 @@ namespace Client.Main.ClassicFX.Core
         private readonly bool _renderRagefulBlendOnLowQuality;
         private readonly bool _nativeRagefulBmdLighting;
         private readonly bool _nativeKnightPlancrackLighting;
+        private readonly bool _nativeDestructionBmdLighting;
         private bool _nativeRagefulStoneLighting;
 
         private bool NeedsRagefulBmdLighting =>
             _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
 
         private bool NeedsNativeBmdLighting =>
-            NeedsRagefulBmdLighting || _nativeKnightPlancrackLighting;
+            NeedsRagefulBmdLighting || _nativeDestructionBmdLighting;
 
         public void EnableNativeFuryStoneLighting(in Vector3 light)
         {
@@ -2311,6 +2312,11 @@ namespace Client.Main.ClassicFX.Core
             _nativeKnightPlancrackLighting =
                 type is ClassicFxEffectType.KnightPlancrackA or
                     ClassicFxEffectType.KnightPlancrackB;
+            // Main ZzzObject.cpp sets BodyLight = Light * Alpha for
+            // NightWater, both plancrack models and the grand crack.
+            _nativeDestructionBmdLighting = _nativeKnightPlancrackLighting ||
+                type is ClassicFxEffectType.NightWater01 or
+                    ClassicFxEffectType.RaklionBossCrack;
             if (_nativeKnightPlancrackLighting)
                 _knightPlancrackUvDeformer = new KnightPlancrackUvDeformer();
             // The native wheel uses RenderPartObject for the equipped
@@ -2321,7 +2327,7 @@ namespace Client.Main.ClassicFX.Core
                     ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&
                  type <= ClassicFxEffectType.FuryQuake8) ||
-                _nativeKnightPlancrackLighting;
+                _nativeDestructionBmdLighting;
             if (type is ClassicFxEffectType.FuryQuake2 or
                 ClassicFxEffectType.FuryQuake5 or
                 ClassicFxEffectType.FuryQuake8)
@@ -2330,15 +2336,22 @@ namespace Client.Main.ClassicFX.Core
                 type == ClassicFxEffectType.DarkLordSkill;
             IsTransparent = true;
             AffectedByTransparency = true;
-            BlendState = BlendState.Additive;
-            BlendMesh = _nativeKnightPlancrackLighting ? 1 : 0;
+            // Native plancrack: textured non-blend meshes and additive mesh 1.
+            // NightWater/Raklion keep native BlendMesh=-1 (not generic mesh 0).
+            BlendState = _nativeKnightPlancrackLighting
+                ? BlendState.AlphaBlend : BlendState.Additive;
+            BlendMesh = _nativeKnightPlancrackLighting ? 1 :
+                _nativeDestructionBmdLighting ? -1 : 0;
             BlendMeshLight = 1f;
             DepthState = DepthStencilState.DepthRead;
             RenderShadow = false;
             LightEnabled = false;
             UseSunLight = false;
             ContinuousAnimation = !_useDarkLordModelProfile;
-            AnimationSpeed = 25f;
+            // MuMain ZzzOpenData.cpp assigns Actions[0].PlaySpeed = 0.3f
+            // to knight_plancrack A/B. It is not stored in the BMD itself.
+            // Native 25Hz reference: 0.3 * 25 = 7.5 animation keys/sec.
+            AnimationSpeed = _nativeKnightPlancrackLighting ? 7.5f : 25f;
             Color = type == ClassicFxEffectType.SwellOfMagicPower
                 ? new Color(0.7f, 0.4f, 0.9f)
                 : new Color(0.2f, 0.2f, 0.9f);
@@ -2380,7 +2393,8 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (NeedsNativeBmdLighting)
                 {
-                    // Fury Strike and Strike of Destruction render their actual BMD
+                    // Fury Strike and all four Strike of Destruction children
+                    // render their original BMD using native blue illumination.
                     // textures. LightEnabled is disabled for the skill bridge;
                     // without a native Light value CPU vertex colors become
                     // black even though the BMD and its texture are loaded.

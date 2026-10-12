@@ -30,9 +30,11 @@ namespace Client.Main.ClassicFX.Core
                         useCallerScale: true);
                     return true;
                 case ClassicFxEffectType.KnightPlancrackB:
+                    // MuMain EffectTypes.json: +15 * FPS_ANIMATION_FACTOR
+                    // and +90 degrees * FPS_ANIMATION_FACTOR at creation.
                     definition = new Season6ModelDefinition(
                         "Effect/knight_plancrack_b.bmd", 25f, 1f,
-                        useCallerScale: true);
+                        offsetZ: 15f, useCallerScale: true);
                     return true;
                 case ClassicFxEffectType.RaklionBossCrack:
                     // The original scale is caller Scale + 1, not a
@@ -51,6 +53,8 @@ namespace Client.Main.ClassicFX.Core
         {
             if (type == ClassicFxEffectType.NightWater01)
                 angle.Z = MathHelper.ToRadians(Random.Modulo(360));
+            else if (type == ClassicFxEffectType.KnightPlancrackB)
+                angle.Z += MathHelper.ToRadians(90f * Clock.FrameFactor);
             else if (type == ClassicFxEffectType.RaklionBossCrack)
                 angle.Z = MathHelper.ToRadians(Random.Modulo(360));
         }
