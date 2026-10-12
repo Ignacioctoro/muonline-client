@@ -40,6 +40,11 @@ namespace Client.Main.Objects.Player
         public bool IsRightHand { get; set; }
         public string TexturePath { get; set; }
 
+        // The same BMD path used by the equipped weapon renderer.
+        // ClassicFX weapon echoes must not guess a path from TexturePath,
+        // which is not the BMD source loaded by OnChangeTypeAsync().
+        public string ModelAssetPath => GetWeaponPath(Type);
+
         // Set only by BuffVisualManager from server 0x07/0x1B status.
         // Uses the existing ModelObject material passes; no extra emitter.
         public bool InfinityArrowBuffActive { get; set; }

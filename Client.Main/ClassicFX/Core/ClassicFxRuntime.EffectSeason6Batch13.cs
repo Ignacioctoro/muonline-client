@@ -5,6 +5,7 @@
 // pools only. No second mesh renderer, no damage or network logic.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Controllers;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -195,6 +196,7 @@ namespace Client.Main.ClassicFX.Core
                 {
                     e.TriggerMask |= 1;
                     EmitS6FuryTails(ref e);
+                    SoundController.Instance.PlayBuffer("Sound/eRageBlow_2.wav");
                 }
                 if (e.LifeTime <= 11f && (e.TriggerMask & 2) == 0)
                 {
@@ -205,6 +207,7 @@ namespace Client.Main.ClassicFX.Core
                 {
                     e.TriggerMask |= 4;
                     EmitS6FuryOutwardCracks(ref e);
+                    SoundController.Instance.PlayBuffer("Sound/eRageBlow_3.wav");
                     return false;
                 }
             }
@@ -230,6 +233,17 @@ namespace Client.Main.ClassicFX.Core
             e.Position = e.StartPosition +
                 Vector3.TransformNormal(e.Direction, head);
             e.Position.Z += e.Gravity + 200f;
+            if (e.ModelView != null)
+            {
+                // Native RenderFuryStrike() shows the equipped weapon only
+                // before the impact. Keep it synchronized with the exact
+                // ClassicFX motion state: never run a second weapon animator.
+                e.ModelView.Hidden = e.SubType != 0 || e.LifeTime <= 10f;
+                e.ModelView.Position = e.Position;
+                e.ModelView.Angle = e.Angle;
+                e.ModelView.ApplyNativeRenderState(
+                    e.Scale, e.Alpha, e.BlendMeshLight, e.Light);
+            }
             return true;
         }
 

@@ -1182,6 +1182,17 @@ namespace Client.Main.ClassicFX.Core
                 life = 20f;
                 InitializeS6FuryStrike(ref angle,
                     ref effectHeading, ref effectGravity);
+                // RenderFuryStrike draws the caster's equipped weapon for
+                // native Kind 0 while LifeTime > 10. Use the existing BMD
+                // model-view renderer, not an invented 'Fury Strike' mesh.
+                if (subType == 0 && owner.WorldObject is PlayerObject fighter)
+                {
+                    WeaponObject equipped =
+                        fighter.Weapon1?.Model != null ? fighter.Weapon1 :
+                        fighter.Weapon2?.Model != null ? fighter.Weapon2 : null;
+                    if (equipped != null)
+                        modelPath = equipped.ModelAssetPath;
+                }
             }
             else if (s6Batch35Logical)
             {
@@ -1303,6 +1314,24 @@ namespace Client.Main.ClassicFX.Core
                     ConfigureS6Batch12ModelView(view, type, subType);
                 if (IsS6Batch13QuakeType(type))
                     ConfigureS6Batch13ModelView(view, type, subType);
+                if (furyStrike && owner.WorldObject is PlayerObject fighter)
+                {
+                    WeaponObject weapon =
+                        fighter.Weapon1?.Model != null ? fighter.Weapon1 :
+                        fighter.Weapon2?.Model != null ? fighter.Weapon2 : null;
+                    if (weapon != null)
+                    {
+                        view.ItemLevel = weapon.ItemLevel;
+                        view.IsExcellentItem = weapon.IsExcellentItem;
+                        view.IsAncientItem = weapon.IsAncientItem;
+                        view.BlendMesh = -2;
+                        view.BlendState = BlendState.AlphaBlend;
+                        view.BlendMeshState = BlendState.AlphaBlend;
+                        view.Color = Color.White;
+                        view.Light = Vector3.One;
+                        view.ContinuousAnimation = false;
+                    }
+                }
                 if (IsS6Batch15ModelType(type))
                     ConfigureS6Batch15ModelView(view, type, subType);
                 if (IsS6Batch16ModelType(type))
