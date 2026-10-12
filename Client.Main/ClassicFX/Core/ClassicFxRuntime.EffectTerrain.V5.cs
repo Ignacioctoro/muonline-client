@@ -4,6 +4,7 @@
 // Uses the shared terrain tessellator in ClassicFxRuntime.Effects.cs.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.ClassicFX.Rendering;
 using Client.Main.Objects;
 using Microsoft.Xna.Framework;
 
