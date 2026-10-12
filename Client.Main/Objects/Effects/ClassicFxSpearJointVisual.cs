@@ -2,7 +2,6 @@ using System;
 using Client.Main.ClassicFX.Core;
 using Client.Main.ClassicFX.Primitives;
 using Client.Main.Graphics;
-using Client.Main.ClassicFX.Primitives;
 using Client.Main.Controllers;
 using Client.Main.Models;
 using Client.Main.Objects.Player;
@@ -27,6 +26,8 @@ namespace Client.Main.Objects.Effects
         private int _diagnosticFrames;
         private int _createdJoints;
         private bool _diagnosticEmitted;
+        private int _runtimeFrameSamples;
+        private float _stableFrameFactor;
 
         public PlayerObject Owner => _owner;
         public int SubType => _subType;
@@ -77,8 +78,11 @@ namespace Client.Main.Objects.Effects
                 _diagnosticFrames = 0;
                 _createdJoints = 0;
                 _diagnosticEmitted = false;
+                _runtimeFrameSamples = 0;
+                _stableFrameFactor = 0f;
             }
             EnsureJoints();
+            RefreshPersistentTailCapacity();
             DiagnoseTailHistoryOnce();
         }
 
@@ -116,6 +120,38 @@ namespace Client.Main.Objects.Effects
             {
                 _logged = true;
                 Console.WriteLine($"[ClassicFX] SPEARSKILL {_subType}: {created} joints nuevos");
+            }
+        }
+
+        // The first frames after a warp can be slow while the world loads.
+        // CreateJoint takes MaxTails = 30 / FrameFactor at creation time;
+        // if that one frame is slow, an otherwise fast client gets a
+        // permanently tiny trail. Follow the settled frame factor instead,
+        // extending only these persistent auras' preallocated histories.
+        private void RefreshPersistentTailCapacity()
+        {
+            if (_runtime == null || _runtime.IsDisposed)
+                return;
+
+            float sample = _runtime.Clock.FrameFactor;
+            if (!float.IsFinite(sample) || sample <= 0f)
+                return;
+
+            if (_runtimeFrameSamples == 0)
+                _stableFrameFactor = sample;
+            else
+                _stableFrameFactor += (sample - _stableFrameFactor) * 0.2f;
+            _runtimeFrameSamples++;
+
+            // Allow startup spikes to decay before changing tail capacity.
+            // Recheck only every eight frames; no allocations or logging.
+            if (_runtimeFrameSamples < 12 || (_runtimeFrameSamples % 8) != 0)
+                return;
+
+            for (int i = 0; i < _handles.Length; i++)
+            {
+                if (_handles[i].IsValid)
+                    _runtime.GrowPersistentSpearTrail(_handles[i], _stableFrameFactor);
             }
         }
 

@@ -221,6 +221,31 @@ namespace Client.Main.ClassicFX.Core
             return true;
         }
 
+        /// <summary>
+        /// Long-lived MODEL_SPEARSKILL aura trails must not remain sized
+        /// from a single slow world-loading frame. Original base MaxTails=30;
+        /// increase the preallocated trail history when the frame rate
+        /// stabilizes. Only persistent subtypes 0/4/9 are eligible.
+        /// </summary>
+        public void GrowPersistentSpearTrail(ClassicFxHandle handle, float stableFrameFactor)
+        {
+            if (_disposed || !Enabled ||
+                handle.Kind != ClassicFxPoolKind.Joint ||
+                !Pools.Joints.IsAlive(handle) ||
+                !float.IsFinite(stableFrameFactor) || stableFrameFactor <= 0f)
+                return;
+
+            ref ClassicJoint joint = ref _joints[handle.Index];
+            if (joint.Type != ClassicModelSpearSkill ||
+                (joint.SubType != 0 && joint.SubType != 4 && joint.SubType != 9))
+                return;
+
+            int capacity = Math.Clamp((int)(30f / stableFrameFactor),
+                30, ClassicJoint.MaxTailSegments);
+            if (capacity > joint.MaxTails)
+                joint.MaxTails = capacity;
+        }
+
         public bool ReleaseJoint(ClassicFxHandle handle)
         {
             if (handle.Kind != ClassicFxPoolKind.Joint ||
