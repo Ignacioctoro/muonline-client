@@ -2244,6 +2244,42 @@ namespace Client.Main.ClassicFX.Core
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
 
+        // MODEL_NIGHTWATER_01, MODEL_KNIGHT_PLANCRACK_A/B and
+        // MODEL_RAKLION_BOSS_CRACKEFFECT are all rendered by native
+        // RenderBody(RENDER_TEXTURE | RENDER_BRIGHT), for EVERY mesh.
+        // In ModelObject the non-blend pass writes to the depth buffer.
+        // Grandmark mesh 0 would therefore mask the coplanar bright
+        // lines2.jpg mesh 1, hiding the persistent blue floor cracks.
+        // Treat the entire four native BMDs as translucent additive
+        // geometry. Rageful Blow and all other model types remain as is.
+        protected override bool IsBlendMesh(int mesh) =>
+            _nativeDestructionBmdLighting || base.IsBlendMesh(mesh);
+
+        public override void DrawModel(bool isAfterDraw)
+        {
+            if (!_nativeDestructionBmdLighting || !isAfterDraw)
+            {
+                base.DrawModel(isAfterDraw);
+                return;
+            }
+
+            // Even the fast grouped DrawMeshFastAlpha path must keep depth
+            // testing but NEVER write depth for bright floor effects.
+            // DrawMesh() already uses this state for blend meshes; this
+            // closes the accelerated grouped path for the whole BMD.
+            var device = GraphicsDevice;
+            var previousDepth = device.DepthStencilState;
+            try
+            {
+                device.DepthStencilState = Client.Main.Graphics.GraphicsManager.ReadOnlyDepth;
+                base.DrawModel(true);
+            }
+            finally
+            {
+                device.DepthStencilState = previousDepth;
+            }
+        }
+
         // The original quakes 2, 5 and 8 scroll the UV of BlendMesh 0.
         // Per-instance deformer avoids modifying the shared BMD resource.
         private sealed class FuryQuakeUvDeformer : IVertexDeformer, IMeshTexCoordDeformer
