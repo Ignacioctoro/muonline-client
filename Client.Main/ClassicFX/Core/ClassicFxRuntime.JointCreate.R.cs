@@ -27,6 +27,10 @@ namespace Client.Main.ClassicFX.Core
                     j.InitializeFirstTail();
                     return InitializeJointSparkR(ref j, sourceScale);
 
+                case ClassicTextureIds.BitmapSpark + 1:
+                    j.InitializeFirstTail();
+                    return InitializeSparkPlusOneR(ref j, sourceScale);
+
                 case ClassicTextureIds.BitmapSmoke:
                     j.InitializeFirstTail();
                     return InitializeJointSmokeR(ref j, sourceScale);
@@ -39,6 +43,35 @@ namespace Client.Main.ClassicFX.Core
                 default:
                     return false;
             }
+        }
+
+        // ZzzEffectJoint.cpp CreateJoint(BITMAP_SPARK + 1).
+        // Its motion is already ported in MoveSparkPlusOneJointD.
+        private bool InitializeSparkPlusOneR(
+            ref ClassicJoint j, float sourceScale)
+        {
+            j.LifeTime = 100f;
+            j.MaxTails = 20;
+            j.Scale = 10f;
+            if (j.SubType == 0)
+            {
+                j.Direction.Z = R(20) + 35f;
+                j.Scale = R(20) + 20f;
+                j.LifeTime = 25f;
+            }
+            else if (j.SubType == 1)
+            {
+                j.Scale = sourceScale;
+                j.Velocity = R(55) + 14f;
+                j.LifeTime = R(10) + 8f;
+                j.MaxTails = 4;
+            }
+            else
+                return false;
+
+            j.Light = Vector3.One;
+            j.TargetPosition = j.Position;
+            return true;
         }
 
         private bool InitializeJointSparkR(ref ClassicJoint j, float sourceScale)

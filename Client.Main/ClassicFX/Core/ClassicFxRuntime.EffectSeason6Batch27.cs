@@ -207,6 +207,37 @@ namespace Client.Main.ClassicFX.Core
             return false;
         }
 
+        // MuMain MoveHandlers.cpp: Move_MODEL_BLADE_SKILL subtype 1.
+        // Three blue/white flashes and three BITMAP_SPARK+1 joints per
+        // shot; all use the shared Sprite/Joint pools (no WorldObjects).
+        private void EmitS6MultiShotLaunchSparks(
+            Vector3 emitterPosition, PlayerObject caster)
+        {
+            ClassicFxOwner owner = ClassicFxOwner.FromWorldObject(caster);
+            Vector3 shotOrigin = caster.WorldPosition.Translation;
+            Vector3 shotAngle = caster.TotalAngle;
+            Vector3 blue = new Vector3(0.2f, 0.3f, 1f);
+
+            for (int i = 0; i < 3; ++i)
+            {
+                Vector3 flashAt = emitterPosition;
+                flashAt.Y += Random.Modulo(200) - 100f;
+                flashAt.Z += Random.Modulo(200) - 100f;
+                CreateSprite(ClassicTextureIds.BitmapShiny + 1,
+                    flashAt, (Random.Modulo(8) + 8f) * 0.2f,
+                    blue, owner, rotation: Random.Modulo(360));
+                CreateSprite(ClassicTextureIds.BitmapShiny + 1,
+                    flashAt, (Random.Modulo(8) + 8f) * 0.07f,
+                    Vector3.One, owner, rotation: Random.Modulo(360));
+
+                Vector3 sparkAt = shotOrigin;
+                sparkAt.Z += Random.Modulo(80) - 40f + 200f;
+                CreateJointFpsChecked(ClassicTextureIds.BitmapSpark + 1,
+                    sparkAt, sparkAt, shotAngle, subType: 1,
+                    target: owner, scale: 18.7f);
+            }
+        }
+
         private bool MoveS6Batch27Model(ref EffectState e, float f)
         {
             if (e.Type == ClassicFxEffectType.BladeSkillModel)
@@ -235,6 +266,11 @@ namespace Client.Main.ClassicFX.Core
                             if ((e.TriggerMask & bit) == 0)
                             {
                                 e.TriggerMask |= (byte)bit;
+                                // Original Move_MODEL_BLADE_SKILL emits two
+                                // crossed shiny sprites and one spark trail
+                                // three times, before calling CreateArrow.
+                                EmitS6MultiShotLaunchSparks(
+                                    e.Position, caster);
                                 if (ElfArrowSkillEffect.TryGetArrowModel(
                                         caster, out ClassicFxEffectType arrowType,
                                         out _))
@@ -267,8 +303,6 @@ namespace Client.Main.ClassicFX.Core
                             }
                         }
                     }
-                    // Native also emits shiny sprites and spark joints at
-                    // each tick; these remain separate from actual arrows.
                     // Combat facing and server damage remain untouched.
                 }
                 return true;
