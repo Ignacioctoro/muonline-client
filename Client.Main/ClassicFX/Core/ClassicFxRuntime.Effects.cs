@@ -1340,6 +1340,10 @@ namespace Client.Main.ClassicFX.Core
                 if (type == ClassicFxEffectType.SkillWheel2 &&
                     wheelSnapshot.IsValid)
                 {
+                    // Weapon1.Model is already loaded at equip time. Reuse
+                    // that exact BMD instead of scheduling five asynchronous
+                    // loads that may finish after the one-second wheel fades.
+                    view.Model = wheelSnapshot.LoadedModel;
                     view.ItemGroup = wheelSnapshot.ItemGroup;
                     view.ItemNumber = wheelSnapshot.ItemNumber;
                     view.ItemLevel = wheelSnapshot.ItemLevel;
@@ -2352,7 +2356,8 @@ namespace Client.Main.ClassicFX.Core
         {
             try
             {
-                Model = await BMDLoader.Instance.Prepare(_bmdPath);
+                if (Model == null)
+                    Model = await BMDLoader.Instance.Prepare(_bmdPath);
             }
             catch (Exception ex)
             {
