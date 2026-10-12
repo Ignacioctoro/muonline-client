@@ -6,6 +6,7 @@
 // JOINT_SPARK trails, SPARK particles, BITMAP_LIGHT and terrain lights.
 // This contains no collision, damage, input, or packet handling.
 using System;
+using Client.Data.BMD;
 using Client.Main.ClassicFX.Data;
 using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
@@ -20,17 +21,20 @@ namespace Client.Main.ClassicFX.Core
     public readonly struct ClassicFxWheelWeaponSnapshot
     {
         public readonly string ModelPath;
+        public readonly BMD LoadedModel;
         public readonly int ItemGroup;
         public readonly int ItemNumber;
         public readonly int ItemLevel;
         public readonly bool Excellent;
         public readonly bool Ancient;
 
-        public bool IsValid => !string.IsNullOrWhiteSpace(ModelPath);
+        public bool IsValid => LoadedModel != null &&
+            !string.IsNullOrWhiteSpace(ModelPath);
 
         public ClassicFxWheelWeaponSnapshot(WeaponObject weapon, string modelPath)
         {
             ModelPath = modelPath;
+            LoadedModel = weapon.Model;
             ItemGroup = weapon.ItemGroup;
             ItemNumber = weapon.ItemNumber;
             ItemLevel = weapon.ItemLevel;
