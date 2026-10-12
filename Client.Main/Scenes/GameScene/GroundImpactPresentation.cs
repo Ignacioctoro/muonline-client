@@ -64,7 +64,7 @@ namespace Client.Main.Scenes
                 _casts.RemoveAt(i);
             }
 
-            int actionIndex = caster.CurrentAction;
+            int actionIndex = (int)caster.CurrentAction;
             var actions = caster.Model?.Actions;
             if (actions != null && actionIndex >= 0 &&
                 actionIndex < actions.Length && actions[actionIndex] != null)
@@ -92,7 +92,7 @@ namespace Client.Main.Scenes
             {
                 GroundCast cast = _casts[i];
                 if (ReferenceEquals(cast.Caster, hero) &&
-                    cast.SkillId == skillId && hero.CurrentAction == cast.Action &&
+                    cast.SkillId == skillId && (int)hero.CurrentAction == cast.Action &&
                     now - cast.StartedMs <= MaximumImpactWaitMs)
                     return true;
             }
@@ -177,7 +177,7 @@ namespace Client.Main.Scenes
             if (now - cast.StartedMs >= MaximumImpactWaitMs ||
                 cast.Caster.Status == GameControlStatus.Disposed ||
                 cast.Caster.IsDead ||
-                cast.Caster.CurrentAction != cast.Action)
+                (int)cast.Caster.CurrentAction != cast.Action)
                 return true;
 
             // Allow at least one animation update following PlayAction.
