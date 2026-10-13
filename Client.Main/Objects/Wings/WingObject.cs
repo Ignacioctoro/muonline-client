@@ -568,6 +568,8 @@ namespace Client.Main.Objects.Wings
             Model =
                 resolvedModel;
 
+            // The state must include both S2 capes. Without this, the
+            // per-frame S2 mesh suppression in Draw() is never reached.
             ApplyClassicCapeState(
                 resolvedModel == null
                     ? (short)-1
@@ -575,7 +577,11 @@ namespace Client.Main.Objects.Wings
                         ? EmperorCapeItemIndex
                         : isOverruleCape
                             ? OverruleCapeItemIndex
-                            : (short)-1);
+                            : requestedItemIndex == LordCapeItemIndex
+                                ? LordCapeItemIndex
+                                : requestedItemIndex == FighterCapeItemIndex
+                                    ? FighterCapeItemIndex
+                                    : (short)-1);
 
             if (isOverruleCape && resolvedModel != null)
                 EnsureOverruleCapeCloth();
