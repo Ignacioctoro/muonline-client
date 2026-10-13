@@ -43,6 +43,13 @@ namespace Client.Main.Objects
         public string SummonerName { get; internal set; }
 
         /// <summary>
+        /// An OpenMU C2 1F summon. The classic Main classifies these
+        /// creatures as KIND_PLAYER for target selection, even though
+        /// NeffisDev renders them using MonsterObject.
+        /// </summary>
+        public bool IsPlayerSummon => !string.IsNullOrWhiteSpace(SummonerName);
+
+        /// <summary>
         /// Set of mesh indices that should NOT use blending (equivalent to NoneBlendMesh = true in original code).
         /// </summary>
         public HashSet<int> NoneBlendMeshes { get; set; } = new HashSet<int>();
