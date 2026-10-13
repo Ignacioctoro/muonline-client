@@ -487,6 +487,7 @@ namespace Client.Main.Objects.Wings
                 // Existing compatibility fallback for the old cape.
                 //
                 if (resolvedModel == null &&
+                    requestedItemIndex != LordCapeItemIndex &&
                     normalized.EndsWith(
                         "DarkLordRobe.bmd",
                         StringComparison.OrdinalIgnoreCase))
