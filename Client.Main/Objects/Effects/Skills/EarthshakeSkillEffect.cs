@@ -2,7 +2,6 @@
 // GOBoid.cpp RenderDarkHorseSkill / MoveMount(MODEL_DARK_HORSE).
 // No additional renderer: native resources travel through ClassicFX.
 using System;
-using Client.Data.ATT;
 using Client.Main.ClassicFX.Core;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
@@ -35,8 +34,9 @@ namespace Client.Main.Objects.Effects.Skills
 
     /// <summary>
     /// Presentation-only counterpart of RenderDarkHorseSkill.
-    /// A native 25-Hz logical counter schedules periodic wave, FuryStrike
-    /// Kind=2 and rock bursts. Actual foot contact is gated by the
+    /// Native-time sampling schedules the wave, FuryStrike Kind=2 and rock
+    /// bursts. The stone radius follows the horse animation, not network
+    /// arrival time. Actual foot contact is gated by the
     /// horse's fractional BMD frame. Adapt the native 8..9.5 impact
     /// window when the installed horse BMD has fewer animation keys.
     /// </summary>
@@ -48,7 +48,6 @@ namespace Client.Main.Objects.Effects.Skills
         private readonly VehicleObject _horse;
         private float _elapsed;
         private float _tickRemainder;
-        private int _weaponLevel;
         private bool _furyTriggered;
         private bool _sawHorseAttack;
         private bool _finished;
@@ -123,17 +122,11 @@ namespace Client.Main.Objects.Effects.Skills
             bool inImpactWindow = usableFrames >= 4 &&
                 frame >= impactBegin && frame <= impactEnd;
 
-            // Main triggers FuryStrike Kind=2 at WeaponLevel 19, before
-            // the horse reaches its original 8..9.5 impact window.
-            // The 7-key Broyal horse reaches its adapted contact window
-            // much earlier, so keeping tick 19 spawns the explosion AFTER
-            // the stones, leaving WeaponLevel large (and the ring far away).
-            // The native explosion occurs around animation frame
-            // 19 * PlaySpeed, about four reference ticks before frame 8.
-            // For the shortened BMD, move both events by the same frame
-            // offset. Use the observed BMD frame instead of a sequence-
-            // local counter because the network effect may start after the
-            // horse animation; this keeps the explosion ahead of stones.
+            // Main creates FuryStrike when WeaponLevel reaches 19, about
+            // four horse-action ticks before native frame 8. Preserve that
+            // relationship for a shorter installed BMD. Use the observed
+            // horse frame rather than a counter started on packet arrival:
+            // late 0x1E packets must not postpone or entirely skip FuryStrike.
             float actionPlaySpeed = horseAction.PlaySpeed == 0f
                 ? 1f : horseAction.PlaySpeed;
             float furyFrame = Math.Clamp(
@@ -167,21 +160,16 @@ namespace Client.Main.Objects.Effects.Skills
                     subType: 0, scale: 20f);
             }
 
-            // Native GOBoid misuses WeaponLevel as a render frame counter.
-            // Convert that counter into reference ticks once per cast.
-            // MuMain clamps FPS_ANIMATION_FACTOR to <= 1 at low FPS.
-            // Do not fast-forward 2-6 native ticks after an Android hitch:
-            // the original processes at most one logical tick per render.
+            // Sample rand_fps_check(2) at the 25-Hz native reference rate.
+            // MuMain clamps FPS_ANIMATION_FACTOR to <= 1 at low FPS, so
+            // do not replay many emission ticks after an Android hitch.
+            // Stone distance is calculated from the actual horse frame below.
             _tickRemainder += MathF.Min(1f, dt * ReferenceRate);
             int advanced = (int)_tickRemainder;
             _tickRemainder -= advanced;
             for (int tick = 0; tick < advanced; tick++)
             {
-                _weaponLevel++;
-                if (!_furyTriggered &&
-                    (shortenedAttack
-                        ? frame >= furyFrame
-                        : _weaponLevel == 19 && !inImpactWindow))
+                if (!_furyTriggered && frame >= furyFrame)
                 {
                     // Last positional argument to CreateEffect is Kind=2
                     // in MuMain; ClassicFX uses subType to carry that Kind.
@@ -189,12 +177,12 @@ namespace Client.Main.Objects.Effects.Skills
                         origin, angle, Vector3.One, horseOwner,
                         subType: 2);
                     _furyTriggered = true;
-                    _weaponLevel = -3;
                 }
 
                 // rand_fps_check(2): half probability at each native tick.
                 if (inImpactWindow && fx.Random.Modulo(2) == 0)
-                    EmitGroundStones(fx, origin, angle);
+                    EmitGroundStones(fx, origin, angle,
+                        GetNativeStoneRadius(frame, impactBegin, actionPlaySpeed));
             }
 
             // GOBoid applies EarthQuake on EVERY impact-window render,
@@ -210,18 +198,29 @@ namespace Client.Main.Objects.Effects.Skills
                 Finish();
         }
 
+        private static float GetNativeStoneRadius(
+            float horseFrame, float impactBegin, float actionPlaySpeed)
+        {
+            // GOBoid: at native 25 Hz, WeaponLevel reaches 19 around
+            // frame 19 * PlaySpeed and resets to -3. At native tick 24
+            // (frame >= 8 with PlaySpeed 0.34), its value is 2.
+            // A late network effect must not restart this counter from 0.
+            // Map the shortened BMD's contact window onto native 8..9.5
+            // while retaining the original integer (WeaponLevel / 2).
+            float nativeFrame = horseFrame + (8f - impactBegin);
+            int nativeTick = (int)MathF.Ceiling(nativeFrame / actionPlaySpeed);
+            int weaponLevel = Math.Max(0, nativeTick - 22);
+            return 150f * (weaponLevel / 2);
+        }
+
         private void EmitGroundStones(ClassicFxRuntime fx,
-            Vector3 origin, Vector3 horseAngle)
+            Vector3 origin, Vector3 horseAngle, float radius)
         {
             if (World?.Terrain == null)
                 return;
 
-            // GOBoid: six stones rotated around the horse at 60 degrees.
-            // o->WeaponLevel is reset to -3 when FuryStrike Kind 2 fires.
-            // C++ divides the integer WeaponLevel by 2 before scaling.
-            // FuryStrike must already have reset this counter to -3
-            // at impact, otherwise the stones form an oversized ring.
-            float radius = 150f * (_weaponLevel / 2);
+            // GOBoid: six stones at 60-degree increments around the horse.
+            // The random initial angle and BMD variation remain native.
             float start = MathHelper.ToRadians(fx.Random.Modulo(360));
             const float step = MathHelper.TwoPi / 6f;
             for (int i = 0; i < 6; i++)
@@ -242,13 +241,10 @@ namespace Client.Main.Objects.Effects.Skills
                          Client.Main.Constants.TERRAIN_SCALE)
                     continue;
 
-                TWFlags flags = World.Terrain.RequestTerrainFlag(
-                    (int)(x / Client.Main.Constants.TERRAIN_SCALE),
-                    (int)(y / Client.Main.Constants.TERRAIN_SCALE));
-                if ((flags & (TWFlags.NoMove | TWFlags.NoGround |
-                              TWFlags.Water)) != 0)
-                    continue;
-
+                // RenderDarkHorseSkill never rejects NoMove/NoGround/Water
+                // tiles. That extra ClassicFX test was silently removing
+                // stones (sometimes all six) near monster/map boundaries.
+                // Only skip coordinates outside the allocated terrain.
                 pos.Z = World.Terrain.RequestTerrainRenderHeight(x, y);
 
                 fx.CreateEffect(fx.Random.Modulo(2) == 0

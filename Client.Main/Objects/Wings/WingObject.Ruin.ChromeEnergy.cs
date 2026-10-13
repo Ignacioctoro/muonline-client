@@ -89,11 +89,10 @@ namespace Client.Main.Objects.Wings
 
 
         // ================================================================
-        // NO EDIT REQUIRED IN WingObject.cs
+        // POST-BASE TRANSPARENT PASSES
         //
-        // WingObject did not previously override DrawAfter().
-        // We preserve the inherited behavior and append only Ruin's missing
-        // chrome-energy particles here.
+        // The inherited draw completes the opaque and alpha passes before
+        // Dimension's chrome overlay or Ruin's energy cloud is composited.
         // ================================================================
 
         public override void DrawAfter(
@@ -101,6 +100,10 @@ namespace Client.Main.Objects.Wings
         {
             base.DrawAfter(
                 gameTime);
+
+            // Original 12,43 renders a Chrome01-bright pass over mesh 1.
+            // Keep it after the normal model's transparent meshes.
+            DrawDimensionClassicChrome();
 
             // First draw the missing classic chrome-energy cloud.
             DrawRuinChromeEnergyEffects(
