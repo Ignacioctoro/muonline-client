@@ -326,13 +326,15 @@ namespace Client.Main.ClassicFX.Core
                 case 0:
                     p.Gravity += 0.02f * ff;
                     p.Scale += p.Gravity * ff;
-                    // Native BITMAP_FIRE+1 uses Velocity *= 1.05 per
-                    // 25-Hz reference tick. The unscaled per-render-frame
-                    // multiplier compounded 1.05^70 in 0.48 seconds at
-                    // 144 FPS, so Fire Burst flames shot off screen AFTER
-                    // reaching their target. Preserve the 25-FPS original
-                    // factor but scale it by FPS_ANIMATION_FACTOR for the
-                    // particles owned by MODEL_PIER_PART(1) only.
+                    // MuMain uses Velocity *= 1.05 per update with no
+                    // FPS scaling. At the 25-Hz ClassicFX reference rate
+                    // that means 12 multiplications during Fire02's
+                    // 12-tick lifespan; at 144 FPS it meant roughly 70
+                    // multiplications (1.05^70), making the Fire Burst
+                    // flame trail escape the screen after target crossing.
+                    // Preserve the native 25-FPS appearance by applying
+                    // the reference multiplier per elapsed reference tick,
+                    // only for MODEL_PIER_PART(1)'s child Fire02.
                     // Every other Fire02 use keeps the existing behavior.
                     bool pierPartFire =
                         p.SubType == 0 &&
