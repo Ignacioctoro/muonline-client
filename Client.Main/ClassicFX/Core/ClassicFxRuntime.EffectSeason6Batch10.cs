@@ -219,8 +219,8 @@ namespace Client.Main.ClassicFX.Core
                 // Native CreateParticle copies angles in DEGREES and later
                 // MovePosition calls the degree-based AngleMatrix. Passing
                 // radians here makes every Fire02 projectile drift toward
-                // world -Y (the bottom-left of the player's screen), no
-                // matter which monster the homing parent is following.
+                // world -Y (seen as bottom-left in the reported camera),
+                // regardless of the monster followed by the parent.
                 // Only this particle needs the boundary conversion; the BMD
                 // continues to use radians.
                 Vector3 nativeParticleAngle =
@@ -384,12 +384,12 @@ namespace Client.Main.ClassicFX.Core
                 return true;
             }
 
-            // MuMain keeps the OBJECT* target while a killed monster leaves
-            // its last world position in memory. NeffisDev detaches a dying
-            // WalkerObject from World, causing TryGetOwnerSnapshot to fail
-            // and prematurely freezing all three 20-tick PierPart paths.
-            // Preserve the last REAL transform even after detachment; never
-            // invent a new target or aim at the caster as a fallback.
+            // MuMain keeps the target OBJECT* for the full effect life,
+            // including its death animation. NeffisDev may detach the walker
+            // during scope removal; TryGetOwnerSnapshot then fails and the
+            // 20-tick PierPart paths freeze. The object reference still owns
+            // its last real WorldPosition, even after detachment. Use that
+            // position instead of inventing an unrelated fallback target.
             var targetObject = e.Owner.WorldObject;
             if (targetObject == null ||
                 (targetObject.World != null &&
