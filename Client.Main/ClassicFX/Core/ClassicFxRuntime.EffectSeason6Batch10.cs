@@ -413,8 +413,7 @@ namespace Client.Main.ClassicFX.Core
                 target += e.StartPosition;
                 for (int i = 1; i < e.Gravity; ++i)
                 {
-                    if (Clock.AdvancedReferenceFrame &&
-                        Random.FpsCheck(2, Clock))
+                    if (Random.FpsCheck(2, Clock))
                     {
                         if (e.Angle.X < MathHelper.ToRadians(-90f))
                             e.Angle.X += MathHelper.ToRadians(20f * f);
@@ -436,8 +435,11 @@ namespace Client.Main.ClassicFX.Core
                     // Keep the native MODEL_PIER_PART(1) trail: a 0.5-scale
                     // PierPart BMD and its BITMAP_FIRE+1 particle, attached
                     // to that BMD. It does not chase a random monster.
-                    if (Clock.AdvancedReferenceFrame &&
-                        e.ModelView != null &&
+                    // MuMain calls CreateEffectFpsChecked(1) on EVERY
+                    // update. FpsCheck already scales the probability by
+                    // FrameFactor: combining it with AdvancedReferenceFrame
+                    // would thin the visible chain by ~60% at 60 fps.
+                    if (e.ModelView != null &&
                         e.ModelView.Status == GameControlStatus.Ready &&
                         Random.FpsCheck(1, Clock))
                     {
