@@ -596,6 +596,26 @@ public class VehicleObject : ModelObject
         }
     }
 
+    // MuMain OBJECT::LastHorseWaveEffect persists across casts.
+    // Unlike a per-skill timer, this prevents repeated 400-ms waves
+    // when Dark Horse Earthshake is cast rapidly.
+    private double _lastDarkHorseWaveSeconds = double.NegativeInfinity;
+
+    public bool TryConsumeDarkHorseWave(double worldSeconds)
+    {
+        if (itemIndex != 0 || !double.IsFinite(worldSeconds))
+            return false;
+
+        if (worldSeconds < _lastDarkHorseWaveSeconds)
+            _lastDarkHorseWaveSeconds = double.NegativeInfinity;
+
+        if (worldSeconds - _lastDarkHorseWaveSeconds < 0.4)
+            return false;
+
+        _lastDarkHorseWaveSeconds = worldSeconds;
+        return true;
+    }
+
     private Vector3 GetFenrirThunderColor()
     {
         return
