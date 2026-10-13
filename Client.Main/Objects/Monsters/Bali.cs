@@ -16,6 +16,10 @@ namespace Client.Main.Objects.Monsters
     {
         public Bali()
         {
+            // MuMain ZzzCharacter.cpp: CreateMonster(MONSTER_BALI)
+            // sets c->Object.Scale = 0.12f. Without this the unscaled
+            // Monster33 BMD renders over eight times too large.
+            Scale = 0.12f;
         }
 
         public override async Task Load()
