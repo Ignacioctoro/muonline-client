@@ -578,6 +578,16 @@ namespace Client.Main.Objects.Wings
                     return;
                 }
             }
+            else if (requestedItemIndex == 43)
+            {
+                await PrepareDimensionClassicAssetsAsync();
+
+                if (!IsCurrentChangeVersion(
+                        changeVersion))
+                {
+                    return;
+                }
+            }
 
 
             UpdateStatusAfterAsyncResolve(
@@ -863,6 +873,9 @@ namespace Client.Main.Objects.Wings
 
 
             DrawRuinClassicEffects(
+                gameTime);
+
+            DrawDimensionClassicEffects(
                 gameTime);
         }
     }
