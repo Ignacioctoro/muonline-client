@@ -1302,6 +1302,14 @@ namespace Client.Main.ClassicFX.Core
             if (modelPath != null)
             {
                 view = new ClassicFxEffectModelObject(modelPath, type);
+                // The native PierPart trail shares a single already-loaded
+                // BMD from its parent effect. NeffisDev otherwise schedules
+                // a separate async Prepare() for every short-lived segment,
+                // leaving only the independent Fire02 billboards visible.
+                if (type == ClassicFxEffectType.PierPart && subType == 1 &&
+                    owner.WorldObject is ClassicFxEffectModelObject parentPierPart &&
+                    parentPierPart.Model != null)
+                    view.Model = parentPierPart.Model;
                 view.Position = effectPosition;
                 view.Angle = angle;
                 view.Scale = effectScale;
@@ -2239,13 +2247,22 @@ namespace Client.Main.ClassicFX.Core
         private readonly bool _nativeKnightPlancrackLighting;
         private readonly bool _nativeGrandCrackDepthBypass;
         private readonly bool _nativeDestructionBmdLighting;
+        // The native PierPart object renders its original textured meshes
+        // with o->Light (white). Without it, the NeffisDev CPU path has
+        // LightEnabled=false and Light=0, leaving chains effectively black.
+        private readonly bool _nativePierPartBmdLighting;
+        // Fire Burst's Fire02 trail owns a PierPart ModelView. Expose the
+        // already-recorded effect identity to correct its 25-Hz velocity
+        // scaling without altering generic Fire02 particles of other skills.
+        internal bool IsPierPartModel => _nativePierPartBmdLighting;
         private bool _nativeRagefulStoneLighting;
 
         private bool NeedsRagefulBmdLighting =>
             _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
 
         private bool NeedsNativeBmdLighting =>
-            NeedsRagefulBmdLighting || _nativeDestructionBmdLighting;
+            NeedsRagefulBmdLighting || _nativeDestructionBmdLighting ||
+            _nativePierPartBmdLighting;
 
         // Preserve the existing Rageful Blow call site. The original
         // Strike of Destruction impact emits the same Stone01/Stone02
@@ -2400,6 +2417,7 @@ namespace Client.Main.ClassicFX.Core
             _nativeDestructionBmdLighting = _nativeKnightPlancrackLighting ||
                 type is ClassicFxEffectType.NightWater01 or
                     ClassicFxEffectType.RaklionBossCrack;
+            _nativePierPartBmdLighting = type == ClassicFxEffectType.PierPart;
             if (_nativeKnightPlancrackLighting)
                 _knightPlancrackUvDeformer = new KnightPlancrackUvDeformer();
             // The native wheel uses RenderPartObject for the equipped
