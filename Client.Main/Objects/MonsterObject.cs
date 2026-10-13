@@ -37,6 +37,12 @@ namespace Client.Main.Objects
         public ushort LastAttackTargetId { get; internal set; }
 
         /// <summary>
+        /// Owner name supplied by OpenMU C2 1F for summoned monsters.
+        /// Empty for ordinary monsters. The server remains authoritative.
+        /// </summary>
+        public string SummonerName { get; internal set; }
+
+        /// <summary>
         /// Set of mesh indices that should NOT use blending (equivalent to NoneBlendMesh = true in original code).
         /// </summary>
         public HashSet<int> NoneBlendMeshes { get; set; } = new HashSet<int>();

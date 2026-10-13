@@ -527,6 +527,76 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
+        // OpenMU sends summoned Elf monsters in C2 1F, not in the
+        // ordinary NPC scope packets C2 13 / C2 16.
+        // https://munique.github.io/OpenMU/Packets/C2-1F-AddSummonedMonstersToScope_by-server.html
+        // Keep the existing server-authoritative NPC spawn pipeline, IDs,
+        // orientations, movement and despawn lifecycle. ClassicFX only
+        // provides the separate caster effect.
+        [PacketHandler(0x1F, PacketRouter.NoSubCode)]
+        public Task HandleSummonedMonstersToScopeAsync(Memory<byte> packet)
+        {
+            ReadOnlySpan<byte> data = packet.Span;
+            if (data.Length < 5 || data[0] != 0xC2 || data[3] != 0x1F)
+            {
+                _logger.LogWarning("Invalid AddSummonedMonstersToScope (0x1F) packet.");
+                return Task.CompletedTask;
+            }
+
+            int count = data[4];
+            int offset = 5;
+            ushort mapId = _characterState.MapId;
+
+            for (int i = 0; i < count; i++)
+            {
+                // Season 6: Id(2), TypeNumber(2), X/Y(2),
+                // TargetX/TargetY(2), Rotation(1), OwnerName(10),
+                // EffectCount(1), EffectId[EffectCount].
+                // The records have variable lengths: do not assume the
+                // normal NPC scope record size or discard following records.
+                const int baseRecordLength = 20;
+                if (data.Length - offset < baseRecordLength)
+                {
+                    _logger.LogWarning(
+                        "Truncated 0x1F summon record {Index}/{Count}.", i, count);
+                    break;
+                }
+
+                ReadOnlySpan<byte> record = data.Slice(offset, baseRecordLength);
+                ushort rawId = BinaryPrimitives.ReadUInt16BigEndian(record.Slice(0, 2));
+                ushort monsterType = BinaryPrimitives.ReadUInt16BigEndian(record.Slice(2, 2));
+                byte x = record[4];
+                byte y = record[5];
+                byte direction = (byte)(record[8] & 0x0F);
+                string owner = Encoding.ASCII.GetString(record.Slice(9, 10))
+                    .TrimEnd('\0', ' ');
+                int activeEffectCount = record[19];
+                offset += baseRecordLength;
+
+                if (data.Length - offset < activeEffectCount)
+                {
+                    _logger.LogWarning(
+                        "Truncated 0x1F summon effects {Index}/{Count}.", i, count);
+                    break;
+                }
+
+                // Advance past all active effect IDs even if none applies to
+                // the three basic invocations. The NPC status/buff system is
+                // separate from skill cast effects.
+                offset += activeEffectCount;
+
+                ushort maskedId = (ushort)(rawId & 0x7FFF);
+                string name = NpcDatabase.GetNpcName(monsterType);
+                _scopeManager.AddOrUpdateNpcInScope(
+                    maskedId, rawId, x, y, monsterType, name);
+                _npcSpawnQueue.Enqueue(new NpcSpawnRequest(
+                    maskedId, rawId, x, y, direction, monsterType, name,
+                    mapId, owner));
+            }
+
+            return Task.CompletedTask;
+        }
+
         private void ParseAndQueueNpcSpawns(byte[] packetData)
         {
             Memory<byte> packet = packetData;
@@ -644,10 +714,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 return Task.CompletedTask;
             }
 
-            return ProcessNpcSpawnAsync(request.MaskedId, request.RawId, request.X, request.Y, request.Direction, request.Type, request.Name);
+            return ProcessNpcSpawnAsync(request.MaskedId, request.RawId, request.X, request.Y, request.Direction, request.Type, request.Name, request.OwnerName);
         }
 
-        private async Task ProcessNpcSpawnAsync(ushort maskedId, ushort rawId, byte x, byte y, byte direction, ushort type, string name)
+        private async Task ProcessNpcSpawnAsync(ushort maskedId, ushort rawId, byte x, byte y, byte direction, ushort type, string name, string ownerName)
         {
             if (MuGame.Instance.ActiveScene?.World is not WalkableWorldControl worldRef || worldRef.Status != GameControlStatus.Ready)
             {
@@ -672,6 +742,12 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 _logger.LogWarning($"ScopeHandler: Could not create instance of NPC type {npcClassType} for TypeID {type}.");
                 return;
             }
+
+            // Attach authoritative ownership metadata from OpenMU 0x1F.
+            // Never create a second local monster for summon visuals.
+            if (obj is MonsterObject summonedMonster &&
+                !string.IsNullOrWhiteSpace(ownerName))
+                summonedMonster.SummonerName = ownerName;
 
             // Configure the object's properties
             obj.NetworkId = maskedId;
@@ -760,7 +836,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
         private readonly struct NpcSpawnRequest
         {
-            public NpcSpawnRequest(ushort maskedId, ushort rawId, byte x, byte y, byte direction, ushort type, string name, ushort mapId)
+            public NpcSpawnRequest(ushort maskedId, ushort rawId, byte x, byte y, byte direction, ushort type, string name, ushort mapId, string ownerName = null)
             {
                 MaskedId = maskedId;
                 RawId = rawId;
@@ -770,6 +846,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 Type = type;
                 Name = name;
                 MapId = mapId;
+                OwnerName = ownerName;
             }
 
             public ushort MaskedId { get; }
@@ -780,6 +857,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             public ushort Type { get; }
             public string Name { get; }
             public ushort MapId { get; }
+            public string OwnerName { get; }
         }
 
         [PacketHandler(0x25, PacketRouter.NoSubCode)]
