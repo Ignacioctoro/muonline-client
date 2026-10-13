@@ -106,6 +106,19 @@ namespace Client.Main.Objects.Effects.Skills
             Vector3 angle = _horse.TotalAngle;
             ClassicFxOwner horseOwner = ClassicFxOwner.FromWorldObject(_horse);
 
+            // GOBoid's horse attack draws a native CreateBlur from bone 9:
+            // one endpoint offset (60,0,0), the other at the bone origin.
+            // Its owner is the CHARACTER, so ClassicFX merges samples into
+            // a single time-varying trail instead of creating a new mesh.
+            if (fx.TryTransformOwnerBonePosition(horseOwner, 9,
+                    new Vector3(60f, 0f, 0f), out Vector3 blurEnd) &&
+                fx.TryTransformOwnerBonePosition(horseOwner, 9,
+                    Vector3.Zero, out Vector3 blurStart))
+            {
+                fx.CreateBlur(ClassicFxOwner.FromWorldObject(_caster),
+                    blurEnd, blurStart, Vector3.One, 0);
+            }
+
             // LastHorseWaveEffect uses a 400-ms cadence in MuMain. It is
             // separate from the exact frame-8 contact / radial rock burst.
             int dueWaves = Math.Min(3, 1 + (int)(_elapsed / HorseWaveInterval));
