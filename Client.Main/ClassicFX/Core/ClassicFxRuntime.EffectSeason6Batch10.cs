@@ -296,14 +296,81 @@ namespace Client.Main.ClassicFX.Core
             return 20f;
         }
 
+        // MuMain ZzzAI.cpp MoveHumming + Engine/AI/AngleMath.cpp TurnAngle2.
+        // Work in radians in ClassicFX but normalize after each turn, just as
+        // the native degree-based implementation does. This is intentionally
+        // independent of the Javelin helper: Fire Burst must retain the
+        // original PierPart movement even when other skills are adjusted.
+        private static float NormalizeS6PierPartAngle(float radians)
+        {
+            radians %= MathHelper.TwoPi;
+            return radians < 0f ? radians + MathHelper.TwoPi : radians;
+        }
+
+        private static float TurnS6PierPartAngle(
+            float current, float target, float turn)
+        {
+            current = NormalizeS6PierPartAngle(current);
+            target = NormalizeS6PierPartAngle(target);
+            if (turn <= 0f)
+                return current;
+
+            float difference = target - current;
+            if (difference > MathHelper.Pi)
+                difference -= MathHelper.TwoPi;
+            else if (difference < -MathHelper.Pi)
+                difference += MathHelper.TwoPi;
+
+            return NormalizeS6PierPartAngle(
+                current + Math.Clamp(difference, -turn, turn));
+        }
+
+        private static void MoveS6PierPartHumming(
+            Vector3 from, Vector3 target, ref Vector3 angle,
+            float velocity, float referenceFrameFactor)
+        {
+            float x = target.X - from.X;
+            float y = target.Y - from.Y;
+            // CreateAngle2D(from, target) = atan2(dx, -dy).
+            float targetYaw = MathF.Abs(x) < float.Epsilon &&
+                              MathF.Abs(y) < float.Epsilon
+                ? 0f : MathF.Atan2(x, -y);
+            float turn = MathHelper.ToRadians(
+                velocity * referenceFrameFactor);
+            angle.Z = TurnS6PierPartAngle(angle.Z, targetYaw, turn);
+
+            // Native pitch: 360 - CreateAngle(
+            //     Position[2], horizontalDistance, Target[2], 0).
+            float horizontalDistance = MathF.Sqrt(x * x + y * y);
+            float targetPitch = -MathF.Atan2(
+                target.Z - from.Z, horizontalDistance);
+            angle.X = TurnS6PierPartAngle(angle.X, targetPitch, turn);
+        }
+
+        // The original AngleMatrix multiplies Z * Y * X and VectorRotate
+        // uses that exact 3x4 matrix. Matrix.CreateFromYawPitchRoll is not
+        // interchangeable for this movement. It was making the three
+        // Fire Burst branches drift away from the monster.
+        private static Vector3 RotateS6PierPartNative(
+            Vector3 direction, Vector3 anglesRadians)
+        {
+            const float radiansToDegrees = 180f / MathF.PI;
+            Vector3 anglesDegrees = anglesRadians * radiansToDegrees;
+            return ClassicMath.VectorRotate(
+                direction, ClassicMath.AngleMatrix(anglesDegrees));
+        }
+
         private bool MoveS6PierPart(ref EffectState e, float f)
         {
             if (e.SubType == 1)
             {
+                // SubType 1 is a stationary child left by its moving parent;
+                // the parent remaining lifetime was copied at creation.
                 if (e.LifeTime < 5f)
                     e.Alpha *= MathF.Pow(1f / 1.3f, f);
                 return true;
             }
+
             if (!TryGetOwnerSnapshot(e.Owner,
                     out ClassicFxOwnerSnapshot owner) ||
                 owner.WorldObject == null ||
@@ -313,7 +380,9 @@ namespace Client.Main.ClassicFX.Core
             Vector3 target = owner.Position;
             if (e.SubType == 0)
             {
-                target += e.StartPosition; // native target-relative Light
+                // ZzzEffect.cpp: Light is the target-relative height offset
+                // copied into StartPosition; never treat it as a RGB color.
+                target += e.StartPosition;
                 for (int i = 1; i < e.Gravity; ++i)
                 {
                     if (Clock.AdvancedReferenceFrame &&
@@ -324,34 +393,42 @@ namespace Client.Main.ClassicFX.Core
                         else
                             e.Angle.X -= MathHelper.ToRadians(20f * f);
                     }
-                    TurnS6JavelinHeading(e.Position, target,
-                        ref e.Angle, e.Velocity, f);
+
+                    MoveS6PierPartHumming(
+                        e.Position, target, ref e.Angle, e.Velocity, f);
                     e.Velocity += 0.4f * f;
                     if (e.LifeTime < 10f)
                         e.Velocity += 0.1f * f;
-                    e.Position += Vector3.TransformNormal(
-                        e.Direction, Matrix.CreateFromYawPitchRoll(
-                            e.Angle.Y, e.Angle.X, e.Angle.Z)) * f;
 
-                    // Native child Owner is the parent Effect, not caster.
+                    // Original: AngleMatrix(o->Angle); VectorRotate(
+                    // Direction); VectorAddScaled(Position, direction).
+                    e.Position += RotateS6PierPartNative(
+                        e.Direction, e.Angle) * f;
+
+                    // Keep the native MODEL_PIER_PART(1) trail: a 0.5-scale
+                    // PierPart BMD and its BITMAP_FIRE+1 particle, attached
+                    // to that BMD. It does not chase a random monster.
                     if (Clock.AdvancedReferenceFrame &&
                         e.ModelView != null &&
                         e.ModelView.Status == GameControlStatus.Ready)
+                    {
                         CreateEffect(ClassicFxEffectType.PierPart,
                             e.Position, e.Angle, e.Light,
                             ClassicFxOwner.FromWorldObject(e.ModelView),
                             subType: 1);
+                    }
                 }
                 e.Gravity += 0.1f * f;
             }
             else if (e.SubType == 2)
             {
-                TurnS6JavelinHeading(e.Position, target,
-                    ref e.Angle, e.Velocity, f);
+                // This is also used by Space Split, not the Fire Burst cast.
+                // Preserve its own native target (without StartPosition).
+                MoveS6PierPartHumming(
+                    e.Position, target, ref e.Angle, e.Velocity, f);
                 e.Velocity += 2.4f * f;
-                e.Position += Vector3.TransformNormal(
-                    e.Direction, Matrix.CreateFromYawPitchRoll(
-                        e.Angle.Y, e.Angle.X, e.Angle.Z)) * f;
+                e.Position += RotateS6PierPartNative(
+                    e.Direction, e.Angle) * f;
 
                 int tick = (int)e.LifeTime;
                 if (Clock.AdvancedReferenceFrame &&
