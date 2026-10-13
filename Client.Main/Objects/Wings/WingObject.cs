@@ -112,6 +112,8 @@ namespace Client.Main.Objects.Wings
 
         private bool _isEmperorCape;
         private bool _isOverruleCape;
+        private bool _isLordCape;
+        private bool _isFighterCape;
 
         private bool _savedBaseAttachmentTransform;
 
@@ -663,12 +665,14 @@ namespace Client.Main.Objects.Wings
         {
             bool emperor = capeItemIndex == EmperorCapeItemIndex;
             bool overrule = capeItemIndex == OverruleCapeItemIndex;
+            bool lord = capeItemIndex == LordCapeItemIndex;
+            bool fighter = capeItemIndex == FighterCapeItemIndex;
 
-            if (emperor || overrule)
+            if (emperor || overrule || lord || fighter)
             {
-                // Save the normal wing transform only on first entry into
-                // cape mode. Switching between DL and RF must not overwrite it.
-                if (!_isEmperorCape && !_isOverruleCape)
+                // Preserve the original wing transform across S2/S3 changes.
+                if (!_isEmperorCape && !_isOverruleCape &&
+                    !_isLordCape && !_isFighterCape)
                 {
                     _savedBasePosition = Position;
                     _savedBaseAngle = Angle;
@@ -676,24 +680,34 @@ namespace Client.Main.Objects.Wings
                     _savedBaseAttachmentTransform = true;
                 }
 
-                ParentBoneLink = EmperorCapeBoneLink;
+                // Original Main renders only the cloth for Lord/Fighter S2.
+                // S3 capes also render a rigid mesh attached to bone 19.
+                if (emperor || overrule)
+                {
+                    ParentBoneLink = EmperorCapeBoneLink;
+                    Position = overrule ? OverruleCapePosition : EmperorCapePosition;
+                    Angle = EmperorCapeAngle;
+                }
+                else
+                {
+                    ParentBoneLink = DefaultWingBoneLink;
+                    Position = _savedBasePosition;
+                    Angle = _savedBaseAngle;
+                }
 
-                // As with DL's DarkLordRobe02, the cape's cloth is
-                // produced separately by CPhysicsCloth. Render only the
-                // rigid model mesh 0, never the static cloth model meshes.
+                // Hide all static meshes in BOTH opaque and alpha model passes.
+                // Draw() re-enables mesh 0 for S3 only.
                 HiddenMesh = -2;
-
-                Position = overrule
-                    ? OverruleCapePosition
-                    : EmperorCapePosition;
-                Angle = EmperorCapeAngle;
 
                 _isEmperorCape = emperor;
                 _isOverruleCape = overrule;
+                _isLordCape = lord;
+                _isFighterCape = fighter;
                 return;
             }
 
-            bool wasCape = _isEmperorCape || _isOverruleCape;
+            bool wasCape = _isEmperorCape || _isOverruleCape ||
+                           _isLordCape || _isFighterCape;
             ParentBoneLink = DefaultWingBoneLink;
 
             if (wasCape)
@@ -708,6 +722,8 @@ namespace Client.Main.Objects.Wings
             _savedBaseAttachmentTransform = false;
             _isEmperorCape = false;
             _isOverruleCape = false;
+            _isLordCape = false;
+            _isFighterCape = false;
         }
 
         // ============================================================
@@ -805,60 +821,46 @@ namespace Client.Main.Objects.Wings
 
 
             // ========================================================
-            // CAPE OF EMPEROR (DL) / CAPE OF OVERRULE (RF)
+            // CLASSIC CAPES: S2 CLOTH ONLY, S3 RIGID ORNAMENT + CLOTH
             // ========================================================
 
-            if (((_isEmperorCape && ItemIndex == EmperorCapeItemIndex) ||
-                 (_isOverruleCape && ItemIndex == OverruleCapeItemIndex)) &&
-                Model != null)
+            bool isS3Cape =
+                (_isEmperorCape && ItemIndex == EmperorCapeItemIndex) ||
+                (_isOverruleCape && ItemIndex == OverruleCapeItemIndex);
+            bool isS2Cape =
+                (_isLordCape && ItemIndex == LordCapeItemIndex) ||
+                (_isFighterCape && ItemIndex == FighterCapeItemIndex);
+
+            if ((isS2Cape || isS3Cape) && Model != null)
             {
-                //
-                // Preserve the normal model lifecycle while suppressing
-                // the rigid BMD's static cloth portions. Both capes use
-                // separately simulated cloth grids anchored to player bone 19.
-                //
-                HiddenMesh =
-                    -2;
+                // The Main explicitly skips RenderPartObjectEffect for
+                // MODEL_CAPE_OF_LORD and MODEL_CAPE_OF_FIGHTER:
+                // no stiff BMD is drawn when equipped, only CPhysicsCloth.
+                HiddenMesh = -2;
+                base.Draw(gameTime);
 
-
-                base.Draw(
-                    gameTime);
-
-
-                //
-                // Draw the rigid ornament, not a duplicate static cape.
-                // DL: DarkLordRobe02.bmd; RF: Wing51.bmd.
-                // Temporarily permit mesh rendering for this one pass.
-                //
-                try
+                if (isS3Cape)
                 {
-                    HiddenMesh =
-                        -1;
-
-
-                    DrawMesh(
-                        0);
-                }
-                finally
-                {
-                    //
-                    // Very important:
-                    //
-                    // Leave -2 active after this draw so ModelObject.DrawAfter()
-                    // cannot render meshes 1/2 again during the transparent pass.
-                    //
-                    HiddenMesh =
-                        -2;
+                    // Keep the rigid top ornament of the original S3 capes.
+                    try
+                    {
+                        HiddenMesh = -1;
+                        DrawMesh(0);
+                    }
+                    finally
+                    {
+                        HiddenMesh = -2;
+                    }
                 }
             }
             else
             {
-                base.Draw(
-                    gameTime);
+                base.Draw(gameTime);
             }
 
 
             // ========================================================
+
             // CLASSIC EXTERNAL WING EFFECTS
             // ========================================================
 
