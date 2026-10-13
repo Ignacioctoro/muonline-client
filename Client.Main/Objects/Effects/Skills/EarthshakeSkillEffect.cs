@@ -43,17 +43,12 @@ namespace Client.Main.Objects.Effects.Skills
     {
         private const int HorseAttackAction = 3;
         private const float ReferenceRate = 25f;
-        private const float HorseWaveInterval = 0.4f;
         private readonly PlayerObject _caster;
         private readonly VehicleObject _horse;
         private float _elapsed;
         private float _tickRemainder;
-        private float _lastHorseFrame = -1f;
         private int _weaponLevel;
-        private int _waves;
-        private int _rockBursts;
         private bool _furyTriggered;
-        private bool _contactCrossed;
         private bool _sawHorseAttack;
         private bool _finished;
 
@@ -119,15 +114,14 @@ namespace Client.Main.Objects.Effects.Skills
                     blurEnd, blurStart, Vector3.One, 0);
             }
 
-            // LastHorseWaveEffect uses a 400-ms cadence in MuMain. It is
-            // separate from the exact frame-8 contact / radial rock burst.
-            int dueWaves = 1 + (int)(_elapsed / HorseWaveInterval);
-            while (_waves < dueWaves)
+            // Native LastHorseWaveEffect is stored on the horse and
+            // remains valid between casts. Do not restart its interval.
+            if (_horse.TryConsumeDarkHorseWave(
+                    gameTime.TotalGameTime.TotalSeconds))
             {
                 fx.CreateEffect(ClassicFxEffectType.ShockWave,
                     origin, angle, Vector3.One, horseOwner,
                     subType: 0, scale: 20f);
-                _waves++;
             }
 
             // Native GOBoid misuses WeaponLevel as a render frame counter.
@@ -156,16 +150,13 @@ namespace Client.Main.Objects.Effects.Skills
                     EmitGroundStones(fx, origin, angle);
             }
 
-            // Detect the crossing even if 30-FPS sampling jumps from
-            // below frame 8 to after 9.5, skipping the comparison window.
-            if (!_contactCrossed && _lastHorseFrame < 8f && frame >= 8f)
-            {
-                _contactCrossed = true;
-                if (_rockBursts == 0)
-                    EmitGroundStones(fx, origin, angle);
-            }
-
-            _lastHorseFrame = frame;
+            // GOBoid applies EarthQuake on EVERY impact-window render,
+            // independent of whether the probabilistic rocks are spawned.
+            // Its amplitude is a small camera-pitch change in DEGREES;
+            // positional Camera.Shake would be an invented visual.
+            if (frame >= 8f && frame <= 9.5f)
+                Client.Main.Graphics.Camera.Instance.SetNativeEarthQuakePitch(
+                    (fx.Random.Modulo(3) - 3) * 0.7f);
 
             // Cleanup guard only, never used to time the impact.
             if (_elapsed >= 3f)
@@ -175,12 +166,13 @@ namespace Client.Main.Objects.Effects.Skills
         private void EmitGroundStones(ClassicFxRuntime fx,
             Vector3 origin, Vector3 horseAngle)
         {
-            if (_rockBursts >= 5 || World?.Terrain == null)
+            if (World?.Terrain == null)
                 return;
 
             // GOBoid: six stones rotated around the horse at 60 degrees.
             // o->WeaponLevel is reset to -3 when FuryStrike Kind 2 fires.
-            float radius = 150f * (Math.Max(1, _weaponLevel) / 2f);
+            // C++ divides the integer WeaponLevel by 2 before scaling.
+            float radius = 150f * (_weaponLevel / 2);
             float start = MathHelper.ToRadians(fx.Random.Modulo(360));
             const float step = MathHelper.TwoPi / 6f;
             for (int i = 0; i < 6; i++)
@@ -215,7 +207,6 @@ namespace Client.Main.Objects.Effects.Skills
                         : ClassicFxEffectType.GroundStone2Model,
                     pos, horseAngle, Vector3.One, ClassicFxOwner.None);
             }
-            _rockBursts++;
         }
 
         private void Finish()
