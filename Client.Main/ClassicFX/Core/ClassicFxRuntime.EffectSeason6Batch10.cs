@@ -171,6 +171,16 @@ namespace Client.Main.ClassicFX.Core
                 view.BlendMesh = -1;
                 view.HiddenMesh = subType == 0 ? 1 :
                     subType == 1 ? 0 : -2;
+
+                // The visible Fire Burst chain is PierPart mesh 0,
+                // m_Piercing.tga, rendered as a textured model in Main.
+                // ClassicFxEffectModelObject's generic Additive blend was
+                // treating the solid links like a light sprite (the same
+                // washed-out material previously seen on GroundStone).
+                // Restore their texture/alpha colors without changing the
+                // subtype 1 Fire02 glow or projectile movement.
+                if (subType == 0)
+                    view.BlendState = BlendState.AlphaBlend;
             }
         }
 
