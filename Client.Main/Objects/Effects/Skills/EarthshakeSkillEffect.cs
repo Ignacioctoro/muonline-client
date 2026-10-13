@@ -128,16 +128,17 @@ namespace Client.Main.Objects.Effects.Skills
             // The 7-key Broyal horse reaches its adapted contact window
             // much earlier, so keeping tick 19 spawns the explosion AFTER
             // the stones, leaving WeaponLevel large (and the ring far away).
-            // Shift the FuryStrike trigger by the same number of action
-            // frames, using the BMD's actual PlaySpeed. This restores the
-            // original ordering and counter reset (-3), so the native
-            // radial formula places rocks close to the explosion.
+            // The native explosion occurs around animation frame
+            // 19 * PlaySpeed, about four reference ticks before frame 8.
+            // For the shortened BMD, move both events by the same frame
+            // offset. Use the observed BMD frame instead of a sequence-
+            // local counter because the network effect may start after the
+            // horse animation; this keeps the explosion ahead of stones.
             float actionPlaySpeed = horseAction.PlaySpeed == 0f
                 ? 1f : horseAction.PlaySpeed;
-            int furyTriggerTick = shortenedAttack
-                ? Math.Clamp(19 + (int)MathF.Round(
-                    (impactBegin - 8f) / actionPlaySpeed), 1, 19)
-                : 19;
+            float furyFrame = Math.Clamp(
+                19f * actionPlaySpeed + impactBegin - 8f,
+                0f, impactBegin);
 
             Vector3 origin = _horse.WorldPosition.Translation;
             Vector3 angle = _horse.TotalAngle;
@@ -177,8 +178,10 @@ namespace Client.Main.Objects.Effects.Skills
             for (int tick = 0; tick < advanced; tick++)
             {
                 _weaponLevel++;
-                if (!_furyTriggered && _weaponLevel == furyTriggerTick &&
-                    !inImpactWindow)
+                if (!_furyTriggered &&
+                    (shortenedAttack
+                        ? frame >= furyFrame
+                        : _weaponLevel == 19 && !inImpactWindow))
                 {
                     // Last positional argument to CreateEffect is Kind=2
                     // in MuMain; ClassicFX uses subType to carry that Kind.
