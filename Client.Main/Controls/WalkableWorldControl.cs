@@ -441,6 +441,7 @@ namespace Client.Main.Controls
                 var m = monsters[i];
 
                 if (m != null &&
+                    !m.IsPlayerSummon &&
                     m.Location.X == tileX &&
                     m.Location.Y == tileY)
                 {
@@ -519,6 +520,7 @@ namespace Client.Main.Controls
                     monsters[i];
 
                 if (monster == null ||
+                    monster.IsPlayerSummon ||
                     monster.IsDead ||
                     monster.World != World)
                 {

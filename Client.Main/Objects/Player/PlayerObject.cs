@@ -3378,6 +3378,17 @@ namespace Client.Main.Objects.Player
         {
             if (target == null || World == null) return;
 
+            // The native Main marks Elf summons as KIND_PLAYER. A normal
+            // bow/melee click must not hit them as if they were hostile mobs;
+            // holding Ctrl expresses explicit PvP attack intent.
+            if (target.IsPlayerSummon)
+            {
+                var keys = Microsoft.Xna.Framework.Input.Keyboard.GetState();
+                if (!keys.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.LeftControl) &&
+                    !keys.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.RightControl))
+                    return;
+            }
+
             // Don't attack if player is dead
             if (IsDead) return;
 

@@ -301,6 +301,7 @@ namespace Client.Main.Scenes
 
             // Desde aquí hacia abajo sí necesitamos target.
             if (target == null ||
+                (target.IsPlayerSummon && !IsCtrlHeld()) ||
                 target.IsDead ||
                 target.World != _scene.World)
             {
@@ -866,10 +867,22 @@ namespace Client.Main.Scenes
             return true;
         }
 
+        private static bool IsCtrlHeld()
+        {
+            var keyboard = Keyboard.GetState();
+            return keyboard.IsKeyDown(Keys.LeftControl) ||
+                   keyboard.IsKeyDown(Keys.RightControl);
+        }
+
         private WalkerObject GetHoveredSkillTarget()
         {
             if (_scene.MouseHoverObject is MonsterObject monster)
             {
+                // Native Main uses KIND_PLAYER for these summons:
+                // a normal skill click cannot select them as hostile mobs.
+                if (monster.IsPlayerSummon && !IsCtrlHeld())
+                    return null;
+
                 if (!monster.IsDead &&
                     monster.World == _scene.World)
                 {
@@ -1130,6 +1143,7 @@ namespace Client.Main.Scenes
 
             // TARGET = MONSTER
             if (walker is not MonsterObject targetMonster ||
+                (targetMonster.IsPlayerSummon && !IsCtrlHeld()) ||
                 targetMonster.IsDead ||
                 targetMonster.World != _scene.World)
             {
@@ -1269,6 +1283,7 @@ namespace Client.Main.Scenes
 
             if (skill == null ||
                 target == null ||
+                (target.IsPlayerSummon && !IsCtrlHeld()) ||
                 hero == null)
             {
                 return false;
