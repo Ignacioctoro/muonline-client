@@ -59,6 +59,7 @@ namespace Client.Main.Objects.Wings
 
 
         private const short EmperorCapeItemIndex = 40;
+        private const short OverruleCapeItemIndex = 50;
 
 
         // ============================================================
@@ -101,7 +102,13 @@ namespace Client.Main.Objects.Wings
                 0.0f);
 
 
+        // Cape of Overrule (12,50) rigid component is Wing51.bmd.
+        // Main RenderLinkObject: bone 19; yaw 90 degrees; (10,-15,0).
+        private static readonly Vector3 OverruleCapePosition =
+            new Vector3(10.0f, -15.0f, 0.0f);
+
         private bool _isEmperorCape;
+        private bool _isOverruleCape;
 
         private bool _savedBaseAttachmentTransform;
 
@@ -413,6 +420,11 @@ namespace Client.Main.Objects.Wings
                         await BMDLoader.Instance.Prepare(
                             "Item/DarkLordRobe02.bmd");
                 }
+                else if (requestedItemIndex == OverruleCapeItemIndex)
+                {
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare("Item/Wing51.bmd");
+                }
             }
             else
             {
@@ -497,6 +509,13 @@ namespace Client.Main.Objects.Wings
                         await BMDLoader.Instance.Prepare(
                             "Item/DarkLordRobe02.bmd");
                 }
+
+                if (resolvedModel == null &&
+                    requestedItemIndex == OverruleCapeItemIndex)
+                {
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare("Item/Wing51.bmd");
+                }
             }
 
 
@@ -514,6 +533,8 @@ namespace Client.Main.Objects.Wings
             bool isEmperorCape =
                 requestedItemIndex ==
                 EmperorCapeItemIndex;
+            bool isOverruleCape =
+                requestedItemIndex == OverruleCapeItemIndex;
 
 
             //
@@ -525,9 +546,17 @@ namespace Client.Main.Objects.Wings
             Model =
                 resolvedModel;
 
-            ApplyEmperorCapeState(
-                isEmperorCape &&
-                resolvedModel != null);
+            ApplyClassicCapeState(
+                resolvedModel == null
+                    ? (short)-1
+                    : isEmperorCape
+                        ? EmperorCapeItemIndex
+                        : isOverruleCape
+                            ? OverruleCapeItemIndex
+                            : (short)-1);
+
+            if (isOverruleCape && resolvedModel != null)
+                EnsureOverruleCapeCloth();
 
 
             // ========================================================
@@ -596,104 +625,64 @@ namespace Client.Main.Objects.Wings
 
 
         // ============================================================
-        // CAPE OF EMPEROR RIGID BMD TRANSFORM
+        // CLASSIC CAPES: RIGID BMD TRANSFORMS
         // ============================================================
 
-        private void ApplyEmperorCapeState(
-            bool enabled)
+        private void ApplyEmperorCapeState(bool enabled)
         {
-            if (enabled)
+            ApplyClassicCapeState(enabled ? EmperorCapeItemIndex : (short)-1);
+        }
+
+        private void ApplyClassicCapeState(short capeItemIndex)
+        {
+            bool emperor = capeItemIndex == EmperorCapeItemIndex;
+            bool overrule = capeItemIndex == OverruleCapeItemIndex;
+
+            if (emperor || overrule)
             {
-                //
-                // Save the normal wing transform only when entering
-                // Emperor Cape mode.
-                //
-                if (!_isEmperorCape)
+                // Save the normal wing transform only on first entry into
+                // cape mode. Switching between DL and RF must not overwrite it.
+                if (!_isEmperorCape && !_isOverruleCape)
                 {
-                    _savedBasePosition =
-                        Position;
-
-                    _savedBaseAngle =
-                        Angle;
-
-                    _savedBaseHiddenMesh =
-                        HiddenMesh;
-
-                    _savedBaseAttachmentTransform =
-                        true;
+                    _savedBasePosition = Position;
+                    _savedBaseAngle = Angle;
+                    _savedBaseHiddenMesh = HiddenMesh;
+                    _savedBaseAttachmentTransform = true;
                 }
 
+                ParentBoneLink = EmperorCapeBoneLink;
 
-                //
-                // Original MU:
-                //
-                //     w->LinkBone = 19;
-                //
-                ParentBoneLink =
-                    EmperorCapeBoneLink;
-
-
-                //
-                // Cape of Emperor:
-                //
-                // DarkLordRobe02 contains:
-                //
-                // mesh 0 = rigid upper frame / dl_redwings01
-                // mesh 1 = static cloth / dl_redwings03
-                // mesh 2 = static cloth / dl_redwings02
-                //
-                // Meshes 1 and 2 are replaced by EmperorCapeCloth.
-                //
+                // As with DL's DarkLordRobe02, the cape's cloth is
+                // produced separately by CPhysicsCloth. Render only the
+                // rigid model mesh 0, never the static cloth model meshes.
                 HiddenMesh = -2;
 
+                Position = overrule
+                    ? OverruleCapePosition
+                    : EmperorCapePosition;
+                Angle = EmperorCapeAngle;
 
-                Position =
-                    EmperorCapePosition;
-
-
-                Angle =
-                    EmperorCapeAngle;
-
-
-                _isEmperorCape =
-                    true;
-
-
+                _isEmperorCape = emperor;
+                _isOverruleCape = overrule;
                 return;
             }
 
+            bool wasCape = _isEmperorCape || _isOverruleCape;
+            ParentBoneLink = DefaultWingBoneLink;
 
-            //
-            // Restore standard wing attachment.
-            //
-            ParentBoneLink =
-                DefaultWingBoneLink;
+            if (wasCape)
+                HiddenMesh = _savedBaseHiddenMesh;
 
-            if (_isEmperorCape)
-                {
-                    HiddenMesh =
-                        _savedBaseHiddenMesh;
-                }
-
-            if (_isEmperorCape &&
-                _savedBaseAttachmentTransform)
+            if (wasCape && _savedBaseAttachmentTransform)
             {
-                Position =
-                    _savedBasePosition;
-
-                Angle =
-                    _savedBaseAngle;
+                Position = _savedBasePosition;
+                Angle = _savedBaseAngle;
             }
 
-
-            _savedBaseAttachmentTransform =
-                false;
-
-
-            _isEmperorCape =
-                false;
+            _savedBaseAttachmentTransform = false;
+            _isEmperorCape = false;
+            _isOverruleCape = false;
         }
-
 
         // ============================================================
         // CUSTOM EFFECT CHILDREN
@@ -790,20 +779,17 @@ namespace Client.Main.Objects.Wings
 
 
             // ========================================================
-            // CAPE OF EMPEROR
+            // CAPE OF EMPEROR (DL) / CAPE OF OVERRULE (RF)
             // ========================================================
 
-            if (_isEmperorCape &&
-                ItemIndex == EmperorCapeItemIndex &&
+            if (((_isEmperorCape && ItemIndex == EmperorCapeItemIndex) ||
+                 (_isOverruleCape && ItemIndex == OverruleCapeItemIndex)) &&
                 Model != null)
             {
                 //
-                // Keep the normal ModelObject render path alive, but suppress
-                // every mesh from DarkLordRobe02.
-                //
-                // This is important because meshes 1 and 2 contain the static
-                // versions of the cape surfaces that are now replaced by
-                // EmperorCapeCloth.
+                // Preserve the normal model lifecycle while suppressing
+                // the rigid BMD's static cloth portions. Both capes use
+                // separately simulated cloth grids anchored to player bone 19.
                 //
                 HiddenMesh =
                     -2;
@@ -814,19 +800,9 @@ namespace Client.Main.Objects.Wings
 
 
                 //
-                // DarkLordRobe02:
-                //
-                // mesh 0 -> dl_redwings01.jpg
-                //           rigid upper frame / ornament
-                //
-                // mesh 1 -> dl_redwings03.tga
-                //           replaced by physics cloth
-                //
-                // mesh 2 -> dl_redwings02.tga
-                //           replaced by physics cloth
-                //
-                // Temporarily allow meshes again and explicitly render only
-                // mesh 0.
+                // Draw the rigid ornament, not a duplicate static cape.
+                // DL: DarkLordRobe02.bmd; RF: Wing51.bmd.
+                // Temporarily permit mesh rendering for this one pass.
                 //
                 try
                 {

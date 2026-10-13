@@ -11,7 +11,15 @@ using System.Threading.Tasks;
 namespace Client.Main.Objects.Wings
 {
     /// <summary>
-    /// Classic MU Cape of Emperor cloth simulation.
+    /// Classic MU cape cloth simulation shared by:
+    /// - Dark Lord Cape of Emperor (12,40)
+    /// - Rage Fighter Cape of Overrule (12,50)
+    ///
+    /// Neither cape deforms its attached BMD. The original Main
+    /// constructs three separate CPhysicsCloth pieces instead.
+    ///
+    /// The RF variant uses its own textures, shape, collision radii
+    /// and mirrored PCT_ELASTIC_RAGE_L/R ribbon forces.
     ///
     /// The original MODEL_CAPE_OF_EMPEROR does NOT deform
     /// DarkLordRobe02.bmd.
@@ -44,8 +52,7 @@ namespace Client.Main.Objects.Wings
     ///    size      = 12 x 200
     ///    texture   = dl_redwings03
     ///
-    /// This ports only the subset of CPhysicsCloth needed
-    /// by Cape of Emperor.
+    /// This ports the subset of CPhysicsCloth required for both S3 capes.
     /// </summary>
     internal sealed class EmperorCapeCloth : EffectObject
     {
@@ -58,6 +65,13 @@ namespace Client.Main.Objects.Wings
 
         private const string RibbonTexturePath =
             "Item/dl_redwings03.OZT";
+
+        // Original BITMAP_MANTOE and BITMAP_MANTO01 from ZzzOpenData.cpp.
+        // The client data stores them as OZT (encrypted TGA).
+        private const string OverruleMainTexturePath =
+            "Item/monke_manto.OZT";
+        private const string OverruleRibbonTexturePath =
+            "Item/monk_manto01.OZT";
 
 
         // ============================================================
@@ -128,6 +142,10 @@ namespace Client.Main.Objects.Wings
 
         private readonly WingObject _owner;
 
+        // Reuse the existing DL simulator for RF, but keep independent
+        // cloth grids, collision radii and elastic ribbon directions.
+        private readonly bool _overruleCape;
+
 
         // ============================================================
         // TEXTURES
@@ -167,12 +185,14 @@ namespace Client.Main.Objects.Wings
         // ============================================================
 
         public EmperorCapeCloth(
-            WingObject owner)
+            WingObject owner,
+            bool overruleCape = false)
         {
             _owner =
                 owner ??
                 throw new ArgumentNullException(
                     nameof(owner));
+            _overruleCape = overruleCape;
 
 
             IsTransparent = true;
@@ -202,142 +222,101 @@ namespace Client.Main.Objects.Wings
             _mainCape =
                 new ClothPiece(
                     bone: 19,
-
-                    offset:
-                        new Vector3(
-                            0.0f,
-                            8.0f,
-                            10.0f),
-
+                    offset: _overruleCape
+                        ? new Vector3(0.0f, 15.0f, 5.0f)
+                        : new Vector3(0.0f, 8.0f, 10.0f),
                     columns: 10,
                     rows: 10,
-
                     width: 180.0f,
-                    height: 180.0f,
-
+                    height: _overruleCape ? 170.0f : 180.0f,
                     curved: true,
                     shortShoulder: true,
                     heavy: true,
-
-                    collisions:
-                        new[]
-                        {
-                            new CollisionSphereDefinition(
-                                bone: 17,
-                                localCenter:
-                                    new Vector3(
-                                        -10.0f,
-                                        -10.0f,
-                                        -10.0f),
-                                radius: 25.0f),
-
-                            new CollisionSphereDefinition(
-                                bone: 17,
-                                localCenter:
-                                    new Vector3(
-                                        10.0f,
-                                        -10.0f,
-                                        -10.0f),
-                                radius: 25.0f),
-
-                            new CollisionSphereDefinition(
-                                bone: 17,
-                                localCenter:
-                                    new Vector3(
-                                        -10.0f,
-                                        -10.0f,
-                                        20.0f),
-                                radius: 27.0f),
-
-                            new CollisionSphereDefinition(
-                                bone: 17,
-                                localCenter:
-                                    new Vector3(
-                                        10.0f,
-                                        -10.0f,
-                                        20.0f),
-                                radius: 27.0f)
-                        });
-
+                    collisions: _overruleCape
+                        ? CreateOverruleMainCollisions()
+                        : CreateEmperorMainCollisions());
 
             // ========================================================
-            // RIGHT RIBBON
+            // RIBBONS
+            // Classic RF ribbons have mirrored PCT_ELASTIC_RAGE_L/R.
+            // The DL ribbons have no additional horizontal elasticity.
             // ========================================================
 
             _rightRibbon =
                 new ClothPiece(
                     bone: 19,
-
-                    offset:
-                        new Vector3(
-                            30.0f,
-                            15.0f,
-                            10.0f),
-
+                    offset: _overruleCape
+                        ? new Vector3(25.0f, 15.0f, 2.0f)
+                        : new Vector3(30.0f, 15.0f, 10.0f),
                     columns: 2,
                     rows: 5,
-
                     width: 12.0f,
-                    height: 200.0f,
-
+                    height: _overruleCape ? 180.0f : 200.0f,
                     curved: false,
                     shortShoulder: false,
                     heavy: false,
-
-                    collisions:
-                        CreateRibbonCollisions());
-
-
-            // ========================================================
-            // LEFT RIBBON
-            // ========================================================
+                    collisions: _overruleCape
+                        ? CreateOverruleRibbonCollisions(45.0f)
+                        : CreateRibbonCollisions(),
+                    elasticDirection: _overruleCape ? -1 : 0);
 
             _leftRibbon =
                 new ClothPiece(
                     bone: 19,
-
-                    offset:
-                        new Vector3(
-                            -30.0f,
-                            20.0f,
-                            10.0f),
-
+                    offset: _overruleCape
+                        ? new Vector3(-25.0f, 15.0f, 2.0f)
+                        : new Vector3(-30.0f, 20.0f, 10.0f),
                     columns: 2,
                     rows: 5,
-
                     width: 12.0f,
-                    height: 200.0f,
-
+                    height: _overruleCape ? 180.0f : 200.0f,
                     curved: false,
                     shortShoulder: false,
                     heavy: false,
-
-                    collisions:
-                        CreateRibbonCollisions());
+                    collisions: _overruleCape
+                        ? CreateOverruleRibbonCollisions(50.0f)
+                        : CreateRibbonCollisions(),
+                    elasticDirection: _overruleCape ? 1 : 0);
         }
 
-
-        private static CollisionSphereDefinition[]
-            CreateRibbonCollisions()
+        private static CollisionSphereDefinition[] CreateEmperorMainCollisions()
         {
-            return
-                new[]
-                {
-                    new CollisionSphereDefinition(
-                        bone: 2,
-                        localCenter:
-                            new Vector3(
-                                0.0f,
-                                -15.0f,
-                                -20.0f),
-                        radius: 30.0f),
+            return new[]
+            {
+                new CollisionSphereDefinition(17, new Vector3(-10, -10, -10), 25),
+                new CollisionSphereDefinition(17, new Vector3(10, -10, -10), 25),
+                new CollisionSphereDefinition(17, new Vector3(-10, -10, 20), 27),
+                new CollisionSphereDefinition(17, new Vector3(10, -10, 20), 27)
+            };
+        }
 
-                    new CollisionSphereDefinition(
-                        bone: 17,
-                        localCenter:
-                            Vector3.Zero,
-                        radius: 35.0f)
-                };
+        private static CollisionSphereDefinition[] CreateOverruleMainCollisions()
+        {
+            return new[]
+            {
+                new CollisionSphereDefinition(17, new Vector3(-10, -10, -10), 35),
+                new CollisionSphereDefinition(17, new Vector3(10, -10, -10), 35),
+                new CollisionSphereDefinition(17, new Vector3(-10, -10, 20), 37),
+                new CollisionSphereDefinition(17, new Vector3(10, -10, 20), 37)
+            };
+        }
+
+        private static CollisionSphereDefinition[] CreateRibbonCollisions()
+        {
+            return new[]
+            {
+                new CollisionSphereDefinition(2, new Vector3(0, -15, -20), 30),
+                new CollisionSphereDefinition(17, Vector3.Zero, 35)
+            };
+        }
+
+        private static CollisionSphereDefinition[] CreateOverruleRibbonCollisions(float torsoRadius)
+        {
+            return new[]
+            {
+                new CollisionSphereDefinition(2, new Vector3(0, -15, -20), 35),
+                new CollisionSphereDefinition(17, Vector3.Zero, torsoRadius)
+            };
         }
 
 
@@ -347,22 +326,23 @@ namespace Client.Main.Objects.Wings
 
         public override async Task LoadContent()
         {
-            await Task.WhenAll(
-                TextureLoader.Instance.Prepare(
-                    MainCapeTexturePath),
+            string mainPath = _overruleCape
+                ? OverruleMainTexturePath
+                : MainCapeTexturePath;
+            string ribbonPath = _overruleCape
+                ? OverruleRibbonTexturePath
+                : RibbonTexturePath;
 
-                TextureLoader.Instance.Prepare(
-                    RibbonTexturePath));
+            await Task.WhenAll(
+                TextureLoader.Instance.Prepare(mainPath),
+                TextureLoader.Instance.Prepare(ribbonPath));
 
 
             _mainCapeTexture =
-                TextureLoader.Instance.GetTexture2D(
-                    MainCapeTexturePath);
-
+                TextureLoader.Instance.GetTexture2D(mainPath);
 
             _ribbonTexture =
-                TextureLoader.Instance.GetTexture2D(
-                    RibbonTexturePath);
+                TextureLoader.Instance.GetTexture2D(ribbonPath);
 
 
             _mainCape.Texture =
@@ -589,7 +569,9 @@ namespace Client.Main.Objects.Wings
             player = null;
 
 
-            if (!_owner.IsEmperorCapeClothActive ||
+            if (!(_overruleCape
+                    ? _owner.IsOverruleCapeClothActive
+                    : _owner.IsEmperorCapeClothActive) ||
                 _owner.Hidden)
             {
                 return false;
@@ -1324,6 +1306,9 @@ namespace Client.Main.Objects.Wings
 
             private readonly bool _heavy;
 
+            // -1 / +1 reproduce PCT_ELASTIC_RAGE_L / PCT_ELASTIC_RAGE_R.
+            private readonly int _elasticDirection;
+
 
             private readonly CollisionSphereDefinition[]
                 _collisions;
@@ -1381,7 +1366,8 @@ namespace Client.Main.Objects.Wings
                 bool curved,
                 bool shortShoulder,
                 bool heavy,
-                CollisionSphereDefinition[] collisions)
+                CollisionSphereDefinition[] collisions,
+                int elasticDirection = 0)
             {
                 _bone =
                     bone;
@@ -1409,6 +1395,8 @@ namespace Client.Main.Objects.Wings
 
                 _heavy =
                     heavy;
+
+                _elasticDirection = elasticDirection;
 
 
                 _collisions =
@@ -1975,6 +1963,20 @@ namespace Client.Main.Objects.Wings
                         -
                         vertex.Velocity *
                         0.01f;
+
+                    // PCT_ELASTIC_RAGE_L/R (PhysicsManager.cpp):
+                    // force.x += +/- fRand * fWind * 0.8 * FPS_FACTOR.
+                    // The simulation already distributes legacy time in
+                    // its substeps. Use the existing wind magnitude and
+                    // this vertex's original fRand for the mirrored impulse.
+                    if (_elasticDirection != 0)
+                    {
+                        vertex.Force.X +=
+                            _elasticDirection *
+                            randomForce *
+                            wind.Length() *
+                            0.8f;
+                    }
 
 
                     float weight =
