@@ -111,11 +111,12 @@ namespace Client.Main.Core.Utilities
         public static int GetSkillAnimation(
             int skillId)
         {
-            // Fire Scream plays its correct foot/Dark Horse/Fenrir strike
-            // when the local cast is issued. Do not let the server echo
-            // overwrite that mounted action with PlayerAttackStrike.
-            // Remote casts use PlayerObject.GetSkillAction directly.
-            if (skillId is 78 or 518)
+            // Fire Scream and Fire Burst play their correct
+            // foot/Dark Horse/Fenrir strike when the cast is issued.
+            // Do not let the server echo overwrite mounted actions
+            // with PlayerAttackStrike. Remote casts resolve via
+            // PlayerObject.GetSkillAction directly.
+            if (skillId is 78 or 518 or 61 or 508 or 514)
                 return -1;
 
             if (Season6SkillActionDatabase.TryGet(
