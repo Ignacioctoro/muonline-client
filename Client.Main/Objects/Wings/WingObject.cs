@@ -60,6 +60,9 @@ namespace Client.Main.Objects.Wings
 
         private const short EmperorCapeItemIndex = 40;
         private const short OverruleCapeItemIndex = 50;
+        // Unlike the other capes, original Cape of Lord is in group 13.
+        private const short LordCapeItemIndex = 30;
+        private const short FighterCapeItemIndex = 49;
 
 
         // ============================================================
@@ -372,9 +375,11 @@ namespace Client.Main.Objects.Wings
             }
 
 
+            // Cape of Lord is item 13,30 (MODEL_HELPER + 30).
+            // Its index alone overlaps group 12,30, an unrelated item.
             ItemDefinition itemDefinition =
                 ItemDatabase.GetItemDefinition(
-                    12,
+                    requestedItemIndex == LordCapeItemIndex ? (byte)13 : (byte)12,
                     requestedItemIndex);
 
 
@@ -393,16 +398,13 @@ namespace Client.Main.Objects.Wings
                     modelPath))
             {
                 //
-                // Existing Cape of Lord fallback.
-                //
-                if (requestedItemIndex == 30)
+                // Original Cape of Lord (13,30): separate from
+                // DarkLordRobe02, the Cape of Emperor model.
+                if (requestedItemIndex == LordCapeItemIndex)
                 {
                     resolvedModel =
                         await BMDLoader.Instance.Prepare(
-                            "Item/DarkLordRobe.bmd")
-                        ??
-                        await BMDLoader.Instance.Prepare(
-                            "Item/DarkLordRobe02.bmd");
+                            "Item/DarkLordRobe.bmd");
                 }
 
                 //
@@ -424,6 +426,11 @@ namespace Client.Main.Objects.Wings
                 {
                     resolvedModel =
                         await BMDLoader.Instance.Prepare("Item/Wing51.bmd");
+                }
+                else if (requestedItemIndex == FighterCapeItemIndex)
+                {
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare("Item/Wing50.bmd");
                 }
             }
             else
@@ -480,6 +487,7 @@ namespace Client.Main.Objects.Wings
                 // Existing compatibility fallback for the old cape.
                 //
                 if (resolvedModel == null &&
+                    requestedItemIndex != LordCapeItemIndex &&
                     normalized.EndsWith(
                         "DarkLordRobe.bmd",
                         StringComparison.OrdinalIgnoreCase))
@@ -515,6 +523,18 @@ namespace Client.Main.Objects.Wings
                 {
                     resolvedModel =
                         await BMDLoader.Instance.Prepare("Item/Wing51.bmd");
+                }
+                if (resolvedModel == null &&
+                    requestedItemIndex == FighterCapeItemIndex)
+                {
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare("Item/Wing50.bmd");
+                }
+                if (resolvedModel == null &&
+                    requestedItemIndex == LordCapeItemIndex)
+                {
+                    resolvedModel =
+                        await BMDLoader.Instance.Prepare("Item/DarkLordRobe.bmd");
                 }
             }
 
@@ -557,6 +577,12 @@ namespace Client.Main.Objects.Wings
 
             if (isOverruleCape && resolvedModel != null)
                 EnsureOverruleCapeCloth();
+            else if (requestedItemIndex == LordCapeItemIndex &&
+                     resolvedModel != null)
+                EnsureLordCapeCloth();
+            else if (requestedItemIndex == FighterCapeItemIndex &&
+                     resolvedModel != null)
+                EnsureFighterCapeCloth();
 
 
             // ========================================================

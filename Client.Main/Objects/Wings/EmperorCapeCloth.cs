@@ -73,6 +73,10 @@ namespace Client.Main.Objects.Wings
         private const string OverruleRibbonTexturePath =
             "Item/monk_manto01.OZT";
 
+        // S2 Cape of Lord uses Player/DarklordRobe, not the Item BMD texture.
+        private const string LordMainTexturePath = "Player/DarklordRobe.OZT";
+        private const string FighterMainTexturePath = "Item/NCcape.OZT";
+
 
         // ============================================================
         // CLASSIC PHYSICS CONSTANTS
@@ -145,6 +149,10 @@ namespace Client.Main.Objects.Wings
         // Reuse the existing DL simulator for RF, but keep independent
         // cloth grids, collision radii and elastic ribbon directions.
         private readonly bool _overruleCape;
+        private readonly bool _lordCape;
+        private readonly bool _fighterCape;
+
+        private bool IsSingleClothCape => _lordCape || _fighterCape;
 
 
         // ============================================================
@@ -186,13 +194,17 @@ namespace Client.Main.Objects.Wings
 
         public EmperorCapeCloth(
             WingObject owner,
-            bool overruleCape = false)
+            bool overruleCape = false,
+            bool lordCape = false,
+            bool fighterCape = false)
         {
             _owner =
                 owner ??
                 throw new ArgumentNullException(
                     nameof(owner));
             _overruleCape = overruleCape;
+            _lordCape = lordCape;
+            _fighterCape = fighterCape;
 
 
             IsTransparent = true;
@@ -222,17 +234,18 @@ namespace Client.Main.Objects.Wings
             _mainCape =
                 new ClothPiece(
                     bone: 19,
-                    offset: _overruleCape
+                    offset: _overruleCape || _fighterCape
                         ? new Vector3(0.0f, 15.0f, 5.0f)
                         : new Vector3(0.0f, 8.0f, 10.0f),
                     columns: 10,
                     rows: 10,
                     width: 180.0f,
-                    height: _overruleCape ? 170.0f : 180.0f,
+                    height: _overruleCape || _fighterCape ? 170.0f : 180.0f,
                     curved: true,
                     shortShoulder: true,
-                    heavy: true,
-                    collisions: _overruleCape
+                    // Original Cape of Lord does not use PCT_HEAVY.
+                    heavy: !_lordCape,
+                    collisions: _overruleCape || _fighterCape
                         ? CreateOverruleMainCollisions()
                         : CreateEmperorMainCollisions());
 
@@ -326,23 +339,30 @@ namespace Client.Main.Objects.Wings
 
         public override async Task LoadContent()
         {
-            string mainPath = _overruleCape
-                ? OverruleMainTexturePath
-                : MainCapeTexturePath;
+            string mainPath = _lordCape
+                ? LordMainTexturePath
+                : _fighterCape
+                    ? FighterMainTexturePath
+                    : _overruleCape
+                        ? OverruleMainTexturePath
+                        : MainCapeTexturePath;
             string ribbonPath = _overruleCape
                 ? OverruleRibbonTexturePath
                 : RibbonTexturePath;
 
-            await Task.WhenAll(
-                TextureLoader.Instance.Prepare(mainPath),
-                TextureLoader.Instance.Prepare(ribbonPath));
-
+            if (IsSingleClothCape)
+                await TextureLoader.Instance.Prepare(mainPath);
+            else
+                await Task.WhenAll(
+                    TextureLoader.Instance.Prepare(mainPath),
+                    TextureLoader.Instance.Prepare(ribbonPath));
 
             _mainCapeTexture =
                 TextureLoader.Instance.GetTexture2D(mainPath);
 
-            _ribbonTexture =
-                TextureLoader.Instance.GetTexture2D(ribbonPath);
+            _ribbonTexture = IsSingleClothCape
+                ? null
+                : TextureLoader.Instance.GetTexture2D(ribbonPath);
 
 
             _mainCape.Texture =
@@ -435,11 +455,11 @@ namespace Client.Main.Objects.Wings
             _mainCape.SyncPinnedVertices(
                 player);
 
-            _rightRibbon.SyncPinnedVertices(
-                player);
-
-            _leftRibbon.SyncPinnedVertices(
-                player);
+            if (!IsSingleClothCape)
+            {
+                _rightRibbon.SyncPinnedVertices(player);
+                _leftRibbon.SyncPinnedVertices(player);
+            }
 
 
             float dt =
@@ -531,15 +551,14 @@ namespace Client.Main.Objects.Wings
                     substepTime);
 
 
-            bool rightOk =
+            bool rightOk = IsSingleClothCape ||
                 _rightRibbon.StepClassic(
                     player,
                     wind,
                     worldTimeSeconds,
                     substepTime);
 
-
-            bool leftOk =
+            bool leftOk = IsSingleClothCape ||
                 _leftRibbon.StepClassic(
                     player,
                     wind,
@@ -569,10 +588,15 @@ namespace Client.Main.Objects.Wings
             player = null;
 
 
-            if (!(_overruleCape
-                    ? _owner.IsOverruleCapeClothActive
-                    : _owner.IsEmperorCapeClothActive) ||
-                _owner.Hidden)
+            bool activeCape = _lordCape
+                ? _owner.IsLordCapeClothActive
+                : _fighterCape
+                    ? _owner.IsFighterCapeClothActive
+                    : _overruleCape
+                        ? _owner.IsOverruleCapeClothActive
+                        : _owner.IsEmperorCapeClothActive;
+
+            if (!activeCape || _owner.Hidden)
             {
                 return false;
             }
@@ -612,14 +636,8 @@ namespace Client.Main.Objects.Wings
                     player);
 
 
-            bool rightOk =
-                _rightRibbon.Initialize(
-                    player);
-
-
-            bool leftOk =
-                _leftRibbon.Initialize(
-                    player);
+            bool rightOk = IsSingleClothCape || _rightRibbon.Initialize(player);
+            bool leftOk = IsSingleClothCape || _leftRibbon.Initialize(player);
 
 
             _simulationInitialized =
@@ -653,9 +671,11 @@ namespace Client.Main.Objects.Wings
 
             _mainCape.Reset();
 
-            _rightRibbon.Reset();
-
-            _leftRibbon.Reset();
+            if (!IsSingleClothCape)
+            {
+                _rightRibbon.Reset();
+                _leftRibbon.Reset();
+            }
         }
 
 
@@ -745,8 +765,8 @@ namespace Client.Main.Objects.Wings
 
             if (_mainCapeTexture == null ||
                 _mainCapeTexture.IsDisposed ||
-                _ribbonTexture == null ||
-                _ribbonTexture.IsDisposed)
+                (!IsSingleClothCape &&
+                    (_ribbonTexture == null || _ribbonTexture.IsDisposed)))
             {
                 base.Draw(
                     gameTime);
@@ -899,16 +919,11 @@ namespace Client.Main.Objects.Wings
                     _mainCape);
 
 
-                DrawPiece(
-                    device,
-                    effect,
-                    _rightRibbon);
-
-
-                DrawPiece(
-                    device,
-                    effect,
-                    _leftRibbon);
+                if (!IsSingleClothCape)
+                {
+                    DrawPiece(device, effect, _rightRibbon);
+                    DrawPiece(device, effect, _leftRibbon);
+                }
             }
             finally
             {

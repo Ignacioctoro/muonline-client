@@ -4642,18 +4642,18 @@ namespace Client.Main.Objects.Player
 
         private static string TryGetWingTexturePath(WingAppearance wingAppearance, CharacterClassNumber characterClass)
         {
-            if (wingAppearance.ItemIndex >= 0)
-            {
-                return ItemDatabase.GetItemDefinition(12, wingAppearance.ItemIndex)?.TexturePath;
-            }
-
             var mappedIndex = TryMapWingAppearanceToItemIndex(wingAppearance, characterClass);
-            if (mappedIndex.HasValue)
-            {
-                return ItemDatabase.GetItemDefinition(12, mappedIndex.Value)?.TexturePath;
-            }
+            if (!mappedIndex.HasValue)
+                return null;
 
-            return null;
+            // MU's Cape of Lord is 13,30, unlike all other wings and capes
+            // in this function, which are group 12.
+            byte group = IsDarkLordClass(characterClass) &&
+                         mappedIndex.Value == CapeOfLordItemIndex
+                ? (byte)13
+                : (byte)12;
+
+            return ItemDatabase.GetItemDefinition(group, mappedIndex.Value)?.TexturePath;
         }
 
         private static bool IsDarkLordClass(CharacterClassNumber characterClass) =>

@@ -4,6 +4,8 @@ namespace Client.Main.Objects.Wings
     {
         private EmperorCapeCloth _emperorCapeCloth;
         private EmperorCapeCloth _overruleCapeCloth;
+        private EmperorCapeCloth _lordCapeCloth;
+        private EmperorCapeCloth _fighterCapeCloth;
 
 
         /// <summary>
@@ -19,6 +21,15 @@ namespace Client.Main.Objects.Wings
             _isOverruleCape &&
             ItemIndex == OverruleCapeItemIndex &&
             Model != null;
+
+        // S2 cloth is simulated independently from the normal BMD renderer.
+        // It uses player bone 19, while the rigid S2 BMD follows the
+        // original default wing attachment on bone 47.
+        internal bool IsLordCapeClothActive =>
+            ItemIndex == LordCapeItemIndex && Model != null;
+
+        internal bool IsFighterCapeClothActive =>
+            ItemIndex == FighterCapeItemIndex && Model != null;
 
 
         /// <summary>
@@ -46,6 +57,10 @@ namespace Client.Main.Objects.Wings
 
                 if (ItemIndex == OverruleCapeItemIndex)
                     EnsureOverruleCapeCloth();
+                else if (ItemIndex == LordCapeItemIndex)
+                    EnsureLordCapeCloth();
+                else if (ItemIndex == FighterCapeItemIndex)
+                    EnsureFighterCapeCloth();
             }
         }
 
@@ -79,6 +94,30 @@ namespace Client.Main.Objects.Wings
 
             if (!Children.Contains(_overruleCapeCloth))
                 Children.Add(_overruleCapeCloth);
+        }
+
+        private void EnsureLordCapeCloth()
+        {
+            if (Parent == null)
+                return;
+
+            if (_lordCapeCloth == null)
+                _lordCapeCloth = new EmperorCapeCloth(this, lordCape: true);
+
+            if (!Children.Contains(_lordCapeCloth))
+                Children.Add(_lordCapeCloth);
+        }
+
+        private void EnsureFighterCapeCloth()
+        {
+            if (Parent == null)
+                return;
+
+            if (_fighterCapeCloth == null)
+                _fighterCapeCloth = new EmperorCapeCloth(this, fighterCape: true);
+
+            if (!Children.Contains(_fighterCapeCloth))
+                Children.Add(_fighterCapeCloth);
         }
     }
 }
