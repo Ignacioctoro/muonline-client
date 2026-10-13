@@ -123,6 +123,22 @@ namespace Client.Main.Objects.Effects.Skills
             bool inImpactWindow = usableFrames >= 4 &&
                 frame >= impactBegin && frame <= impactEnd;
 
+            // Main triggers FuryStrike Kind=2 at WeaponLevel 19, before
+            // the horse reaches its original 8..9.5 impact window.
+            // The 7-key Broyal horse reaches its adapted contact window
+            // much earlier, so keeping tick 19 spawns the explosion AFTER
+            // the stones, leaving WeaponLevel large (and the ring far away).
+            // Shift the FuryStrike trigger by the same number of action
+            // frames, using the BMD's actual PlaySpeed. This restores the
+            // original ordering and counter reset (-3), so the native
+            // radial formula places rocks close to the explosion.
+            float actionPlaySpeed = horseAction.PlaySpeed == 0f
+                ? 1f : horseAction.PlaySpeed;
+            int furyTriggerTick = shortenedAttack
+                ? Math.Clamp(19 + (int)MathF.Round(
+                    (impactBegin - 8f) / actionPlaySpeed), 1, 19)
+                : 19;
+
             Vector3 origin = _horse.WorldPosition.Translation;
             Vector3 angle = _horse.TotalAngle;
             ClassicFxOwner horseOwner = ClassicFxOwner.FromWorldObject(_horse);
@@ -161,7 +177,7 @@ namespace Client.Main.Objects.Effects.Skills
             for (int tick = 0; tick < advanced; tick++)
             {
                 _weaponLevel++;
-                if (!_furyTriggered && _weaponLevel == 19 &&
+                if (!_furyTriggered && _weaponLevel == furyTriggerTick &&
                     !inImpactWindow)
                 {
                     // Last positional argument to CreateEffect is Kind=2
@@ -200,6 +216,8 @@ namespace Client.Main.Objects.Effects.Skills
             // GOBoid: six stones rotated around the horse at 60 degrees.
             // o->WeaponLevel is reset to -3 when FuryStrike Kind 2 fires.
             // C++ divides the integer WeaponLevel by 2 before scaling.
+            // FuryStrike must already have reset this counter to -3
+            // at impact, otherwise the stones form an oversized ring.
             float radius = 150f * (_weaponLevel / 2);
             float start = MathHelper.ToRadians(fx.Random.Modulo(360));
             const float step = MathHelper.TwoPi / 6f;
