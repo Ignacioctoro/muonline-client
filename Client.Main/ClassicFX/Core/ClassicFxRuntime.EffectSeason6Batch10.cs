@@ -10,6 +10,7 @@ using Client.Main.ClassicFX.Data;
 using Client.Main.Controls;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.ClassicFX.Core
 {
