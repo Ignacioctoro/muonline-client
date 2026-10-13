@@ -590,13 +590,6 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.WeaponAttack);
 
             Add(
-                61,
-                "Fire Burst",
-                SkillType.Target,
-                Season6SkillAnimationMode.Explicit,
-                PlayerAction.PlayerAttackStrike);
-
-            Add(
                 62,
                 "Earthshake",
                 SkillType.Area,
