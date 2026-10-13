@@ -14,12 +14,12 @@ public static class VehicleDatabase
                 RiderHeightOffset = 0f,
                 IdleActionIndex = 0,
                 RunActionIndex = 2,
-                SkillActionIndex = 6,
+                SkillActionIndex = 3, // MuMain: MODEL_DARK_HORSE action 3 during PLAYER_ATTACK_DARKHORSE
                 ActionPlaySpeedOverrides = new Dictionary<int, float>
                 {
                     [0] = 0.3f,  // default
-                    [2] = 0.34f, // run
-                    [6] = 0.34f, // horse attack
+                    [2] = 0.34f, // run (kept unchanged outside Earthshake)
+                    [3] = 0.34f, // native horse attack
                 },
             }
         },
