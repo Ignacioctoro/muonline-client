@@ -713,7 +713,7 @@ namespace Client.Main.ClassicFX.Core
                 (!float.IsFinite(scale) || scale <= 0f))
                 return ClassicFxHandle.Invalid;
             // Preserve already-ported Wizardry subtypes ShockWave 14 / Twlight 3.
-            bool terrain = (type == ClassicFxEffectType.ShockWave && subType == 14) ||
+            bool terrain = (type == ClassicFxEffectType.ShockWave && (subType == 0 || subType == 14)) ||
                            (type == ClassicFxEffectType.Twlight && subType == 3);
             if (magicGround2 && subType == 7 && owner.WorldObject == null)
                 return ClassicFxHandle.Invalid; // Native subtype 7 follows Owner.
@@ -1985,8 +1985,21 @@ namespace Client.Main.ClassicFX.Core
 
         private void MoveTerrainEffect(ref EffectState e, float f)
         {
-            // Source MoveHandlers.cpp: Move_BITMAP_SHOCK_WAVE/Move_BITMAP_TWLIGHT.
-            // Both of Wizardry's subtypes use the same scale/fade logic.
+            // MuMain Move_BITMAP_SHOCK_WAVE subtype 0 (Dark Horse):
+            // the 20-unit terrain wave shrinks one unit per 25-Hz tick;
+            // light peaks at LifeTime=20, then fades. Unlike subtype 14,
+            // the wave stays at its creation point, not on its owner.
+            if (e.Type == ClassicFxEffectType.ShockWave && e.SubType == 0)
+            {
+                e.Scale = MathF.Max(0f, e.Scale - f);
+                float luminosity = e.LifeTime <= 20f
+                    ? e.LifeTime / 20f
+                    : (40f - e.LifeTime) / 20f;
+                e.Light = new Vector3(MathHelper.Clamp(luminosity, 0f, 1f));
+                return;
+            }
+
+            // Native Wizardry ShockWave 14 / Twlight 3.
             WorldObject owner = e.Owner.WorldObject;
             if (owner != null && ReferenceEquals(owner.World, World) &&
                 owner.Status != GameControlStatus.Disposed)

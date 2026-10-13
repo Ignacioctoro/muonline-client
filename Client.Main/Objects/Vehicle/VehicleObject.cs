@@ -567,6 +567,55 @@ public class VehicleObject : ModelObject
                     return itemIndex >= 11 && itemIndex <= 18;
                 }
 
+    /// <summary>
+    /// Fractional BMD action frame, driven by MonoGame time and the
+    /// action's original 25-Hz PlaySpeed. Earthshake must detect the
+    /// native horse contact window (8..9.5), not use render-frame counts.
+    /// </summary>
+    public float NativeActionFrame
+    {
+        get
+        {
+            if (Model?.Actions == null ||
+                CurrentAction < 0 ||
+                CurrentAction >= Model.Actions.Length)
+                return 0f;
+
+            var action = Model.Actions[CurrentAction];
+            if (action == null)
+                return 0f;
+
+            int frames = Math.Max(
+                action.LockPositions
+                    ? action.NumAnimationKeys - 1
+                    : action.NumAnimationKeys, 1);
+
+            return HoldOnLastFrame
+                ? (float)Math.Min(_animTime, Math.Max(0, frames - 2))
+                : (float)(_animTime % frames);
+        }
+    }
+
+    // MuMain OBJECT::LastHorseWaveEffect persists across casts.
+    // Unlike a per-skill timer, this prevents repeated 400-ms waves
+    // when Dark Horse Earthshake is cast rapidly.
+    private double _lastDarkHorseWaveSeconds = double.NegativeInfinity;
+
+    public bool TryConsumeDarkHorseWave(double worldSeconds)
+    {
+        if (itemIndex != 0 || !double.IsFinite(worldSeconds))
+            return false;
+
+        if (worldSeconds < _lastDarkHorseWaveSeconds)
+            _lastDarkHorseWaveSeconds = double.NegativeInfinity;
+
+        if (worldSeconds - _lastDarkHorseWaveSeconds < 0.4)
+            return false;
+
+        _lastDarkHorseWaveSeconds = worldSeconds;
+        return true;
+    }
+
     private Vector3 GetFenrirThunderColor()
     {
         return
