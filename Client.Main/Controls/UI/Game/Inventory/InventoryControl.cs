@@ -334,6 +334,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private readonly List<LayoutInfo> _layoutInfos = new();
         private readonly Dictionary<string, TextureRectData> _textureRectLookup = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<byte, EquipSlotLayout> _equipSlots = new();
+        private CharacterClassNumber? _equipmentLayoutClass;
         private Vector2 _layoutScale = Vector2.One;
 
         private static InventoryControl _instance;
@@ -1350,9 +1351,30 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 28);
         }
 
+        private void SyncEquipmentSlotsForClass()
+        {
+            var state = _networkManager?.GetCharacterState();
+            if (state == null)
+                return;
+
+            var characterClass = (CharacterClassNumber)state.Class;
+            if (_equipmentLayoutClass == characterClass)
+                return;
+
+            _equipmentLayoutClass = characterClass;
+            // The layout rectangle stays unchanged: only the class-specific
+            // visible/hittable equipment slots are rebuilt.
+            BuildEquipSlots();
+        }
+
         private void BuildEquipSlots()
         {
             _equipSlots.Clear();
+
+            bool isRageFighter = _equipmentLayoutClass is
+                CharacterClassNumber.RageFighter or CharacterClassNumber.FistMaster;
+            bool isMagicGladiator = _equipmentLayoutClass is
+                CharacterClassNumber.MagicGladiator or CharacterClassNumber.DuelMaster;
 
             const byte PendantSlot = 9;
             const byte LeftRingSlot = 10;
@@ -1369,12 +1391,20 @@ namespace Client.Main.Controls.UI.Game.Inventory
             AddEquipSlot(8, new Point(leftX, topY), new Point(2, 2), "PET");
 
             int leftWeaponY = topY + cell * 2 + 4;
-            AddEquipSlot(0, new Point(leftX, leftWeaponY), new Point(2, 3), "LEFT", accentRed: true);
+            // RF's fist gloves/claws are weapons in slots 0 and 1, NOT
+            // armor gloves in slot 5. Keep both hand slots and their packet IDs.
+            AddEquipSlot(0, new Point(leftX, leftWeaponY), new Point(2, 3),
+                isRageFighter ? "FIST" : "LEFT", accentRed: true);
 
-            int glovesY = leftWeaponY + cell * 3 + 6;
-            AddEquipSlot(5, new Point(leftX, glovesY), new Point(2, 2), "GLOVES");
+            if (!isRageFighter)
+            {
+                int glovesY = leftWeaponY + cell * 3 + 6;
+                AddEquipSlot(5, new Point(leftX, glovesY), new Point(2, 2), "GLOVES");
+            }
 
-            AddEquipSlot(2, new Point(centerX, topY - 2), new Point(2, 2), "HELM");
+            // MG / Duel Master have no helm equipment slot.
+            if (!isMagicGladiator)
+                AddEquipSlot(2, new Point(centerX, topY - 2), new Point(2, 2), "HELM");
 
             int chestY = topY - 2 + cell * 2;
             int pendantY = chestY + cell / 2;
@@ -1408,7 +1438,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             AddEquipSlot(7, new Point(wingsX, topY - 6), new Point(3, 2), "WINGS");
 
             int rightWeaponY = topY + cell * 2 + 4;
-            AddEquipSlot(1, new Point(rightX, rightWeaponY), new Point(2, 3), "RIGHT");
+            AddEquipSlot(1, new Point(rightX, rightWeaponY), new Point(2, 3),
+                isRageFighter ? "FIST" : "RIGHT");
 
             int bootsY = rightWeaponY + cell * 3 + 6;
             AddEquipSlot(6, new Point(rightX, bootsY), new Point(2, 2), "BOOTS");
@@ -2103,6 +2134,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return;
             }
 
+            SyncEquipmentSlotsForClass();
+
             _items.Clear();
             _itemGrid = new InventoryItem[Columns, Rows];
             _equippedItems.Clear();
@@ -2671,6 +2704,11 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private bool TryPlacePickedItemIntoEquipSlot(byte equipSlot)
         {
+            // Hidden class-restricted slots must never be valid drop targets.
+            // OpenMU still owns the authoritative item/class compatibility rules.
+            if (!_equipSlots.ContainsKey(equipSlot))
+                return false;
+
             var itemToPlace = _pickedItemRenderer.Item;
             if (itemToPlace == null)
             {
