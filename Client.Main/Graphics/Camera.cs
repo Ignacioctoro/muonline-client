@@ -32,7 +32,7 @@ namespace Client.Main.Graphics
 
         // Main's global EarthQuake is an additive CAMERA PITCH (degrees),
         // independent of the modern positional screen shake.
-        // Scope this bridge to MODEL_SKILL_FURY_STRIKE + 1 only.
+        // Shared by native FuryStrike ground impact and Dark Horse Earthshake.
         private float _nativeFuryStrikePitchDegrees;
 
         // Public Properties
@@ -109,17 +109,20 @@ namespace Client.Main.Graphics
         }
 
         /// <summary>
-        /// Main ZzzEffect.cpp MODEL_SKILL_FURY_STRIKE + 1 writes EarthQuake
-        /// as (rand()%8 - 4) * 0.1f. DefaultCamera::SetCameraAngle applies
-        /// that value to pitch, not to camera position.
+        /// MuMain's EarthQuake modifies camera pitch, not camera position.
+        /// FuryStrike and Dark Horse Earthshake both write this same value.
         /// </summary>
-        public void SetNativeFuryStrikePitch(float pitchDegrees)
+        public void SetNativeEarthQuakePitch(float pitchDegrees)
         {
             if (!float.IsFinite(pitchDegrees))
                 return;
             _nativeFuryStrikePitchDegrees = pitchDegrees;
             UpdateView();
         }
+
+        // Preserve the existing Rageful Blow / Fury Strike callers.
+        public void SetNativeFuryStrikePitch(float pitchDegrees) =>
+            SetNativeEarthQuakePitch(pitchDegrees);
 
         /// <summary>
         /// Call once per frame from the main update loop to advance shake timer.
