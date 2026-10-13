@@ -649,6 +649,28 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerAttackStrike);
 
+            // AT_SKILL_FIREBURST / _STR / _MASTERY: target-hit
+            // attack, strike pose on foot and mount-specific strike
+            // resolved in PlayerObject.GetSkillAction().
+            Add(
+                61,
+                "Fire Burst",
+                SkillType.Target,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
+            Add(
+                508,
+                "Fire Burst (Strengthener)",
+                SkillType.Target,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
+            Add(
+                514,
+                "Fire Burst (Mastery)",
+                SkillType.Target,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
+
             Add(
                 74,
                 "Fire Blast",
