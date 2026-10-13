@@ -126,8 +126,11 @@ namespace Client.Main.Objects.Effects.Skills
 
             // Native GOBoid misuses WeaponLevel as a render frame counter.
             // Convert that counter into reference ticks once per cast.
-            _tickRemainder += dt * ReferenceRate;
-            int advanced = Math.Min(6, (int)_tickRemainder);
+            // MuMain clamps FPS_ANIMATION_FACTOR to <= 1 at low FPS.
+            // Do not fast-forward 2-6 native ticks after an Android hitch:
+            // the original processes at most one logical tick per render.
+            _tickRemainder += MathF.Min(1f, dt * ReferenceRate);
+            int advanced = (int)_tickRemainder;
             _tickRemainder -= advanced;
             for (int tick = 0; tick < advanced; tick++)
             {
