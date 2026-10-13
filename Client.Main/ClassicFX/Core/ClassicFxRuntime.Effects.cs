@@ -2251,6 +2251,10 @@ namespace Client.Main.ClassicFX.Core
         // with o->Light (white). Without it, the NeffisDev CPU path has
         // LightEnabled=false and Light=0, leaving chains effectively black.
         private readonly bool _nativePierPartBmdLighting;
+        // The two Dark Horse GroundStone BMDs are textured stones, not
+        // luminous billboards. Render their solid meshes without the
+        // generic blue/additive spell material.
+        private readonly bool _nativeGroundStoneBmdLighting;
         // Fire Burst's Fire02 trail owns a PierPart ModelView. Expose the
         // already-recorded effect identity to correct its 25-Hz velocity
         // scaling without altering generic Fire02 particles of other skills.
@@ -2262,7 +2266,7 @@ namespace Client.Main.ClassicFX.Core
 
         private bool NeedsNativeBmdLighting =>
             NeedsRagefulBmdLighting || _nativeDestructionBmdLighting ||
-            _nativePierPartBmdLighting;
+            _nativePierPartBmdLighting || _nativeGroundStoneBmdLighting;
 
         // Preserve the existing Rageful Blow call site. The original
         // Strike of Destruction impact emits the same Stone01/Stone02
@@ -2418,6 +2422,9 @@ namespace Client.Main.ClassicFX.Core
                 type is ClassicFxEffectType.NightWater01 or
                     ClassicFxEffectType.RaklionBossCrack;
             _nativePierPartBmdLighting = type == ClassicFxEffectType.PierPart;
+            _nativeGroundStoneBmdLighting =
+                type is ClassicFxEffectType.GroundStoneModel or
+                    ClassicFxEffectType.GroundStone2Model;
             if (_nativeKnightPlancrackLighting)
                 _knightPlancrackUvDeformer = new KnightPlancrackUvDeformer();
             // The native wheel uses RenderPartObject for the equipped
@@ -2444,12 +2451,18 @@ namespace Client.Main.ClassicFX.Core
             // Use additive for both the textured base and bright mesh 1,
             // matching the Rageful Blow BMD bridge without altering it.
             // NightWater/Raklion keep native BlendMesh=-1.
-            BlendState = BlendState.Additive;
-            BlendMeshState = BlendState.Additive;
-            BlendMesh = _nativeKnightPlancrackLighting ? 1 :
+            BlendState = _nativeGroundStoneBmdLighting
+                ? BlendState.AlphaBlend : BlendState.Additive;
+            BlendMeshState = _nativeGroundStoneBmdLighting
+                ? BlendState.AlphaBlend : BlendState.Additive;
+            BlendMesh = _nativeGroundStoneBmdLighting ? -1 :
+                _nativeKnightPlancrackLighting ? 1 :
                 _nativeDestructionBmdLighting ? -1 : 0;
             BlendMeshLight = 1f;
-            DepthState = DepthStencilState.DepthRead;
+            // Solid rocks write depth to avoid their overlapping faces
+            // flashing through each other. Other ClassicFX retain DepthRead.
+            DepthState = _nativeGroundStoneBmdLighting
+                ? DepthStencilState.Default : DepthStencilState.DepthRead;
             RenderShadow = false;
             LightEnabled = false;
             UseSunLight = false;
