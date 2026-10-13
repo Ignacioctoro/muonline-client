@@ -123,6 +123,23 @@ namespace Client.Main.Objects.Effects.Skills
             bool inImpactWindow = usableFrames >= 4 &&
                 frame >= impactBegin && frame <= impactEnd;
 
+            // Main triggers FuryStrike Kind=2 at WeaponLevel 19, before
+            // the horse reaches its original 8..9.5 impact window.
+            // The 7-key Broyal horse reaches its adapted contact window
+            // much earlier, so keeping tick 19 spawns the explosion AFTER
+            // the stones, leaving WeaponLevel large (and the ring far away).
+            // The native explosion occurs around animation frame
+            // 19 * PlaySpeed, about four reference ticks before frame 8.
+            // For the shortened BMD, move both events by the same frame
+            // offset. Use the observed BMD frame instead of a sequence-
+            // local counter because the network effect may start after the
+            // horse animation; this keeps the explosion ahead of stones.
+            float actionPlaySpeed = horseAction.PlaySpeed == 0f
+                ? 1f : horseAction.PlaySpeed;
+            float furyFrame = Math.Clamp(
+                19f * actionPlaySpeed + impactBegin - 8f,
+                0f, impactBegin);
+
             Vector3 origin = _horse.WorldPosition.Translation;
             Vector3 angle = _horse.TotalAngle;
             ClassicFxOwner horseOwner = ClassicFxOwner.FromWorldObject(_horse);
@@ -161,8 +178,10 @@ namespace Client.Main.Objects.Effects.Skills
             for (int tick = 0; tick < advanced; tick++)
             {
                 _weaponLevel++;
-                if (!_furyTriggered && _weaponLevel == 19 &&
-                    !inImpactWindow)
+                if (!_furyTriggered &&
+                    (shortenedAttack
+                        ? frame >= furyFrame
+                        : _weaponLevel == 19 && !inImpactWindow))
                 {
                     // Last positional argument to CreateEffect is Kind=2
                     // in MuMain; ClassicFX uses subType to carry that Kind.
@@ -200,6 +219,8 @@ namespace Client.Main.Objects.Effects.Skills
             // GOBoid: six stones rotated around the horse at 60 degrees.
             // o->WeaponLevel is reset to -3 when FuryStrike Kind 2 fires.
             // C++ divides the integer WeaponLevel by 2 before scaling.
+            // FuryStrike must already have reset this counter to -3
+            // at impact, otherwise the stones form an oversized ring.
             float radius = 150f * (_weaponLevel / 2);
             float start = MathHelper.ToRadians(fx.Random.Modulo(360));
             const float step = MathHelper.TwoPi / 6f;
