@@ -11,7 +11,15 @@ using System.Threading.Tasks;
 namespace Client.Main.Objects.Wings
 {
     /// <summary>
-    /// Classic MU Cape of Emperor cloth simulation.
+    /// Classic MU cape cloth simulation shared by:
+    /// - Dark Lord Cape of Emperor (12,40)
+    /// - Rage Fighter Cape of Overrule (12,50)
+    ///
+    /// Neither cape deforms its attached BMD. The original Main
+    /// constructs three separate CPhysicsCloth pieces instead.
+    ///
+    /// The RF variant uses its own textures, shape, collision radii
+    /// and mirrored PCT_ELASTIC_RAGE_L/R ribbon forces.
     ///
     /// The original MODEL_CAPE_OF_EMPEROR does NOT deform
     /// DarkLordRobe02.bmd.
@@ -44,8 +52,7 @@ namespace Client.Main.Objects.Wings
     ///    size      = 12 x 200
     ///    texture   = dl_redwings03
     ///
-    /// This ports only the subset of CPhysicsCloth needed
-    /// by Cape of Emperor.
+    /// This ports the subset of CPhysicsCloth required for both S3 capes.
     /// </summary>
     internal sealed class EmperorCapeCloth : EffectObject
     {
