@@ -2287,6 +2287,15 @@ namespace Client.Main.ClassicFX.Core
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality;
 
+        // MuMain explicitly marks both GroundStone action 0 animations
+        // non-looping. They have five BMD keys and Velocity=0.3, so
+        // the pose must hold on key 4 instead of wrapping to key 0.
+        // Standard actors retain their original second-to-last-key hold.
+        protected override int GetHeldAnimationKeyIndex(int totalFrames) =>
+            _nativeGroundStoneBmdLighting
+                ? Math.Max(0, totalFrames - 1)
+                : base.GetHeldAnimationKeyIndex(totalFrames);
+
         // Preserve the verified visible floor cracks from the isolation
         // test: the ground depth test otherwise hides substantial geometry
         // of A/B and the grand impact BMD in the NeffisDev renderer.
@@ -2467,10 +2476,16 @@ namespace Client.Main.ClassicFX.Core
             LightEnabled = false;
             UseSunLight = false;
             ContinuousAnimation = !_useDarkLordModelProfile;
+            // Source ZzzEffect.cpp: both MODEL_GROUND_STONE variants have
+            // Velocity=0.3; ZzzOpenData sets Actions[0].Loop=false.
+            // Neffis otherwise loops their five BMD keys at 25 keys/s,
+            // causing the conspicuous flashing texture/geometry.
+            HoldOnLastFrame = _nativeGroundStoneBmdLighting;
             // MuMain ZzzOpenData.cpp assigns Actions[0].PlaySpeed = 0.3f
             // to knight_plancrack A/B. It is not stored in the BMD itself.
             // Native 25Hz reference: 0.3 * 25 = 7.5 animation keys/sec.
-            AnimationSpeed = _nativeKnightPlancrackLighting ? 7.5f : 25f;
+            AnimationSpeed = _nativeKnightPlancrackLighting ||
+                _nativeGroundStoneBmdLighting ? 7.5f : 25f;
             Color = type == ClassicFxEffectType.SwellOfMagicPower
                 ? new Color(0.7f, 0.4f, 0.9f)
                 : new Color(0.2f, 0.2f, 0.9f);

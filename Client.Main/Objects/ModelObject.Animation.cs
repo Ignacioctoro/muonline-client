@@ -180,10 +180,7 @@ namespace Client.Main.Objects
             if (isDeathAction ||
                 HoldOnLastFrame)
             {
-                int endIdx =
-                    Math.Max(
-                        0,
-                        totalFrames - 2);
+                int endIdx = GetHeldAnimationKeyIndex(totalFrames);
 
                 _animTime =
                     Math.Min(
@@ -326,6 +323,12 @@ namespace Client.Main.Objects
             _priorActionIndex =
                 currentActionIndex;
         }
+
+        // Standard actors keep their existing penultimate-key hold.
+        // Original MU GroundStone actions are explicitly non-looping and
+        // must instead complete their final BMD key before holding.
+        protected virtual int GetHeldAnimationKeyIndex(int totalFrames) =>
+            Math.Max(0, totalFrames - 2);
 
         private bool TryConsumeAnimationDelta(
             float frameDelta,
