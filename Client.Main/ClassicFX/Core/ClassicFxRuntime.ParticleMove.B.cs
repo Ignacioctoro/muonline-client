@@ -326,7 +326,25 @@ namespace Client.Main.ClassicFX.Core
                 case 0:
                     p.Gravity += 0.02f * ff;
                     p.Scale += p.Gravity * ff;
-                    p.Velocity *= 1.05f;
+                    // MuMain uses Velocity *= 1.05 per update with no
+                    // FPS scaling. At the 25-Hz ClassicFX reference rate
+                    // that means 12 multiplications during Fire02's
+                    // 12-tick lifespan; at 144 FPS it meant roughly 70
+                    // multiplications (1.05^70), making the Fire Burst
+                    // flame trail escape the screen after target crossing.
+                    // Preserve the native 25-FPS appearance by applying
+                    // the reference multiplier per elapsed reference tick,
+                    // only for MODEL_PIER_PART(1)'s child Fire02.
+                    // Every other Fire02 use keeps the existing behavior.
+                    bool pierPartFire =
+                        p.SubType == 0 &&
+                        p.Target.WorldObject is ClassicFxEffectModelObject
+                        {
+                            IsPierPartModel: true
+                        };
+                    p.Velocity *= pierPartFire
+                        ? MathF.Pow(1.05f, ff)
+                        : 1.05f;
                     p.Position.Z += p.Gravity * 20f * ff;
                     luminosity = p.LifeTime * 0.2f;
                     p.Light = new Vector3(luminosity);
