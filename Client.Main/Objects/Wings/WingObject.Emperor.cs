@@ -3,6 +3,7 @@ namespace Client.Main.Objects.Wings
     public partial class WingObject
     {
         private EmperorCapeCloth _emperorCapeCloth;
+        private EmperorCapeCloth _overruleCapeCloth;
 
 
         /// <summary>
@@ -12,6 +13,11 @@ namespace Client.Main.Objects.Wings
         internal bool IsEmperorCapeClothActive =>
             _isEmperorCape &&
             ItemIndex == EmperorCapeItemIndex &&
+            Model != null;
+
+        internal bool IsOverruleCapeClothActive =>
+            _isOverruleCape &&
+            ItemIndex == OverruleCapeItemIndex &&
             Model != null;
 
 
@@ -37,6 +43,9 @@ namespace Client.Main.Objects.Wings
             if (current != null)
             {
                 EnsureEmperorCapeCloth();
+
+                if (ItemIndex == OverruleCapeItemIndex)
+                    EnsureOverruleCapeCloth();
             }
         }
 
@@ -57,6 +66,19 @@ namespace Client.Main.Objects.Wings
                 Children.Add(
                     _emperorCapeCloth);
             }
+        }
+        // RF Overrule uses the same CPhysicsCloth integrator as DL,
+        // but it is only allocated when this actual item is equipped.
+        private void EnsureOverruleCapeCloth()
+        {
+            if (Parent == null)
+                return;
+
+            if (_overruleCapeCloth == null)
+                _overruleCapeCloth = new EmperorCapeCloth(this, overruleCape: true);
+
+            if (!Children.Contains(_overruleCapeCloth))
+                Children.Add(_overruleCapeCloth);
         }
     }
 }
