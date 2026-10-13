@@ -121,7 +121,7 @@ namespace Client.Main.Objects.Effects.Skills
 
             // LastHorseWaveEffect uses a 400-ms cadence in MuMain. It is
             // separate from the exact frame-8 contact / radial rock burst.
-            int dueWaves = Math.Min(3, 1 + (int)(_elapsed / HorseWaveInterval));
+            int dueWaves = 1 + (int)(_elapsed / HorseWaveInterval);
             while (_waves < dueWaves)
             {
                 fx.CreateEffect(ClassicFxEffectType.ShockWave,
@@ -196,14 +196,14 @@ namespace Client.Main.Objects.Effects.Skills
                 float x = pos.X, y = pos.Y;
                 if (x < 0f || y < 0f ||
                     x >= Client.Data.Constants.TERRAIN_SIZE *
-                         Client.Data.Constants.TERRAIN_SCALE ||
+                         Client.Main.Constants.TERRAIN_SCALE ||
                     y >= Client.Data.Constants.TERRAIN_SIZE *
-                         Client.Data.Constants.TERRAIN_SCALE)
+                         Client.Main.Constants.TERRAIN_SCALE)
                     continue;
 
                 TWFlags flags = World.Terrain.RequestTerrainFlag(
-                    (int)(x / Client.Data.Constants.TERRAIN_SCALE),
-                    (int)(y / Client.Data.Constants.TERRAIN_SCALE));
+                    (int)(x / Client.Main.Constants.TERRAIN_SCALE),
+                    (int)(y / Client.Main.Constants.TERRAIN_SCALE));
                 if ((flags & (TWFlags.NoMove | TWFlags.NoGround |
                               TWFlags.Water)) != 0)
                     continue;
