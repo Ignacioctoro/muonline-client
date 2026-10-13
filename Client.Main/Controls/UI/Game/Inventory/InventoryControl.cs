@@ -2720,6 +2720,22 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return true;
             }
 
+            // Fist slots still use OpenMU's normal hand slot IDs, but the RF
+            // cannot equip a conventional sword, shield, bow, etc. there.
+            // Respect item.bmd's class flags instead of hardcoding claw IDs.
+            if (_equipmentLayoutClass is CharacterClassNumber.RageFighter or CharacterClassNumber.FistMaster &&
+                (equipSlot == 0 || equipSlot == 1))
+            {
+                var definition = itemToPlace.Definition;
+                if (definition == null ||
+                    definition.Group != 0 ||
+                    (definition.AllowedClasses.Count > 0 &&
+                     !definition.AllowedClasses.Contains("Rage Fighter")))
+                {
+                    return false;
+                }
+            }
+
             byte fromSlot = 0;
             if (_pickedItemOriginalGrid.X >= 0)
             {
