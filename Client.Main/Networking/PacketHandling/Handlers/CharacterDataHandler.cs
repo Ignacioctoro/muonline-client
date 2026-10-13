@@ -1240,6 +1240,16 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 ushort skillId = skillAnim.SkillId;
                 ushort targetId = skillAnim.TargetId;
 
+                // This is an authoritative OpenMU response. The local
+                // PlayerSkillElf1 animation alone does not prove the server
+                // accepted a summon.
+                if (skillId >= 30 && skillId <= 36)
+                {
+                    _logger.LogInformation(
+                        "OpenMU confirmed Elf summon animation: SkillId={SkillId}, CasterId={CasterId}, TargetId={TargetId}.",
+                        skillId, playerId, targetId);
+                }
+
                 _logger.LogDebug("SkillAnimation: Player={PlayerId}, Skill={SkillId}, Target={TargetId}",
                     playerId, skillId, targetId);
 
