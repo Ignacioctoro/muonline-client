@@ -187,12 +187,14 @@ namespace Client.Main.ClassicFX.Core
 
         private void SpawnS6Batch10InitialChildren(ref EffectState e)
         {
-            // Wait for the owner model to be usable when the first particle
-            // must follow it; Wave joints do not depend on a model owner.
+            // MuMain emits BITMAP_FIRE+1 immediately when it creates
+            // MODEL_PIER_PART(1), not after its BMD finishes loading.
+            // The visual's world position is available before Ready;
+            // otherwise the short-lived flames disappear on first cast
+            // (especially while Android is loading the PierPart asset).
+            // Keep FirstMove true only if the BMD view does not exist.
             if (e.Type == ClassicFxEffectType.PierPart &&
-                e.SubType == 1 &&
-                (e.ModelView == null ||
-                 e.ModelView.Status != GameControlStatus.Ready))
+                e.SubType == 1 && e.ModelView == null)
                 return;
 
             e.FirstMove = false;
@@ -409,8 +411,7 @@ namespace Client.Main.ClassicFX.Core
                     // PierPart BMD and its BITMAP_FIRE+1 particle, attached
                     // to that BMD. It does not chase a random monster.
                     if (Clock.AdvancedReferenceFrame &&
-                        e.ModelView != null &&
-                        e.ModelView.Status == GameControlStatus.Ready)
+                        e.ModelView != null)
                     {
                         CreateEffect(ClassicFxEffectType.PierPart,
                             e.Position, e.Angle, e.Light,
