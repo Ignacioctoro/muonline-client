@@ -37,7 +37,8 @@ namespace Client.Main.Objects.Effects.Skills
     /// Presentation-only counterpart of RenderDarkHorseSkill.
     /// A native 25-Hz logical counter schedules periodic wave, FuryStrike
     /// Kind=2 and rock bursts. Actual foot contact is gated by the
-    /// animated horse's fractional BMD frame (8 to 9.5), not elapsed ms.
+    /// horse's fractional BMD frame. Adapt the native 8..9.5 impact
+    /// window when the installed horse BMD has fewer animation keys.
     /// </summary>
     internal sealed class ClassicFxEarthshakeSequence : WorldObject
     {
@@ -97,6 +98,31 @@ namespace Client.Main.Objects.Effects.Skills
 
             _sawHorseAttack = true;
             float frame = _horse.NativeActionFrame;
+
+            // Original MuMain checks frame 8..9.5 on action 3. However,
+            // Data_Broyal/Skill/DarkHorse.bmd action 3 has only 7 keys.
+            // ModelObject's one-shot animation holds at (keys - 2) = 5,
+            // so the original numeric frame range is unreachable.
+            // Preserve it for native-length models; for shortened BMDs,
+            // use the same late 1.5-frame portion of the actual attack.
+            // Exclude the final held frame so no rocks spawn forever.
+            var horseAction = _horse.Model?.Actions != null &&
+                _horse.CurrentAction < _horse.Model.Actions.Length
+                ? _horse.Model.Actions[_horse.CurrentAction] : null;
+            if (horseAction == null)
+                return;
+            int usableFrames = horseAction.LockPositions
+                ? horseAction.NumAnimationKeys - 1
+                : horseAction.NumAnimationKeys;
+            float heldFrame = MathF.Max(0f, usableFrames - 2f);
+            bool shortenedAttack = heldFrame < 9.5f;
+            float impactBegin = shortenedAttack
+                ? MathF.Max(0f, heldFrame - 1.5f) : 8f;
+            float impactEnd = shortenedAttack
+                ? heldFrame - 0.01f : 9.5f;
+            bool inImpactWindow = usableFrames >= 4 &&
+                frame >= impactBegin && frame <= impactEnd;
+
             Vector3 origin = _horse.WorldPosition.Translation;
             Vector3 angle = _horse.TotalAngle;
             ClassicFxOwner horseOwner = ClassicFxOwner.FromWorldObject(_horse);
@@ -136,7 +162,7 @@ namespace Client.Main.Objects.Effects.Skills
             {
                 _weaponLevel++;
                 if (!_furyTriggered && _weaponLevel == 19 &&
-                    !(frame >= 8f && frame <= 9.5f))
+                    !inImpactWindow)
                 {
                     // Last positional argument to CreateEffect is Kind=2
                     // in MuMain; ClassicFX uses subType to carry that Kind.
@@ -148,8 +174,7 @@ namespace Client.Main.Objects.Effects.Skills
                 }
 
                 // rand_fps_check(2): half probability at each native tick.
-                if (frame >= 8f && frame <= 9.5f &&
-                    fx.Random.Modulo(2) == 0)
+                if (inImpactWindow && fx.Random.Modulo(2) == 0)
                     EmitGroundStones(fx, origin, angle);
             }
 
@@ -157,7 +182,7 @@ namespace Client.Main.Objects.Effects.Skills
             // independent of whether the probabilistic rocks are spawned.
             // Its amplitude is a small camera-pitch change in DEGREES;
             // positional Camera.Shake would be an invented visual.
-            if (frame >= 8f && frame <= 9.5f)
+            if (inImpactWindow)
                 Client.Main.Graphics.Camera.Instance.SetNativeEarthQuakePitch(
                     (fx.Random.Modulo(3) - 3) * 0.7f);
 
