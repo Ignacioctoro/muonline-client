@@ -12,6 +12,19 @@ permissions:
   id-token: write
 
 jobs:
+  test-skill-routes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Season 6 skill initialization smoke test
+        run: dotnet run --project tests/Season6SkillRoutes/Season6SkillRoutes.Smoke.csproj --configuration Release
+
   build-windows:
     runs-on: windows-latest
     strategy:
