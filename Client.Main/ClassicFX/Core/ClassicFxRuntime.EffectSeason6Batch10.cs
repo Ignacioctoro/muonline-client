@@ -163,6 +163,12 @@ namespace Client.Main.ClassicFX.Core
             }
             else if (type == ClassicFxEffectType.PierPart)
             {
+                // ZzzEffect.cpp leaves BlendMesh at the CreateEffect
+                // default -1. ClassicFxEffectModelObject defaults to 0,
+                // which wrongly sends mesh 0 to the blend-only pass: at
+                // Medium quality the visible root mesh can disappear.
+                // Keep the native mesh visibility and normal BMD pass.
+                view.BlendMesh = -1;
                 view.HiddenMesh = subType == 0 ? 1 :
                     subType == 1 ? 0 : -2;
             }
@@ -187,14 +193,17 @@ namespace Client.Main.ClassicFX.Core
 
         private void SpawnS6Batch10InitialChildren(ref EffectState e)
         {
-            // MuMain emits BITMAP_FIRE+1 immediately when it creates
-            // MODEL_PIER_PART(1), not after its BMD finishes loading.
-            // The visual's world position is available before Ready;
-            // otherwise the short-lived flames disappear on first cast
-            // (especially while Android is loading the PierPart asset).
-            // Keep FirstMove true only if the BMD view does not exist.
+            // Native MODEL_PIER_PART(1) is created when its mesh is
+            // already loaded. The NeffisDev model loads asynchronously:
+            // spawning Fire02 while it is not Ready produces the free
+            // floating fireballs seen in the capture, with no visible
+            // chain segment. The effect reuses its parent's loaded BMD
+            // in CreateEffect, so this waits only for the child view to
+            // enter the world, not for another disk load.
             if (e.Type == ClassicFxEffectType.PierPart &&
-                e.SubType == 1 && e.ModelView == null)
+                e.SubType == 1 &&
+                (e.ModelView == null ||
+                 e.ModelView.Status != GameControlStatus.Ready))
                 return;
 
             e.FirstMove = false;
@@ -428,7 +437,9 @@ namespace Client.Main.ClassicFX.Core
                     // PierPart BMD and its BITMAP_FIRE+1 particle, attached
                     // to that BMD. It does not chase a random monster.
                     if (Clock.AdvancedReferenceFrame &&
-                        e.ModelView != null)
+                        e.ModelView != null &&
+                        e.ModelView.Status == GameControlStatus.Ready &&
+                        Random.FpsCheck(1, Clock))
                     {
                         CreateEffect(ClassicFxEffectType.PierPart,
                             e.Position, e.Angle, e.Light,
