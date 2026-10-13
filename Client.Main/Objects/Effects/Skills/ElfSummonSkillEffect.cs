@@ -15,6 +15,10 @@ namespace Client.Main.Objects.Effects.Skills
     [SkillVisualEffect(30)] // Summon Goblin
     [SkillVisualEffect(31)] // Summon Stone Golem
     [SkillVisualEffect(32)] // Summon Assassin
+    [SkillVisualEffect(33)] // Summon Elite Yeti
+    [SkillVisualEffect(34)] // Summon Dark Knight
+    [SkillVisualEffect(35)] // Summon Bali
+    [SkillVisualEffect(36)] // Summon Soldier
     public sealed class ElfSummonSkillEffect : IClassicFxSkillVisualEffect
     {
         public bool TryCreateClassicFx(SkillEffectContext context)
