@@ -4604,6 +4604,20 @@ namespace Client.Main.Objects.Player
                 // Other capes (e.g., Emperor) follow the generic tier/type mapping.
             }
 
+            // In the original 18-byte Season 6 viewport format, Rage
+            // Fighter's tier-2 code 7 means Cape of Fighter (12,49),
+            // and tier-3 code 7 means Cape of Overrule (12,50).
+            // The generic tier-3 entry 7 means Dimension for Summoner,
+            // so class identification is required here.
+            if (IsRageFighterClass(characterClass) &&
+                wingAppearance.Type == 7)
+            {
+                if (wingAppearance.Level == 2)
+                    return 49;
+                if (wingAppearance.Level == 3)
+                    return 50;
+            }
+
             // Season 6 appearance bits encode wing tier (Level) and type within tier.
             // We map this to actual item ids (group 12) for common wings/capes.
             // Tier 1: 0-6 (Elf..Darkness)
