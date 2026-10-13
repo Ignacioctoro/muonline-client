@@ -2238,6 +2238,10 @@ namespace Client.Main.ClassicFX.Core
         // with o->Light (white). Without it, the NeffisDev CPU path has
         // LightEnabled=false and Light=0, leaving chains effectively black.
         private readonly bool _nativePierPartBmdLighting;
+        // Fire Burst's Fire02 trail owns a PierPart ModelView. Expose the
+        // already-recorded effect identity to correct its 25-Hz velocity
+        // scaling without altering generic Fire02 particles of other skills.
+        internal bool IsPierPartModel => _nativePierPartBmdLighting;
         private bool _nativeRagefulStoneLighting;
 
         private bool NeedsRagefulBmdLighting =>
