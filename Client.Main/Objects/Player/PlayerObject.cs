@@ -2923,7 +2923,13 @@ namespace Client.Main.Objects.Player
             if (weapon == null)
                 return;
 
-            ApplyWeaponAttachment(weapon, isLeftHand, _weaponsHolstered);
+            // Season 6 Rage Fighter equips fist gloves/claws in the weapon
+            // slots. Unlike conventional weapons, they stay on the hand bones
+            // in safe zones as well as during movement and skill animations.
+            // This also applies to remote RF/Fist Master characters.
+            bool shouldHolster = _weaponsHolstered &&
+                !IsRageFighterClass(CharacterClass);
+            ApplyWeaponAttachment(weapon, isLeftHand, shouldHolster);
         }
 
         private static Vector3 GetHolsterOffset(bool isLeftHand) => WeaponHolsterOffsets[isLeftHand ? 0 : 1];
