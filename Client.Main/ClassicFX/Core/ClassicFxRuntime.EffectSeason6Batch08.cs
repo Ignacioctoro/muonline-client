@@ -6,7 +6,6 @@
 // remain with the existing client / OpenMU gameplay layer.
 using System;
 using Client.Main.ClassicFX.Data;
-using Client.Main.Controls;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
 
@@ -92,7 +91,7 @@ namespace Client.Main.ClassicFX.Core
                 // Native places the shockwave close to terrain, *not*
                 // at the z=135 launch height of the fire model.
                 position.Z = RequestTerrainHeight(position.X, position.Y)
-                    + 23f * Clock.FrameFactor;
+                    + 3f + 20f * Clock.FrameFactor;
             }
         }
 
@@ -133,8 +132,7 @@ namespace Client.Main.ClassicFX.Core
         {
             // Native CreateEffect, not each Move. Wait for BMD load,
             // because both JOINT_FORCE variants require a live Owner.
-            if (!e.FirstMove || e.ModelView == null ||
-                e.ModelView.Status != GameControlStatus.Ready)
+            if (!e.FirstMove || e.ModelView == null)
                 return;
 
             e.FirstMove = false;
@@ -143,14 +141,18 @@ namespace Client.Main.ClassicFX.Core
 
             ClassicFxOwner model = ClassicFxOwner.FromWorldObject(
                 e.ModelView);
+            // Native creates the force joint at terrain + 3, before
+            // raising the emitter by 20 * FPS_ANIMATION_FACTOR.
+            Vector3 jointPosition = e.StartPosition;
+            jointPosition.Z -= 20f * Clock.FrameFactor;
             CreateJoint(ClassicTextureIds.BitmapJointForce,
-                e.Position, e.Position, e.Angle,
+                jointPosition, jointPosition, e.Angle,
                 subType: e.SubType == 0 ? 7 : 20,
                 target: model,
                 scale: e.SubType == 0 ? 150f : 400f,
                 pkKey: 40);
 
-            Vector3 blueBlurPosition = e.Position +
+            Vector3 blueBlurPosition = e.StartPosition +
                 Vector3.TransformNormal(new Vector3(0f, -20f, 0f),
                     Matrix.CreateFromYawPitchRoll(
                         e.Angle.Y, e.Angle.X, e.Angle.Z));
@@ -171,10 +173,17 @@ namespace Client.Main.ClassicFX.Core
             e.Position.Z = RequestTerrainHeight(e.Position.X, e.Position.Y)
                 + 3f;
 
-            if (Clock.AdvancedReferenceFrame && e.Scale > 0.4f)
+            if (Clock.AdvancedReferenceFrame)
                 CreateParticle(ClassicTextureIds.BitmapFlame,
                     e.Position, e.Angle, e.Light,
                     subType: 8, scale: (e.Scale - 0.4f) * 3.5f);
+
+            // Native MoveEffect calls MoveParticle(o, true) AFTER the
+            // type-specific movement and flame emission. Rotate the local
+            // direction by this chain's own launch angle.
+            e.Position += Vector3.TransformNormal(e.Direction,
+                Matrix.CreateFromYawPitchRoll(e.Angle.Y, e.Angle.X,
+                    e.Angle.Z)) * f;
 
             // Native CheckClientArrow and AttackCharacterRange are
             // gameplay/hit-test operations, not visual FX. Never run

@@ -1684,6 +1684,15 @@ namespace Client.Main.Objects.Player
             if ((skillId == 77 || skillId == 441) && _isRiding)
                 return GetDefaultSkillAction(isInSafeZone);
 
+            // ZzzCharacter.cpp: Fire Scream (78 / strengthened 518)
+            // uses the Dark Lord's strike pose even when riding. Its
+            // mounted animations differ from the normal on-foot strike.
+            if ((skillId == 78 || skillId == 518) &&
+                _isRiding && !isInSafeZone)
+                return IsFenrirVehicle(_currentVehicleIndex)
+                    ? PlayerAction.PlayerFenrirAttackDarklordStrike
+                    : PlayerAction.PlayerAttackRideStrike;
+
             if (Season6SkillActionDatabase.TryGet(
                     skillId,
                     out var route))

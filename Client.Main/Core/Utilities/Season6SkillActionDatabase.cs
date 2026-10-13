@@ -663,6 +663,15 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerAttackStrike);
 
+            // AT_SKILL_FIRE_SCREAM_STR (MuMain ID 518) shares the
+            // original Fire Scream attack action and cast visuals.
+            Add(
+                518,
+                "Fire Scream (Strengthener)",
+                SkillType.Area,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
+
             // =========================================================
             // COMMON / EVENT S6 ACTIVE SKILLS
             // =========================================================
