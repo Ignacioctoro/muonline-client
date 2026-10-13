@@ -215,8 +215,19 @@ namespace Client.Main.ClassicFX.Core
             }
             else if (e.Type == ClassicFxEffectType.PierPart && e.SubType == 1)
             {
+                // MODEL_PIER_PART retains its orientation in MonoGame radians.
+                // Native CreateParticle copies angles in DEGREES and later
+                // MovePosition calls the degree-based AngleMatrix. Passing
+                // radians here makes every Fire02 projectile drift toward
+                // world -Y (the bottom-left of the player's screen), no
+                // matter which monster the homing parent is following.
+                // Only this particle needs the boundary conversion; the BMD
+                // continues to use radians.
+                Vector3 nativeParticleAngle =
+                    e.Angle * ClassicMath.RadiansToAngle;
                 CreateParticle(ClassicTextureIds.BitmapFire + 1,
-                    e.Position, e.Angle, e.Light, subType: 0, scale: 1f,
+                    e.Position, nativeParticleAngle, e.Light,
+                    subType: 0, scale: 1f,
                     target: ClassicFxOwner.FromWorldObject(e.ModelView));
             }
         }
@@ -373,13 +384,19 @@ namespace Client.Main.ClassicFX.Core
                 return true;
             }
 
-            if (!TryGetOwnerSnapshot(e.Owner,
-                    out ClassicFxOwnerSnapshot owner) ||
-                owner.WorldObject == null ||
-                !ReferenceEquals(owner.WorldObject.World, World))
+            // MuMain keeps the OBJECT* target while a killed monster leaves
+            // its last world position in memory. NeffisDev detaches a dying
+            // WalkerObject from World, causing TryGetOwnerSnapshot to fail
+            // and prematurely freezing all three 20-tick PierPart paths.
+            // Preserve the last REAL transform even after detachment; never
+            // invent a new target or aim at the caster as a fallback.
+            var targetObject = e.Owner.WorldObject;
+            if (targetObject == null ||
+                (targetObject.World != null &&
+                 !ReferenceEquals(targetObject.World, World)))
                 return true;
 
-            Vector3 target = owner.Position;
+            Vector3 target = targetObject.WorldPosition.Translation;
             if (e.SubType == 0)
             {
                 // ZzzEffect.cpp: Light is the target-relative height offset
