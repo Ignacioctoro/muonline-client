@@ -527,71 +527,115 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-        // OpenMU sends summoned Elf monsters in C2 1F, not in the
-        // ordinary NPC scope packets C2 13 / C2 16.
-        // https://munique.github.io/OpenMU/Packets/C2-1F-AddSummonedMonstersToScope_by-server.html
-        // Keep the existing server-authoritative NPC spawn pipeline, IDs,
-        // orientations, movement and despawn lifecycle. ClassicFX only
-        // provides the separate caster effect.
+        // Elf summons are server-authoritative NPCs, received as C2 1F.
+        // OpenMU has three incompatible layouts with the same packet ID.
+        // The server's negotiated version (rather than local UI protocol)
+        // determines which one is sent.
         [PacketHandler(0x1F, PacketRouter.NoSubCode)]
         public Task HandleSummonedMonstersToScopeAsync(Memory<byte> packet)
         {
             ReadOnlySpan<byte> data = packet.Span;
             if (data.Length < 5 || data[0] != 0xC2 || data[3] != 0x1F)
             {
-                _logger.LogWarning("Invalid AddSummonedMonstersToScope (0x1F) packet.");
+                _logger.LogWarning("Invalid summoned-monster scope packet C2 1F, Length={Length}.", data.Length);
                 return Task.CompletedTask;
             }
 
             int count = data[4];
+            if (count == 0)
+                return Task.CompletedTask;
+
             int offset = 5;
             ushort mapId = _characterState.MapId;
 
+            // OpenMU C2 1F packet definitions:
+            //   v075: 19 bytes (Type byte 2, X byte 4, Owner bytes 9-18).
+            //   v095: 20 bytes (Type byte 2, X byte 5, Owner bytes 10-19).
+            //   v5+: 20 bytes + variable effect IDs (Type BE bytes 2-3,
+            //         X byte 4, Owner bytes 9-18, EffectCount byte 19).
+            // Modern OpenMU reserves an additional five effect bytes per
+            // monster, even when the count of actual effects is zero.
+            bool format075 = data.Length == 5 + count * 19;
+            bool format095 = data.Length == 5 + count * 20;
+
+            _logger.LogInformation(
+                "Summoned monster scope C2 1F: count={Count}, length={Length}, format={Format}.",
+                count, data.Length, format075 ? "075" : format095 ? "095" : "modern");
+
             for (int i = 0; i < count; i++)
             {
-                // Season 6: Id(2), TypeNumber(2), X/Y(2),
-                // TargetX/TargetY(2), Rotation(1), OwnerName(10),
-                // EffectCount(1), EffectId[EffectCount].
-                // The records have variable lengths: do not assume the
-                // normal NPC scope record size or discard following records.
-                const int baseRecordLength = 20;
-                if (data.Length - offset < baseRecordLength)
+                int baseLength = format075 ? 19 : 20;
+                if (data.Length - offset < baseLength)
                 {
                     _logger.LogWarning(
-                        "Truncated 0x1F summon record {Index}/{Count}.", i, count);
+                        "Truncated summoned monster record {Index}/{Count} at offset {Offset}.",
+                        i + 1, count, offset);
                     break;
                 }
 
-                ReadOnlySpan<byte> record = data.Slice(offset, baseRecordLength);
+                ReadOnlySpan<byte> record = data.Slice(offset, baseLength);
                 ushort rawId = BinaryPrimitives.ReadUInt16BigEndian(record.Slice(0, 2));
-                ushort monsterType = BinaryPrimitives.ReadUInt16BigEndian(record.Slice(2, 2));
-                byte x = record[4];
-                byte y = record[5];
-                byte direction = (byte)(record[8] & 0x0F);
-                string owner = Encoding.ASCII.GetString(record.Slice(9, 10))
-                    .TrimEnd('\0', ' ');
-                int activeEffectCount = record[19];
-                offset += baseRecordLength;
+                ushort monsterType;
+                byte x;
+                byte y;
+                byte direction;
+                string owner;
+                int effectsCount = 0;
 
-                if (data.Length - offset < activeEffectCount)
+                if (format075)
                 {
-                    _logger.LogWarning(
-                        "Truncated 0x1F summon effects {Index}/{Count}.", i, count);
+                    monsterType = record[2];
+                    x = record[4];
+                    y = record[5];
+                    direction = (byte)(record[8] & 0x0F);
+                    owner = Encoding.ASCII.GetString(record.Slice(9, 10)).TrimEnd('\0', ' ');
+                }
+                else if (format095)
+                {
+                    monsterType = record[2];
+                    x = record[5];
+                    y = record[6];
+                    direction = (byte)(record[9] & 0x0F);
+                    owner = Encoding.ASCII.GetString(record.Slice(10, 10)).TrimEnd('\0', ' ');
+                }
+                else
+                {
+                    monsterType = BinaryPrimitives.ReadUInt16BigEndian(record.Slice(2, 2));
+                    x = record[4];
+                    y = record[5];
+                    direction = (byte)(record[8] & 0x0F);
+                    owner = Encoding.ASCII.GetString(record.Slice(9, 10)).TrimEnd('\0', ' ');
+                    effectsCount = record[19];
+                }
+
+                offset += baseLength;
+                if (data.Length - offset < effectsCount)
+                {
+                    _logger.LogWarning("Truncated effects for summoned monster record {Index}.", i + 1);
                     break;
                 }
 
-                // Advance past all active effect IDs even if none applies to
-                // the three basic invocations. The NPC status/buff system is
-                // separate from skill cast effects.
-                offset += activeEffectCount;
-
+                // Magic-effect IDs belong to the server buff/status system;
+                // do not spawn separate monsters or fake skill particles.
+                offset += effectsCount;
                 ushort maskedId = (ushort)(rawId & 0x7FFF);
+
+                if (!NpcDatabase.TryGetNpcType(monsterType, out _))
+                {
+                    _logger.LogWarning(
+                        "Summoned monster {Id:X4} type {Type} from {Owner} lacks a client NPC mapping.",
+                        maskedId, monsterType, owner);
+                    continue;
+                }
+
                 string name = NpcDatabase.GetNpcName(monsterType);
-                _scopeManager.AddOrUpdateNpcInScope(
-                    maskedId, rawId, x, y, monsterType, name);
+                _scopeManager.AddOrUpdateNpcInScope(maskedId, rawId, x, y, monsterType, name);
                 _npcSpawnQueue.Enqueue(new NpcSpawnRequest(
-                    maskedId, rawId, x, y, direction, monsterType, name,
-                    mapId, owner));
+                    maskedId, rawId, x, y, direction, monsterType, name, mapId, owner));
+
+                _logger.LogInformation(
+                    "Summoned monster queued: Name={Name}, Id={Id:X4}, Type={Type}, Owner={Owner}, Position=({X},{Y}).",
+                    name, maskedId, monsterType, owner, x, y);
             }
 
             return Task.CompletedTask;
