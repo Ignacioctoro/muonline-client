@@ -2251,6 +2251,10 @@ namespace Client.Main.ClassicFX.Core
         // with o->Light (white). Without it, the NeffisDev CPU path has
         // LightEnabled=false and Light=0, leaving chains effectively black.
         private readonly bool _nativePierPartBmdLighting;
+        // MODEL_AIR_FORCE's original textured BMD must receive its own
+        // o->Light and the decreasing BlendMeshLight; otherwise the wind
+        // geometry stays overbright while multiple short gusts overlap.
+        private readonly bool _nativeAirForceBmdLighting;
         // The two Dark Horse GroundStone BMDs are textured stones, not
         // luminous billboards. Render their solid meshes without the
         // generic blue/additive spell material.
@@ -2266,7 +2270,8 @@ namespace Client.Main.ClassicFX.Core
 
         private bool NeedsNativeBmdLighting =>
             NeedsRagefulBmdLighting || _nativeDestructionBmdLighting ||
-            _nativePierPartBmdLighting || _nativeGroundStoneBmdLighting;
+            _nativePierPartBmdLighting || _nativeAirForceBmdLighting ||
+            _nativeGroundStoneBmdLighting;
 
         // Preserve the existing Rageful Blow call site. The original
         // Strike of Destruction impact emits the same Stone01/Stone02
@@ -2431,6 +2436,7 @@ namespace Client.Main.ClassicFX.Core
                 type is ClassicFxEffectType.NightWater01 or
                     ClassicFxEffectType.RaklionBossCrack;
             _nativePierPartBmdLighting = type == ClassicFxEffectType.PierPart;
+            _nativeAirForceBmdLighting = type == ClassicFxEffectType.AirForce;
             _nativeGroundStoneBmdLighting =
                 type is ClassicFxEffectType.GroundStoneModel or
                     ClassicFxEffectType.GroundStone2Model;
@@ -2527,9 +2533,9 @@ namespace Client.Main.ClassicFX.Core
             {
                 if (NeedsNativeBmdLighting)
                 {
-                    // Fury Strike and all four Strike of Destruction children
-                    // render their original BMD using native blue illumination.
-                    // textures. LightEnabled is disabled for the skill bridge;
+                    // Fury Strike, destruction cracks, and AirForce use their
+                    // original per-effect BMD light and fading blend intensity.
+                    // LightEnabled is disabled for the skill bridge;
                     // without a native Light value CPU vertex colors become
                     // black even though the BMD and its texture are loaded.
                     // BlendMeshLight changes require a LIGHTING invalidation,
