@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Client.Main.Core.Client;
+using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.Controls.UI.Game.Skills
@@ -247,6 +248,13 @@ namespace Client.Main.Controls.UI.Game.Skills
         {
             ClearSkills();
 
+            // MuMain SkillList.cpp keeps regular skills in m_GridSnapshot and
+            // the four Raven commands in m_PetSnapshot. Preserve that same
+            // separation in the expanded HUD without changing hotkey IDs.
+            int regularSkillCount = skills.Count(
+                skill => !DarkRavenCommands.IsCommandSkill(skill.SkillId));
+            int regularIndex = 0;
+
             for (int i = 0;
                  i < skills.Count;
                  i++)
@@ -255,8 +263,11 @@ namespace Client.Main.Controls.UI.Game.Skills
                     skills[i];
 
                 Point position =
-                    GetClassicPosition(
-                        i);
+                    DarkRavenCommands.IsCommandSkill(skill.SkillId)
+                        ? GetClassicRavenCommandPosition(
+                            skill.SkillId - DarkRavenCommands.Normal,
+                            regularSkillCount)
+                        : GetClassicPosition(regularIndex++);
 
                 var slot =
                     new SkillSlotControl
@@ -408,6 +419,25 @@ namespace Client.Main.Controls.UI.Game.Skills
             return new Point(
                 x,
                 y);
+        }
+
+        /// <summary>
+        /// The Main renders four Raven commands in a dedicated row above
+        /// the normal skill grid (GIPetManager.cpp / SkillList.cpp).
+        /// Match that centered four-cell layout, independently of the skill
+        /// ID sort order. Leave room above the second row for characters
+        /// with a large number of learned skills.
+        /// </summary>
+        private static Point GetClassicRavenCommandPosition(
+            int commandIndex,
+            int regularSkillCount)
+        {
+            int width = SkillSlotControl.SLOT_WIDTH;
+            int height = SkillSlotControl.SLOT_HEIGHT;
+            int normalRows = regularSkillCount > 18 ? 2 : 1;
+            return new Point(
+                commandIndex * width,
+                -(normalRows * height + 20));
         }
 
         // =============================================================
