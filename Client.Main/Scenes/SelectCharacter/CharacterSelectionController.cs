@@ -117,6 +117,17 @@ namespace Client.Main.Scenes.SelectCharacter
 
             await Task.WhenAll(loading);
 
+            // Character-list appearance carries a Raven *visual tier* in two
+            // previously unused bits of the extended right-hand entry.
+            // Apply after PlayerObject.Load(), which equips/loads preview pets.
+            // This avoids the black level-0 Raven on the selection screen,
+            // without sending an in-game C1 A9 request before character entry.
+            foreach (var player in _characters)
+            {
+                player.DarkRaven?.SetCharacterSelectionVisualLevel(
+                    player.Appearance.DarkRavenPreviewVisualLevel);
+            }
+
             // Note: Cursor.BringToFront() is handled by the scene after creation
 
             _logger.LogInformation("Finished creating and loading character objects and labels.");
