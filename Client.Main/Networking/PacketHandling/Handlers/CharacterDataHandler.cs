@@ -160,6 +160,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 ushort str = 0, agi = 0, vit = 0, ene = 0, cmd = 0;
                 ushort attackSpeed = 0, magicSpeed = 0, maxAttackSpeed = 0;
                 byte inventoryExpansion = 0;
+                ushort? resets = null;
                 CharacterStatus status = CharacterStatus.Normal;
                 CharacterHeroState heroState = CharacterHeroState.Normal;
                 uint money = 0;
@@ -203,6 +204,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             magicSpeed = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(84, 2));
                             maxAttackSpeed = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(86, 2));
                             inventoryExpansion = data[88];
+                            // Extended OpenMU packet: UInt16 little-endian resets at offsets 90-91.
+                            resets = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(90, 2));
                         }
                         else if (packet.Length >= 72)
                         {
@@ -314,6 +317,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 _characterState.UpdateInventoryZen(money);
                 _characterState.UpdateStatus(status, heroState);
                 _characterState.InventoryExpansionState = inventoryExpansion;
+                _characterState.Resets = resets;
                 _characterState.UpdateAttackSpeeds(attackSpeed, magicSpeed, maxAttackSpeed);
 
                 _logger.LogInformation(
