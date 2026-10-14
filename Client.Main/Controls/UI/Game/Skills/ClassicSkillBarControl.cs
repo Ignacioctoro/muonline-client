@@ -191,7 +191,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         {
             List<SkillEntryState> skills =
                 _characterState
-                    .GetSkills()
+                    .GetSelectableSkills()
                     .Where(
                         skill =>
                             skill.SkillId != 0)
