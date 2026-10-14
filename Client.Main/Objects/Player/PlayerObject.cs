@@ -1635,6 +1635,10 @@ namespace Client.Main.Objects.Player
             // child objects. Keep a perched Raven exactly on the raised arm
             // after this frame's owner position and animation selection.
             DarkRaven?.SyncPerchAfterOwnerMovement();
+
+            // Native horse muzzle particles must use the fully advanced rider
+            // transform, not the previous child-update transform.
+            Vehicle?.EmitDarkHorseBreathAfterRiderMovement(gameTime);
         }
 
         public override void Draw(GameTime gameTime)
