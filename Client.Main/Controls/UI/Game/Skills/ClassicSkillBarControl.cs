@@ -437,7 +437,7 @@ namespace Client.Main.Controls.UI.Game.Skills
             int normalRows = regularSkillCount > 18 ? 2 : 1;
             return new Point(
                 commandIndex * width,
-                -(normalRows * height + 20));
+                -(normalRows * height + 2));
         }
 
         // =============================================================
