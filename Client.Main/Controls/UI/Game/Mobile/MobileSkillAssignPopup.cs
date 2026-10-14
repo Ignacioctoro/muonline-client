@@ -402,7 +402,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
             List<SkillEntryState> skills =
                 _characterState
-                    .GetSkills()
+                    .GetSelectableSkills()
                     .Where(
                         skill =>
                             skill.SkillId != 0)
