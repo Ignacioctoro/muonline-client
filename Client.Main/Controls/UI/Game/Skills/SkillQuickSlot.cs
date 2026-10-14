@@ -348,6 +348,25 @@ namespace Client.Main.Controls.UI.Game.Skills
         public override void Update(
             GameTime gameTime)
         {
+            // Native Main clears the pet-command selection when the Raven
+            // is unequipped. Don't leave an unusable A7 mode as active skill.
+            if (SelectedSkill != null &&
+                DarkRavenCommands.IsCommandSkill(SelectedSkill.SkillId) &&
+                !_characterState.HasEquippedDarkRaven)
+            {
+                SkillEntryState? replacement = _characterState.GetSkills().FirstOrDefault();
+                if (replacement != null)
+                {
+                    ApplySelectedSkill(replacement);
+                }
+                else
+                {
+                    SelectedSkill = null;
+                    _currentSkillSlot.Skill = null;
+                    _classicSkillBar.SetSelectedSkill(null);
+                }
+            }
+
             base.Update(
                 gameTime);
 
