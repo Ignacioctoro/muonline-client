@@ -1319,8 +1319,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                         else
                                         {
                                             cls = serverPacketsClass;
-                                            // SelectCharacter rendering expects classic appearance layout.
-                                            appearance = serverAppearanceFull.Length >= 18 ? serverAppearanceFull[..18] : serverAppearanceFull;
+                                            // AppearanceData understands the full 27-byte OpenMU
+                                            // layout. Keep all bytes; truncating to 18 discarded
+                                            // the right-hand Raven preview level tier and other
+                                            // extended equipment data from character selection.
+                                            appearance = serverAppearanceFull;
 
                                             _logger.LogInformation(
                                                 "S6 Character(44-ServerPackets): Name='{Name}', Level={Level}, Class={Class}, Score={Score}, Reason={Reason}, AppearanceLen={AppLen}, FullAppearanceLen={FullLen}",
