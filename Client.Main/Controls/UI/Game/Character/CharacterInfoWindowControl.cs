@@ -11,7 +11,6 @@ using Microsoft.Xna.Framework.Input;
 using MUnique.OpenMU.Network.Packets;
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 using Client.Main.Helpers;
@@ -21,7 +20,7 @@ namespace Client.Main.Controls.UI.Game.Character
     public class CharacterInfoWindowControl : UIControl, IUiTexturePreloadable
     {
         private const int WINDOW_WIDTH = 300;
-        private const int WINDOW_HEIGHT = 530;
+        private const int WINDOW_HEIGHT = 470;
         private const int STAT_BOX_WIDTH = 190;
         private const int STAT_BOX_HEIGHT = 21;
         private const int BTN_STAT_COUNT = 5;
@@ -176,20 +175,6 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoSnapshot _cachedSnapshot;
         private bool _hasCachedSnapshot;
         private bool _lastIsDarkLordFamily;
-        private int _selectedStatIndex = 0;
-        private CharacterInfoTextEntry _selectionText;
-        private CharacterInfoTextEntry _allocationStatusText;
-        private string _amountText = "1";
-        private bool _amountFocused, _keypadOpen;
-        private KeyboardState _previousAmountKeys;
-        private static readonly Rectangle s_amountBounds = new(121, 435, 78, 29);
-        private static readonly Rectangle s_confirmBounds = new(209, 435, 74, 29);
-        private readonly ConcurrentQueue<(CharacterStatAttribute attr, bool success, ushort amount)> _replyQueue = new();
-        private bool _statReplySubscribed, _awaitingResponse;
-        private int _remaining, _completed, _requested;
-        private CharacterStatAttribute _allocationAttribute;
-        private double _responseSeconds, _sendCooldown;
-
         public CharacterInfoWindowControl()
         {
             _logger = MuGame.AppLoggerFactory.CreateLogger<CharacterInfoWindowControl>();
@@ -199,7 +184,6 @@ namespace Client.Main.Controls.UI.Game.Character
             Interactive = true;
             Visible = false;
 
-            _previousAmountKeys = Keyboard.GetState();
             _networkManager = MuGame.Network;
             if (_networkManager == null)
             {
@@ -270,9 +254,6 @@ namespace Client.Main.Controls.UI.Game.Character
             _fruitProbText = CreateText(new Vector2(28f, 96f), 10f, new Color(76, 197, 254));
             _fruitStatsText = CreateText(new Vector2(28f, 114f), 10f, new Color(76, 197, 254));
             _statPointsText = CreateText(new Vector2(169f, 60f), 11f, new Color(255, 165, 66));
-            _selectionText = CreateText(new Vector2(29f, 441f), 10f, new Color(228, 177, 109));
-            _allocationStatusText = CreateText(new Vector2(27f, 469f), 9f, Color.LightGray);
-
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
                 float rowY = s_statRowY[i];
@@ -577,65 +558,6 @@ namespace Client.Main.Controls.UI.Game.Character
                     i % 2 == 0 ? new Color(35, 28, 30, 220) : new Color(24, 20, 23, 220));
                 b.Draw(pixel, new Rectangle(18, y, WINDOW_WIDTH - 36, 1), new Color(111, 74, 57));
             }
-            b.Draw(pixel, new Rectangle(18, 414, WINDOW_WIDTH - 36, 70), new Color(33, 17, 20, 235));
-            b.Draw(pixel, new Rectangle(18, 414, WINDOW_WIDTH - 36, 2), new Color(153, 76, 59));
-        }
-
-        private Rectangle ScreenRect(Rectangle local)
-        {
-            float s = Scale;
-            return new Rectangle(DisplayRectangle.X + (int)MathF.Round(local.X * s),
-                DisplayRectangle.Y + (int)MathF.Round(local.Y * s),
-                Math.Max(1, (int)MathF.Round(local.Width * s)),
-                Math.Max(1, (int)MathF.Round(local.Height * s)));
-        }
-
-        private void DrawPanelRectangle(SpriteBatch b, Rectangle r, Color fill, Color border)
-        {
-            var p = GraphicsManager.Instance.Pixel;
-            if (p == null) return;
-            b.Draw(p, ScreenRect(r), fill * Alpha);
-            b.Draw(p, ScreenRect(new Rectangle(r.X, r.Y, r.Width, 1)), border * Alpha);
-            b.Draw(p, ScreenRect(new Rectangle(r.X, r.Bottom - 1, r.Width, 1)), border * Alpha);
-            b.Draw(p, ScreenRect(new Rectangle(r.X, r.Y, 1, r.Height)), border * Alpha);
-            b.Draw(p, ScreenRect(new Rectangle(r.Right - 1, r.Y, 1, r.Height)), border * Alpha);
-        }
-
-        private void DrawPanelString(SpriteBatch b, SpriteFont font, string value, int x, int y, float px, Color color)
-        {
-            float s = Scale;
-            b.DrawString(font, value, new Vector2(DisplayRectangle.X + x * s, DisplayRectangle.Y + y * s),
-                color * Alpha, 0f, Vector2.Zero, s * px / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0);
-        }
-
-        private void DrawAllocationUi(SpriteBatch b, SpriteFont font)
-        {
-            var p = GraphicsManager.Instance.Pixel;
-            if (p != null && _selectedStatIndex >= 0 && (_selectedStatIndex < 4 || _lastIsDarkLordFamily))
-                b.Draw(p, ScreenRect(new Rectangle(18, (int)s_statRowY[_selectedStatIndex] - 3, 3, 58)),
-                    new Color(227, 160, 84) * Alpha);
-            DrawPanelString(b, font, "ASIGNACION DE PUNTOS", 28, 419, 10, new Color(223, 151, 101));
-            DrawPanelRectangle(b, s_amountBounds, new Color(8, 9, 12, 245),
-                _amountFocused ? new Color(236, 170, 88) : new Color(117, 91, 68));
-            DrawPanelRectangle(b, s_confirmBounds, new Color(107, 39, 35, 238),
-                new Color(178, 105, 67));
-            DrawPanelString(b, font, string.IsNullOrEmpty(_amountText) ? "0" : _amountText, 128, 442,
-                11, Color.WhiteSmoke);
-            DrawPanelString(b, font, _remaining > 0 ? "CANCELAR" : "ASIGNAR", 215, 442,
-                9, Color.WhiteSmoke);
-            if (!_keypadOpen) return;
-
-            DrawPanelRectangle(b, new Rectangle(89, 231, 137, 169), new Color(13, 12, 15, 253),
-                new Color(187, 119, 73));
-            DrawPanelString(b, font, "CANTIDAD", 113, 236, 10, new Color(235, 187, 105));
-            string[] labels = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "CLR", "0", "OK" };
-            for (int i = 0; i < labels.Length; i++)
-            {
-                var box = new Rectangle(97 + i % 3 * 41, 258 + i / 3 * 34, 37, 29);
-                DrawPanelRectangle(b, box, new Color(56, 42, 43, 250), new Color(128, 84, 64));
-                DrawPanelString(b, font, labels[i], box.X + 9, box.Y + 6,
-                    labels[i].Length == 1 ? 12 : 9, Color.White);
-            }
         }
 
         private void DrawInfoTableSurface(SpriteBatch spriteBatch, Vector2 origin)
@@ -733,9 +655,7 @@ namespace Client.Main.Controls.UI.Game.Character
             base.Update(gameTime);
 
             HandleButtonInput();
-            UpdateAmountKeyboard();
             UpdateDisplayData();
-            UpdateAllocationBatch(gameTime.ElapsedGameTime.TotalSeconds);
         }
 
         private void HandleButtonInput()
@@ -751,40 +671,6 @@ namespace Client.Main.Controls.UI.Game.Character
             _hoveredButtonIndex = -1;
 
             float controlScale = Scale;
-
-            if (leftJustReleased)
-            {
-                if (_keypadOpen)
-                {
-                    HandleKeypadTap(mousePosition);
-                    _pressedButtonIndex = -1;
-                    return;
-                }
-                if (ScreenRect(s_amountBounds).Contains(mousePosition))
-                {
-                    _amountFocused = _keypadOpen = true;
-                    _previousAmountKeys = Keyboard.GetState();
-                    _pressedButtonIndex = -1;
-                    return;
-                }
-                if (ScreenRect(s_confirmBounds).Contains(mousePosition))
-                {
-                    if (_remaining > 0) StopAllocation("Asignacion cancelada; se conservan los puntos confirmados.");
-                    else ConfirmAmount();
-                    _pressedButtonIndex = -1;
-                    return;
-                }
-                for (int stat = 0; stat < (_lastIsDarkLordFamily ? 5 : 4); stat++)
-                {
-                    if (ScreenRect(new Rectangle(20, (int)s_statRowY[stat], WINDOW_WIDTH - 40, 25))
-                        .Contains(mousePosition))
-                    {
-                        _selectedStatIndex = stat;
-                        UpdateAllocationLabels();
-                        break;
-                    }
-                }
-            }
 
             for (int i = 0; i < _buttons.Count; i++)
             {
@@ -849,7 +735,6 @@ namespace Client.Main.Controls.UI.Game.Character
 
                 DrawTexts(spriteBatch, font);
                 DrawButtons(spriteBatch);
-                DrawAllocationUi(spriteBatch, font);
             }
             finally
             {
@@ -959,11 +844,6 @@ namespace Client.Main.Controls.UI.Game.Character
             }
 
             if (_characterState == null) return;
-            if (!_statReplySubscribed)
-            {
-                _characterState.StatIncreaseResponseReceived += OnStatIncreaseResponse;
-                _statReplySubscribed = true;
-            }
             var snapshot = CharacterInfoSnapshot.Create(_characterState);
             if (_hasCachedSnapshot && snapshot.Equals(_cachedSnapshot))
             {
@@ -1097,211 +977,53 @@ namespace Client.Main.Controls.UI.Game.Character
             _questButton.Enabled = true;
             _petButton.Visible = true;
             _petButton.Enabled = true;
-            UpdateAllocationLabels();
         }
 
 
-        private void UpdateAllocationLabels()
-        {
-            if (_selectionText == null || _allocationStatusText == null) return;
-            if (_selectedStatIndex == 4 && !_lastIsDarkLordFamily) _selectedStatIndex = 0;
-            _selectionText.Text = $"A {s_statShortNames[_selectedStatIndex]}";
-            if (_remaining > 0)
-                _allocationStatusText.Text = $"Asignados {_completed}/{_requested} | Pendientes: {_remaining}";
-            else if (string.IsNullOrEmpty(_allocationStatusText.Text))
-                _allocationStatusText.Text = "Pulsa + para 1 punto o ingresa una cantidad.";
-        }
-
-        private static CharacterStatAttribute AttributeAt(int index) => index switch
-        {
-            0 => CharacterStatAttribute.Strength,
-            1 => CharacterStatAttribute.Agility,
-            2 => CharacterStatAttribute.Vitality,
-            3 => CharacterStatAttribute.Energy,
-            4 => CharacterStatAttribute.Leadership,
-            _ => CharacterStatAttribute.Strength
-        };
-
-        private void OnStatButtonClicked(int index)
+        private void OnStatButtonClicked(int statIndex)
         {
             SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
-            _selectedStatIndex = index;
-            UpdateAllocationLabels();
-            BeginAllocation(index, 1);
-        }
 
-        private void ConfirmAmount()
-        {
-            if (!int.TryParse(_amountText, out int amount) || amount < 1)
+            if (_networkManager == null || !_networkManager.IsConnected || _networkManager.CurrentState < ClientConnectionState.InGame)
             {
-                _allocationStatusText.Text = "Ingresa una cantidad positiva.";
-                return;
-            }
-            _keypadOpen = _amountFocused = false;
-            BeginAllocation(_selectedStatIndex, amount);
-        }
-
-        private void BeginAllocation(int statIndex, int amount)
-        {
-            if (_remaining > 0 || _awaitingResponse)
-            {
-                _allocationStatusText.Text = "Ya hay una asignacion en curso.";
-                return;
-            }
-            if (_networkManager == null || !_networkManager.IsConnected ||
-                _networkManager.CurrentState < ClientConnectionState.InGame || _characterState == null)
-            {
-                _allocationStatusText.Text = "No hay conexion con el servidor.";
-                return;
-            }
-            if (statIndex < 0 || statIndex >= 5 ||
-                (statIndex == 4 && !_lastIsDarkLordFamily))
-            {
-                _allocationStatusText.Text = "Atributo no disponible para esta clase.";
+                _logger.LogWarning("Cannot increase stat: Not connected to game server or invalid state.");
+                MessageWindow.Show("Cannot add stat points: Not connected to server or not in game.");
                 return;
             }
 
-            int current = statIndex switch
+            CharacterStatAttribute attributeToSend = statIndex switch
             {
-                0 => _characterState.Strength,
-                1 => _characterState.Agility,
-                2 => _characterState.Vitality,
-                3 => _characterState.Energy,
-                4 => _characterState.Leadership,
-                _ => 0
+                0 => CharacterStatAttribute.Strength,
+                1 => CharacterStatAttribute.Agility,
+                2 => CharacterStatAttribute.Vitality,
+                3 => CharacterStatAttribute.Energy,
+                4 => CharacterStatAttribute.Leadership,
+                _ => CharacterStatAttribute.Strength
             };
-            if (amount < 1 || amount > _characterState.LevelUpPoints ||
-                amount > ushort.MaxValue - current)
+
+            if (_characterState == null)
             {
-                _allocationStatusText.Text = "Supera los puntos disponibles o el limite del atributo.";
                 return;
             }
 
-            _selectedStatIndex = statIndex;
-            _allocationAttribute = AttributeAt(statIndex);
-            _remaining = _requested = amount;
-            _completed = 0;
-            _responseSeconds = _sendCooldown = 0;
-            _allocationStatusText.Text = "";
-            UpdateAllocationLabels();
-        }
-
-        // Network callbacks can be delivered off the render thread. Consume on Update().
-        private void OnStatIncreaseResponse(CharacterStatAttribute attr, bool success, ushort amount)
-            => _replyQueue.Enqueue((attr, success, amount));
-
-        private void UpdateAllocationBatch(double deltaSeconds)
-        {
-            while (_replyQueue.TryDequeue(out var result))
+            if (attributeToSend == CharacterStatAttribute.Leadership &&
+                !(_characterState.Class == CharacterClassNumber.DarkLord || _characterState.Class == CharacterClassNumber.LordEmperor))
             {
-                if (!_awaitingResponse || result.attr != _allocationAttribute) continue;
-                _awaitingResponse = false;
-                if (!result.success || result.amount == 0)
-                {
-                    StopAllocation("Servidor rechazo el incremento.");
-                    continue;
-                }
-                int applied = Math.Min(result.amount, _remaining);
-                _completed += applied;
-                _remaining -= applied;
-                _sendCooldown = 0.02; // Wait for each ACK, then apply modest pacing.
-                if (_remaining == 0)
-                    StopAllocation($"Completado: {_completed} puntos en {s_statShortNames[_selectedStatIndex]}.");
-            }
-            if (_remaining <= 0) return;
-
-            if (_awaitingResponse)
-            {
-                _responseSeconds += deltaSeconds;
-                if (_responseSeconds > 6)
-                    StopAllocation("No hubo respuesta del servidor; comprueba tus puntos.");
-                return;
-            }
-
-            _sendCooldown -= deltaSeconds;
-            if (_sendCooldown > 0) return;
-            if (_networkManager == null || !_networkManager.IsConnected ||
-                _networkManager.CurrentState < ClientConnectionState.InGame ||
-                _characterState == null || _characterState.LevelUpPoints == 0)
-            {
-                StopAllocation("Se detuvo: sin conexion o sin puntos disponibles.");
+                _logger.LogInformation("Cannot add Leadership points for non-Dark Lord character.");
+                MessageWindow.Show("Only Dark Lords can add Leadership points.");
                 return;
             }
 
             var service = _networkManager.GetCharacterService();
-            if (service == null)
+            if (service != null)
             {
-                StopAllocation("No se pudo acceder al servicio de stats.");
-                return;
+                _ = service.SendIncreaseCharacterStatPointRequestAsync(attributeToSend);
+                _logger.LogInformation("Sent request to add point to {Attribute}.", attributeToSend);
             }
-            _awaitingResponse = true;
-            _responseSeconds = 0;
-            // There is no amount field in the existing client request. Send only one
-            // and wait for the authoritative F3:06 response before the next request.
-            _ = service.SendIncreaseCharacterStatPointRequestAsync(_allocationAttribute);
-            UpdateAllocationLabels();
-        }
-
-        private void StopAllocation(string feedback)
-        {
-            _remaining = 0;
-            _awaitingResponse = false;
-            _sendCooldown = 0;
-            if (feedback != null && _allocationStatusText != null)
-                _allocationStatusText.Text = feedback;
-        }
-
-        private void AppendAmountDigit(char digit)
-        {
-            if (_amountText.Length >= 5) return;
-            _amountText = (_amountText == "0" ? "" : _amountText) + digit;
-        }
-
-        private void UpdateAmountKeyboard()
-        {
-            KeyboardState keys = Keyboard.GetState();
-            if (_amountFocused)
+            else
             {
-                foreach (Keys key in keys.GetPressedKeys())
-                {
-                    if (!_previousAmountKeys.IsKeyUp(key)) continue;
-                    if (key == Keys.Back)
-                    {
-                        if (_amountText.Length > 0)
-                            _amountText = _amountText.Substring(0, _amountText.Length - 1);
-                    }
-                    else if (key == Keys.Delete) _amountText = "";
-                    else if (key == Keys.Enter)
-                    {
-                        _keypadOpen = false;
-                        ConfirmAmount();
-                    }
-                    else if (key == Keys.Escape) _amountFocused = _keypadOpen = false;
-                    else if (key >= Keys.D0 && key <= Keys.D9)
-                        AppendAmountDigit((char)('0' + (int)(key - Keys.D0)));
-                    else if (key >= Keys.NumPad0 && key <= Keys.NumPad9)
-                        AppendAmountDigit((char)('0' + (int)(key - Keys.NumPad0)));
-                }
-            }
-            _previousAmountKeys = keys;
-        }
-
-        private void HandleKeypadTap(Point point)
-        {
-            if (!ScreenRect(new Rectangle(89, 231, 137, 169)).Contains(point))
-            {
-                _keypadOpen = false;
-                return;
-            }
-            const string digits = "123456789C0K";
-            for (int i = 0; i < 12; i++)
-            {
-                var rect = new Rectangle(97 + i % 3 * 41, 258 + i / 3 * 34, 37, 29);
-                if (!ScreenRect(rect).Contains(point)) continue;
-                if (digits[i] == 'C') _amountText = "";
-                else if (digits[i] == 'K') _keypadOpen = false;
-                else AppendAmountDigit(digits[i]);
-                return;
+                _logger.LogError("CharacterService is null. Cannot send stat increase request.");
+                MessageWindow.Show("Internal error: Could not add points.");
             }
         }
 
@@ -1326,8 +1048,6 @@ namespace Client.Main.Controls.UI.Game.Character
 
         public void HideWindow()
         {
-            StopAllocation(null);
-            _amountFocused = _keypadOpen = false;
             Visible = false;
             if (Scene != null && Scene.FocusControl == this)
             {
@@ -1347,8 +1067,6 @@ namespace Client.Main.Controls.UI.Game.Character
                 }
             }
 
-            if (_statReplySubscribed && _characterState != null)
-                _characterState.StatIncreaseResponseReceived -= OnStatIncreaseResponse;
             base.Dispose();
             _staticSurface?.Dispose();
             _staticSurface = null;
