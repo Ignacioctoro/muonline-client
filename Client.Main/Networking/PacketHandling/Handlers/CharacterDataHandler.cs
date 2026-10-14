@@ -1108,38 +1108,37 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 uint maxHp = 0, maxSd = 0, maxMana = 0, maxAbility = 0;
                 ushort mlvl = 0; ulong mexp = 0, nextMexp = 1; ushort mpts = 0;
 
-                if (packet.Length >= MasterStatsUpdateExtended.Length
-                    && _targetVersion >= TargetProtocolVersion.Season6)
+                if (_targetVersion >= TargetProtocolVersion.Season6 && packet.Length >= 40)
                 {
-                    var upd = new MasterStatsUpdateExtended(packet);
-                    mlvl = upd.MasterLevel;
-                    mexp = upd.MasterExperience;
-                    nextMexp = upd.MasterExperienceOfNextLevel;
-                    mpts = upd.MasterLevelUpPoints;
-                    maxHp = upd.MaximumHealth;
-                    maxSd = upd.MaximumShield;
-                    maxMana = upd.MaximumMana;
-                    maxAbility = upd.MaximumAbility;
-                    _logger.LogInformation("Ⓜ️ MasterStatsUpdate (Extended): MLvl={Lvl}, MPts={Pts}", mlvl, mpts);
+                    // OpenMU F3:50 Extended is 40 bytes. The older packet-package
+                    // layout reads the 32-bit max values incorrectly.
+                    var data = packet.Span;
+                    mlvl = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(4, 2));
+                    mexp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(6, 8));
+                    nextMexp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(14, 8));
+                    mpts = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(22, 2));
+                    maxHp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(24, 4));
+                    maxMana = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(28, 4));
+                    maxSd = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(32, 4));
+                    maxAbility = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(36, 4));
+                    _logger.LogInformation("MasterStatsUpdate F3:50 Extended: MLvl={Lvl}, MPts={Pts}", mlvl, mpts);
                 }
-                else if (packet.Length >= MasterStatsUpdate.Length)
+                else if (packet.Length >= 32)
                 {
-                    var upd = new MasterStatsUpdate(packet);
-                    mlvl = upd.MasterLevel;
-                    mexp = upd.MasterExperience;
-                    nextMexp = upd.MasterExperienceOfNextLevel;
-                    mpts = upd.MasterLevelUpPoints;
-                    maxHp = upd.MaximumHealth;
-                    maxSd = upd.MaximumShield;
-                    maxMana = upd.MaximumMana;
-                    maxAbility = upd.MaximumAbility;
-                    _logger.LogInformation("Ⓜ️ MasterStatsUpdate (Standard): MLvl={Lvl}, MPts={Pts}", mlvl, mpts);
+                    var data = packet.Span;
+                    mlvl = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(4, 2));
+                    mexp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(6, 8));
+                    nextMexp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(14, 8));
+                    mpts = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(22, 2));
+                    maxHp = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(24, 2));
+                    maxMana = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(26, 2));
+                    maxSd = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(28, 2));
+                    maxAbility = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(30, 2));
+                    _logger.LogInformation("MasterStatsUpdate F3:50 Standard: MLvl={Lvl}, MPts={Pts}", mlvl, mpts);
                 }
                 else
                 {
-                    _logger.LogWarning(
-                        "⚠️ Unexpected length ({Length}) for MasterStatsUpdate packet.",
-                        packet.Length);
+                    _logger.LogWarning("Unexpected length ({Length}) for MasterStatsUpdate packet.", packet.Length);
                     return Task.CompletedTask;
                 }
 
