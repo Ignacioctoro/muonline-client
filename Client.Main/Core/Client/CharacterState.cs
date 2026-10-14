@@ -1605,6 +1605,39 @@ namespace Client.Main.Core.Client
             return _skillList.Values.OrderBy(s => s.SkillId);
         }
 
+        /// <summary>
+        /// Local selectable skill palette. Raven commands are temporary UI
+        /// entries (Main 120..123); they are never inserted into the F3 11
+        /// learned-skill list, and disappear when the raven is unequipped.
+        /// </summary>
+        public IEnumerable<SkillEntryState> GetSelectableSkills()
+        {
+            foreach (var skill in GetSkills())
+                yield return skill;
+
+            if (!HasEquippedDarkRaven)
+                yield break;
+
+            foreach (var command in DarkRavenCommands.GetSkills())
+                yield return command;
+        }
+
+        public bool HasEquippedDarkRaven
+        {
+            get
+            {
+                if (Class != CharacterClassNumber.DarkLord &&
+                    Class != CharacterClassNumber.LordEmperor)
+                    return false;
+
+                if (!_inventoryItems.TryGetValue(1, out var itemData))
+                    return false;
+
+                var item = ItemDatabase.GetItemDefinition(itemData);
+                return item?.Group == 13 && item.Id == 5;
+            }
+        }
+
         // --- Active Buffs/Effects Methods ---
 
         /// <summary>
