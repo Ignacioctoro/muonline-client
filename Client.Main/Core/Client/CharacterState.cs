@@ -97,6 +97,8 @@ namespace Client.Main.Core.Client
         public ulong Experience { get; set; } = 0;
         public ulong ExperienceForNextLevel { get; set; } = 1;
         public ushort LevelUpPoints { get; set; } = 0;
+        // OpenMU Season 6 C3 F3 03 includes resets; null means the protocol did not provide a count.
+        public ushort? Resets { get; set; }
         public ushort MasterLevel { get; set; } = 0;
         public ulong MasterExperience { get; set; } = 0;
         public ulong MasterExperienceForNextLevel { get; set; } = 1;
