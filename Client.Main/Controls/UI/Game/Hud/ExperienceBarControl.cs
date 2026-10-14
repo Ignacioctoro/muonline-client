@@ -22,6 +22,9 @@ namespace Client.Main.Controls.UI.Game.Hud
         private ulong _shownExperience = ulong.MaxValue;
         private ulong _shownNextExperience = ulong.MaxValue;
 
+        /// <summary>Original HUD EXP digit, 0-9. Updated with the gauge.</summary>
+        public int CurrentDecileDigit { get; private set; }
+
         public ExperienceBarControl(CharacterState state)
         {
             _state = state;
@@ -31,8 +34,10 @@ namespace Client.Main.Controls.UI.Game.Hud
             TextureRectangle = new Rectangle(218, 90, 741, 14);
             BlendState = BlendState.NonPremultiplied;
 
-            // Stretch the tiny original EXP gauge across the available track.
-            // The cover draws the ten divisions on top, preserving NewUI artwork.
+            // The GFx normal-EXP resource is orange. Data also has a green
+            // guege_exp_1 variant; its original switching rule is unverified.
+            // Do not invent a color change per decile or activate Master here.
+            // The cover draws the original divisions on top.
             _fill = new TextureControl
             {
                 Name = "ExperienceFill",
@@ -103,8 +108,10 @@ namespace Client.Main.Controls.UI.Game.Hud
             const int insetX = 4;
             int usableWidth = Math.Max(0, ViewSize.X - insetX * 2);
             int usableHeight = Math.Max(0, ViewSize.Y - 6);
-            float fraction = ExperienceProgressCalculator.GetNormalLevelFraction(
-                _state.Level, _state.Experience, _state.ExperienceForNextLevel);
+            ExperienceProgressCalculator.GetNormalLevelDecile(
+                _state.Level, _state.Experience, _state.ExperienceForNextLevel,
+                out int digit, out float fraction);
+            CurrentDecileDigit = digit;
 
             _fill.X = insetX;
             _fill.Y = (ViewSize.Y - usableHeight) / 2;

@@ -41,6 +41,8 @@ namespace Client.Main.Controls.UI.Game
         private readonly SkillHotkeyHudControl _skillHotkeys;
         private readonly MapPositionHudControl _mapPositionHud;
         private ExperienceBarControl _experienceBar;
+        private TextureControl _experienceDigit;
+        private int _lastExperienceDigit = -1;
 
         // Yellow highlight taken from ActiveSkill_1.
         private TextureControl _skillHotkeyHighlight;
@@ -91,7 +93,6 @@ namespace Client.Main.Controls.UI.Game
             {
                 "ActiveSkill_1",
                 "ActiveSkill_2",
-                "0",
                 "1",
                 "2",
                 "3",
@@ -262,6 +263,11 @@ namespace Client.Main.Controls.UI.Game
 
             CreateControls();
             UpdateLayout();
+
+            // MainLayout's sprite named "0" is the EXP decile indicator at
+            // the far right, not a skill hotkey. Keep its original atlas art.
+            _experienceDigit = Controls.FirstOrDefault(
+                c => c.Name == "0") as TextureControl;
 
             // =========================================================
             // HOTKEY HIGHLIGHT
@@ -689,6 +695,19 @@ namespace Client.Main.Controls.UI.Game
             _hoveredHudElements = 0;
 
             base.Update(gameTime);
+
+            // MainControl updates child gauges first. Change the original
+            // HUD digit sprite only when the active 10% stage changes.
+            if (_experienceDigit != null && _experienceBar != null)
+            {
+                int digit = _experienceBar.CurrentDecileDigit;
+                if (digit != _lastExperienceDigit)
+                {
+                    _experienceDigit.TextureRectangle =
+                        GetHotkeyDigitRectangle(digit);
+                    _lastExperienceDigit = digit;
+                }
+            }
 
             if (_hoveredHudElements > 0)
             {
