@@ -336,7 +336,7 @@ namespace Client.Main.Controls.UI.Game.Character
             // Bottom buttons
             _exitButton = CreateButton(CreateBottomBounds(20, _buttonExitTexture), _buttonExitTexture, CreateButtonFrames(_buttonExitTexture, out var exitHover, out var exitPressed), exitHover, exitPressed, () =>
             {
-                Visible = false;
+                HideWindow();
                 SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
             });
 
@@ -751,6 +751,39 @@ namespace Client.Main.Controls.UI.Game.Character
 
             float controlScale = Scale;
 
+            if (leftJustReleased)
+            {
+                if (_keypadOpen)
+                {
+                    HandleKeypadTap(mousePosition);
+                    _pressedButtonIndex = -1;
+                    return;
+                }
+                if (ScreenRect(s_amountBounds).Contains(mousePosition))
+                {
+                    _amountFocused = _keypadOpen = true;
+                    _previousAmountKeys = Keyboard.GetState();
+                    _pressedButtonIndex = -1;
+                    return;
+                }
+                if (ScreenRect(s_confirmBounds).Contains(mousePosition))
+                {
+                    ConfirmAmount();
+                    _pressedButtonIndex = -1;
+                    return;
+                }
+                for (int stat = 0; stat < (_lastIsDarkLordFamily ? 5 : 4); stat++)
+                {
+                    if (ScreenRect(new Rectangle(20, (int)s_statRowY[stat], WINDOW_WIDTH - 40, 25))
+                        .Contains(mousePosition))
+                    {
+                        _selectedStatIndex = stat;
+                        UpdateAllocationLabels();
+                        break;
+                    }
+                }
+            }
+
             for (int i = 0; i < _buttons.Count; i++)
             {
                 var button = _buttons[i];
@@ -1062,50 +1095,208 @@ namespace Client.Main.Controls.UI.Game.Character
             UpdateAllocationLabels();
         }
 
-        private void OnStatButtonClicked(int statIndex)
+
+        private void UpdateAllocationLabels()
+        {
+            if (_selectionText == null || _allocationStatusText == null) return;
+            if (_selectedStatIndex == 4 && !_lastIsDarkLordFamily) _selectedStatIndex = 0;
+            _selectionText.Text = $"A {s_statShortNames[_selectedStatIndex]}";
+            if (_remaining > 0)
+                _allocationStatusText.Text = $"Asignados {_completed}/{_requested} | Pendientes: {_remaining}";
+            else if (string.IsNullOrEmpty(_allocationStatusText.Text))
+                _allocationStatusText.Text = "Pulsa + para 1 punto o ingresa una cantidad.";
+        }
+
+        private static CharacterStatAttribute AttributeAt(int index) => index switch
+        {
+            0 => CharacterStatAttribute.Strength,
+            1 => CharacterStatAttribute.Agility,
+            2 => CharacterStatAttribute.Vitality,
+            3 => CharacterStatAttribute.Energy,
+            4 => CharacterStatAttribute.Leadership,
+            _ => CharacterStatAttribute.Strength
+        };
+
+        private void OnStatButtonClicked(int index)
         {
             SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+            _selectedStatIndex = index;
+            UpdateAllocationLabels();
+            BeginAllocation(index, 1);
+        }
 
-            if (_networkManager == null || !_networkManager.IsConnected || _networkManager.CurrentState < ClientConnectionState.InGame)
+        private void ConfirmAmount()
+        {
+            if (!int.TryParse(_amountText, out int amount) || amount < 1)
             {
-                _logger.LogWarning("Cannot increase stat: Not connected to game server or invalid state.");
-                MessageWindow.Show("Cannot add stat points: Not connected to server or not in game.");
+                _allocationStatusText.Text = "Ingresa una cantidad positiva.";
+                return;
+            }
+            _keypadOpen = _amountFocused = false;
+            BeginAllocation(_selectedStatIndex, amount);
+        }
+
+        private void BeginAllocation(int statIndex, int amount)
+        {
+            if (_remaining > 0 || _awaitingResponse)
+            {
+                _allocationStatusText.Text = "Ya hay una asignacion en curso.";
+                return;
+            }
+            if (_networkManager == null || !_networkManager.IsConnected ||
+                _networkManager.CurrentState < ClientConnectionState.InGame || _characterState == null)
+            {
+                _allocationStatusText.Text = "No hay conexion con el servidor.";
+                return;
+            }
+            if (statIndex < 0 || statIndex >= 5 ||
+                (statIndex == 4 && !_lastIsDarkLordFamily))
+            {
+                _allocationStatusText.Text = "Atributo no disponible para esta clase.";
                 return;
             }
 
-            CharacterStatAttribute attributeToSend = statIndex switch
+            int current = statIndex switch
             {
-                0 => CharacterStatAttribute.Strength,
-                1 => CharacterStatAttribute.Agility,
-                2 => CharacterStatAttribute.Vitality,
-                3 => CharacterStatAttribute.Energy,
-                4 => CharacterStatAttribute.Leadership,
-                _ => CharacterStatAttribute.Strength
+                0 => _characterState.Strength,
+                1 => _characterState.Agility,
+                2 => _characterState.Vitality,
+                3 => _characterState.Energy,
+                4 => _characterState.Leadership,
+                _ => 0
             };
-
-            if (_characterState == null)
+            if (amount < 1 || amount > _characterState.LevelUpPoints ||
+                amount > ushort.MaxValue - current)
             {
+                _allocationStatusText.Text = "Supera los puntos disponibles o el limite del atributo.";
                 return;
             }
 
-            if (attributeToSend == CharacterStatAttribute.Leadership &&
-                !(_characterState.Class == CharacterClassNumber.DarkLord || _characterState.Class == CharacterClassNumber.LordEmperor))
+            _selectedStatIndex = statIndex;
+            _allocationAttribute = AttributeAt(statIndex);
+            _remaining = _requested = amount;
+            _completed = 0;
+            _responseSeconds = _sendCooldown = 0;
+            _allocationStatusText.Text = "";
+            UpdateAllocationLabels();
+        }
+
+        // Network callbacks can be delivered off the render thread. Consume on Update().
+        private void OnStatIncreaseResponse(CharacterStatAttribute attr, bool success, ushort amount)
+            => _replyQueue.Enqueue((attr, success, amount));
+
+        private void UpdateAllocationBatch(double deltaSeconds)
+        {
+            while (_replyQueue.TryDequeue(out var result))
             {
-                _logger.LogInformation("Cannot add Leadership points for non-Dark Lord character.");
-                MessageWindow.Show("Only Dark Lords can add Leadership points.");
+                if (!_awaitingResponse || result.attr != _allocationAttribute) continue;
+                _awaitingResponse = false;
+                if (!result.success || result.amount == 0)
+                {
+                    StopAllocation("Servidor rechazo el incremento.");
+                    continue;
+                }
+                int applied = Math.Min(result.amount, _remaining);
+                _completed += applied;
+                _remaining -= applied;
+                _sendCooldown = 0.09; // Avoid flooding the connection even on fast replies.
+                if (_remaining == 0)
+                    StopAllocation($"Completado: {_completed} puntos en {s_statShortNames[_selectedStatIndex]}.");
+            }
+            if (_remaining <= 0) return;
+
+            if (_awaitingResponse)
+            {
+                _responseSeconds += deltaSeconds;
+                if (_responseSeconds > 6)
+                    StopAllocation("No hubo respuesta del servidor; comprueba tus puntos.");
+                return;
+            }
+
+            _sendCooldown -= deltaSeconds;
+            if (_sendCooldown > 0) return;
+            if (_networkManager == null || !_networkManager.IsConnected ||
+                _networkManager.CurrentState < ClientConnectionState.InGame ||
+                _characterState == null || _characterState.LevelUpPoints == 0)
+            {
+                StopAllocation("Se detuvo: sin conexion o sin puntos disponibles.");
                 return;
             }
 
             var service = _networkManager.GetCharacterService();
-            if (service != null)
+            if (service == null)
             {
-                _ = service.SendIncreaseCharacterStatPointRequestAsync(attributeToSend);
-                _logger.LogInformation("Sent request to add point to {Attribute}.", attributeToSend);
+                StopAllocation("No se pudo acceder al servicio de stats.");
+                return;
             }
-            else
+            _awaitingResponse = true;
+            _responseSeconds = 0;
+            // There is no amount field in the existing client request. Send only one
+            // and wait for the authoritative F3:06 response before the next request.
+            _ = service.SendIncreaseCharacterStatPointRequestAsync(_allocationAttribute);
+            UpdateAllocationLabels();
+        }
+
+        private void StopAllocation(string feedback)
+        {
+            _remaining = 0;
+            _awaitingResponse = false;
+            _sendCooldown = 0;
+            if (feedback != null && _allocationStatusText != null)
+                _allocationStatusText.Text = feedback;
+        }
+
+        private void AppendAmountDigit(char digit)
+        {
+            if (_amountText.Length >= 5) return;
+            _amountText = (_amountText == "0" ? "" : _amountText) + digit;
+        }
+
+        private void UpdateAmountKeyboard()
+        {
+            KeyboardState keys = Keyboard.GetState();
+            if (_amountFocused)
             {
-                _logger.LogError("CharacterService is null. Cannot send stat increase request.");
-                MessageWindow.Show("Internal error: Could not add points.");
+                foreach (Keys key in keys.GetPressedKeys())
+                {
+                    if (!_previousAmountKeys.IsKeyUp(key)) continue;
+                    if (key == Keys.Back)
+                    {
+                        if (_amountText.Length > 0)
+                            _amountText = _amountText.Substring(0, _amountText.Length - 1);
+                    }
+                    else if (key == Keys.Delete) _amountText = "";
+                    else if (key == Keys.Enter)
+                    {
+                        _keypadOpen = false;
+                        ConfirmAmount();
+                    }
+                    else if (key == Keys.Escape) _amountFocused = _keypadOpen = false;
+                    else if (key >= Keys.D0 && key <= Keys.D9)
+                        AppendAmountDigit((char)('0' + (int)(key - Keys.D0)));
+                    else if (key >= Keys.NumPad0 && key <= Keys.NumPad9)
+                        AppendAmountDigit((char)('0' + (int)(key - Keys.NumPad0)));
+                }
+            }
+            _previousAmountKeys = keys;
+        }
+
+        private void HandleKeypadTap(Point point)
+        {
+            if (!ScreenRect(new Rectangle(89, 287, 137, 169)).Contains(point))
+            {
+                _keypadOpen = false;
+                return;
+            }
+            const string digits = "123456789C0K";
+            for (int i = 0; i < 12; i++)
+            {
+                var rect = new Rectangle(97 + i % 3 * 41, 314 + i / 3 * 34, 37, 29);
+                if (!ScreenRect(rect).Contains(point)) continue;
+                if (digits[i] == 'C') _amountText = "";
+                else if (digits[i] == 'K') _keypadOpen = false;
+                else AppendAmountDigit(digits[i]);
+                return;
             }
         }
 
