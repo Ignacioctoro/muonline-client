@@ -169,6 +169,34 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
         // ───────────────────── Packet Handlers ──────────────────────
 
+        // OpenMU Season 6 C1 09 A8: dark-raven server-authoritative attack.
+        // Indexes 5..8 are network owner/target IDs (big endian). The payload
+        // has no subcode; 0 = physical rush, 1 = ranged/magic.
+        [PacketHandler(0xA8, PacketRouter.NoSubCode)]
+        public Task HandleDarkRavenAttackAsync(Memory<byte> packet)
+        {
+            ReadOnlySpan<byte> data = packet.Span;
+            if (data.Length < 9 || data[0] != 0xC1 || data[1] != 9 ||
+                data[2] != 0xA8 || data[3] != 0 || data[4] > 1)
+                return Task.CompletedTask;
+
+            byte attackType = data[4];
+            ushort ownerId = (ushort)(BinaryPrimitives.ReadUInt16BigEndian(data.Slice(5, 2)) & 0x7FFF);
+            ushort targetId = (ushort)(BinaryPrimitives.ReadUInt16BigEndian(data.Slice(7, 2)) & 0x7FFF);
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                if (MuGame.Instance.ActiveScene?.World is not WorldControl world ||
+                    !world.TryGetWalkerById(ownerId, out var owner) ||
+                    owner is not PlayerObject player ||
+                    !world.TryGetWalkerById(targetId, out var target))
+                    return;
+
+                player.DarkRaven?.StartServerAttack(target, attackType == 1);
+            });
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0x12, PacketRouter.NoSubCode)] // AddCharacterToScope
         public Task HandleAddCharacterToScopeAsync(Memory<byte> packet)
         {
