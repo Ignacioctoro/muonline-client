@@ -24,11 +24,30 @@ namespace Client.Main.Controls.UI.Game.Hud
         private const string BarPath = "Interface/newui_Pet_HpBar.jpg";
         private const byte RavenSlot = 1; // EQUIPMENT_WEAPON_LEFT
         private const byte HelperSlot = 8; // EQUIPMENT_HELPER
-        private const int FrameWidth = 57;
-        private const int FrameHeight = 23;
-        private const int RowPitch = 24;
-        private const int BarWidth = 49;
-        private const float NameTextScale = 0.34f;
+        // Magnification affects only the NewUI destination geometry.
+        // All source rectangles continue using the original MU texture pixels.
+        private const float DisplayScale = 1.6f;
+        private const int SourceFrameWidth = 57;
+        private const int SourceFrameHeight = 23;
+        private const int SourceRowPitch = 24;
+        private const int SourceBarWidth = 49;
+        private const int SourceBarHeight = 3;
+        private const float NameTextScale = 0.34f * DisplayScale;
+
+        private static int Scale(int pixels) => (int)MathF.Round(pixels * DisplayScale);
+
+        // Precomputed virtual screen sizes; avoid recalculating scaling each frame.
+        private static readonly int FrameWidth = Scale(SourceFrameWidth);
+        private static readonly int FrameHeight = Scale(SourceFrameHeight);
+        private static readonly int RowPitch = Scale(SourceRowPitch);
+        private static readonly int BarWidth = Scale(SourceBarWidth);
+        private static readonly int BarHeight = Math.Max(1, Scale(SourceBarHeight));
+        private static readonly int InnerX = Scale(2);
+        private static readonly int InnerY = Scale(2);
+        private static readonly int InnerWidth = Scale(53);
+        private static readonly int InnerHeight = Scale(13);
+        private static readonly int BarOffsetX = Scale(4);
+        private static readonly int BarOffsetY = Scale(16);
 
         private readonly CharacterState _state;
         private readonly PetEntry[] _entries = new PetEntry[2];
@@ -126,17 +145,23 @@ namespace Client.Main.Controls.UI.Game.Hud
 
                     // Original CItemEnduranceInfo's black inner backing.
                     sprite.Draw(GraphicsManager.Instance.Pixel,
-                        new Rectangle(x + 2, y + 2, 53, 13),
+                        new Rectangle(x + InnerX, y + InnerY, InnerWidth, InnerHeight),
                         new Color(0, 0, 0, 179));
                     sprite.Draw(_frame, new Rectangle(x, y, FrameWidth, FrameHeight),
-                        new Rectangle(0, 0, FrameWidth, FrameHeight), Color.White);
+                        new Rectangle(0, 0, SourceFrameWidth, SourceFrameHeight),
+                        Color.White);
 
-                    // Source is cropped as well as destination: never stretch 49 texels.
-                    int width = Math.Clamp(_entries[i].Health * BarWidth / 255, 0, BarWidth);
-                    if (width > 0)
+                    // Crop the original 49x3 source strip, then enlarge its
+                    // destination. This preserves the native health percentage.
+                    int sourceWidth = Math.Clamp(
+                        _entries[i].Health * SourceBarWidth / 255, 0, SourceBarWidth);
+                    if (sourceWidth > 0)
                     {
-                        sprite.Draw(_bar, new Rectangle(x + 4, y + 16, width, 3),
-                            new Rectangle(0, 0, width, 3), Color.White);
+                        int destWidth = Math.Min(BarWidth, Scale(sourceWidth));
+                        sprite.Draw(_bar,
+                            new Rectangle(x + BarOffsetX, y + BarOffsetY, destWidth, BarHeight),
+                            new Rectangle(0, 0, sourceWidth, SourceBarHeight),
+                            Color.White);
                     }
                 }
             }
@@ -155,7 +180,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                     string name = _entries[i].Name;
                     float textWidth = font.MeasureString(name).X * NameTextScale;
                     float nameX = origin.X + (FrameWidth - textWidth) * 0.5f;
-                    float nameY = origin.Y + i * RowPitch + 5f;
+                    float nameY = origin.Y + i * RowPitch + (5f * DisplayScale);
                     sprite.DrawString(font, name, new Vector2(nameX, nameY),
                         Color.White, 0f, Vector2.Zero, NameTextScale,
                         SpriteEffects.None, 0f);
