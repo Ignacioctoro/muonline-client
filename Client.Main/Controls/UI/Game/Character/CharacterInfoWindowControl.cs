@@ -41,7 +41,8 @@ namespace Client.Main.Controls.UI.Game.Character
         private const string StatIncreaseButtonPath = "Interface/newui_chainfo_btn_level.tga";
         // Crop packed-sprite interior instead of including adjacent colored atlas gutters.
         // These are visual reconstructions, not original Scaleform placement records.
-        private static readonly Rectangle s_panelSource = new(665, 4, 345, 629);
+        // Include the complete outer corner ornament, not just the inner vertical rail.
+        private static readonly Rectangle s_panelSource = new(656, 0, 354, 633);
         private static readonly Rectangle s_informationSource = new(676, 645, 245, 56);
         // Neutral charcoal box (fourth small box in I1), without the gold button ornament.
         private static readonly Rectangle s_attributeBandSource = new(728, 720, 114, 26);
@@ -152,6 +153,8 @@ namespace Client.Main.Controls.UI.Game.Character
         private int _pressedButtonIndex = -1;
         private int _clickFlashButtonIndex = -1;
         private double _clickFlashSeconds;
+        private bool _isDragging;
+        private Point _dragOffset;
 
         private CharacterState _characterState;
         private NetworkManager _networkManager;
@@ -279,7 +282,7 @@ namespace Client.Main.Controls.UI.Game.Character
             }
 
             // Season 6 compatibility buttons: visual feedback only, no nonexistent windows.
-            Rectangle buttonNormal = s_buttonSource;
+            Rectangle buttonNormal = s_attributeBandSource;
             _petButton = CreateButton(new Rectangle(23, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
                 () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "PETS");
@@ -456,14 +459,77 @@ namespace Client.Main.Controls.UI.Game.Character
         {
             if (!Visible)
             {
+                _isDragging = false;
                 return;
             }
 
             base.Update(gameTime);
 
             _clickFlashSeconds = Math.Max(0d, _clickFlashSeconds - gameTime.ElapsedGameTime.TotalSeconds);
-            HandleButtonInput();
+            if (!HandleWindowDrag())
+            {
+                HandleButtonInput();
+            }
             UpdateDisplayData();
+        }
+
+        private bool HandleWindowDrag()
+        {
+            var mouse = MuGame.Instance.UiMouseState;
+            bool pressed = mouse.LeftButton == ButtonState.Pressed;
+            if (_isDragging)
+            {
+                Scene?.SetMouseInputConsumed();
+                if (!pressed || !MuGame.Instance.IsActive)
+                {
+                    _isDragging = false;
+                    return true;
+                }
+
+                // UI mouse coordinates and X/Y use the same virtual coordinate system,
+                // as in InventoryControl. The saved offset prevents a jump on mouse-down.
+                X = mouse.X - _dragOffset.X;
+                Y = mouse.Y - _dragOffset.Y;
+                return true;
+            }
+
+            bool justPressed = pressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released;
+            if (!justPressed || !MuGame.Instance.IsActive)
+            {
+                return false;
+            }
+
+            var bounds = DisplayRectangle;
+            var header = new Rectangle(bounds.X + (int)(16 * Scale), bounds.Y + (int)(29 * Scale),
+                (int)(316 * Scale), (int)(42 * Scale));
+            if (!header.Contains(mouse.Position) ||
+                (_exitButton != null && GetButtonRectangle(_exitButton, Scale).Contains(mouse.Position)))
+            {
+                return false;
+            }
+
+            // Fresh hit-test: Scene.MouseControl uses the previous frame's hover flags.
+            if (Scene != null)
+            {
+                for (int i = Scene.Controls.Count - 1; i >= 0; i--)
+                {
+                    var control = Scene.Controls[i];
+                    if (control == this) break;
+                    if (control.Visible && control.Interactive && control != Scene.World &&
+                        control.DisplayRectangle.Contains(mouse.Position))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            _isDragging = true;
+            _dragOffset = new Point(mouse.X - X, mouse.Y - Y);
+            Align = ControlAlign.None;
+            _pressedButtonIndex = _hoveredButtonIndex = -1;
+            BringToFront();
+            Scene?.SetMouseInputConsumed();
+            return true;
         }
 
         private void HandleButtonInput()
@@ -634,7 +700,7 @@ namespace Client.Main.Controls.UI.Game.Character
                     var position = new Vector2(target.X + (target.Width - textSize.X) * 0.5f,
                         target.Y + (target.Height - textSize.Y) * 0.5f);
                     spriteBatch.DrawString(font, button.Label, position,
-                        (hovered ? Color.White : new Color(243, 218, 158)) * Alpha,
+                        (hovered ? Color.White : new Color(213, 207, 191)) * Alpha,
                         0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
                 }
             }
@@ -822,6 +888,7 @@ namespace Client.Main.Controls.UI.Game.Character
         public void ShowWindow()
         {
             Visible = true;
+            _isDragging = false;
             _pressedButtonIndex = -1;
             _hoveredButtonIndex = -1;
             _clickFlashButtonIndex = -1;
@@ -840,6 +907,7 @@ namespace Client.Main.Controls.UI.Game.Character
         public void HideWindow()
         {
             Visible = false;
+            _isDragging = false;
             if (Scene != null && Scene.FocusControl == this)
             {
                 Scene.FocusControl = null;
