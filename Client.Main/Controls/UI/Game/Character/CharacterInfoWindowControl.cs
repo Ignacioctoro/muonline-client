@@ -26,10 +26,10 @@ namespace Client.Main.Controls.UI.Game.Character
         private static readonly float[] s_statRowY =
         {
             165f,
-            237f,
-            309f,
-            381f,
-            453f
+            240f,
+            319f,
+            397f,
+            473f
         };
 
         private static readonly string[] s_statShortNames = { "STR", "AGI", "STA", "ENE", "CMD" };
@@ -39,12 +39,15 @@ namespace Client.Main.Controls.UI.Game.Character
         // Keep them centralized until the native movie's placement records are decoded.
         private const string CharacterAtlasPath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
         private const string CharacterInsetPath = "Interface/GFx/CharacterInfoFrame_I24.ozd";
-        private static readonly Rectangle s_panelSource = new(665, 0, 348, 638);
-        private static readonly Rectangle s_informationSource = new(674, 643, 249, 60);
-        private static readonly Rectangle s_attributeBandSource = new(346, 718, 121, 32);
-        private static readonly Rectangle s_buttonSource = new(348, 720, 118, 30);
-        private static readonly Rectangle s_closeSource = new(985, 754, 32, 30);
-        private static readonly Rectangle s_insetSource = new(0, 0, 324, 383);
+        private const string StatIncreaseButtonPath = "Interface/newui_chainfo_btn_level.tga";
+        // Crop packed-sprite interior instead of including adjacent colored atlas gutters.
+        // These are visual reconstructions, not original Scaleform placement records.
+        private static readonly Rectangle s_panelSource = new(665, 4, 345, 629);
+        private static readonly Rectangle s_informationSource = new(676, 645, 245, 56);
+        private static readonly Rectangle s_attributeBandSource = new(351, 724, 110, 23);
+        private static readonly Rectangle s_buttonSource = new(353, 725, 109, 22);
+        private static readonly Rectangle s_closeSource = new(986, 756, 26, 26);
+        private static readonly Rectangle s_insetSource = new(3, 3, 316, 374);
 
 
         private enum TextAlignment
@@ -100,6 +103,7 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private Texture2D _characterAtlas;
         private Texture2D _characterInset;
+        private Texture2D _statIncreaseButtonTexture;
 
 
         private RenderTarget2D _staticSurface;
@@ -126,6 +130,7 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoTextEntry _eneDetail3Text;
         private CharacterInfoTextEntry _pvmInfo1Text;
         private CharacterInfoTextEntry _pvmInfo2Text;
+        private readonly CharacterInfoButton[] _statButtons = new CharacterInfoButton[BTN_STAT_COUNT];
 
         private CharacterInfoButton _exitButton;
         private CharacterInfoButton _skillsButton;
@@ -171,16 +176,18 @@ namespace Client.Main.Controls.UI.Game.Character
         }
 
         public IEnumerable<string> GetPreloadTexturePaths()
-            => new[] { CharacterAtlasPath, CharacterInsetPath };
+            => new[] { CharacterAtlasPath, CharacterInsetPath, StatIncreaseButtonPath };
 
         public override async Task Load()
         {
             await base.Load();
             var textures = await Task.WhenAll(
                 TextureLoader.Instance.PrepareAndGetTexture(CharacterAtlasPath),
-                TextureLoader.Instance.PrepareAndGetTexture(CharacterInsetPath));
+                TextureLoader.Instance.PrepareAndGetTexture(CharacterInsetPath),
+                TextureLoader.Instance.PrepareAndGetTexture(StatIncreaseButtonPath));
             _characterAtlas = textures[0];
             _characterInset = textures[1];
+            _statIncreaseButtonTexture = textures[2];
             if (_characterAtlas == null || _characterInset == null)
             {
                 _logger.LogWarning("Character GFx atlases could not be loaded from Data. Check CharacterInfoFrame_I1/I24.ozd.");
@@ -206,8 +213,8 @@ namespace Client.Main.Controls.UI.Game.Character
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
-                _statValueTexts[i] = CreateText(new Vector2(317f, s_statRowY[i] - 1f), 11f,
-                    new Color(240, 215, 111), TextAlignment.Right);
+                _statValueTexts[i] = CreateText(new Vector2(96f, s_statRowY[i] - 1f), 11f,
+                    new Color(240, 215, 111));
             }
 
             // A fixed-height row accommodates the native stat and all existing combat detail lines.
@@ -223,6 +230,30 @@ namespace Client.Main.Controls.UI.Game.Character
             _eneDetail3Text = CreateText(new Vector2(29f, s_statRowY[3] + 54f), 10f, Color.LightGray);
             _pvmInfo1Text = CreateText(new Vector2(29f, 530f), 10f, new Color(225, 197, 148));
             _pvmInfo2Text = CreateText(new Vector2(29f, 546f), 10f, new Color(225, 197, 148));
+
+            // Reuse native S6 single-point buttons; the numeric allocation UI is phase 2.
+            int frames = GetTextureFrameCount(_statIncreaseButtonTexture);
+            int frameHeight = _statIncreaseButtonTexture != null
+                ? Math.Max(1, _statIncreaseButtonTexture.Height / frames) : 0;
+            for (int i = 0; i < BTN_STAT_COUNT; i++)
+            {
+                int statIndex = i;
+                var normal = _statIncreaseButtonTexture != null
+                    ? new Rectangle(0, 0, _statIncreaseButtonTexture.Width, frameHeight)
+                    : s_buttonSource;
+                var hover = frames > 1
+                    ? new Rectangle(0, frameHeight, _statIncreaseButtonTexture.Width, frameHeight)
+                    : normal;
+                var pressed = frames > 2
+                    ? new Rectangle(0, frameHeight * 2, _statIncreaseButtonTexture.Width, frameHeight)
+                    : hover;
+                _statButtons[i] = CreateButton(
+                    new Rectangle(294, (int)s_statRowY[i] - 5, 26, 24),
+                    _statIncreaseButtonTexture ?? _characterAtlas,
+                    normal, hover, pressed,
+                    () => OnStatButtonClicked(statIndex),
+                    _statIncreaseButtonTexture == null ? "+" : null);
+            }
 
             // Season 6 compatibility buttons: visual feedback only, no nonexistent windows.
             Rectangle buttonNormal = s_buttonSource;
@@ -260,6 +291,14 @@ namespace Client.Main.Controls.UI.Game.Character
         }
 
 
+        private static int GetTextureFrameCount(Texture2D texture)
+        {
+            if (texture == null) return 1;
+            if (texture.Height % 3 == 0) return 3;
+            if (texture.Height % 2 == 0) return 2;
+            return 1;
+        }
+
         private void InvalidateStaticSurface()
         {
             _staticSurfaceDirty = true;
@@ -286,7 +325,9 @@ namespace Client.Main.Controls.UI.Game.Character
             graphicsDevice.Clear(Color.Transparent);
 
             var spriteBatch = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend))
+            // Point sampling prevents colors from neighboring packed atlas sprites bleeding in.
+            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.PointClamp))
             {
                 DrawStaticElements(spriteBatch);
             }
@@ -307,7 +348,7 @@ namespace Client.Main.Controls.UI.Game.Character
 
             if (_characterInset != null)
             {
-                spriteBatch.Draw(_characterInset, new Rectangle(11, 148, 326, 414), s_insetSource, Color.White);
+                spriteBatch.Draw(_characterInset, new Rectangle(13, 148, 322, 414), s_insetSource, Color.White);
             }
 
             spriteBatch.Draw(_characterAtlas, new Rectangle(16, 80, 316, 62), s_informationSource, Color.White);
@@ -551,9 +592,11 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private void UpdateDisplayData()
         {
-            if (_characterState == null)
+            var currentState = _networkManager?.GetCharacterState();
+            if (!ReferenceEquals(_characterState, currentState))
             {
-                _characterState = _networkManager?.GetCharacterState();
+                _characterState = currentState;
+                _hasCachedSnapshot = false;
             }
 
             if (_characterState == null)
@@ -665,6 +708,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 _eneDetail3Text.Text = string.Empty;
             }
 
+            _pvmInfo1Text.BasePosition = new Vector2(29f, isDarkLordFamily ? 530f : 502f);
+            _pvmInfo2Text.BasePosition = new Vector2(29f, isDarkLordFamily ? 546f : 518f);
             _pvmInfo1Text.Visible = true;
             _pvmInfo1Text.Text = $"PvM Attack Success Rate: {snapshot.PvMAttackRate}%";
             _pvmInfo2Text.Visible = true;
@@ -673,6 +718,14 @@ namespace Client.Main.Controls.UI.Game.Character
             // Show/hide Leadership (CMD) stat value text based on character class
             _statValueTexts[4].Visible = isDarkLordFamily;
 
+            for (int i = 0; i < BTN_STAT_COUNT; i++)
+            {
+                if (_statButtons[i] == null) continue;
+                bool available = snapshot.LevelUpPoints > 0 && (i != 4 || isDarkLordFamily);
+                _statButtons[i].Visible = available;
+                _statButtons[i].Enabled = available;
+            }
+
             // All three are future Season 6 navigation shortcuts, not active windows.
             _exitButton.Visible = _exitButton.Enabled = true;
             _skillsButton.Visible = _skillsButton.Enabled = true;
@@ -680,7 +733,37 @@ namespace Client.Main.Controls.UI.Game.Character
             _masterButton.Visible = _masterButton.Enabled = true;
         }
 
-        // No stat assignment is exposed during Character visual phase 1.
+        // Phase 1 keeps the original single-point operation; no amount editor yet.
+        private void OnStatButtonClicked(int statIndex)
+        {
+            if (_networkManager == null || !_networkManager.IsConnected ||
+                _networkManager.CurrentState < ClientConnectionState.InGame)
+                return;
+
+            var state = _networkManager.GetCharacterState();
+            if (state == null || state.LevelUpPoints == 0)
+                return;
+
+            if (statIndex == 4 && state.Class != CharacterClassNumber.DarkLord &&
+                state.Class != CharacterClassNumber.LordEmperor)
+                return;
+
+            CharacterStatAttribute attribute = statIndex switch
+            {
+                0 => CharacterStatAttribute.Strength,
+                1 => CharacterStatAttribute.Agility,
+                2 => CharacterStatAttribute.Vitality,
+                3 => CharacterStatAttribute.Energy,
+                4 => CharacterStatAttribute.Leadership,
+                _ => throw new ArgumentOutOfRangeException(nameof(statIndex)),
+            };
+            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+            var service = _networkManager.GetCharacterService();
+            if (service != null)
+            {
+                _ = service.SendIncreaseCharacterStatPointRequestAsync(attribute);
+            }
+        }
 
         public void ShowWindow()
         {

@@ -3,6 +3,7 @@ using MUnique.OpenMU.Network.Packets;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
 using Client.Main.Objects.Player;
 using System;
+using System.Buffers.Binary;
 using System.Threading.Tasks;
 using Client.Data.ATT;
 using Client.Main.Core.Utilities;
@@ -1051,13 +1052,21 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 if (_targetVersion >= TargetProtocolVersion.Season6 && packet.Length >= BaseStatsExtended.Length)
                 {
                     var stats = new BaseStatsExtended(packet);
+                    // F3:32 OpenMU encodes Command as uint32 LE at absolute offset 20.
+                    // Read from the wire to guard against generated-schema CMD regressions.
+                    uint commandWire = BinaryPrimitives.ReadUInt32LittleEndian(packet.Span.Slice(20, 4));
+                    if (commandWire != stats.Command)
+                    {
+                        _logger.LogWarning("F3:32 CMD mismatch: decoded {Decoded}, wire {Wire}.",
+                            stats.Command, commandWire);
+                    }
                     _characterState.UpdateStats(
                         (ushort)stats.Strength,
                         (ushort)stats.Agility,
                         (ushort)stats.Vitality,
                         (ushort)stats.Energy,
-                        (ushort)stats.Command);
-                    _logger.LogInformation("📊 BaseStatsExtended received.");
+                        (ushort)Math.Min(commandWire, ushort.MaxValue));
+                    _logger.LogInformation("📊 BaseStatsExtended received; CMD={Command}.", commandWire);
                 }
                 else
                 {
