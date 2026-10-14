@@ -123,6 +123,11 @@ namespace Client.Main.Scenes
                 return false;
             }
 
+            // A Raven mode is a command, not a targeted skill spell.
+            // The original Main sends it on right-click via C1 A7.
+            if (DarkRavenCommands.IsCommandSkill(skill.SkillId))
+                return false;
+
             if (SkillDatabase.IsSelfSkill(
                     skill.SkillId))
             {
@@ -244,6 +249,10 @@ namespace Client.Main.Scenes
             {
                 return false;
             }
+
+            if (DarkRavenCommands.IsCommandSkill(skill.SkillId))
+                return false;
+
             // Self / friendly buffs must never require the monster
             // which happened to be selected when the player pressed
             // the skill button.
@@ -403,6 +412,33 @@ namespace Client.Main.Scenes
 
             if (hero == null || hero.IsDead || walkableForSkills == null)
                 return;
+
+            if (DarkRavenCommands.IsCommandSkill(skill.SkillId))
+            {
+                // MuMain GIPetManager::SendPetCommand: send only on a
+                // fresh right click. Holding the button must not flood A7.
+                // OpenMU owns pet AI and determines what it may attack.
+                if (!rightJustPressed || hero.DarkRaven?.IsEquipped != true)
+                    return;
+
+                byte mode = DarkRavenCommands.ToMode(skill.SkillId);
+                ushort targetId = 0xFFFF;
+                if (mode == 3)
+                {
+                    // Target mode needs a real monster or an allowed PvP target.
+                    // Don't send the owner, terrain, or a missing target.
+                    var target = GetHoveredSkillTarget();
+                    if (target == null)
+                        return;
+
+                    targetId = target.NetworkId;
+                }
+
+                _ = MuGame.Network.GetCharacterService()
+                    .SendDarkRavenCommandAsync(mode, targetId);
+                _scene.SetMouseInputConsumed();
+                return;
+            }
 
             if (skill.SkillId == NovaSkillId)
             {
