@@ -2996,6 +2996,24 @@ namespace Client.Main.Scenes
 
             base.Draw(gameTime);
 
+            // HUD tooltips must be drawn after every regular scene/UI pass.
+            // MainControl's texture/text render happens earlier, and a central
+            // skill can otherwise overpaint the EXP hint. Keep dragged item
+            // previews above the hint in their separate final pass below.
+            if (_main.HasExperienceTooltip)
+            {
+                using (new SpriteBatchScope(
+                           GraphicsManager.Instance.Sprite,
+                           SpriteSortMode.Deferred,
+                           BlendState.AlphaBlend,
+                           SamplerState.PointClamp,
+                           DepthStencilState.None,
+                           transform: UiScaler.SpriteTransform))
+                {
+                    _main.DrawExperienceTooltip(gameTime);
+                }
+            }
+
             // Final top-most pass: draw dragged item previews above all UI windows
             using (new SpriteBatchScope(
                        GraphicsManager.Instance.Sprite,

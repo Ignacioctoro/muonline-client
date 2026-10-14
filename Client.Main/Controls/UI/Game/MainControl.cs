@@ -880,9 +880,22 @@ namespace Client.Main.Controls.UI.Game
 
                 _mp.DrawLabel(
                     gameTime);
-
-                _experienceBar?.DrawTooltip(gameTime);
             }
+        }
+
+        // GameScene calls this after its regular UI draw pass, ensuring the
+        // EXP tooltip is never covered by the active skill or other HUD art.
+        public bool HasExperienceTooltip =>
+            Status == GameControlStatus.Ready &&
+            Visible &&
+            _experienceBar != null &&
+            _experienceBar.Visible &&
+            _experienceBar.IsMouseOver;
+
+        public void DrawExperienceTooltip(GameTime gameTime)
+        {
+            if (HasExperienceTooltip)
+                _experienceBar.DrawTooltip(gameTime);
         }
 
         // =============================================================

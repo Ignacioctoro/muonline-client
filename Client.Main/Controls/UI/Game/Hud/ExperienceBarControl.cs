@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using Client.Main.Core.Client;
+using Client.Main.Controllers;
 using Client.Main.Core.Utilities;
 using Client.Main.Controls.UI;
 using Microsoft.Xna.Framework;
@@ -96,8 +97,16 @@ namespace Client.Main.Controls.UI.Game.Hud
             }
 
             var bar = DisplayRectangle;
-            _hoverTooltip.X = bar.Center.X - _hoverTooltip.ControlSize.X / 2;
-            _hoverTooltip.Y = bar.Y - _hoverTooltip.ControlSize.Y - 14;
+            // The quick-skill row extends upwards from the EXP bar. Place
+            // the hint above those icons instead of inside their rectangles.
+            // Keep it in virtual coordinates; UiScaler handles the DPI.
+            const int skillRowClearance = 60;
+            _hoverTooltip.X = Math.Clamp(
+                bar.Center.X - _hoverTooltip.ControlSize.X / 2,
+                0,
+                Math.Max(0, UiScaler.VirtualSize.X - _hoverTooltip.ControlSize.X));
+            _hoverTooltip.Y = Math.Max(
+                0, bar.Y - _hoverTooltip.ControlSize.Y - skillRowClearance);
             _hoverTooltip.Draw(gameTime);
         }
 
