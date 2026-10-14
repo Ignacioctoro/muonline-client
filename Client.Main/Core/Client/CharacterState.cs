@@ -1412,6 +1412,15 @@ namespace Client.Main.Core.Client
         /// <summary>
         /// Increments a specific character stat attribute by a given amount.
         /// </summary>
+        /// <summary>
+        /// Raised after the server confirms or rejects a stat increase (F3:06).
+        /// The UI uses this instead of assuming that a sent request succeeded.
+        /// </summary>
+        public event Action<CharacterStatAttribute, bool, ushort> StatIncreaseResponseReceived;
+
+        public void NotifyStatIncreaseResponse(CharacterStatAttribute attribute, bool success, ushort amount)
+            => StatIncreaseResponseReceived?.Invoke(attribute, success, amount);
+
         public void IncrementStat(CharacterStatAttribute attribute, ushort amount = 1)
         {
             switch (attribute)
