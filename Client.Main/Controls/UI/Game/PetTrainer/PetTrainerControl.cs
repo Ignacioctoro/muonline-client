@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using Client.Main.Content;
 using Client.Main.Controllers;
+using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Client.Main.Helpers;
 using Client.Main.Models;
@@ -21,7 +23,20 @@ namespace Client.Main.Controls.UI.Game
     public sealed class PetTrainerControl : UIControl, IUiTexturePreloadable
     {
         private const int WindowWidth = 350;
-        private const int WindowHeight = 342;
+        private const int MainWindowHeight = 346;
+        private const int RestoreWindowHeight = 442;
+        private const byte HorseSlot = 8;
+        private const byte RavenSlot = 1;
+        private const int MaximumPetLife = 255;
+
+        private enum TrainerPage
+        {
+            Menu,
+            RestoreLife
+        }
+
+        private TrainerPage _page = TrainerPage.Menu;
+        private int WindowHeight => _page == TrainerPage.RestoreLife ? RestoreWindowHeight : MainWindowHeight;
 
         // Match CharacterInfoWindowControl: use the same verified right-side GFx panel.
         // Do not crop across the separate NpcDialogue sprites (arrows / separator).
@@ -34,16 +49,23 @@ namespace Client.Main.Controls.UI.Game
         private const string ClosePressedPath = "Interface/GFx/btn_close03.ozd";
 
         // Same Character GFx source regions as CharacterInfoWindowControl.cs.
-        // Original Character panel is 354 x 633: preserve the complete 96px title
-        // and 34px footer when shortening it into a compact trainer dialog.
-        private static readonly Rectangle FrameSource = new(656, 0, 354, 633);
+        // Verified CharacterInfoFrame right-hand panel. y=633 excluded a few
+        // bottom border pixels: extend the source to y=638 as in the original atlas.
+        // Preserve the title/footer and scale only the uninterrupted side-wall.
+        private static readonly Rectangle FrameSource = new(656, 0, 354, 638);
         private static readonly Rectangle InformationSource = new(676, 645, 245, 56);
         private const int FrameTopHeight = 96;
-        private const int FrameBottomHeight = 34;
+        private const int FrameBottomHeight = 39;
 
         private static readonly Rectangle InformationTarget = new(27, 99, 296, 75);
         private static readonly Rectangle RestoreButtonTarget = new(57, 187, 236, 56);
         private static readonly Rectangle ResurrectButtonTarget = new(57, 249, 236, 56);
+
+        // Restore Life: original Season 6 order, a status directly under each pet.
+        private static readonly Rectangle RestoreInformationTarget = new(27, 99, 296, 68);
+        private static readonly Rectangle HorseButtonTarget = new(57, 171, 236, 55);
+        private static readonly Rectangle RavenButtonTarget = new(57, 266, 236, 55);
+        private static readonly Rectangle BackButtonTarget = new(102, 376, 146, 44);
         private static readonly Rectangle CloseButtonTarget = new(307, 36, 25, 25);
 
         private static PetTrainerControl _instance;
@@ -62,6 +84,21 @@ namespace Client.Main.Controls.UI.Game
         private int _hoveredButton = -1;
         private int _pressedButton = -1;
         private bool _closeRequestSent;
+        private bool _repairPending;
+
+        private readonly struct PetRecoveryState
+        {
+            public PetRecoveryState(bool canRestore, long cost, string message)
+            {
+                CanRestore = canRestore;
+                Cost = cost;
+                Message = message;
+            }
+
+            public bool CanRestore { get; }
+            public long Cost { get; }
+            public string Message { get; }
+        }
 
         private PetTrainerControl()
         {
@@ -129,9 +166,8 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            Align = ControlAlign.HorizontalCenter | ControlAlign.VerticalCenter;
-            _hoveredButton = -1;
-            _pressedButton = -1;
+            SetPage(TrainerPage.Menu);
+            _repairPending = false;
             _closeRequestSent = false;
             Visible = true;
             BringToFront();
@@ -162,6 +198,7 @@ namespace Client.Main.Controls.UI.Game
         public void HideWithoutServerRequest()
         {
             Visible = false;
+            _repairPending = false;
             _hoveredButton = -1;
             _pressedButton = -1;
             if (Scene?.FocusControl == this)
@@ -183,6 +220,153 @@ namespace Client.Main.Controls.UI.Game
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Unable to close the Pet Trainer NPC session.");
+            }
+        }
+
+        private void SetPage(TrainerPage page)
+        {
+            _page = page;
+            ControlSize = new Point(WindowWidth, WindowHeight);
+            ViewSize = ControlSize;
+            Align = ControlAlign.HorizontalCenter | ControlAlign.VerticalCenter;
+            _hoveredButton = -1;
+            _pressedButton = -1;
+
+            if (page == TrainerPage.RestoreLife)
+            {
+                // OpenMU A9 provides the *pet's* level; +level from item bytes is
+                // not a substitute. Request only the equipped pet slots.
+                _ = RequestEquippedPetInfoAsync();
+            }
+        }
+
+        private async Task RequestEquippedPetInfoAsync()
+        {
+            try
+            {
+                var state = MuGame.Network?.GetCharacterState();
+                var service = MuGame.Network?.GetCharacterService();
+                if (state == null || service == null)
+                {
+                    return;
+                }
+
+                if (IsEquippedPet(state, RavenSlot, 5))
+                {
+                    await service.SendPetInfoRequestAsync(0, RavenSlot);
+                }
+
+                if (IsEquippedPet(state, HorseSlot, 4))
+                {
+                    await service.SendPetInfoRequestAsync(1, HorseSlot);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to request pet information for Restore Life.");
+            }
+        }
+
+        private static bool IsEquippedPet(CharacterState state, byte slot, short number)
+        {
+            return state != null &&
+                state.TryGetInventoryItem(slot, out var data) &&
+                data != null &&
+                ItemDatabase.TryGetItemGroupAndNumber(data, out var group, out var itemNumber) &&
+                group == 13 && itemNumber == number;
+        }
+
+        private static long RoundOpenMuPrice(long value)
+        {
+            if (value >= 1000) return value / 100 * 100;
+            if (value >= 100) return value / 10 * 10;
+            return value;
+        }
+
+        private static long CalculateOpenMuPetRecoveryCost(byte petLevel, byte durability, bool isHorse)
+        {
+            // From OpenMU ItemPriceCalculator.CalculateRepairPrice, with NPC discount:
+            // pet buying price = pet level * 2m (horse) or 1m (raven).
+            // Trainable pets have 255 base durability in OpenMU Season Six.
+            long basePrice = RoundOpenMuPrice(
+                Math.Min((long)petLevel * (isHorse ? 2_000_000L : 1_000_000L),
+                    400_000_000L));
+            float root = (float)Math.Sqrt(basePrice);
+            float fourthRoot = (float)Math.Sqrt(root);
+            float missingLife = 1f - (float)durability / MaximumPetLife;
+            float cost = 3f * root * fourthRoot * missingLife + 1f;
+            if (durability == 0)
+            {
+                cost *= 2.0f; // OpenMU DestroyedPetPenalty
+            }
+
+            return RoundOpenMuPrice((long)cost);
+        }
+
+        private PetRecoveryState GetPetRecoveryState(byte slot, short number)
+        {
+            var state = MuGame.Network?.GetCharacterState();
+            if (!IsEquippedPet(state, slot, number))
+            {
+                return new PetRecoveryState(false, 0, "Pet is not equipped.");
+            }
+
+            if (!state.TryGetPetInfo(slot, out var petInfo) ||
+                petInfo.PetType != (number == 5 ? (byte)0 : (byte)1))
+            {
+                return new PetRecoveryState(false, 0, "Checking pet information...");
+            }
+
+            if (petInfo.Health >= MaximumPetLife)
+            {
+                return new PetRecoveryState(false, 0, "Life has already been recovered.");
+            }
+
+            long cost = CalculateOpenMuPetRecoveryCost(petInfo.Level, petInfo.Health, number == 4);
+            if (state.InventoryZen < cost)
+            {
+                long missingZen = cost - state.InventoryZen;
+                return new PetRecoveryState(false, cost,
+                    $"{missingZen.ToString("N0", CultureInfo.InvariantCulture)} Zen lacking to restore life.");
+            }
+
+            return new PetRecoveryState(true, cost,
+                $"{cost.ToString("N0", CultureInfo.InvariantCulture)} Zen required to restore life.");
+        }
+
+        private async Task RestoreEquippedPetAsync(byte slot, short number)
+        {
+            if (_repairPending || _page != TrainerPage.RestoreLife)
+            {
+                return;
+            }
+
+            // Recheck right before sending. The server validates money and
+            // durability again and sends authoritative inventory/Zen updates.
+            var pet = GetPetRecoveryState(slot, number);
+            if (!pet.CanRestore)
+            {
+                return;
+            }
+
+            var service = MuGame.Network?.GetCharacterService();
+            if (service == null)
+            {
+                return;
+            }
+
+            _repairPending = true;
+            try
+            {
+                await service.SendRepairItemRequestAsync(slot, isSelfRepair: false);
+                // Preserve order: the repair request must reach the server before
+                // closing the NPC dialog; otherwise pet-slot repair is rejected.
+                MuGame.ScheduleOnMainThread(CloseWindow);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to send Pet Trainer repair request.");
+                MuGame.ScheduleOnMainThread(() => _repairPending = false);
             }
         }
 
@@ -230,17 +414,39 @@ namespace Client.Main.Controls.UI.Game
                 if (inside && action >= 0 && action == _hoveredButton)
                 {
                     SoundController.Instance.PlayBuffer("Sound/iButton.wav");
-                    switch (action)
+                    if (_page == TrainerPage.Menu)
                     {
-                        case 0:
-                            RestoreLifeRequested?.Invoke();
-                            break;
-                        case 1:
-                            ResurrectSpiritRequested?.Invoke();
-                            break;
-                        case 2:
-                            CloseWindow();
-                            break;
+                        switch (action)
+                        {
+                            case 0:
+                                SetPage(TrainerPage.RestoreLife);
+                                RestoreLifeRequested?.Invoke();
+                                break;
+                            case 1:
+                                ResurrectSpiritRequested?.Invoke();
+                                break;
+                            case 2:
+                                CloseWindow();
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        switch (action)
+                        {
+                            case 0:
+                                _ = RestoreEquippedPetAsync(HorseSlot, 4);
+                                break;
+                            case 1:
+                                _ = RestoreEquippedPetAsync(RavenSlot, 5);
+                                break;
+                            case 2:
+                                CloseWindow();
+                                break;
+                            case 3:
+                                SetPage(TrainerPage.Menu);
+                                break;
+                        }
                     }
 
                     Scene?.SetMouseInputConsumed();
@@ -250,9 +456,19 @@ namespace Client.Main.Controls.UI.Game
 
         private int HitTestButton(Point mouse)
         {
-            if (ToScreen(RestoreButtonTarget).Contains(mouse)) return 0;
-            if (ToScreen(ResurrectButtonTarget).Contains(mouse)) return 1;
             if (ToScreen(CloseButtonTarget).Contains(mouse)) return 2;
+            if (_page == TrainerPage.RestoreLife)
+            {
+                if (ToScreen(HorseButtonTarget).Contains(mouse)) return 0;
+                if (ToScreen(RavenButtonTarget).Contains(mouse)) return 1;
+                if (ToScreen(BackButtonTarget).Contains(mouse)) return 3;
+            }
+            else
+            {
+                if (ToScreen(RestoreButtonTarget).Contains(mouse)) return 0;
+                if (ToScreen(ResurrectButtonTarget).Contains(mouse)) return 1;
+            }
+
             return -1;
         }
 
@@ -289,9 +505,20 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 DrawCharacterFrame(sb);
-                DrawNineSlice(sb, _characterAtlas, InformationSource, InformationTarget, 10);
-                DrawButtonSprite(sb, 0, RestoreButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
-                DrawButtonSprite(sb, 1, ResurrectButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                if (_page == TrainerPage.RestoreLife)
+                {
+                    DrawNineSlice(sb, _characterAtlas, InformationSource, RestoreInformationTarget, 10);
+                    DrawButtonSprite(sb, 0, HorseButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                    DrawButtonSprite(sb, 1, RavenButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                    DrawButtonSprite(sb, 3, BackButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                }
+                else
+                {
+                    DrawNineSlice(sb, _characterAtlas, InformationSource, InformationTarget, 10);
+                    DrawButtonSprite(sb, 0, RestoreButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                    DrawButtonSprite(sb, 1, ResurrectButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                }
+
                 DrawButtonSprite(sb, 2, CloseButtonTarget, _closeNormal, _closeHover, _closePressed, false);
             }
 
@@ -305,16 +532,32 @@ namespace Client.Main.Controls.UI.Game
                 BlendState.AlphaBlend, GraphicsManager.GetQualityLinearSamplerState(),
                 transform: UiScaler.SpriteTransform))
             {
-                string characterName = MuGame.Network?.GetCharacterState()?.Name;
-                string greeting = string.IsNullOrWhiteSpace(characterName) || characterName == "???"
-                    ? "Hello!"
-                    : $"Hello, {characterName}!";
-
                 DrawCenteredText(sb, font, "Pet Trainer", 52, 12f, new Color(233, 219, 195));
-                DrawCenteredText(sb, font, greeting, 124, 10f, new Color(215, 210, 200));
-                DrawCenteredText(sb, font, "What is your command?", 148, 10f, new Color(191, 182, 166));
-                DrawCenteredText(sb, font, "Restore Life", RestoreButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
-                DrawCenteredText(sb, font, "Resurrect Spirit", ResurrectButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
+                if (_page == TrainerPage.RestoreLife)
+                {
+                    DrawCenteredText(sb, font, "Select the pet to recover life.", 135, 10f, new Color(215, 210, 200));
+                    DrawCenteredText(sb, font, "Dark Horse", HorseButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
+                    DrawCenteredText(sb, font, "Dark Raven", RavenButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
+
+                    var horse = GetPetRecoveryState(HorseSlot, 4);
+                    var raven = GetPetRecoveryState(RavenSlot, 5);
+                    var statusColor = new Color(206, 192, 146);
+                    DrawCenteredText(sb, font, horse.Message, 240, 9f, statusColor);
+                    DrawCenteredText(sb, font, raven.Message, 335, 9f, statusColor);
+                    DrawCenteredText(sb, font, "Back", BackButtonTarget.Center.Y, 10f, new Color(226, 217, 202));
+                }
+                else
+                {
+                    string characterName = MuGame.Network?.GetCharacterState()?.Name;
+                    string greeting = string.IsNullOrWhiteSpace(characterName) || characterName == "???"
+                        ? "Hello!"
+                        : $"Hello, {characterName}!";
+
+                    DrawCenteredText(sb, font, greeting, 124, 10f, new Color(215, 210, 200));
+                    DrawCenteredText(sb, font, "What is your command?", 148, 10f, new Color(191, 182, 166));
+                    DrawCenteredText(sb, font, "Restore Life", RestoreButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
+                    DrawCenteredText(sb, font, "Resurrect Spirit", ResurrectButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
+                }
             }
         }
 
