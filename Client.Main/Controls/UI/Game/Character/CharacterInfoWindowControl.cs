@@ -11,6 +11,7 @@ using Microsoft.Xna.Framework.Input;
 using MUnique.OpenMU.Network.Packets;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 using Client.Main.Helpers;
@@ -19,19 +20,19 @@ namespace Client.Main.Controls.UI.Game.Character
 {
     public class CharacterInfoWindowControl : UIControl, IUiTexturePreloadable
     {
-        private const int WINDOW_WIDTH = 280;
-        private const int WINDOW_HEIGHT = 520;
-        private const int STAT_BOX_WIDTH = 170;
+        private const int WINDOW_WIDTH = 300;
+        private const int WINDOW_HEIGHT = 580;
+        private const int STAT_BOX_WIDTH = 190;
         private const int STAT_BOX_HEIGHT = 21;
         private const int BTN_STAT_COUNT = 5;
 
         private static readonly float[] s_statRowY =
         {
-            140f,
-            200f,
-            270f,
-            340f,
-            410f
+            141f,
+            205f,
+            269f,
+            333f,
+            397f
         };
 
         private static readonly string[] s_statShortNames = { "STR", "AGI", "STA", "ENE", "CMD" };
@@ -175,6 +176,19 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoSnapshot _cachedSnapshot;
         private bool _hasCachedSnapshot;
         private bool _lastIsDarkLordFamily;
+        private int _selectedStatIndex = 0;
+        private CharacterInfoTextEntry _selectionText;
+        private CharacterInfoTextEntry _allocationStatusText;
+        private string _amountText = "1";
+        private bool _amountFocused, _keypadOpen;
+        private KeyboardState _previousAmountKeys;
+        private static readonly Rectangle s_amountBounds = new(121, 483, 78, 29);
+        private static readonly Rectangle s_confirmBounds = new(209, 483, 74, 29);
+        private readonly ConcurrentQueue<(CharacterStatAttribute attr, bool success, ushort amount)> _replyQueue = new();
+        private bool _statReplySubscribed, _awaitingResponse;
+        private int _remaining, _completed, _requested;
+        private CharacterStatAttribute _allocationAttribute;
+        private double _responseSeconds, _sendCooldown;
 
         public CharacterInfoWindowControl()
         {
@@ -185,6 +199,7 @@ namespace Client.Main.Controls.UI.Game.Character
             Interactive = true;
             Visible = false;
 
+            _previousAmountKeys = Keyboard.GetState();
             _networkManager = MuGame.Network;
             if (_networkManager == null)
             {
@@ -254,7 +269,9 @@ namespace Client.Main.Controls.UI.Game.Character
             _expText = CreateText(new Vector2(28f, 78f), 10f, Color.WhiteSmoke);
             _fruitProbText = CreateText(new Vector2(28f, 96f), 10f, new Color(76, 197, 254));
             _fruitStatsText = CreateText(new Vector2(28f, 114f), 10f, new Color(76, 197, 254));
-            _statPointsText = CreateText(new Vector2(155f, 60f), 11f, new Color(255, 138, 0));
+            _statPointsText = CreateText(new Vector2(169f, 60f), 11f, new Color(255, 165, 66));
+            _selectionText = CreateText(new Vector2(29f, 489f), 10f, new Color(228, 177, 109));
+            _allocationStatusText = CreateText(new Vector2(27f, 519f), 9f, Color.LightGray);
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
@@ -276,15 +293,15 @@ namespace Client.Main.Controls.UI.Game.Character
             _eneDetail2Text = CreateText(new Vector2(25f, s_statRowY[3] + statDetailYOffset + 16f), 10f, Color.LightGray);
             _eneDetail3Text = CreateText(new Vector2(25f, s_statRowY[3] + statDetailYOffset + 32f), 10f, Color.LightGray);
 
-            _pvmInfo1Text = CreateText(new Vector2(18f, s_statRowY[4] + 20f), 10f, new Color(255, 200, 100));
-            _pvmInfo2Text = CreateText(new Vector2(18f, s_statRowY[4] + 38f), 10f, new Color(255, 200, 100));
+            _pvmInfo1Text = CreateText(new Vector2(25f, s_statRowY[4] + 19f), 10f, Color.LightGray);
+            _pvmInfo2Text = CreateText(new Vector2(25f, s_statRowY[4] + 36f), 10f, Color.LightGray);
 
             // Stat increase buttons
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
                 int statIndex = i;
                 var bounds = new Rectangle(
-                    WINDOW_WIDTH - 70,
+                    WINDOW_WIDTH - 61,
                     (int)(s_statRowY[i] - 2f),
                     16,
                     15);
@@ -325,19 +342,19 @@ namespace Client.Main.Controls.UI.Game.Character
 
             _questButton = CreateButton(CreateBottomBounds(70, _buttonQuestTexture), _buttonQuestTexture, CreateButtonFrames(_buttonQuestTexture, out var questHover, out var questPressed), questHover, questPressed, () =>
             {
-                _logger.LogInformation("Quest button clicked.");
+                MessageWindow.Show("Quest journal is not yet available.");
                 SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
             });
 
             _petButton = CreateButton(CreateBottomBounds(120, _buttonPetTexture), _buttonPetTexture, CreateButtonFrames(_buttonPetTexture, out var petHover, out var petPressed), petHover, petPressed, () =>
             {
-                _logger.LogInformation("Pet button clicked.");
+                MessageWindow.Show("Pet information window is not yet available.");
                 SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
             });
 
             _masterButton = CreateButton(CreateBottomBounds(170, _buttonMasterTexture), _buttonMasterTexture, CreateButtonFrames(_buttonMasterTexture, out var masterHover, out var masterPressed), masterHover, masterPressed, () =>
             {
-                _logger.LogInformation("Master Level button clicked.");
+                MessageWindow.Show("Master skill tree is not yet available.");
                 SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
             });
         }
@@ -484,6 +501,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT), Color.White);
             }
 
+            DrawModernPanelBackground(spriteBatch);
+
             if (_topFrameTexture != null)
             {
                 spriteBatch.Draw(_topFrameTexture, new Rectangle(0, 0, WINDOW_WIDTH + 97, 74), Color.White);
@@ -540,6 +559,82 @@ namespace Client.Main.Controls.UI.Game.Character
 
             // Draw info table background
             DrawInfoTableSurface(spriteBatch, new Vector2(18f, 55f));
+        }
+
+
+        private void DrawModernPanelBackground(SpriteBatch b)
+        {
+            var pixel = GraphicsManager.Instance.Pixel;
+            if (pixel == null) return;
+            b.Draw(pixel, new Rectangle(10, 40, WINDOW_WIDTH - 20, WINDOW_HEIGHT - 81), new Color(12, 10, 14, 240));
+            b.Draw(pixel, new Rectangle(18, 47, WINDOW_WIDTH - 36, 83), new Color(40, 19, 19, 200));
+            b.Draw(pixel, new Rectangle(18, 47, WINDOW_WIDTH - 36, 2), new Color(166, 74, 54));
+            int count = _lastIsDarkLordFamily ? 5 : 4;
+            for (int i = 0; i < count; i++)
+            {
+                int y = (int)s_statRowY[i] - 3;
+                b.Draw(pixel, new Rectangle(18, y, WINDOW_WIDTH - 36, 58),
+                    i % 2 == 0 ? new Color(35, 28, 30, 220) : new Color(24, 20, 23, 220));
+                b.Draw(pixel, new Rectangle(18, y, WINDOW_WIDTH - 36, 1), new Color(111, 74, 57));
+            }
+            b.Draw(pixel, new Rectangle(18, 462, WINDOW_WIDTH - 36, 72), new Color(33, 17, 20, 235));
+            b.Draw(pixel, new Rectangle(18, 462, WINDOW_WIDTH - 36, 2), new Color(153, 76, 59));
+        }
+
+        private Rectangle ScreenRect(Rectangle local)
+        {
+            float s = Scale;
+            return new Rectangle(DisplayRectangle.X + (int)MathF.Round(local.X * s),
+                DisplayRectangle.Y + (int)MathF.Round(local.Y * s),
+                Math.Max(1, (int)MathF.Round(local.Width * s)),
+                Math.Max(1, (int)MathF.Round(local.Height * s)));
+        }
+
+        private void DrawPanelRectangle(SpriteBatch b, Rectangle r, Color fill, Color border)
+        {
+            var p = GraphicsManager.Instance.Pixel;
+            if (p == null) return;
+            b.Draw(p, ScreenRect(r), fill * Alpha);
+            b.Draw(p, ScreenRect(new Rectangle(r.X, r.Y, r.Width, 1)), border * Alpha);
+            b.Draw(p, ScreenRect(new Rectangle(r.X, r.Bottom - 1, r.Width, 1)), border * Alpha);
+            b.Draw(p, ScreenRect(new Rectangle(r.X, r.Y, 1, r.Height)), border * Alpha);
+            b.Draw(p, ScreenRect(new Rectangle(r.Right - 1, r.Y, 1, r.Height)), border * Alpha);
+        }
+
+        private void DrawPanelString(SpriteBatch b, SpriteFont font, string value, int x, int y, float px, Color color)
+        {
+            float s = Scale;
+            b.DrawString(font, value, new Vector2(DisplayRectangle.X + x * s, DisplayRectangle.Y + y * s),
+                color * Alpha, 0f, Vector2.Zero, s * px / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0);
+        }
+
+        private void DrawAllocationUi(SpriteBatch b, SpriteFont font)
+        {
+            var p = GraphicsManager.Instance.Pixel;
+            if (p != null && _selectedStatIndex >= 0 && (_selectedStatIndex < 4 || _lastIsDarkLordFamily))
+                b.Draw(p, ScreenRect(new Rectangle(18, (int)s_statRowY[_selectedStatIndex] - 3, 3, 58)),
+                    new Color(227, 160, 84) * Alpha);
+            DrawPanelRectangle(b, s_amountBounds, new Color(8, 9, 12, 245),
+                _amountFocused ? new Color(236, 170, 88) : new Color(117, 91, 68));
+            DrawPanelRectangle(b, s_confirmBounds, new Color(107, 39, 35, 238),
+                new Color(178, 105, 67));
+            DrawPanelString(b, font, string.IsNullOrEmpty(_amountText) ? "0" : _amountText, 128, 490,
+                11, Color.WhiteSmoke);
+            DrawPanelString(b, font, _remaining > 0 ? "ENVIANDO" : "ASIGNAR", 215, 491,
+                9, Color.WhiteSmoke);
+            if (!_keypadOpen) return;
+
+            DrawPanelRectangle(b, new Rectangle(89, 287, 137, 169), new Color(13, 12, 15, 253),
+                new Color(187, 119, 73));
+            DrawPanelString(b, font, "CANTIDAD", 113, 292, 10, new Color(235, 187, 105));
+            string[] labels = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "CLR", "0", "OK" };
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var box = new Rectangle(97 + i % 3 * 41, 314 + i / 3 * 34, 37, 29);
+                DrawPanelRectangle(b, box, new Color(56, 42, 43, 250), new Color(128, 84, 64));
+                DrawPanelString(b, font, labels[i], box.X + 9, box.Y + 6,
+                    labels[i].Length == 1 ? 12 : 9, Color.White);
+            }
         }
 
         private void DrawInfoTableSurface(SpriteBatch spriteBatch, Vector2 origin)
@@ -637,7 +732,9 @@ namespace Client.Main.Controls.UI.Game.Character
             base.Update(gameTime);
 
             HandleButtonInput();
+            UpdateAmountKeyboard();
             UpdateDisplayData();
+            UpdateAllocationBatch(gameTime.ElapsedGameTime.TotalSeconds);
         }
 
         private void HandleButtonInput()
@@ -717,6 +814,7 @@ namespace Client.Main.Controls.UI.Game.Character
 
                 DrawTexts(spriteBatch, font);
                 DrawButtons(spriteBatch);
+                DrawAllocationUi(spriteBatch, font);
             }
             finally
             {
@@ -825,11 +923,12 @@ namespace Client.Main.Controls.UI.Game.Character
                 _characterState = _networkManager?.GetCharacterState();
             }
 
-            if (_characterState == null)
+            if (_characterState == null) return;
+            if (!_statReplySubscribed)
             {
-                return;
+                _characterState.StatIncreaseResponseReceived += OnStatIncreaseResponse;
+                _statReplySubscribed = true;
             }
-
             var snapshot = CharacterInfoSnapshot.Create(_characterState);
             if (_hasCachedSnapshot && snapshot.Equals(_cachedSnapshot))
             {
@@ -854,28 +953,13 @@ namespace Client.Main.Controls.UI.Game.Character
             _nameText.Text = snapshot.Name;
             _classText.Text = $"({CharacterClassDatabase.GetClassName(snapshot.Class)})";
 
-            if (snapshot.MasterLevel > 0)
-            {
-                _levelText.Text = $"Master Lv. {snapshot.MasterLevel}";
-                _expText.Text = "----------";
-                if (snapshot.MasterLevelUpPoints > 0)
-                {
-                    _statPointsText.Visible = true;
-                    _statPointsText.Text = $"Points: {snapshot.MasterLevelUpPoints}";
-                }
-                else
-                {
-                    _statPointsText.Visible = false;
-                    _statPointsText.Text = string.Empty;
-                }
-            }
-            else
-            {
-                _levelText.Text = $"Level: {snapshot.Level}";
-                _expText.Text = $"Exp: {snapshot.Experience} / {snapshot.ExperienceForNextLevel}";
-                _statPointsText.Visible = snapshot.LevelUpPoints > 0;
-                _statPointsText.Text = snapshot.LevelUpPoints > 0 ? $"Points: {snapshot.LevelUpPoints}" : string.Empty;
-            }
+            _levelText.Text = snapshot.MasterLevel > 0
+                ? $"Lv. {snapshot.Level} / Master {snapshot.MasterLevel}" : $"Level: {snapshot.Level}";
+            _expText.Text = snapshot.MasterLevel > 0
+                ? $"Master Exp: {snapshot.MasterExperience} / {snapshot.MasterExperienceForNextLevel}"
+                : $"Exp: {snapshot.Experience} / {snapshot.ExperienceForNextLevel}";
+            _statPointsText.Visible = true;
+            _statPointsText.Text = $"Points: {snapshot.LevelUpPoints}";
 
             _fruitProbText.Text = "[+]100%|[-]100%";
             _fruitStatsText.Text = "Create 0/0 | Decrease 0/0";
@@ -884,7 +968,7 @@ namespace Client.Main.Controls.UI.Game.Character
             {
                 ushort baseValue = snapshot.GetBaseStat(i);
                 ushort addedValue = snapshot.GetAddedStat(i);
-                ushort total = (ushort)(baseValue + addedValue);
+                int total = baseValue + addedValue;
                 _statValueTexts[i].Text = addedValue > 0 ? $"{baseValue}+{addedValue}" : total.ToString();
                 _statValueTexts[i].Color = addedValue > 0 ? new Color(100, 150, 255) : new Color(230, 230, 0);
             }
@@ -936,10 +1020,11 @@ namespace Client.Main.Controls.UI.Game.Character
                 _eneDetail3Text.Text = string.Empty;
             }
 
-            _pvmInfo1Text.Visible = true;
-            _pvmInfo1Text.Text = $"PvM Attack Success Rate: {snapshot.PvMAttackRate}%";
-            _pvmInfo2Text.Visible = true;
-            _pvmInfo2Text.Text = $"PvM Defense Success Rate: {snapshot.PvMDefenseRate}%";
+            // Command is the actual fifth stat for DL; don't fabricate pet combat values.
+            _pvmInfo1Text.Visible = isDarkLordFamily;
+            _pvmInfo1Text.Text = $"Command: {snapshot.BaseLeadership + snapshot.AddedLeadership}";
+            _pvmInfo2Text.Visible = isDarkLordFamily;
+            _pvmInfo2Text.Text = "Dark Raven / Dark Horse leadership";
 
             // Show/hide Leadership (CMD) stat value text based on character class
             _statValueTexts[4].Visible = isDarkLordFamily;
@@ -964,7 +1049,7 @@ namespace Client.Main.Controls.UI.Game.Character
             if (_masterButton != null)
             {
                 bool masterActive = snapshot.MasterLevel > 0 && snapshot.CanBeMaster;
-                _masterButton.Visible = masterActive;
+                _masterButton.Visible = true;
                 _masterButton.Enabled = masterActive;
             }
 
@@ -974,6 +1059,7 @@ namespace Client.Main.Controls.UI.Game.Character
             _questButton.Enabled = true;
             _petButton.Visible = true;
             _petButton.Enabled = true;
+            UpdateAllocationLabels();
         }
 
         private void OnStatButtonClicked(int statIndex)
@@ -1044,6 +1130,8 @@ namespace Client.Main.Controls.UI.Game.Character
 
         public void HideWindow()
         {
+            StopAllocation(null);
+            _amountFocused = _keypadOpen = false;
             Visible = false;
             if (Scene != null && Scene.FocusControl == this)
             {
@@ -1063,6 +1151,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 }
             }
 
+            if (_statReplySubscribed && _characterState != null)
+                _characterState.StatIncreaseResponseReceived -= OnStatIncreaseResponse;
             base.Dispose();
             _staticSurface?.Dispose();
             _staticSurface = null;
@@ -1082,6 +1172,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 Class = state.Class;
                 Level = state.Level;
                 MasterLevel = state.MasterLevel;
+                MasterExperience = state.MasterExperience;
+                MasterExperienceForNextLevel = state.MasterExperienceForNextLevel;
                 Experience = state.Experience;
                 ExperienceForNextLevel = state.ExperienceForNextLevel;
                 LevelUpPoints = state.LevelUpPoints;
@@ -1134,6 +1226,8 @@ namespace Client.Main.Controls.UI.Game.Character
             public readonly CharacterClassNumber Class;
             public readonly ushort Level;
             public readonly ushort MasterLevel;
+            public readonly ulong MasterExperience;
+            public readonly ulong MasterExperienceForNextLevel;
             public readonly ulong Experience;
             public readonly ulong ExperienceForNextLevel;
             public readonly ushort LevelUpPoints;
@@ -1198,6 +1292,8 @@ namespace Client.Main.Controls.UI.Game.Character
                        Class == other.Class &&
                        Level == other.Level &&
                        MasterLevel == other.MasterLevel &&
+                       MasterExperience == other.MasterExperience &&
+                       MasterExperienceForNextLevel == other.MasterExperienceForNextLevel &&
                        Experience == other.Experience &&
                        ExperienceForNextLevel == other.ExperienceForNextLevel &&
                        LevelUpPoints == other.LevelUpPoints &&
