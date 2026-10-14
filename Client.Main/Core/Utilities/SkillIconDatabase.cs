@@ -88,6 +88,14 @@ namespace Client.Main.Core.Utilities
                     ? "Interface/newui_non_command.OZJ"
                     : "Interface/newui_command.OZJ";
 
+            // MuMain UI/HUD/Skills/SkillIconAtlas.cpp:
+            // pet commands 120..123 occupy cells (0..3, 0)
+            // in newui_command, not regular skill sheets.
+            if (DarkRavenCommands.IsCommandSkill(skillId))
+            {
+                return Create(command, skillId - DarkRavenCommands.Normal, 0);
+            }
+
             // Fenrir Plasma Storm
             if (skillId == PlasmaStorm)
             {
