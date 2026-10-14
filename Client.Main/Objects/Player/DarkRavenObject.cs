@@ -66,6 +66,8 @@ namespace Client.Main.Objects.Player
         private bool _isPerched;
         private bool _equipped;
         private bool _loadingModel;
+        // Native CSPetDarkSpirit::RenderPet passes the server pet level as WeaponLevel.
+        private int _nativePetLevel;
 
         public bool IsEquipped => _equipped;
 
@@ -99,6 +101,7 @@ namespace Client.Main.Objects.Player
             _attackTarget = null;
             _queuedTarget = null;
             _attackTicks = 0;
+            _nativePetLevel = 0;
 
             if (equipped && Model == null && !_loadingModel)
                 _ = LoadRavenModelAsync();
@@ -200,6 +203,17 @@ namespace Client.Main.Objects.Player
         {
             if (!_equipped || World == null)
                 return;
+
+            // Only the local pet receives the C1 A9 level/experience snapshot.
+            // Other players have no equivalent known level data; use the native
+            // base mesh tier rather than fabricate a high-level glow.
+            if (_owner.IsMainWalker &&
+                MuGame.Network?.GetCharacterState() is { } characterState &&
+                characterState.TryGetPetInfo(1, out var petInfo) &&
+                petInfo.PetType == 0)
+            {
+                _nativePetLevel = petInfo.Level;
+            }
 
             // Keep native world size despite PlayerObject's 0.85 model scale.
             Scale = NativeScale / Math.Max(0.01f, _owner.Scale);
@@ -458,6 +472,29 @@ namespace Client.Main.Objects.Player
                         new Vector3(1f, 0.6f, 0.4f), subType: 6, scale: 1.3f);
                 }
             }
+        }
+
+        /// <summary>
+        /// MuMain ZzzObject.cpp MODEL_DARK_SPIRIT: mesh 3 always renders.
+        /// Level 0-19 uses mesh 2, 20-39 mesh 1 and 40+ mesh 0.
+        /// This affects only the Raven and does not alter shared BMD assets.
+        /// </summary>
+        protected override bool IsNativeMeshVisible(int mesh)
+        {
+            if (mesh == 3 || mesh > 3)
+                return true;
+
+            return mesh == (_nativePetLevel >= 40 ? 0 : _nativePetLevel >= 20 ? 1 : 2);
+        }
+
+        public override void DrawModel(bool isAfterDraw)
+        {
+            base.DrawModel(isAfterDraw);
+
+            // Native high-level Raven mesh 0: RENDER_CHROME | RENDER_BRIGHT
+            // with BodyLight (0.3, 0.6, 1). Do not apply to every pet level.
+            if (!isAfterDraw && _equipped && !Hidden && _nativePetLevel >= 40)
+                DrawClassicChromePass(0, new Vector3(0.3f, 0.6f, 1f));
         }
 
         private void StepFlight(Vector3 ownerWorld)
