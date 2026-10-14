@@ -1146,10 +1146,10 @@ namespace Client.Main.Controls.UI.Game
                           ?? new ItemDefinition(0, ItemDatabase.GetItemName(data) ?? "Unknown Item", 1, 1, "Interface/newui_item_box.tga");
 
                 var item = new InventoryItem(def, new Point(gridX, gridY), data);
-                if (data.Length > 2)
-                {
-                    item.Durability = data[2];
-                }
+                // Season 6 extended item bytes store durability at index 3,
+                // not the classic index 2. Use the shared verified item parser
+                // so jewels/spirits are counted correctly in both mix modes.
+                item.Durability = ItemDatabase.GetItemDurability(data);
 
                 _items.Add(item);
                 PlaceItemOnGrid(item, item.GridPosition);
