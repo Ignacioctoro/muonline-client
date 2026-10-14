@@ -308,6 +308,31 @@ namespace Client.Main.Networking.PacketHandling
 
 
         /// <summary>
+        /// Original MU C1 A7 PetCommandRequest (seven bytes, not an ordinary
+        /// TargetedSkill). Pet type 0 = Dark Raven; modes 0..3 match OpenMU.
+        /// The final two bytes contain the big-endian target NetworkId.
+        /// </summary>
+        public static int BuildDarkRavenCommandPacket(
+            IBufferWriter<byte> writer,
+            byte commandMode,
+            ushort targetId)
+        {
+            const int length = 7;
+            if (commandMode > 3)
+                throw new ArgumentOutOfRangeException(nameof(commandMode));
+
+            var data = writer.GetMemory(length).Span;
+            data[0] = 0xC1;
+            data[1] = length;
+            data[2] = 0xA7;
+            data[3] = 0; // PetType.DarkRaven
+            data[4] = commandMode;
+            data[5] = (byte)(targetId >> 8);
+            data[6] = (byte)targetId;
+            return length;
+        }
+
+        /// <summary>
         /// Builds a skill usage request packet using TargetedSkill.
         /// </summary>
         public static int BuildSkillRequestPacket(
