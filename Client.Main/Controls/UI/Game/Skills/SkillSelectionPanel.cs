@@ -987,6 +987,15 @@ namespace Client.Main.Controls.UI.Game.Skills
                 return;
             }
 
+            if (DarkRavenCommands.IsCommandSkill(skill.SkillId))
+            {
+                _skillNameLabel.Text = DarkRavenCommands.GetName(skill.SkillId);
+                _skillTypeLabel.Text = "Comando del Dark Raven";
+                _skillCostLabel.Text = string.Empty;
+                _skillStatsLabel.Text = DarkRavenCommands.GetDescription(skill.SkillId);
+                return;
+            }
+
             SkillBMD? definition =
                 SkillDatabase
                     .GetSkillDefinition(
