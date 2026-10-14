@@ -922,6 +922,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 {
                     _logger.LogWarning("⚠️ Failed to increase stat {Attr}.", attr);
                 }
+
+                _characterState.NotifyStatIncreaseResponse(attr, success, success ? addedAmount : (ushort)0);
             }
             catch (Exception ex)
             {
