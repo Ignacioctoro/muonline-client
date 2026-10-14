@@ -55,6 +55,7 @@ namespace Client.Main.Objects.Player
         public WingObject EquippedWings { get; private set; }
 
         public VehicleObject Vehicle { get; private set; }
+        public DarkRavenObject DarkRaven { get; private set; }
 
         internal const int LeftHandBoneIndex = 33;
         internal const int RightHandBoneIndex = 42;
@@ -201,6 +202,7 @@ namespace Client.Main.Objects.Player
             Weapon2 = new WeaponObject { };
             EquippedWings = new WingObject { LinkParentAnimation = true, Hidden = true };
             Vehicle = new VehicleObject { Hidden = true };
+            DarkRaven = new DarkRavenObject(this);
 
             Children.Add(HelmMask);
             Children.Add(Helm);
@@ -218,6 +220,7 @@ namespace Client.Main.Objects.Player
             Children.Add(EquippedWings);
             Children.Add(GuildEmblem3D = new GuildEmblem3DObject());
             Children.Add(Vehicle);
+            Children.Add(DarkRaven);
 
             // Classic MU +15 armor attachments (NextGradeObjectRender).
             // They stay loaded once and toggle automatically according to each
@@ -835,9 +838,19 @@ namespace Client.Main.Objects.Player
                 ClearItemProperties(Weapon1);
             }
 
-            // Right Hand
+            // The Dark Raven occupies OpenMU hand slot 1, but is not a
+            // weapon: its independent CSPetDarkSpirit-style model flies
+            // alongside the player and never gets attached to a hand bone.
             var rightHandDef = GetItemDef(InventoryConstants.RightHandSlot);
-            if (rightHandDef != null)
+            bool isDarkRaven = rightHandDef?.Group == 13 && rightHandDef.Id == 5;
+            DarkRaven.SetEquipped(isDarkRaven);
+            if (isDarkRaven)
+            {
+                Weapon2.Model = null;
+                Weapon2.TexturePath = null;
+                ClearItemProperties(Weapon2);
+            }
+            else if (rightHandDef != null)
             {
                 Weapon2.Model = await BMDLoader.Instance.Prepare(rightHandDef.TexturePath);
                 Weapon2.TexturePath = rightHandDef.TexturePath;
@@ -1037,7 +1050,15 @@ namespace Client.Main.Objects.Player
             }
 
             short rightHandNumber = Appearance.RightHandItemNumber;
-            if (rightHandNumber >= 0 && rightHandNumber != 0xFF)
+            bool remoteHasDarkRaven = Appearance.RightHandItemGroup == 13 && rightHandNumber == 5;
+            DarkRaven.SetEquipped(remoteHasDarkRaven);
+            if (remoteHasDarkRaven)
+            {
+                Weapon2.Model = null;
+                Weapon2.TexturePath = null;
+                ClearItemProperties(Weapon2);
+            }
+            else if (rightHandNumber >= 0 && rightHandNumber != 0xFF)
             {
                 var rightHandDef = ItemDatabase.GetItemDefinition(Appearance.RightHandItemGroup, rightHandNumber);
                 if (rightHandDef != null)
@@ -1275,7 +1296,16 @@ namespace Client.Main.Objects.Player
                 ClearItemProperties(Weapon1);
             }
 
-            if (appearanceConfig.RightHandItemIndex != 255 && appearanceConfig.RightHandItemIndex != 0xFF)
+            bool configHasDarkRaven = appearanceConfig.RightHandItemGroup == 13 &&
+                appearanceConfig.RightHandItemIndex == 5;
+            DarkRaven.SetEquipped(configHasDarkRaven);
+            if (configHasDarkRaven)
+            {
+                Weapon2.Model = null;
+                Weapon2.TexturePath = null;
+                ClearItemProperties(Weapon2);
+            }
+            else if (appearanceConfig.RightHandItemIndex != 255 && appearanceConfig.RightHandItemIndex != 0xFF)
             {
                 var rightHandDef = ItemDatabase.GetItemDefinition(appearanceConfig.RightHandItemGroup, appearanceConfig.RightHandItemIndex);
                 if (rightHandDef != null)
@@ -4774,8 +4804,19 @@ namespace Client.Main.Objects.Player
                         await UpdateWeaponSlotAsync(Weapon1, equipmentData, 33);
                         break;
 
-                    case InventoryConstants.RightHandSlot: // 1 - Right Hand (Shield/Weapon)
-                        await UpdateWeaponSlotAsync(Weapon2, equipmentData, 42);
+                    case InventoryConstants.RightHandSlot: // 1 - Weapon or Dark Raven
+                        bool changedToRaven = equipmentData.ItemGroup == 13 && equipmentData.ItemNumber == 5;
+                        DarkRaven.SetEquipped(changedToRaven);
+                        if (changedToRaven)
+                        {
+                            Weapon2.Model = null;
+                            Weapon2.TexturePath = null;
+                            ClearItemProperties(Weapon2);
+                        }
+                        else
+                        {
+                            await UpdateWeaponSlotAsync(Weapon2, equipmentData, 42);
+                        }
                         break;
 
                     case InventoryConstants.HelmSlot: // 2 - Helm
@@ -4896,6 +4937,7 @@ namespace Client.Main.Objects.Player
                     break;
 
                 case InventoryConstants.RightHandSlot:
+                    DarkRaven.SetEquipped(false);
                     Weapon2.Model = null;
                     Weapon2.TexturePath = null;
                     ClearItemProperties(Weapon2);
