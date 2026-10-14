@@ -522,8 +522,12 @@ namespace Client.Main.Core.Items.Tooltips
         {
             bool isRaven = item.Definition.Id == 5;
             var result = new List<(string text, Color color)>();
-            string name = ItemTooltipDataRepository.GetLegacyItem(
-                (byte)item.Definition.Group, (ushort)item.Definition.Id)?.Name;
+            // Tooltips may be drawn before the asynchronous BMD repository
+            // finishes loading. Do not call GetLegacyItem in that state.
+            string name = ItemTooltipDataRepository.IsLoaded
+                ? ItemTooltipDataRepository.GetLegacyItem(
+                    (byte)item.Definition.Group, (ushort)item.Definition.Id)?.Name
+                : null;
             if (string.IsNullOrWhiteSpace(name))
                 name = item.Definition.Name ?? (isRaven ? "Dark Raven" : "Dark Horse");
 
