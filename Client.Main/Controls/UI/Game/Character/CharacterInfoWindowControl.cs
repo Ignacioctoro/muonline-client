@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MUnique.OpenMU.Network.Packets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
