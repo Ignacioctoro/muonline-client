@@ -34,7 +34,9 @@ namespace Client.Main.Controls.UI.Game
         public const int Columns = 8;
         public const int Rows = 4;
 
-        private const string TrainerFramePath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
+        // The NewUI Personal Store atlas has an opaque textured window body.
+        // The same crop/layout can be reused for other combination dialogs.
+        private const string TrainerFramePath = NewUiFrameRenderer.PersonalShopAtlasPath;
         private const string TrainerSlotsPath = "Interface/GFx/NpcShop_I3.ozd";
         private const string TrainerButtonNormalPath = "Interface/GFx/btn_l01.ozd";
         private const string TrainerButtonHoverPath = "Interface/GFx/btn_l02.ozd";
@@ -43,13 +45,9 @@ namespace Client.Main.Controls.UI.Game
         private const string TrainerCloseHoverPath = "Interface/GFx/btn_close02.ozd";
         private const string TrainerClosePressedPath = "Interface/GFx/btn_close03.ozd";
 
-        private static readonly Rectangle TrainerFrameSource = new(656, 0, 354, 638);
-        private static readonly Rectangle TrainerInfoSource = new(676, 645, 245, 56);
-        // Same verified NpcShop_I3 inventory slot crop used in Inventory/NpcShop.
         // Use the exact source crop already used by the NewUI Inventory.
         private static readonly Rectangle TrainerSlotSource = new(546, 220, 29, 29);
-        private const int TrainerTopSourceHeight = 96;
-        private const int TrainerBottomSourceHeight = 39;
+        private const int TrainerTopSourceHeight = NewUiFrameRenderer.PersonalShopHeaderHeight;
         private const int TrainerWindowWidth = 420;
         private const int TrainerWindowHeight = 690;
 
@@ -530,51 +528,19 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawTrainerFrame(SpriteBatch sb)
         {
-            // The GFx panel contains translucent art. Render a truly opaque
-            // dark backing FIRST, keeping the header, corners and borders intact.
-            // Without this, the terrain and character show through the mix grid.
+            // Opaque backing is just a safety net for any partially transparent
+            // pixels in the OZD. The *visible* surface, texture and ornaments
+            // come from PersonalShop_I1, not a flat black rectangle.
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel != null)
             {
-                sb.Draw(pixel, new Rectangle(7, 80, ControlSize.X - 14,
-                    ControlSize.Y - 100), new Color(13, 15, 19, 255));
+                sb.Draw(pixel,
+                    new Rectangle(12, 90, ControlSize.X - 24, ControlSize.Y - 112),
+                    new Color(25, 23, 23, 255));
             }
 
-            int middleHeight = ControlSize.Y - TrainerTopSourceHeight - TrainerBottomSourceHeight;
-            sb.Draw(_trainerFrame, new Rectangle(0, 0, ControlSize.X, TrainerTopSourceHeight),
-                new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Y,
-                    TrainerFrameSource.Width, TrainerTopSourceHeight), Color.White);
-            sb.Draw(_trainerFrame, new Rectangle(0, TrainerTopSourceHeight, ControlSize.X, middleHeight),
-                new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Y + TrainerTopSourceHeight,
-                    TrainerFrameSource.Width,
-                    TrainerFrameSource.Height - TrainerTopSourceHeight - TrainerBottomSourceHeight), Color.White);
-            sb.Draw(_trainerFrame,
-                new Rectangle(0, ControlSize.Y - TrainerBottomSourceHeight, ControlSize.X, TrainerBottomSourceHeight),
-                new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Bottom - TrainerBottomSourceHeight,
-                    TrainerFrameSource.Width, TrainerBottomSourceHeight), Color.White);
-        }
-
-        private static void DrawTrainerNineSlice(SpriteBatch sb, Texture2D atlas,
-            Rectangle source, Rectangle destination, int border)
-        {
-            if (atlas == null || atlas.IsDisposed) return;
-
-            for (int row = 0; row < 3; row++)
-            {
-                int sy = row == 0 ? source.Y : row == 1 ? source.Y + border : source.Bottom - border;
-                int dy = row == 0 ? destination.Y : row == 1 ? destination.Y + border : destination.Bottom - border;
-                int sh = row == 1 ? source.Height - border * 2 : border;
-                int dh = row == 1 ? destination.Height - border * 2 : border;
-                for (int col = 0; col < 3; col++)
-                {
-                    int sx = col == 0 ? source.X : col == 1 ? source.X + border : source.Right - border;
-                    int dx = col == 0 ? destination.X : col == 1 ? destination.X + border : destination.Right - border;
-                    int sw = col == 1 ? source.Width - border * 2 : border;
-                    int dw = col == 1 ? destination.Width - border * 2 : border;
-                    sb.Draw(atlas, new Rectangle(dx, dy, dw, dh),
-                        new Rectangle(sx, sy, sw, sh), Color.White);
-                }
-            }
+            NewUiFrameRenderer.DrawPersonalShopWindow(
+                sb, _trainerFrame, new Rectangle(0, 0, ControlSize.X, ControlSize.Y));
         }
 
         private static void DrawTrainerButton(SpriteBatch sb, Texture2D texture, Rectangle rect)
@@ -692,7 +658,7 @@ namespace Client.Main.Controls.UI.Game
         {
             if (IsTrainerMix && _trainerFrame != null)
             {
-                DrawTrainerNineSlice(sb, _trainerFrame, TrainerInfoSource, _infoRect, 10);
+                NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _infoRect);
             }
             else
             {
@@ -707,7 +673,7 @@ namespace Client.Main.Controls.UI.Game
 
             if (IsTrainerMix && _trainerFrame != null)
             {
-                DrawTrainerNineSlice(sb, _trainerFrame, TrainerInfoSource, _gridFrameRect, 10);
+                NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _gridFrameRect);
                 DrawSectionHeader(sb, "SPIRIT COMBINATION", _gridFrameRect.X,
                     _gridFrameRect.Y + 2, _gridFrameRect.Width);
 
@@ -1804,7 +1770,11 @@ namespace Client.Main.Controls.UI.Game
             var svc = _networkManager?.GetCharacterService();
             if (svc != null)
             {
-                _ = svc.SendCraftingDialogCloseRequestAsync();
+                // Original MuMain closes MIXTYPE_TRAINER as an NPC conversation;
+                // Chaos Goblin keeps its existing crafting-dialog close packet.
+                _ = IsTrainerMix
+                    ? svc.SendCloseNpcRequestAsync()
+                    : svc.SendCraftingDialogCloseRequestAsync();
             }
         }
 
