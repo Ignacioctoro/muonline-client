@@ -13,6 +13,13 @@ namespace Client.Main.Objects.NPCS
         }
         protected override void HandleClick()
         {
+            // The NPC itself must initiate the C3:30 conversation with OpenMU.
+            // ShopHandler opens PetTrainerControl once the server returns NpcWindow.PetTrainer (7).
+            var service = MuGame.Network?.GetCharacterService();
+            if (service != null)
+            {
+                _ = service.SendTalkToNpcRequestAsync(NetworkId);
+            }
         }
     }
 }
