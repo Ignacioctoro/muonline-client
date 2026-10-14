@@ -32,7 +32,8 @@ namespace Client.Main.Controls.UI.Game.Hud
         private const int SourceRowPitch = 24;
         private const int SourceBarWidth = 49;
         private const int SourceBarHeight = 3;
-        private const float NameTextScale = 0.34f * DisplayScale;
+        // Keep the original compact font size while enlarging the pet frames.
+        private const float NameTextScale = 0.34f;
 
         private static int Scale(int pixels) => (int)MathF.Round(pixels * DisplayScale);
 
