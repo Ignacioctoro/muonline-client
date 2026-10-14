@@ -21,18 +21,18 @@ namespace Client.Main.Controls.UI.Game.Character
     public class CharacterInfoWindowControl : UIControl, IUiTexturePreloadable
     {
         private const int WINDOW_WIDTH = 300;
-        private const int WINDOW_HEIGHT = 580;
+        private const int WINDOW_HEIGHT = 530;
         private const int STAT_BOX_WIDTH = 190;
         private const int STAT_BOX_HEIGHT = 21;
         private const int BTN_STAT_COUNT = 5;
 
         private static readonly float[] s_statRowY =
         {
-            141f,
-            205f,
-            269f,
-            333f,
-            397f
+            132f,
+            188f,
+            244f,
+            300f,
+            356f
         };
 
         private static readonly string[] s_statShortNames = { "STR", "AGI", "STA", "ENE", "CMD" };
@@ -182,8 +182,8 @@ namespace Client.Main.Controls.UI.Game.Character
         private string _amountText = "1";
         private bool _amountFocused, _keypadOpen;
         private KeyboardState _previousAmountKeys;
-        private static readonly Rectangle s_amountBounds = new(121, 483, 78, 29);
-        private static readonly Rectangle s_confirmBounds = new(209, 483, 74, 29);
+        private static readonly Rectangle s_amountBounds = new(121, 435, 78, 29);
+        private static readonly Rectangle s_confirmBounds = new(209, 435, 74, 29);
         private readonly ConcurrentQueue<(CharacterStatAttribute attr, bool success, ushort amount)> _replyQueue = new();
         private bool _statReplySubscribed, _awaitingResponse;
         private int _remaining, _completed, _requested;
@@ -270,8 +270,8 @@ namespace Client.Main.Controls.UI.Game.Character
             _fruitProbText = CreateText(new Vector2(28f, 96f), 10f, new Color(76, 197, 254));
             _fruitStatsText = CreateText(new Vector2(28f, 114f), 10f, new Color(76, 197, 254));
             _statPointsText = CreateText(new Vector2(169f, 60f), 11f, new Color(255, 165, 66));
-            _selectionText = CreateText(new Vector2(29f, 489f), 10f, new Color(228, 177, 109));
-            _allocationStatusText = CreateText(new Vector2(27f, 519f), 9f, Color.LightGray);
+            _selectionText = CreateText(new Vector2(29f, 441f), 10f, new Color(228, 177, 109));
+            _allocationStatusText = CreateText(new Vector2(27f, 469f), 9f, Color.LightGray);
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
@@ -567,7 +567,7 @@ namespace Client.Main.Controls.UI.Game.Character
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null) return;
             b.Draw(pixel, new Rectangle(10, 40, WINDOW_WIDTH - 20, WINDOW_HEIGHT - 81), new Color(12, 10, 14, 240));
-            b.Draw(pixel, new Rectangle(18, 47, WINDOW_WIDTH - 36, 83), new Color(40, 19, 19, 200));
+            b.Draw(pixel, new Rectangle(18, 47, WINDOW_WIDTH - 36, 78), new Color(40, 19, 19, 200));
             b.Draw(pixel, new Rectangle(18, 47, WINDOW_WIDTH - 36, 2), new Color(166, 74, 54));
             int count = _lastIsDarkLordFamily ? 5 : 4;
             for (int i = 0; i < count; i++)
@@ -577,8 +577,8 @@ namespace Client.Main.Controls.UI.Game.Character
                     i % 2 == 0 ? new Color(35, 28, 30, 220) : new Color(24, 20, 23, 220));
                 b.Draw(pixel, new Rectangle(18, y, WINDOW_WIDTH - 36, 1), new Color(111, 74, 57));
             }
-            b.Draw(pixel, new Rectangle(18, 462, WINDOW_WIDTH - 36, 72), new Color(33, 17, 20, 235));
-            b.Draw(pixel, new Rectangle(18, 462, WINDOW_WIDTH - 36, 2), new Color(153, 76, 59));
+            b.Draw(pixel, new Rectangle(18, 414, WINDOW_WIDTH - 36, 70), new Color(33, 17, 20, 235));
+            b.Draw(pixel, new Rectangle(18, 414, WINDOW_WIDTH - 36, 2), new Color(153, 76, 59));
         }
 
         private Rectangle ScreenRect(Rectangle local)
@@ -614,24 +614,24 @@ namespace Client.Main.Controls.UI.Game.Character
             if (p != null && _selectedStatIndex >= 0 && (_selectedStatIndex < 4 || _lastIsDarkLordFamily))
                 b.Draw(p, ScreenRect(new Rectangle(18, (int)s_statRowY[_selectedStatIndex] - 3, 3, 58)),
                     new Color(227, 160, 84) * Alpha);
-            DrawPanelString(b, font, "ASIGNACION DE PUNTOS", 28, 466, 10, new Color(223, 151, 101));
+            DrawPanelString(b, font, "ASIGNACION DE PUNTOS", 28, 419, 10, new Color(223, 151, 101));
             DrawPanelRectangle(b, s_amountBounds, new Color(8, 9, 12, 245),
                 _amountFocused ? new Color(236, 170, 88) : new Color(117, 91, 68));
             DrawPanelRectangle(b, s_confirmBounds, new Color(107, 39, 35, 238),
                 new Color(178, 105, 67));
-            DrawPanelString(b, font, string.IsNullOrEmpty(_amountText) ? "0" : _amountText, 128, 490,
+            DrawPanelString(b, font, string.IsNullOrEmpty(_amountText) ? "0" : _amountText, 128, 442,
                 11, Color.WhiteSmoke);
-            DrawPanelString(b, font, _remaining > 0 ? "CANCELAR" : "ASIGNAR", 215, 491,
+            DrawPanelString(b, font, _remaining > 0 ? "CANCELAR" : "ASIGNAR", 215, 442,
                 9, Color.WhiteSmoke);
             if (!_keypadOpen) return;
 
-            DrawPanelRectangle(b, new Rectangle(89, 287, 137, 169), new Color(13, 12, 15, 253),
+            DrawPanelRectangle(b, new Rectangle(89, 231, 137, 169), new Color(13, 12, 15, 253),
                 new Color(187, 119, 73));
-            DrawPanelString(b, font, "CANTIDAD", 113, 292, 10, new Color(235, 187, 105));
+            DrawPanelString(b, font, "CANTIDAD", 113, 236, 10, new Color(235, 187, 105));
             string[] labels = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "CLR", "0", "OK" };
             for (int i = 0; i < labels.Length; i++)
             {
-                var box = new Rectangle(97 + i % 3 * 41, 314 + i / 3 * 34, 37, 29);
+                var box = new Rectangle(97 + i % 3 * 41, 258 + i / 3 * 34, 37, 29);
                 DrawPanelRectangle(b, box, new Color(56, 42, 43, 250), new Color(128, 84, 64));
                 DrawPanelString(b, font, labels[i], box.X + 9, box.Y + 6,
                     labels[i].Length == 1 ? 12 : 9, Color.White);
@@ -641,7 +641,7 @@ namespace Client.Main.Controls.UI.Game.Character
         private void DrawInfoTableSurface(SpriteBatch spriteBatch, Vector2 origin)
         {
             const int tableWidth = WINDOW_WIDTH - 36;
-            const int tableHeight = 80;
+            const int tableHeight = 70;
 
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel != null)
@@ -996,8 +996,11 @@ namespace Client.Main.Controls.UI.Game.Character
             _statPointsText.Visible = true;
             _statPointsText.Text = $"Points: {snapshot.LevelUpPoints}";
 
-            _fruitProbText.Text = "[+]100%|[-]100%";
-            _fruitStatsText.Text = "Create 0/0 | Decrease 0/0";
+            // Avoid displaying fabricated Fruit percentages: not supplied by OpenMU here.
+            _fruitProbText.Text = $"HP: {snapshot.CurrentHealth} | MP: {snapshot.CurrentMana}";
+            _fruitStatsText.Text = snapshot.MasterLevel > 0
+                ? $"Master points: {snapshot.MasterLevelUpPoints}"
+                : $"SD: {snapshot.CurrentShield} | AG: {snapshot.CurrentAbility}";
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
@@ -1285,7 +1288,7 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private void HandleKeypadTap(Point point)
         {
-            if (!ScreenRect(new Rectangle(89, 287, 137, 169)).Contains(point))
+            if (!ScreenRect(new Rectangle(89, 231, 137, 169)).Contains(point))
             {
                 _keypadOpen = false;
                 return;
@@ -1293,7 +1296,7 @@ namespace Client.Main.Controls.UI.Game.Character
             const string digits = "123456789C0K";
             for (int i = 0; i < 12; i++)
             {
-                var rect = new Rectangle(97 + i % 3 * 41, 314 + i / 3 * 34, 37, 29);
+                var rect = new Rectangle(97 + i % 3 * 41, 258 + i / 3 * 34, 37, 29);
                 if (!ScreenRect(rect).Contains(point)) continue;
                 if (digits[i] == 'C') _amountText = "";
                 else if (digits[i] == 'K') _keypadOpen = false;
