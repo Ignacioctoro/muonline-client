@@ -39,6 +39,10 @@ namespace Client.Main.Controls.UI.Game.Character
         // Keep them centralized until the native movie's placement records are decoded.
         private const string CharacterAtlasPath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
         private const string StatIncreaseButtonPath = "Interface/newui_chainfo_btn_level.tga";
+        // Original GFx close-button states from Data_Broyal, not a cropped neighboring atlas sprite.
+        private const string CloseNormalPath = "Interface/GFx/btn_close01.ozd";
+        private const string CloseHoverPath = "Interface/GFx/btn_close02.ozd";
+        private const string ClosePressedPath = "Interface/GFx/btn_close03.ozd";
         // Crop packed-sprite interior instead of including adjacent colored atlas gutters.
         // These are visual reconstructions, not original Scaleform placement records.
         // Include the complete outer corner ornament, not just the inner vertical rail.
@@ -107,6 +111,9 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private Texture2D _characterAtlas;
         private Texture2D _statIncreaseButtonTexture;
+        private Texture2D _closeNormalTexture;
+        private Texture2D _closeHoverTexture;
+        private Texture2D _closePressedTexture;
 
         // OZD stores straight alpha. Convert RGB while preserving alpha in the cached surface.
         private readonly BlendState _atlasCacheBlend = new()
@@ -126,6 +133,7 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private CharacterInfoTextEntry _nameText;
         private CharacterInfoTextEntry _levelText;
+        private CharacterInfoTextEntry _resetsText;
         private CharacterInfoTextEntry _informationClassText;
         private CharacterInfoTextEntry _serverText;
         private CharacterInfoTextEntry _statPointsText;
@@ -191,16 +199,22 @@ namespace Client.Main.Controls.UI.Game.Character
         }
 
         public IEnumerable<string> GetPreloadTexturePaths()
-            => new[] { CharacterAtlasPath, StatIncreaseButtonPath };
+            => new[] { CharacterAtlasPath, StatIncreaseButtonPath, CloseNormalPath, CloseHoverPath, ClosePressedPath };
 
         public override async Task Load()
         {
             await base.Load();
             var textures = await Task.WhenAll(
                 TextureLoader.Instance.PrepareAndGetTexture(CharacterAtlasPath),
-                TextureLoader.Instance.PrepareAndGetTexture(StatIncreaseButtonPath));
+                TextureLoader.Instance.PrepareAndGetTexture(StatIncreaseButtonPath),
+                TextureLoader.Instance.PrepareAndGetTexture(CloseNormalPath),
+                TextureLoader.Instance.PrepareAndGetTexture(CloseHoverPath),
+                TextureLoader.Instance.PrepareAndGetTexture(ClosePressedPath));
             _characterAtlas = textures[0];
             _statIncreaseButtonTexture = textures[1];
+            _closeNormalTexture = textures[2];
+            _closeHoverTexture = textures[3];
+            _closePressedTexture = textures[4];
             if (_characterAtlas == null)
             {
                 _logger.LogWarning("Character GFx atlas could not be loaded from Data. Check CharacterInfoFrame_I1.ozd.");
@@ -226,8 +240,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 CreateText(new Vector2(29f, 84f + i * 18f), 10f, new Color(177, 172, 160)).Text = informationLabels[i];
             }
             _informationClassText = CreateInformationValue(84f);
-            // The current client state does not expose resets. Do not invent a server value.
-            CreateInformationValue(102f).Text = "--";
+            _resetsText = CreateInformationValue(102f);
+            _resetsText.Text = "--";
             _levelText = CreateInformationValue(120f);
             _statPointsText = CreateInformationValue(138f);
             _statPointsText.Color = new Color(220, 204, 161);
@@ -293,7 +307,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 buttonNormal, buttonNormal, buttonNormal,
                 () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "MASTER");
 
-            _exitButton = CreateButton(new Rectangle(309, 39, 22, 22), _characterAtlas,
+            _exitButton = CreateButton(new Rectangle(307, 37, 26, 26), _characterAtlas,
                 s_closeSource, s_closeSource, s_closeSource, () =>
                 {
                     HideWindow();
@@ -677,20 +691,27 @@ namespace Client.Main.Controls.UI.Game.Character
                     (_clickFlashButtonIndex == i && _clickFlashSeconds > 0d));
                 bool hovered = button.Enabled && _hoveredButtonIndex == i;
                 Rectangle target = GetButtonRectangle(button, controlScale);
-                Rectangle? source = pressed ? button.PressedRect : hovered ? button.HoverRect : button.NormalRect;
-                if (pressed)
+                // The GFx close button has dedicated normal/hover/pressed OZD images.
+                // Other Character buttons keep their existing atlas-based rendering.
+                bool nativeClose = ReferenceEquals(button, _exitButton) && _closeNormalTexture != null;
+                Texture2D buttonTexture = nativeClose
+                    ? pressed ? (_closePressedTexture ?? _closeHoverTexture ?? _closeNormalTexture)
+                        : hovered ? (_closeHoverTexture ?? _closeNormalTexture) : _closeNormalTexture
+                    : button.Texture;
+                Rectangle? source = nativeClose ? null
+                    : pressed ? button.PressedRect : hovered ? button.HoverRect : button.NormalRect;
+                if (pressed && !nativeClose)
                 {
                     target.Offset(0, Math.Max(1, (int)MathF.Round(controlScale)));
                 }
 
-                // The atlas holds the native ornament. Tint and a one-pixel press offset
-                // supply feedback; do not claim these are recovered native GFx frames.
-                var tint = pressed ? new Color(203, 189, 161) : hovered ? new Color(255, 236, 192) : Color.White;
+                var tint = nativeClose ? Color.White
+                    : pressed ? new Color(203, 189, 161) : hovered ? new Color(255, 236, 192) : Color.White;
                 using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred,
                     BlendState.NonPremultiplied, SamplerState.PointClamp, transform: UiScaler.SpriteTransform))
                 {
                     // Both OZD and the native TGA button use straight alpha.
-                    spriteBatch.Draw(button.Texture, target, source, new Color(tint.R, tint.G, tint.B, (byte)(255 * Alpha)));
+                    spriteBatch.Draw(buttonTexture, target, source, new Color(tint.R, tint.G, tint.B, (byte)(255 * Alpha)));
                 }
 
                 if (font != null && !string.IsNullOrEmpty(button.Label))
@@ -768,6 +789,7 @@ namespace Client.Main.Controls.UI.Game.Character
             _nameText.Text = snapshot.Name;
 
             _informationClassText.Text = CharacterClassDatabase.GetClassName(snapshot.Class);
+            _resetsText.Text = snapshot.Resets?.ToString() ?? "--";
             _levelText.Text = snapshot.MasterLevel > 0
                 ? $"{snapshot.Level} (Master {snapshot.MasterLevel})" : snapshot.Level.ToString();
             // These are the regular points consumed by the existing + buttons, including at master level.
@@ -949,6 +971,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 Experience = state.Experience;
                 ExperienceForNextLevel = state.ExperienceForNextLevel;
                 LevelUpPoints = state.LevelUpPoints;
+                Resets = state.Resets;
                 MasterLevelUpPoints = state.MasterLevelUpPoints;
                 BaseStrength = state.Strength;
                 AddedStrength = state.AddedStrength;
@@ -1001,6 +1024,7 @@ namespace Client.Main.Controls.UI.Game.Character
             public readonly ulong Experience;
             public readonly ulong ExperienceForNextLevel;
             public readonly ushort LevelUpPoints;
+            public readonly ushort? Resets;
             public readonly ushort MasterLevelUpPoints;
             public readonly ushort BaseStrength;
             public readonly ushort AddedStrength;
@@ -1065,6 +1089,7 @@ namespace Client.Main.Controls.UI.Game.Character
                        Experience == other.Experience &&
                        ExperienceForNextLevel == other.ExperienceForNextLevel &&
                        LevelUpPoints == other.LevelUpPoints &&
+                       Resets == other.Resets &&
                        MasterLevelUpPoints == other.MasterLevelUpPoints &&
                        BaseStrength == other.BaseStrength &&
                        AddedStrength == other.AddedStrength &&
