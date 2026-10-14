@@ -171,9 +171,17 @@ namespace Client.Main.Objects
             return _meshIsRGBA != null && (uint)mesh < (uint)_meshIsRGBA.Length && _meshIsRGBA[mesh];
         }
 
+        // Allows special models with original per-mesh visibility rules (e.g.
+        // Dark Raven level tiers) to reuse the normal opaque/RGBA render paths.
+        // Defaults to true for every existing player, item and monster model.
+        protected virtual bool IsNativeMeshVisible(int mesh) => true;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsHiddenMesh(int mesh)
         {
+            if (!IsNativeMeshVisible(mesh))
+                return true;
+
             if (_meshHiddenByScript == null || (uint)mesh >= (uint)_meshHiddenByScript.Length)
                 return false;
 
