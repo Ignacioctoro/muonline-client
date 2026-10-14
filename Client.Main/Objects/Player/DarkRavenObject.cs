@@ -21,6 +21,9 @@ namespace Client.Main.Objects.Player
         private const float NativeTickSeconds = 1f / 25f;
         private const float FlyRange = 150f;
         private const float RecoveryDistanceSquared = 409600f;
+        // MuMain PET_STAND_START switches to PET_STAND once the raven
+        // is within 50 native world units of its arm attachment.
+        private const float PerchArrivalDistanceSquared = 50f * 50f;
         private const float NativeScale = 0.7f;
         private const float DegToRad = MathF.PI / 180f;
 
@@ -35,6 +38,7 @@ namespace Client.Main.Objects.Player
         private float _stepAccumulator;
         private float _recoveryFrames;
         private bool _hasPosition;
+        private bool _isPerched;
         private bool _equipped;
         private bool _loadingModel;
 
@@ -63,6 +67,7 @@ namespace Client.Main.Objects.Player
             _equipped = equipped;
             Hidden = !equipped;
             _hasPosition = false;
+            _isPerched = false;
             _stepAccumulator = 0f;
             _recoveryFrames = 0f;
 
@@ -123,33 +128,42 @@ namespace Client.Main.Objects.Player
 
             if (isSafeZone)
             {
-                // MuMain PET_STAND: bone 37, local offset (-10, 0, 10),
-                // facing OwnerAngle - 120 degrees.
-                var bones = _owner.GetBoneTransforms();
-                Vector3 shoulder = bones != null && bones.Length > 37
-                    ? Vector3.Transform(new Vector3(-10f, 0f, 10f),
-                        bones[37] * _owner.WorldPosition)
-                    : ownerWorld + new Vector3(0f, 0f, 250f);
+                // The original client has two distinct states:
+                // PET_STAND_START approaches the arm; PET_STAND is attached
+                // to bone 37 on every frame (including walking frames).
+                // Smoothing PET_STAND would make the raven trail its owner.
+                Vector3 shoulder = GetPerchWorldPosition(ownerWorld);
 
-                if (Vector3.DistanceSquared(_flightPosition, shoulder) > 4f)
+                if (!_isPerched)
                 {
-                    float approach = Math.Min(1f,
-                        (float)gameTime.ElapsedGameTime.TotalSeconds * 6f);
-                    _flightPosition = Vector3.Lerp(_flightPosition, shoulder, approach);
+                    if (Vector3.DistanceSquared(_flightPosition, shoulder) >
+                        PerchArrivalDistanceSquared)
+                    {
+                        float approach = Math.Min(1f,
+                            (float)gameTime.ElapsedGameTime.TotalSeconds * 6f);
+                        _flightPosition = Vector3.Lerp(
+                            _flightPosition, shoulder, approach);
+                    }
+
+                    if (Vector3.DistanceSquared(_flightPosition, shoulder) <=
+                        PerchArrivalDistanceSquared)
+                    {
+                        _isPerched = true;
+                    }
                 }
-                else
-                {
+
+                if (_isPerched)
                     _flightPosition = shoulder;
-                }
 
                 _yaw = _owner.Angle.Z - 120f * DegToRad;
                 _pitch = 0f;
-                CurrentAction = 2;
+                CurrentAction = _isPerched ? 2 : 1;
                 _stepAccumulator = 0f;
                 _recoveryFrames = 0f;
             }
             else
             {
+                _isPerched = false;
                 _stepAccumulator = Math.Min(
                     _stepAccumulator + (float)gameTime.ElapsedGameTime.TotalSeconds,
                     NativeTickSeconds * 4f);
@@ -163,13 +177,56 @@ namespace Client.Main.Objects.Player
                 }
             }
 
-            // A child for lifetime/visibility, but its flight is in world space:
-            // undo the owner's animated transform rather than orbit with its turns.
+            ApplyWorldSpaceTransform();
+
+            base.Update(gameTime);
+        }
+
+        /// <summary>
+        /// WalkerObject moves its owner AFTER ModelObject.Update has already
+        /// updated child pets. Re-anchor a perched raven after the movement
+        /// phase so its hand attachment never uses the previous frame's
+        /// owner transform. This is intentionally visual-only and does not
+        /// advance AI or animation a second time.
+        /// </summary>
+        public void SyncPerchAfterOwnerMovement()
+        {
+            if (!_equipped || !_isPerched || World == null || _owner.World == null)
+                return;
+
+            bool inSafeZone = _owner.World.Terrain.RequestTerrainFlag(
+                (int)_owner.Location.X, (int)_owner.Location.Y)
+                .HasFlag(Client.Data.ATT.TWFlags.SafeZone);
+
+            if (!inSafeZone)
+                return;
+
+            _flightPosition = GetPerchWorldPosition(
+                _owner.WorldPosition.Translation);
+            _yaw = _owner.Angle.Z - 120f * DegToRad;
+            _pitch = 0f;
+            ApplyWorldSpaceTransform();
+        }
+
+        private Vector3 GetPerchWorldPosition(Vector3 ownerWorld)
+        {
+            // MuMain CSPetDarkSpirit::MovePet (PET_STAND): bone 37,
+            // offset (-10, 0, 10) transformed by the owner's full matrix.
+            var bones = _owner.GetBoneTransforms();
+            return bones != null && bones.Length > 37
+                ? Vector3.Transform(new Vector3(-10f, 0f, 10f),
+                    bones[37] * _owner.WorldPosition)
+                : ownerWorld + new Vector3(0f, 0f, 250f);
+        }
+
+        private void ApplyWorldSpaceTransform()
+        {
+            // Raven remains an owner child for lifetime/visibility, but
+            // its flight position is world-space. Avoid applying the
+            // owner's transform twice.
             Matrix parentInverse = Matrix.Invert(_owner.WorldPosition);
             Position = Vector3.Transform(_flightPosition, parentInverse);
             Angle = new Vector3(_pitch, 0f, _yaw - _owner.Angle.Z);
-
-            base.Update(gameTime);
         }
 
         private void StepFlight(Vector3 ownerWorld)
