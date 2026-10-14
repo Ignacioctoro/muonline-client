@@ -477,6 +477,15 @@ namespace Client.Main.Controls.UI.Game.Skills
                 return;
             }
 
+            if (DarkRavenCommands.IsCommandSkill(_skill.SkillId))
+            {
+                _tooltipLabel.Text =
+                    DarkRavenCommands.GetName(_skill.SkillId) + "\n" +
+                    DarkRavenCommands.GetDescription(_skill.SkillId);
+                _tooltipLabel.Visible = true;
+                return;
+            }
+
             var skillDef =
                 SkillDatabase
                     .GetSkillDefinition(
