@@ -28,6 +28,12 @@ namespace Client.Main.Scenes
                 SendCloseNpcRequestAsync();
             }
 
+            if (PetTrainerControl.IsOpen)
+            {
+                _logger?.LogInformation("Hero moved or took damage; closing Pet Trainer dialog.");
+                PetTrainerControl.Instance.CloseWindow();
+            }
+
             if (VaultControl.Instance.Visible)
             {
                 _logger?.LogInformation("Hero moved, closing Vault (storage) window.");
@@ -60,6 +66,12 @@ namespace Client.Main.Scenes
 
         public void OnHeroTookDamage(object sender, EventArgs e)
         {
+            if (PetTrainerControl.IsOpen)
+            {
+                _logger?.LogInformation("Hero moved or took damage; closing Pet Trainer dialog.");
+                PetTrainerControl.Instance.CloseWindow();
+            }
+
             if (VaultControl.Instance.Visible)
             {
                 _logger?.LogInformation("Hero took damage, closing Vault (storage) window.");

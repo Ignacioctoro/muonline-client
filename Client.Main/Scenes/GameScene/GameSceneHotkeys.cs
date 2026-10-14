@@ -136,7 +136,8 @@ namespace Client.Main.Scenes
             return modifiers;
         }
 
-        private static bool WhenEscapeNotConsumed(HotkeyContext context) => !context.Scene.IsKeyboardEscapeConsumedThisFrame;
+        private static bool WhenEscapeNotConsumed(HotkeyContext context)
+            => !context.Scene.IsKeyboardEscapeConsumedThisFrame && !PetTrainerControl.IsOpen;
 
         private static bool WhenMoveCommandFocused(HotkeyContext context)
         {

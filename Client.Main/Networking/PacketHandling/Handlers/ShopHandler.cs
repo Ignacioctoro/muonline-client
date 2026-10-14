@@ -83,6 +83,12 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         scene?.InventoryControl?.Show();
                     });
                 }
+                else if (resp.Window == NpcWindowResponse.NpcWindow.PetTrainer)
+                {
+                    // The server explicitly identifies the trainer window (7).
+                    // Do not open this dialog just by matching an NPC display name.
+                    MuGame.ScheduleOnMainThread(() => PetTrainerControl.Instance.ShowWindow());
+                }
                 else if (resp.Window == NpcWindowResponse.NpcWindow.ChaosMachine)
                 {
                     _characterState.ClearChaosMachineItems();

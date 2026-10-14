@@ -1263,6 +1263,7 @@ namespace Client.Main.Scenes
             Controls.Add(NpcShopControl.Instance);
             Controls.Add(VaultControl.Instance);
             Controls.Add(ChaosMixControl.Instance);
+            Controls.Add(PetTrainerControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(DevilSquareEnterControl.Instance);
@@ -3115,6 +3116,8 @@ namespace Client.Main.Scenes
                     _hero.PlayerTookDamage -= _windowCloseController.OnHeroTookDamage;
                 }
             }
+
+            PetTrainerControl.Instance.HideWithoutServerRequest();
 
             base.Dispose();
         }
