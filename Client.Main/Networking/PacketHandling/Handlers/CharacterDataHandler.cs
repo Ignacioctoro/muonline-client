@@ -169,56 +169,69 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 switch (_targetVersion)
                 {
                     case TargetProtocolVersion.Season6:
-                        if (packet.Length >= CharacterInformationExtended.Length)
+                        // Read the documented OpenMU wire format directly. The client uses
+                        // MUnique.OpenMU.Network.Packets 0.9.8, whose generated layout for
+                        // CharacterInformationExtended is not compatible with our newer server.
+                        // In the actual C3 F3 03 92-byte packet Leadership is at offset 34,
+                        // followed by 32-bit current/maximum HP, MP, SD and AG.
+                        if (packet.Length >= 92)
                         {
-                            var info = new CharacterInformationExtended(packet);
-                            mapId = info.MapId; x = info.X; y = info.Y;
-                            currentExp = info.CurrentExperience;
-                            nextExp = info.ExperienceForNextLevel;
-                            levelUpPoints = info.LevelUpPoints;
-                            str = info.Strength; agi = info.Agility;
-                            vit = info.Vitality; ene = info.Energy;
-                            cmd = info.Leadership;
-                            initialHp = info.CurrentHealth;
-                            maxHp = info.MaximumHealth;
-                            initialSd = info.CurrentShield;
-                            maxSd = info.MaximumShield;
-                            initialMana = info.CurrentMana;
-                            maxMana = info.MaximumMana;
-                            initialAbility = info.CurrentAbility;
-                            maxAbility = info.MaximumAbility;
-                            attackSpeed = info.AttackSpeed;
-                            magicSpeed = info.MagicSpeed;
-                            maxAttackSpeed = info.MaximumAttackSpeed;
-                            money = info.Money;
-                            heroState = info.HeroState;
-                            status = info.Status;
-                            inventoryExpansion = info.InventoryExtensions;
-                            // Note: CharacterInformationExtended (S6) does not have a direction field. Client might get it from MapChange or default.
+                            var data = packet.Span;
+                            x = data[4];
+                            y = data[5];
+                            mapId = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(6, 2));
+                            currentExp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(8, 8));
+                            nextExp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(16, 8));
+                            levelUpPoints = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(24, 2));
+                            str = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(26, 2));
+                            agi = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(28, 2));
+                            vit = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(30, 2));
+                            ene = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(32, 2));
+                            cmd = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(34, 2));
+                            initialHp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(36, 4));
+                            maxHp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(40, 4));
+                            initialMana = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(44, 4));
+                            maxMana = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4));
+                            initialSd = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4));
+                            maxSd = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(56, 4));
+                            initialAbility = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(60, 4));
+                            maxAbility = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(64, 4));
+                            money = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(68, 4));
+                            heroState = (CharacterHeroState)data[72];
+                            status = (CharacterStatus)data[73];
+                            attackSpeed = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(82, 2));
+                            magicSpeed = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(84, 2));
+                            maxAttackSpeed = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(86, 2));
+                            inventoryExpansion = data[88];
                         }
-                        else if (packet.Length >= CharacterInformation.Length)
+                        else if (packet.Length >= 72)
                         {
-                            var info = new CharacterInformation(packet);
-                            mapId = info.MapId; x = info.X; y = info.Y;
-                            currentExp = info.CurrentExperience;
-                            nextExp = info.ExperienceForNextLevel;
-                            levelUpPoints = info.LevelUpPoints;
-                            str = info.Strength; agi = info.Agility;
-                            vit = info.Vitality; ene = info.Energy;
-                            cmd = info.Leadership;
-                            initialHp = info.CurrentHealth;
-                            maxHp = info.MaximumHealth;
-                            initialSd = info.CurrentShield;
-                            maxSd = info.MaximumShield;
-                            initialMana = info.CurrentMana;
-                            maxMana = info.MaximumMana;
-                            initialAbility = info.CurrentAbility;
-                            maxAbility = info.MaximumAbility;
-                            money = info.Money;
-                            heroState = info.HeroState;
-                            status = info.Status;
-                            inventoryExpansion = info.InventoryExtensions;
-                            // Note: CharacterInformation (S6, non-extended) does not have a direction field.
+                            // Older non-extended Season 6 variant (C3 F3 03, 72 bytes).
+                            // Leadership is at offset 62 in this variant.
+                            var data = packet.Span;
+                            x = data[4];
+                            y = data[5];
+                            mapId = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(6, 2));
+                            currentExp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(8, 8));
+                            nextExp = BinaryPrimitives.ReadUInt64BigEndian(data.Slice(16, 8));
+                            levelUpPoints = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(24, 2));
+                            str = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(26, 2));
+                            agi = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(28, 2));
+                            vit = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(30, 2));
+                            ene = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(32, 2));
+                            initialHp = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(34, 2));
+                            maxHp = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(36, 2));
+                            initialMana = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(38, 2));
+                            maxMana = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(40, 2));
+                            initialSd = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(42, 2));
+                            maxSd = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(44, 2));
+                            initialAbility = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(46, 2));
+                            maxAbility = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(48, 2));
+                            money = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4));
+                            heroState = (CharacterHeroState)data[56];
+                            status = (CharacterStatus)data[57];
+                            cmd = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(62, 2));
+                            inventoryExpansion = data[68];
                         }
                         else goto DefaultCase;
                         break;
@@ -1049,24 +1062,23 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         {
             try
             {
-                if (_targetVersion >= TargetProtocolVersion.Season6 && packet.Length >= BaseStatsExtended.Length)
+                // F3:32 uses five little-endian 32-bit values, CMD at byte 20.
+                if (_targetVersion >= TargetProtocolVersion.Season6 && packet.Length >= 24)
                 {
-                    var stats = new BaseStatsExtended(packet);
-                    // F3:32 OpenMU encodes Command as uint32 LE at absolute offset 20.
-                    // Read from the wire to guard against generated-schema CMD regressions.
-                    uint commandWire = BinaryPrimitives.ReadUInt32LittleEndian(packet.Span.Slice(20, 4));
-                    if (commandWire != stats.Command)
-                    {
-                        _logger.LogWarning("F3:32 CMD mismatch: decoded {Decoded}, wire {Wire}.",
-                            stats.Command, commandWire);
-                    }
+                    var data = packet.Span;
+                    uint strength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4, 4));
+                    uint agility = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(8, 4));
+                    uint vitality = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(12, 4));
+                    uint energy = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(16, 4));
+                    uint command = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(20, 4));
                     _characterState.UpdateStats(
-                        (ushort)stats.Strength,
-                        (ushort)stats.Agility,
-                        (ushort)stats.Vitality,
-                        (ushort)stats.Energy,
-                        (ushort)Math.Min(commandWire, ushort.MaxValue));
-                    _logger.LogInformation("📊 BaseStatsExtended received; CMD={Command}.", commandWire);
+                        (ushort)Math.Min(strength, ushort.MaxValue),
+                        (ushort)Math.Min(agility, ushort.MaxValue),
+                        (ushort)Math.Min(vitality, ushort.MaxValue),
+                        (ushort)Math.Min(energy, ushort.MaxValue),
+                        (ushort)Math.Min(command, ushort.MaxValue));
+                    _logger.LogInformation("BaseStatsExtended F3:32: STR={Str}, AGI={Agi}, VIT={Vit}, ENE={Ene}, CMD={Cmd}",
+                        strength, agility, vitality, energy, command);
                 }
                 else
                 {
@@ -1075,7 +1087,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "💥 Error parsing BaseStatsExtended packet.");
+                _logger.LogError(ex, "Error parsing BaseStatsExtended packet.");
             }
 
             return Task.CompletedTask;
