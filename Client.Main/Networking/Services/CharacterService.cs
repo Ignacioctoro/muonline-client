@@ -55,6 +55,28 @@ namespace Client.Main.Networking.Services
         }
 
         /// <summary>
+        /// Request server-authoritative level, experience and health of a pet.
+        /// </summary>
+        public async Task SendPetInfoRequestAsync(byte petType, byte inventorySlot)
+        {
+            if (!_connectionManager.IsConnected || petType > 1)
+                return;
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                    PacketBuilder.BuildPetInfoRequestPacket(
+                        _connectionManager.Connection.Output, petType, inventorySlot));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Could not request pet info for type {PetType}, slot {Slot}",
+                    petType, inventorySlot);
+            }
+        }
+
+        /// <summary>
         /// Sends a request to drop an item from inventory onto the ground at the specified tile.
         /// </summary>
         /// <param name="tileX">Target tile X.</param>
