@@ -407,9 +407,12 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     // First, try restore inventory<->inventory failed move
                     if (_characterState.TryConsumePendingInventoryMove(out var fromSlot, out _))
                     {
-                        // Restore the item at original location
-                        _characterState.AddOrUpdateInventoryItem(fromSlot, itemData);
-                        _logger.LogWarning("Item move failed. Restored item at slot {From}", fromSlot);
+                        // A rejected PetTrainer move can contain no item payload.
+                        // Decoding that zero-filled payload creates a fake Kris
+                        // in the UI. The original item is still in our inventory
+                        // snapshot; never overwrite it with failure-packet bytes.
+                        _characterState.RaiseInventoryChanged();
+                        _logger.LogWarning("Item move failed. Refreshed original slot {From} without accepting failed item bytes.", fromSlot);
                         // Inform user
                         MuGame.ScheduleOnMainThread(() =>
                         {
@@ -422,7 +425,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     {
                         // If the move originated from vault -> inventory, vFrom represents the vault slot and vTo == 0xFF
                         // Restore the item back into the vault at its original slot.
-                        _characterState.AddOrUpdateVaultItem(vFrom, itemData);
+                        // The failed packet's item bytes are not guaranteed to
+                        // represent a valid item; retain the current vault snapshot.
                         _characterState.RaiseVaultItemsChanged();
                         _logger.LogWarning("Storage move failed. Restored vault item at slot {From}", vFrom);
 
@@ -437,7 +441,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     // Chaos machine storage move failed
                     else if (_characterState.TryConsumePendingChaosMachineMove(out var cFrom, out var cTo))
                     {
-                        _characterState.AddOrUpdateChaosMachineItem(cFrom, itemData);
+                        // Retain the source storage snapshot on failed moves.
                         _characterState.RaiseChaosMachineItemsChanged();
                         _logger.LogWarning("Chaos machine move failed. Restored item at slot {From}", cFrom);
 
@@ -485,7 +489,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         _characterState.RaiseVaultItemsChanged();
                         _logger.LogInformation("Vault item moved to slot {To}.", toSlot);
                     }
-                    else if (targetStore == ItemStorageKind.ChaosMachine)
+                    else if (targetStore == ItemStorageKind.ChaosMachine ||
+                             targetStore == ItemStorageKind.PetTrainer)
                     {
                         // Clear any pending chaos machine move information (for chaos->chaos moves)
                         if (_characterState.TryConsumePendingChaosMachineMove(out var from, out var to))

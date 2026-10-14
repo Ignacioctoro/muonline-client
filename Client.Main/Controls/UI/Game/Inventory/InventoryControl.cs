@@ -2618,7 +2618,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                     _ = Task.Run(async () =>
                     {
-                        await svc.SendStorageItemMoveAsync(ItemStorageKind.Inventory, slotIndex, ItemStorageKind.ChaosMachine, toSlot, _networkManager.TargetVersion, raw);
+                        await svc.SendStorageItemMoveAsync(ItemStorageKind.Inventory, slotIndex,
+                            chaos.IsTrainerMode ? ItemStorageKind.PetTrainer : ItemStorageKind.ChaosMachine,
+                            toSlot, _networkManager.TargetVersion, raw);
                         await Task.Delay(1200);
                         if (_networkManager != null && state.IsInventoryMovePending(slotIndex, slotIndex))
                         {

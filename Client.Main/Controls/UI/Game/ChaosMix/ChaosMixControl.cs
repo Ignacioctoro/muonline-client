@@ -46,9 +46,12 @@ namespace Client.Main.Controls.UI.Game
         private static readonly Rectangle TrainerFrameSource = new(656, 0, 354, 638);
         private static readonly Rectangle TrainerInfoSource = new(676, 645, 245, 56);
         // Same verified NpcShop_I3 inventory slot crop used in Inventory/NpcShop.
-        private static readonly Rectangle TrainerSlotSource = new(548, 223, 25, 25);
+        // Use the exact source crop already used by the NewUI Inventory.
+        private static readonly Rectangle TrainerSlotSource = new(546, 220, 29, 29);
         private const int TrainerTopSourceHeight = 96;
         private const int TrainerBottomSourceHeight = 39;
+        private const int TrainerWindowWidth = 420;
+        private const int TrainerWindowHeight = 690;
 
         private const int SLOT_WIDTH = 34;
         private const int SLOT_HEIGHT = 34;
@@ -121,6 +124,9 @@ namespace Client.Main.Controls.UI.Game
 
         private MixInventoryType _mixInventoryType = MixInventoryType.GoblinNormal;
         private bool IsTrainerMix => _mixInventoryType == MixInventoryType.Trainer;
+        public bool IsTrainerMode => IsTrainerMix;
+        private ItemStorageKind ActiveCraftingStorage =>
+            IsTrainerMix ? ItemStorageKind.PetTrainer : ItemStorageKind.ChaosMachine;
         private Texture2D _trainerFrame;
         private Texture2D _trainerSlots;
         private Texture2D _trainerButtonNormal;
@@ -249,11 +255,22 @@ namespace Client.Main.Controls.UI.Game
         {
             _mixInventoryType = mode;
             BuildLayoutMetrics();
-            ControlSize = new Point(WINDOW_WIDTH, _mixButtonRect.Bottom + WINDOW_MARGIN);
+            ControlSize = IsTrainerMix
+                ? new Point(TrainerWindowWidth, TrainerWindowHeight)
+                : new Point(WINDOW_WIDTH, _mixButtonRect.Bottom + WINDOW_MARGIN);
             ViewSize = ControlSize;
             Align = ControlAlign.VerticalCenter | ControlAlign.Left;
             ForceAlignNow();
             Align = ControlAlign.None;
+
+            // Keep the two 420x690 NewUI windows adjacent (rather than
+            // overlapping the item grid) in the same logical parent space.
+            var inventory = InventoryControl.Instance;
+            if (IsTrainerMix && inventory?.Visible == true)
+            {
+                X = Math.Max(12, inventory.X - ControlSize.X - 12);
+                Y = inventory.Y;
+            }
 
             Visible = true;
             BringToFront();
@@ -391,7 +408,23 @@ namespace Client.Main.Controls.UI.Game
 
         private void BuildLayoutMetrics()
         {
-            int currentHeaderHeight = IsTrainerMix ? TrainerTopSourceHeight : HEADER_HEIGHT;
+            if (IsTrainerMix)
+            {
+                // Exact NewUI Inventory footprint. Use the additional height
+                // for readable ingredient/recipe descriptions.
+                _headerRect = new Rectangle(0, 0, TrainerWindowWidth, TrainerTopSourceHeight);
+                int frameX = 18;
+                int frameW = TrainerWindowWidth - frameX * 2;
+                _gridFrameRect = new Rectangle(frameX, 106, frameW, 190);
+                _gridRect = new Rectangle((TrainerWindowWidth - GRID_WIDTH) / 2, 142,
+                    GRID_WIDTH, GRID_HEIGHT);
+                _infoRect = new Rectangle(frameX, 308, frameW, 270);
+                _mixButtonRect = new Rectangle(64, 595, TrainerWindowWidth - 128, 58);
+                _closeButtonRect = new Rectangle(TrainerWindowWidth - 44, 35, 25, 25);
+                return;
+            }
+
+            int currentHeaderHeight = HEADER_HEIGHT;
             _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, currentHeaderHeight);
 
             int frameX = WINDOW_MARGIN;
@@ -497,6 +530,16 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawTrainerFrame(SpriteBatch sb)
         {
+            // The GFx panel contains translucent art. Render a truly opaque
+            // dark backing FIRST, keeping the header, corners and borders intact.
+            // Without this, the terrain and character show through the mix grid.
+            var pixel = GraphicsManager.Instance.Pixel;
+            if (pixel != null)
+            {
+                sb.Draw(pixel, new Rectangle(7, 80, ControlSize.X - 14,
+                    ControlSize.Y - 100), new Color(13, 15, 19, 255));
+            }
+
             int middleHeight = ControlSize.Y - TrainerTopSourceHeight - TrainerBottomSourceHeight;
             sb.Draw(_trainerFrame, new Rectangle(0, 0, ControlSize.X, TrainerTopSourceHeight),
                 new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Y,
@@ -586,7 +629,7 @@ namespace Client.Main.Controls.UI.Game
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null || _font == null) return;
 
-            float scale = 0.32f;
+            float scale = IsTrainerMix ? 0.42f : 0.32f;
             Vector2 size = _font.MeasureString(title) * scale;
             int textX = x + (width - (int)size.X) / 2;
 
@@ -607,7 +650,7 @@ namespace Client.Main.Controls.UI.Game
                 if (_font != null)
                 {
                     const string title = "Resurrect Spirit";
-                    float scale = 0.43f;
+                    float scale = 0.53f;
                     Vector2 size = _font.MeasureString(title) * scale;
                     Vector2 pos = new((ControlSize.X - size.X) / 2, 52 - size.Y / 2);
                     sb.DrawString(_font, title, pos + Vector2.One, Color.Black * 0.7f,
@@ -674,10 +717,12 @@ namespace Client.Main.Controls.UI.Game
                     {
                         for (int x = 0; x < Columns; x++)
                         {
-                            sb.Draw(_trainerSlots,
-                                new Rectangle(_gridRect.X + x * SLOT_WIDTH,
-                                    _gridRect.Y + y * SLOT_HEIGHT, SLOT_WIDTH, SLOT_HEIGHT),
-                                TrainerSlotSource, Color.White);
+                            var slotRect = new Rectangle(
+                                _gridRect.X + x * SLOT_WIDTH,
+                                _gridRect.Y + y * SLOT_HEIGHT,
+                                SLOT_WIDTH, SLOT_HEIGHT);
+                            sb.Draw(pixel, slotRect, new Color(17, 20, 25, 255));
+                            sb.Draw(_trainerSlots, slotRect, TrainerSlotSource, Color.White);
                         }
                     }
                     return;
@@ -762,22 +807,22 @@ namespace Client.Main.Controls.UI.Game
         {
             if (_font == null) return;
 
-            float scale = 0.32f;
-            int x = DisplayRectangle.X + _infoRect.X + 10;
+            float scale = IsTrainerMix ? 0.42f : 0.32f;
+            int x = DisplayRectangle.X + _infoRect.X + 14;
             int y = DisplayRectangle.Y + _infoRect.Y + 10;
 
             foreach (string line in _infoLines)
             {
                 sb.DrawString(_font, line, new Vector2(x + 1, y + 1), Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
                 sb.DrawString(_font, line, new Vector2(x, y), Theme.TextGray, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                y += (int)(_font.LineSpacing * scale) + 2;
+                y += (int)(_font.LineSpacing * scale) + (IsTrainerMix ? 4 : 2);
                 if (y > DisplayRectangle.Y + _infoRect.Bottom - 28) break;
             }
 
             string warn = _warningLine ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(warn))
             {
-                float warnScale = 0.30f;
+                float warnScale = IsTrainerMix ? 0.37f : 0.30f;
                 Vector2 warnSize = _font.MeasureString(warn) * warnScale;
                 Vector2 warnPos = new(
                     DisplayRectangle.X + _infoRect.X + (_infoRect.Width - warnSize.X) / 2,
@@ -815,7 +860,7 @@ namespace Client.Main.Controls.UI.Game
             if (_font == null) return;
 
             string text = _mixInProgress ? "MIXING..." : "MIX";
-            float scale = 0.45f;
+            float scale = IsTrainerMix ? 0.54f : 0.45f;
             Vector2 size = _font.MeasureString(text) * scale;
             Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
 
@@ -1219,6 +1264,8 @@ namespace Client.Main.Controls.UI.Game
 
         private static string FormatMixType(int mixId)
         {
+            if (mixId == 13) return "Dark Horse";
+            if (mixId == 14) return "Dark Raven";
             if (s_mixTypeNames.TryGetValue(mixId, out var cached))
             {
                 return cached;
@@ -1605,7 +1652,7 @@ namespace Client.Main.Controls.UI.Game
             {
                 try
                 {
-                    await svc.SendStorageItemMoveAsync(ItemStorageKind.ChaosMachine, from, ItemStorageKind.ChaosMachine, to, version, raw);
+                    await svc.SendStorageItemMoveAsync(ActiveCraftingStorage, from, ActiveCraftingStorage, to, version, raw);
                 }
                 catch (Exception ex)
                 {
@@ -1641,7 +1688,7 @@ namespace Client.Main.Controls.UI.Game
                 {
                     try
                     {
-                        await svc.SendStorageItemMoveAsync(ItemStorageKind.ChaosMachine, fromSlot, ItemStorageKind.Inventory, toSlot, version, raw);
+                        await svc.SendStorageItemMoveAsync(ActiveCraftingStorage, fromSlot, ItemStorageKind.Inventory, toSlot, version, raw);
                     }
                     catch (Exception ex)
                     {

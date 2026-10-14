@@ -239,8 +239,8 @@ namespace Client.Main.Controls.UI.Game
             HideWithoutServerRequest();
 
             var mixWindow = ChaosMixControl.Instance;
-            mixWindow.ShowTrainer();
             scene.InventoryControl?.Show();
+            mixWindow.ShowTrainer();
             mixWindow.BringToFront();
         }
 
