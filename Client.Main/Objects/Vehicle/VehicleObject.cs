@@ -562,8 +562,17 @@ public class VehicleObject : ModelObject
             UpdateFenrirBodyThunder(gameTime);
             UpdateFenrirFaceLights(gameTime);
             UpdateFenrirSkillSpark(gameTime);
-            UpdateNativeDarkHorseBreath(gameTime);
         }
+
+    /// <summary>
+    /// Called by PlayerObject after the rider's world transform has advanced.
+    /// Child mount updates happen earlier; emitting during Vehicle.Update
+    /// would leave the breath one movement frame behind the muzzle.
+    /// </summary>
+    public void EmitDarkHorseBreathAfterRiderMovement(GameTime gameTime)
+    {
+        UpdateNativeDarkHorseBreath(gameTime);
+    }
 
     /// <summary>
     /// MuMain GOBoid.cpp / MODEL_DARK_HORSE:
