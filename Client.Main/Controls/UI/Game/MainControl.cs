@@ -40,6 +40,7 @@ namespace Client.Main.Controls.UI.Game
         private readonly ItemHotkeyHudControl _itemHotkeys;
         private readonly SkillHotkeyHudControl _skillHotkeys;
         private readonly MapPositionHudControl _mapPositionHud;
+        private ExperienceBarControl _experienceBar;
 
         // Yellow highlight taken from ActiveSkill_1.
         private TextureControl _skillHotkeyHighlight;
@@ -257,7 +258,7 @@ namespace Client.Main.Controls.UI.Game
             // Replace the static atlas slice with its server-driven NewUI gauge.
             // It retains the ExpBar layout and original render order.
             ControlFactories["ExpBar"] =
-                _ => new ExperienceBarControl(state);
+                _ => _experienceBar = new ExperienceBarControl(state);
 
             CreateControls();
             UpdateLayout();
@@ -860,6 +861,8 @@ namespace Client.Main.Controls.UI.Game
 
                 _mp.DrawLabel(
                     gameTime);
+
+                _experienceBar?.DrawTooltip(gameTime);
             }
         }
 

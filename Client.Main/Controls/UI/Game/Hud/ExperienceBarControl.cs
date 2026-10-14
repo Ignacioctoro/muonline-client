@@ -18,12 +18,15 @@ namespace Client.Main.Controls.UI.Game.Hud
         private readonly CharacterState _state;
         private readonly TextureControl _fill;
         private readonly TextureControl _cover;
+        private readonly LabelControl _hoverTooltip;
+        private ulong _shownExperience = ulong.MaxValue;
+        private ulong _shownNextExperience = ulong.MaxValue;
 
         public ExperienceBarControl(CharacterState state)
         {
             _state = state;
             AutoViewSize = false;
-            Interactive = false;
+            Interactive = true; // Enables the original EXP current/next hover tooltip.
             TexturePath = "Interface/GFx/main_IE.ozd";
             TextureRectangle = new Rectangle(218, 90, 741, 14);
             BlendState = BlendState.NonPremultiplied;
@@ -54,6 +57,43 @@ namespace Client.Main.Controls.UI.Game.Hud
 
             Controls.Add(_fill);
             Controls.Add(_cover);
+
+            // As in the original main frame, show exact cumulative EXP on hover.
+            // Draw it in MainControl's existing text pass, not in this texture batch.
+            _hoverTooltip = new LabelControl
+            {
+                FontSize = 11f,
+                TextColor = new Color(245, 218, 153),
+                BackgroundColor = new Color(14, 10, 9, 210),
+                Padding = new Client.Main.Models.Margin
+                {
+                    Left = 6,
+                    Right = 6,
+                    Top = 4,
+                    Bottom = 4
+                },
+                ShadowOpacity = 0.7f
+            };
+        }
+
+        public void DrawTooltip(GameTime gameTime)
+        {
+            if (!IsMouseOver || !Visible || Status != Client.Main.Models.GameControlStatus.Ready)
+                return;
+
+            ulong current = _state.Experience;
+            ulong next = _state.ExperienceForNextLevel;
+            if (current != _shownExperience || next != _shownNextExperience)
+            {
+                _hoverTooltip.Text = $"EXP: {current:N0} / {next:N0}";
+                _shownExperience = current;
+                _shownNextExperience = next;
+            }
+
+            var bar = DisplayRectangle;
+            _hoverTooltip.X = bar.Center.X - _hoverTooltip.ControlSize.X / 2;
+            _hoverTooltip.Y = bar.Y - _hoverTooltip.ControlSize.Y - 14;
+            _hoverTooltip.Draw(gameTime);
         }
 
         public override void Update(GameTime gameTime)
