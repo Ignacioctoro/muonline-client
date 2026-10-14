@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using MUnique.OpenMU.Network.Packets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,49 +18,33 @@ namespace Client.Main.Controls.UI.Game.Character
 {
     public class CharacterInfoWindowControl : UIControl, IUiTexturePreloadable
     {
-        private const int WINDOW_WIDTH = 280;
-        private const int WINDOW_HEIGHT = 520;
-        private const int STAT_BOX_WIDTH = 170;
-        private const int STAT_BOX_HEIGHT = 21;
+        private const int WINDOW_WIDTH = 348;
+        private const int WINDOW_HEIGHT = 640;
         private const int BTN_STAT_COUNT = 5;
 
         private static readonly float[] s_statRowY =
         {
-            140f,
-            200f,
-            270f,
-            340f,
-            410f
+            165f,
+            237f,
+            309f,
+            381f,
+            453f
         };
 
         private static readonly string[] s_statShortNames = { "STR", "AGI", "STA", "ENE", "CMD" };
 
-        private static readonly string[] s_tableTexturePaths =
-        {
-            "Interface/newui_item_table01(L).tga",
-            "Interface/newui_item_table01(R).tga",
-            "Interface/newui_item_table02(L).tga",
-            "Interface/newui_item_table02(R).tga",
-            "Interface/newui_item_table03(Up).tga",
-            "Interface/newui_item_table03(Dw).tga",
-            "Interface/newui_item_table03(L).tga",
-            "Interface/newui_item_table03(R).tga"
-        };
+        // Regions reconstructed from the Data_Broyal 1024x1024 OZD preview.
+        // These are atlas coordinates, NOT recovered GFx/Scaleform transforms.
+        // Keep them centralized until the native movie's placement records are decoded.
+        private const string CharacterAtlasPath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
+        private const string CharacterInsetPath = "Interface/GFx/CharacterInfoFrame_I24.ozd";
+        private static readonly Rectangle s_panelSource = new(665, 0, 348, 638);
+        private static readonly Rectangle s_informationSource = new(674, 643, 249, 60);
+        private static readonly Rectangle s_attributeBandSource = new(346, 718, 121, 32);
+        private static readonly Rectangle s_buttonSource = new(348, 720, 118, 30);
+        private static readonly Rectangle s_closeSource = new(985, 754, 32, 30);
+        private static readonly Rectangle s_insetSource = new(0, 0, 324, 383);
 
-        private static readonly string[] s_additionalPreloadTextures =
-        {
-            "Interface/newui_msgbox_back.jpg",
-            "Interface/newui_item_back04.tga",
-            "Interface/newui_item_back02-L.tga",
-            "Interface/newui_item_back02-R.tga",
-            "Interface/newui_item_back03.tga",
-            "Interface/newui_cha_textbox02.tga",
-            "Interface/newui_chainfo_btn_level.tga",
-            "Interface/newui_exit_00.tga",
-            "Interface/newui_chainfo_btn_quest.tga",
-            "Interface/newui_chainfo_btn_pet.tga",
-            "Interface/newui_chainfo_btn_master.tga"
-        };
 
         private enum TextAlignment
         {
@@ -90,15 +73,16 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private sealed class CharacterInfoButton
         {
-            public CharacterInfoButton(Rectangle baseBounds, Texture2D texture, Rectangle? normalRect, Rectangle? hoverRect, Rectangle? pressedRect, Action onClick)
+            public CharacterInfoButton(Rectangle baseBounds, Texture2D texture, Rectangle? normalRect, Rectangle? hoverRect, Rectangle? pressedRect, Action onClick, string label)
             {
                 BaseBounds = baseBounds;
                 Texture = texture;
                 NormalRect = normalRect;
                 HoverRect = hoverRect;
                 PressedRect = pressedRect;
-                FrameSize = normalRect?.Size ?? baseBounds.Size;
+                FrameSize = baseBounds.Size;
                 OnClick = onClick;
+                Label = label;
             }
 
             public Rectangle BaseBounds { get; set; }
@@ -108,29 +92,14 @@ namespace Client.Main.Controls.UI.Game.Character
             public Rectangle? PressedRect { get; }
             public Point FrameSize { get; }
             public Action OnClick { get; }
+            public string Label { get; }
             public bool Visible { get; set; } = true;
             public bool Enabled { get; set; } = true;
         }
 
-        private Texture2D _backgroundTexture;
-        private Texture2D _topFrameTexture;
-        private Texture2D _leftFrameTexture;
-        private Texture2D _rightFrameTexture;
-        private Texture2D _bottomFrameTexture;
-        private Texture2D _statTextboxTexture;
-        private Texture2D _buttonExitTexture;
-        private Texture2D _buttonQuestTexture;
-        private Texture2D _buttonPetTexture;
-        private Texture2D _buttonMasterTexture;
-        private Texture2D _statIncreaseButtonTexture;
-        private Texture2D _tableTopLeftTexture;
-        private Texture2D _tableTopRightTexture;
-        private Texture2D _tableBottomLeftTexture;
-        private Texture2D _tableBottomRightTexture;
-        private Texture2D _tableTopLineTexture;
-        private Texture2D _tableBottomLineTexture;
-        private Texture2D _tableLeftLineTexture;
-        private Texture2D _tableRightLineTexture;
+        private Texture2D _characterAtlas;
+        private Texture2D _characterInset;
+
 
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
@@ -142,8 +111,6 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoTextEntry _classText;
         private CharacterInfoTextEntry _levelText;
         private CharacterInfoTextEntry _expText;
-        private CharacterInfoTextEntry _fruitProbText;
-        private CharacterInfoTextEntry _fruitStatsText;
         private CharacterInfoTextEntry _statPointsText;
         private readonly CharacterInfoTextEntry[] _statValueTexts = new CharacterInfoTextEntry[BTN_STAT_COUNT];
         private CharacterInfoTextEntry _strDetail1Text;
@@ -159,14 +126,15 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoTextEntry _pvmInfo1Text;
         private CharacterInfoTextEntry _pvmInfo2Text;
 
-        private readonly CharacterInfoButton[] _statButtons = new CharacterInfoButton[BTN_STAT_COUNT];
         private CharacterInfoButton _exitButton;
-        private CharacterInfoButton _questButton;
+        private CharacterInfoButton _skillsButton;
         private CharacterInfoButton _petButton;
         private CharacterInfoButton _masterButton;
 
         private int _hoveredButtonIndex = -1;
         private int _pressedButtonIndex = -1;
+        private int _clickFlashButtonIndex = -1;
+        private double _clickFlashSeconds;
 
         private CharacterState _characterState;
         private NetworkManager _networkManager;
@@ -202,245 +170,94 @@ namespace Client.Main.Controls.UI.Game.Character
         }
 
         public IEnumerable<string> GetPreloadTexturePaths()
-            => s_additionalPreloadTextures.Concat(s_tableTexturePaths);
+            => new[] { CharacterAtlasPath, CharacterInsetPath };
 
         public override async Task Load()
         {
             await base.Load();
-
-            var tl = TextureLoader.Instance;
-
-            _backgroundTexture = await tl.PrepareAndGetTexture("Interface/newui_msgbox_back.jpg");
-            _topFrameTexture = await tl.PrepareAndGetTexture("Interface/newui_item_back04.tga");
-            _leftFrameTexture = await tl.PrepareAndGetTexture("Interface/newui_item_back02-L.tga");
-            _rightFrameTexture = await tl.PrepareAndGetTexture("Interface/newui_item_back02-R.tga");
-            _bottomFrameTexture = await tl.PrepareAndGetTexture("Interface/newui_item_back03.tga");
-            _statTextboxTexture = await tl.PrepareAndGetTexture("Interface/newui_cha_textbox02.tga");
-
-            _buttonExitTexture = await tl.PrepareAndGetTexture("Interface/newui_exit_00.tga");
-            _buttonQuestTexture = await tl.PrepareAndGetTexture("Interface/newui_chainfo_btn_quest.tga");
-            _buttonPetTexture = await tl.PrepareAndGetTexture("Interface/newui_chainfo_btn_pet.tga");
-            _buttonMasterTexture = await tl.PrepareAndGetTexture("Interface/newui_chainfo_btn_master.tga");
-            _statIncreaseButtonTexture = await tl.PrepareAndGetTexture("Interface/newui_chainfo_btn_level.tga");
-
-            var tableTextures = await Task.WhenAll(s_tableTexturePaths.Select(path => tl.PrepareAndGetTexture(path)));
-            _tableTopLeftTexture = tableTextures.ElementAtOrDefault(0);
-            _tableTopRightTexture = tableTextures.ElementAtOrDefault(1);
-            _tableBottomLeftTexture = tableTextures.ElementAtOrDefault(2);
-            _tableBottomRightTexture = tableTextures.ElementAtOrDefault(3);
-            _tableTopLineTexture = tableTextures.ElementAtOrDefault(4);
-            _tableBottomLineTexture = tableTextures.ElementAtOrDefault(5);
-            _tableLeftLineTexture = tableTextures.ElementAtOrDefault(6);
-            _tableRightLineTexture = tableTextures.ElementAtOrDefault(7);
-
+            var textures = await Task.WhenAll(
+                TextureLoader.Instance.PrepareAndGetTexture(CharacterAtlasPath),
+                TextureLoader.Instance.PrepareAndGetTexture(CharacterInsetPath));
+            _characterAtlas = textures[0];
+            _characterInset = textures[1];
+            if (_characterAtlas == null || _characterInset == null)
+            {
+                _logger.LogWarning("Character GFx atlases could not be loaded from Data. Check CharacterInfoFrame_I1/I24.ozd.");
+            }
             InitializeLayout();
             InvalidateStaticSurface();
             UpdateDisplayData();
         }
+
 
         private void InitializeLayout()
         {
             _texts.Clear();
             _buttons.Clear();
 
-            float statBoxLeft = GetStatBoxLeft();
-            float statValueLeft = statBoxLeft + 70f;
-            float statValueYoffset = -2f;
-            float statDetailYOffset = 15f;
-
-            _nameText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 5f), 13f, Color.White, TextAlignment.Center);
-            _classText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 23f), 12f, Color.LightGray, TextAlignment.Center);
-            _levelText = CreateText(new Vector2(28f, 60f), 11f, new Color(230, 230, 0));
-            _expText = CreateText(new Vector2(28f, 78f), 10f, Color.WhiteSmoke);
-            _fruitProbText = CreateText(new Vector2(28f, 96f), 10f, new Color(76, 197, 254));
-            _fruitStatsText = CreateText(new Vector2(28f, 114f), 10f, new Color(76, 197, 254));
-            _statPointsText = CreateText(new Vector2(155f, 60f), 11f, new Color(255, 138, 0));
+            // CharacterInfoFrame's right-hand panel is composed at 1:1 atlas scale.
+            // All placements below are BroyalMU reconstruction coordinates, not movie coordinates.
+            _nameText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 39f), 13f, Color.White, TextAlignment.Center);
+            _classText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 57f), 11f, new Color(215, 202, 178), TextAlignment.Center);
+            _levelText = CreateText(new Vector2(27f, 85f), 11f, new Color(235, 210, 140));
+            _expText = CreateText(new Vector2(27f, 106f), 10f, Color.WhiteSmoke);
+            _statPointsText = CreateText(new Vector2(321f, 124f), 11f, new Color(255, 191, 88), TextAlignment.Right);
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
-                float rowY = s_statRowY[i];
-                _statValueTexts[i] = CreateText(new Vector2(statValueLeft, rowY + statValueYoffset), 11f, new Color(230, 230, 0), TextAlignment.Left);
+                _statValueTexts[i] = CreateText(new Vector2(317f, s_statRowY[i] - 1f), 11f,
+                    new Color(240, 215, 111), TextAlignment.Right);
             }
 
-            _strDetail1Text = CreateText(new Vector2(25f, s_statRowY[0] + statDetailYOffset), 10f, Color.LightGray);
-            _strDetail2Text = CreateText(new Vector2(25f, s_statRowY[0] + statDetailYOffset + 16f), 10f, Color.LightGray);
+            // A fixed-height row accommodates the native stat and all existing combat detail lines.
+            _strDetail1Text = CreateText(new Vector2(29f, s_statRowY[0] + 24f), 10f, Color.LightGray);
+            _strDetail2Text = CreateText(new Vector2(29f, s_statRowY[0] + 40f), 10f, Color.LightGray);
+            _agiDetail1Text = CreateText(new Vector2(29f, s_statRowY[1] + 24f), 10f, Color.LightGray);
+            _agiDetail2Text = CreateText(new Vector2(29f, s_statRowY[1] + 39f), 10f, Color.LightGray);
+            _agiDetail3Text = CreateText(new Vector2(29f, s_statRowY[1] + 54f), 10f, Color.LightGray);
+            _vitDetail1Text = CreateText(new Vector2(29f, s_statRowY[2] + 24f), 10f, Color.LightGray);
+            _vitDetail2Text = CreateText(new Vector2(29f, s_statRowY[2] + 40f), 10f, Color.LightGray);
+            _eneDetail1Text = CreateText(new Vector2(29f, s_statRowY[3] + 24f), 10f, Color.LightGray);
+            _eneDetail2Text = CreateText(new Vector2(29f, s_statRowY[3] + 39f), 10f, Color.LightGray);
+            _eneDetail3Text = CreateText(new Vector2(29f, s_statRowY[3] + 54f), 10f, Color.LightGray);
+            _pvmInfo1Text = CreateText(new Vector2(29f, 530f), 10f, new Color(225, 197, 148));
+            _pvmInfo2Text = CreateText(new Vector2(29f, 546f), 10f, new Color(225, 197, 148));
 
-            _agiDetail1Text = CreateText(new Vector2(25f, s_statRowY[1] + statDetailYOffset), 10f, Color.LightGray);
-            _agiDetail2Text = CreateText(new Vector2(25f, s_statRowY[1] + statDetailYOffset + 16f), 10f, Color.LightGray);
-            _agiDetail3Text = CreateText(new Vector2(25f, s_statRowY[1] + statDetailYOffset + 32f), 10f, Color.LightGray);
+            // Season 6 compatibility buttons: visual feedback only, no nonexistent windows.
+            Rectangle buttonNormal = s_buttonSource;
+            _petButton = CreateButton(new Rectangle(23, 588, 94, 30), _characterAtlas,
+                buttonNormal, buttonNormal, buttonNormal,
+                () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "PETS");
+            _skillsButton = CreateButton(new Rectangle(127, 588, 94, 30), _characterAtlas,
+                buttonNormal, buttonNormal, buttonNormal,
+                () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "SKILLS");
+            _masterButton = CreateButton(new Rectangle(231, 588, 94, 30), _characterAtlas,
+                buttonNormal, buttonNormal, buttonNormal,
+                () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "MASTER");
 
-            _vitDetail1Text = CreateText(new Vector2(25f, s_statRowY[2] + statDetailYOffset), 10f, Color.LightGray);
-            _vitDetail2Text = CreateText(new Vector2(25f, s_statRowY[2] + statDetailYOffset + 16f), 10f, Color.LightGray);
-
-            _eneDetail1Text = CreateText(new Vector2(25f, s_statRowY[3] + statDetailYOffset), 10f, Color.LightGray);
-            _eneDetail2Text = CreateText(new Vector2(25f, s_statRowY[3] + statDetailYOffset + 16f), 10f, Color.LightGray);
-            _eneDetail3Text = CreateText(new Vector2(25f, s_statRowY[3] + statDetailYOffset + 32f), 10f, Color.LightGray);
-
-            _pvmInfo1Text = CreateText(new Vector2(18f, s_statRowY[4] + 20f), 10f, new Color(255, 200, 100));
-            _pvmInfo2Text = CreateText(new Vector2(18f, s_statRowY[4] + 38f), 10f, new Color(255, 200, 100));
-
-            // Stat increase buttons
-            for (int i = 0; i < BTN_STAT_COUNT; i++)
-            {
-                int statIndex = i;
-                var bounds = new Rectangle(
-                    WINDOW_WIDTH - 70,
-                    (int)(s_statRowY[i] - 2f),
-                    16,
-                    15);
-
-                Rectangle? normal = null;
-                Rectangle? hover = null;
-                Rectangle? pressed = null;
-                if (_statIncreaseButtonTexture != null)
+            _exitButton = CreateButton(new Rectangle(307, 45, 28, 26), _characterAtlas,
+                s_closeSource, s_closeSource, s_closeSource, () =>
                 {
-                    int frameCount = DetermineFrameCount(_statIncreaseButtonTexture);
-                    int frameHeight = Math.Max(1, _statIncreaseButtonTexture.Height / frameCount);
-                    normal = new Rectangle(0, 0, _statIncreaseButtonTexture.Width, frameHeight);
-                    if (frameCount > 1)
-                    {
-                        hover = new Rectangle(0, frameHeight, _statIncreaseButtonTexture.Width, frameHeight);
-                    }
-                    if (frameCount > 2)
-                    {
-                        pressed = new Rectangle(0, frameHeight * 2, _statIncreaseButtonTexture.Width, frameHeight);
-                    }
-                    else
-                    {
-                        pressed = hover;
-                    }
-                    bounds.Width = _statIncreaseButtonTexture.Width;
-                    bounds.Height = frameHeight;
-                }
-
-                _statButtons[i] = CreateButton(bounds, _statIncreaseButtonTexture, normal, hover, pressed, () => OnStatButtonClicked(statIndex));
-            }
-
-            // Bottom buttons
-            _exitButton = CreateButton(CreateBottomBounds(20, _buttonExitTexture), _buttonExitTexture, CreateButtonFrames(_buttonExitTexture, out var exitHover, out var exitPressed), exitHover, exitPressed, () =>
-            {
-                Visible = false;
-                SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
-            });
-
-            _questButton = CreateButton(CreateBottomBounds(70, _buttonQuestTexture), _buttonQuestTexture, CreateButtonFrames(_buttonQuestTexture, out var questHover, out var questPressed), questHover, questPressed, () =>
-            {
-                _logger.LogInformation("Quest button clicked.");
-                SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
-            });
-
-            _petButton = CreateButton(CreateBottomBounds(120, _buttonPetTexture), _buttonPetTexture, CreateButtonFrames(_buttonPetTexture, out var petHover, out var petPressed), petHover, petPressed, () =>
-            {
-                _logger.LogInformation("Pet button clicked.");
-                SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
-            });
-
-            _masterButton = CreateButton(CreateBottomBounds(170, _buttonMasterTexture), _buttonMasterTexture, CreateButtonFrames(_buttonMasterTexture, out var masterHover, out var masterPressed), masterHover, masterPressed, () =>
-            {
-                _logger.LogInformation("Master Level button clicked.");
-                SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
-            });
+                    HideWindow();
+                    SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+                }, null);
         }
 
         private CharacterInfoTextEntry CreateText(Vector2 basePosition, float fontSize, Color color, TextAlignment alignment = TextAlignment.Left)
         {
-            float fontScale = fontSize / Constants.BASE_FONT_SIZE;
-            var entry = new CharacterInfoTextEntry(basePosition, fontScale, color, alignment);
+            var entry = new CharacterInfoTextEntry(basePosition, fontSize / Constants.BASE_FONT_SIZE, color, alignment);
             _texts.Add(entry);
             return entry;
         }
 
-        private static Rectangle CreateBottomBounds(int xOffset, Texture2D texture)
+        private CharacterInfoButton CreateButton(Rectangle bounds, Texture2D atlas, Rectangle normal,
+            Rectangle hover, Rectangle pressed, Action onClick, string label)
         {
-            if (texture == null)
-            {
-                return new Rectangle(xOffset, WINDOW_HEIGHT - 40, 36, 29);
-            }
-
-            int frameHeight = texture.Height / 2;
-            if (frameHeight <= 0)
-            {
-                frameHeight = texture.Height;
-            }
-
-            return new Rectangle(xOffset, WINDOW_HEIGHT - frameHeight - 11, texture.Width, frameHeight);
-        }
-
-        private static Rectangle? CreateButtonFrames(Texture2D texture, out Rectangle? hover, out Rectangle? pressed)
-        {
-            hover = null;
-            pressed = null;
-
-            if (texture == null)
-            {
-                return null;
-            }
-
-            int frameCount = DetermineFrameCount(texture);
-            int frameHeight = Math.Max(1, texture.Height / frameCount);
-
-            if (frameHeight <= 0)
-            {
-                frameHeight = texture.Height;
-            }
-
-            var normal = new Rectangle(0, 0, texture.Width, frameHeight);
-
-            if (texture.Height >= frameHeight * 2)
-            {
-                hover = new Rectangle(0, frameHeight, texture.Width, frameHeight);
-            }
-
-            if (texture.Height >= frameHeight * 3)
-            {
-                pressed = new Rectangle(0, frameHeight * 2, texture.Width, frameHeight);
-            }
-            else
-            {
-                pressed = hover;
-            }
-
-            return normal;
-        }
-
-        private static int DetermineFrameCount(Texture2D texture)
-        {
-            if (texture == null)
-            {
-                return 1;
-            }
-
-            if (texture.Height % 3 == 0)
-            {
-                return 3;
-            }
-
-            if (texture.Height % 2 == 0)
-            {
-                return 2;
-            }
-
-            return 1;
-        }
-
-        private CharacterInfoButton CreateButton(Rectangle baseBounds, Texture2D texture, Rectangle? normalRect, Rectangle? hoverRect, Rectangle? pressedRect, Action onClick)
-        {
-            if (normalRect.HasValue)
-            {
-                baseBounds.Width = normalRect.Value.Width;
-                baseBounds.Height = normalRect.Value.Height;
-            }
-
-            var button = new CharacterInfoButton(baseBounds, texture, normalRect, hoverRect, pressedRect, onClick);
+            var button = new CharacterInfoButton(bounds, atlas, normal, hover, pressed, onClick, label);
             _buttons.Add(button);
             return button;
         }
 
-        private static float GetStatBoxLeft()
-        {
-            float value = (WINDOW_WIDTH - STAT_BOX_WIDTH) / 2f - 40f;
-            return value < 10f ? 15f : value;
-        }
 
         private void InvalidateStaticSurface()
         {
@@ -479,153 +296,58 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private void DrawStaticElements(SpriteBatch spriteBatch)
         {
-            if (_backgroundTexture != null)
+            if (_characterAtlas == null)
             {
-                spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT), Color.White);
+                return;
             }
 
-            if (_topFrameTexture != null)
+            // Authentic GFx OZD sprites, drawn by the existing MonoGame SpriteBatch.
+            spriteBatch.Draw(_characterAtlas, new Rectangle(0, 0, WINDOW_WIDTH, 638), s_panelSource, Color.White);
+
+            if (_characterInset != null)
             {
-                spriteBatch.Draw(_topFrameTexture, new Rectangle(0, 0, WINDOW_WIDTH + 97, 74), Color.White);
+                spriteBatch.Draw(_characterInset, new Rectangle(11, 148, 326, 414), s_insetSource, Color.White);
             }
 
-            if (_leftFrameTexture != null)
-            {
-                spriteBatch.Draw(_leftFrameTexture, new Rectangle(0, 0, 26, WINDOW_HEIGHT + 250), Color.White);
-            }
+            spriteBatch.Draw(_characterAtlas, new Rectangle(16, 80, 316, 62), s_informationSource, Color.White);
 
-            if (_rightFrameTexture != null)
+            var font = GraphicsManager.Instance.Font;
+            for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
-                spriteBatch.Draw(_rightFrameTexture, new Rectangle(WINDOW_WIDTH - 17, 0, 26, WINDOW_HEIGHT + 250), Color.White);
-            }
-
-            if (_bottomFrameTexture != null)
-            {
-                spriteBatch.Draw(_bottomFrameTexture, new Rectangle(0, WINDOW_HEIGHT - 40, WINDOW_WIDTH + 97, 55), Color.White);
-            }
-
-            if (_statTextboxTexture != null)
-            {
-                float statBoxLeft = GetStatBoxLeft();
-
-                // Draw stat boxes - only show Leadership (5th stat) for Dark Lord family
-                int statBoxCount = _lastIsDarkLordFamily ? BTN_STAT_COUNT : BTN_STAT_COUNT - 1;
-                for (int i = 0; i < statBoxCount; i++)
+                if (i == 4 && !_lastIsDarkLordFamily)
                 {
-                    spriteBatch.Draw(_statTextboxTexture,
-                        new Rectangle((int)statBoxLeft, (int)s_statRowY[i], STAT_BOX_WIDTH, STAT_BOX_HEIGHT),
-                        Color.White);
+                    break;
                 }
 
-                // Draw stat short names
-                var font = GraphicsManager.Instance.Font;
+                var band = new Rectangle(22, (int)s_statRowY[i] - 7, 304, 27);
+                DrawAtlasThreeSlice(spriteBatch, _characterAtlas, s_attributeBandSource, band, 10);
                 if (font != null)
                 {
-                    float labelScale = 10f / Constants.BASE_FONT_SIZE;
-                    float labelX = statBoxLeft + 8f;
-                    for (int i = 0; i < statBoxCount; i++)
-                    {
-                        spriteBatch.DrawString(font,
-                            s_statShortNames[i],
-                            new Vector2(labelX, s_statRowY[i] - 1f),
-                            new Color(230, 230, 0),
-                            0f,
-                            Vector2.Zero,
-                            labelScale,
-                            SpriteEffects.None,
-                            0f);
-                    }
+                    spriteBatch.DrawString(font, s_statShortNames[i],
+                        new Vector2(34f, s_statRowY[i] - 1f), new Color(241, 214, 148),
+                        0f, Vector2.Zero, 11f / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0f);
                 }
             }
-
-            // Draw info table background
-            DrawInfoTableSurface(spriteBatch, new Vector2(18f, 55f));
         }
 
-        private void DrawInfoTableSurface(SpriteBatch spriteBatch, Vector2 origin)
+        // The left/right ornaments keep their unscaled width. Only the middle segment stretches.
+        private static void DrawAtlasThreeSlice(SpriteBatch batch, Texture2D atlas,
+            Rectangle source, Rectangle target, int capWidth)
         {
-            const int tableWidth = WINDOW_WIDTH - 36;
-            const int tableHeight = 80;
-
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel != null)
+            int srcMiddle = source.Width - capWidth * 2;
+            int dstMiddle = target.Width - capWidth * 2;
+            if (srcMiddle <= 0 || dstMiddle <= 0)
             {
-                spriteBatch.Draw(pixel, new Rectangle((int)origin.X, (int)origin.Y, tableWidth, tableHeight), Color.Black * 0.3f);
+                return;
             }
-
-            int cornerSizeTopLeftWidth = _tableTopLeftTexture?.Width ?? 0;
-            int cornerSizeTopLeftHeight = _tableTopLeftTexture?.Height ?? 0;
-            int cornerSizeTopRightWidth = _tableTopRightTexture?.Width ?? 0;
-            int cornerSizeTopRightHeight = _tableTopRightTexture?.Height ?? 0;
-            int cornerSizeBottomLeftWidth = _tableBottomLeftTexture?.Width ?? 0;
-            int cornerSizeBottomLeftHeight = _tableBottomLeftTexture?.Height ?? 0;
-            int cornerSizeBottomRightWidth = _tableBottomRightTexture?.Width ?? 0;
-            int cornerSizeBottomRightHeight = _tableBottomRightTexture?.Height ?? 0;
-
-            if (_tableTopLeftTexture != null)
-            {
-                spriteBatch.Draw(_tableTopLeftTexture,
-                    new Rectangle((int)origin.X, (int)origin.Y, cornerSizeTopLeftWidth, cornerSizeTopLeftHeight),
-                    Color.White);
-            }
-
-            if (_tableTopRightTexture != null)
-            {
-                spriteBatch.Draw(_tableTopRightTexture,
-                    new Rectangle((int)(origin.X + tableWidth - cornerSizeTopRightWidth), (int)origin.Y, cornerSizeTopRightWidth, cornerSizeTopRightHeight),
-                    Color.White);
-            }
-
-            if (_tableBottomLeftTexture != null)
-            {
-                spriteBatch.Draw(_tableBottomLeftTexture,
-                    new Rectangle((int)origin.X, (int)(origin.Y + tableHeight - cornerSizeBottomLeftHeight), cornerSizeBottomLeftWidth, cornerSizeBottomLeftHeight),
-                    Color.White);
-            }
-
-            if (_tableBottomRightTexture != null)
-            {
-                spriteBatch.Draw(_tableBottomRightTexture,
-                    new Rectangle((int)(origin.X + tableWidth - cornerSizeBottomRightWidth), (int)(origin.Y + tableHeight - cornerSizeBottomRightHeight), cornerSizeBottomRightWidth, cornerSizeBottomRightHeight),
-                    Color.White);
-            }
-
-            int horizontalStartX = cornerSizeTopLeftWidth;
-            int horizontalEndX = tableWidth - cornerSizeTopRightWidth;
-            int horizontalWidth = Math.Max(0, horizontalEndX - horizontalStartX);
-
-            if (_tableTopLineTexture != null && horizontalWidth > 0)
-            {
-                spriteBatch.Draw(_tableTopLineTexture,
-                    new Rectangle((int)(origin.X + horizontalStartX), (int)origin.Y, horizontalWidth, _tableTopLineTexture.Height),
-                    Color.White);
-            }
-
-            if (_tableBottomLineTexture != null && horizontalWidth > 0)
-            {
-                spriteBatch.Draw(_tableBottomLineTexture,
-                    new Rectangle((int)(origin.X + horizontalStartX), (int)(origin.Y + tableHeight - _tableBottomLineTexture.Height), horizontalWidth, _tableBottomLineTexture.Height),
-                    Color.White);
-            }
-
-            int verticalStartY = cornerSizeTopLeftHeight;
-            int verticalEndY = tableHeight - cornerSizeBottomLeftHeight;
-            int verticalHeight = Math.Max(0, verticalEndY - verticalStartY);
-
-            if (_tableLeftLineTexture != null && verticalHeight > 0)
-            {
-                spriteBatch.Draw(_tableLeftLineTexture,
-                    new Rectangle((int)origin.X, (int)(origin.Y + verticalStartY), _tableLeftLineTexture.Width, verticalHeight),
-                    Color.White);
-            }
-
-            if (_tableRightLineTexture != null && verticalHeight > 0)
-            {
-                spriteBatch.Draw(_tableRightLineTexture,
-                    new Rectangle((int)(origin.X + tableWidth - _tableRightLineTexture.Width), (int)(origin.Y + verticalStartY), _tableRightLineTexture.Width, verticalHeight),
-                    Color.White);
-            }
+            batch.Draw(atlas, new Rectangle(target.X, target.Y, capWidth, target.Height),
+                new Rectangle(source.X, source.Y, capWidth, source.Height), Color.White);
+            batch.Draw(atlas, new Rectangle(target.X + capWidth, target.Y, dstMiddle, target.Height),
+                new Rectangle(source.X + capWidth, source.Y, srcMiddle, source.Height), Color.White);
+            batch.Draw(atlas, new Rectangle(target.Right - capWidth, target.Y, capWidth, target.Height),
+                new Rectangle(source.Right - capWidth, source.Y, capWidth, source.Height), Color.White);
         }
+
 
         public override void Update(GameTime gameTime)
         {
@@ -636,6 +358,7 @@ namespace Client.Main.Controls.UI.Game.Character
 
             base.Update(gameTime);
 
+            _clickFlashSeconds = Math.Max(0d, _clickFlashSeconds - gameTime.ElapsedGameTime.TotalSeconds);
             HandleButtonInput();
             UpdateDisplayData();
         }
@@ -675,6 +398,8 @@ namespace Client.Main.Controls.UI.Game.Character
 
                     if (leftJustReleased && _pressedButtonIndex == i && button.Enabled)
                     {
+                        _clickFlashButtonIndex = i;
+                        _clickFlashSeconds = 0.13d;
                         button.OnClick?.Invoke();
                     }
                 }
@@ -705,7 +430,8 @@ namespace Client.Main.Controls.UI.Game.Character
             SpriteBatchScope? scope = null;
             if (!SpriteBatchScope.BatchIsBegun)
             {
-                scope = new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: UiScaler.SpriteTransform);
+                scope = new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+                    GraphicsManager.GetQualityLinearSamplerState(), transform: UiScaler.SpriteTransform);
             }
 
             try
@@ -738,7 +464,18 @@ namespace Client.Main.Controls.UI.Game.Character
 
                 float textScale = entry.FontScale * controlScale;
                 Vector2 pos = basePosition + entry.BasePosition * controlScale;
+                float widthLimit = entry.Alignment switch
+                {
+                    TextAlignment.Right => entry.BasePosition.X - 24f,
+                    TextAlignment.Center => WINDOW_WIDTH - 46f,
+                    _ => WINDOW_WIDTH - entry.BasePosition.X - 24f
+                };
                 Vector2 size = font.MeasureString(entry.Text) * textScale;
+                if (size.X > widthLimit * controlScale && size.X > 0f)
+                {
+                    textScale *= widthLimit * controlScale / size.X;
+                    size = font.MeasureString(entry.Text) * textScale;
+                }
 
                 switch (entry.Alignment)
                 {
@@ -757,50 +494,43 @@ namespace Client.Main.Controls.UI.Game.Character
         private void DrawButtons(SpriteBatch spriteBatch)
         {
             float controlScale = Scale;
+            var font = GraphicsManager.Instance.Font;
             for (int i = 0; i < _buttons.Count; i++)
             {
                 var button = _buttons[i];
-                if (!button.Visible)
+                if (!button.Visible || button.Texture == null)
                 {
                     continue;
                 }
 
-                Rectangle destRect = GetButtonRectangle(button, controlScale);
-                Rectangle? sourceRect = button.NormalRect;
-                if (_pressedButtonIndex == i && button.Enabled && button.PressedRect.HasValue)
+                bool pressed = button.Enabled && (_pressedButtonIndex == i ||
+                    (_clickFlashButtonIndex == i && _clickFlashSeconds > 0d));
+                bool hovered = button.Enabled && _hoveredButtonIndex == i;
+                Rectangle target = GetButtonRectangle(button, controlScale);
+                Rectangle? source = pressed ? button.PressedRect : hovered ? button.HoverRect : button.NormalRect;
+                if (pressed)
                 {
-                    sourceRect = button.PressedRect;
-                }
-                else if (_hoveredButtonIndex == i && button.Enabled && button.HoverRect.HasValue)
-                {
-                    sourceRect = button.HoverRect;
-                }
-
-                Color baseColor = button.Enabled ? Color.White : new Color(120, 120, 120);
-                if (_pressedButtonIndex == i && button.Enabled)
-                {
-                    baseColor = new Color(200, 200, 180);
-                }
-                else if (_hoveredButtonIndex == i && button.Enabled)
-                {
-                    baseColor = new Color(240, 240, 200);
+                    target.Offset(0, Math.Max(1, (int)MathF.Round(controlScale)));
                 }
 
-                baseColor *= Alpha;
+                // The atlas holds the native ornament. Tint and a one-pixel press offset
+                // supply feedback; do not claim these are recovered native GFx frames.
+                var tint = pressed ? new Color(203, 189, 161) : hovered ? new Color(255, 236, 192) : Color.White;
+                spriteBatch.Draw(button.Texture, target, source, tint * Alpha);
 
-                if (button.Texture != null)
+                if (font != null && !string.IsNullOrEmpty(button.Label))
                 {
-                    spriteBatch.Draw(button.Texture, destRect, sourceRect, baseColor);
-                }
-                else if (_hoveredButtonIndex == i || _pressedButtonIndex == i)
-                {
-                    var overlayColor = _pressedButtonIndex == i
-                        ? new Color(200, 200, 180, 200)
-                        : new Color(240, 240, 200, 160);
-                    spriteBatch.Draw(GraphicsManager.Instance.Pixel, destRect, overlayColor * Alpha);
+                    float textScale = (10f / Constants.BASE_FONT_SIZE) * controlScale;
+                    Vector2 textSize = font.MeasureString(button.Label) * textScale;
+                    var position = new Vector2(target.X + (target.Width - textSize.X) * 0.5f,
+                        target.Y + (target.Height - textSize.Y) * 0.5f);
+                    spriteBatch.DrawString(font, button.Label, position,
+                        (hovered ? Color.White : new Color(243, 218, 158)) * Alpha,
+                        0f, Vector2.Zero, textScale, SpriteEffects.None, 0f);
                 }
             }
         }
+
 
         private Rectangle GetButtonRectangle(CharacterInfoButton button, float controlScale)
         {
@@ -877,14 +607,12 @@ namespace Client.Main.Controls.UI.Game.Character
                 _statPointsText.Text = snapshot.LevelUpPoints > 0 ? $"Points: {snapshot.LevelUpPoints}" : string.Empty;
             }
 
-            _fruitProbText.Text = "[+]100%|[-]100%";
-            _fruitStatsText.Text = "Create 0/0 | Decrease 0/0";
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
                 ushort baseValue = snapshot.GetBaseStat(i);
                 ushort addedValue = snapshot.GetAddedStat(i);
-                ushort total = (ushort)(baseValue + addedValue);
+                int total = baseValue + addedValue;
                 _statValueTexts[i].Text = addedValue > 0 ? $"{baseValue}+{addedValue}" : total.ToString();
                 _statValueTexts[i].Color = addedValue > 0 ? new Color(100, 150, 255) : new Color(230, 230, 0);
             }
@@ -944,93 +672,22 @@ namespace Client.Main.Controls.UI.Game.Character
             // Show/hide Leadership (CMD) stat value text based on character class
             _statValueTexts[4].Visible = isDarkLordFamily;
 
-            bool hasLevelUpPoints = snapshot.LevelUpPoints > 0;
-            for (int i = 0; i < BTN_STAT_COUNT - 1; i++)
-            {
-                if (_statButtons[i] != null)
-                {
-                    _statButtons[i].Visible = hasLevelUpPoints;
-                    _statButtons[i].Enabled = hasLevelUpPoints;
-                }
-            }
-
-            // Leadership button visible only for Dark Lord family with available points
-            if (_statButtons[4] != null)
-            {
-                _statButtons[4].Visible = isDarkLordFamily && hasLevelUpPoints;
-                _statButtons[4].Enabled = isDarkLordFamily && hasLevelUpPoints;
-            }
-
-            if (_masterButton != null)
-            {
-                bool masterActive = snapshot.MasterLevel > 0 && snapshot.CanBeMaster;
-                _masterButton.Visible = masterActive;
-                _masterButton.Enabled = masterActive;
-            }
-
-            _exitButton.Visible = true;
-            _exitButton.Enabled = true;
-            _questButton.Visible = true;
-            _questButton.Enabled = true;
-            _petButton.Visible = true;
-            _petButton.Enabled = true;
+            // All three are future Season 6 navigation shortcuts, not active windows.
+            _exitButton.Visible = _exitButton.Enabled = true;
+            _skillsButton.Visible = _skillsButton.Enabled = true;
+            _petButton.Visible = _petButton.Enabled = true;
+            _masterButton.Visible = _masterButton.Enabled = true;
         }
 
-        private void OnStatButtonClicked(int statIndex)
-        {
-            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
-
-            if (_networkManager == null || !_networkManager.IsConnected || _networkManager.CurrentState < ClientConnectionState.InGame)
-            {
-                _logger.LogWarning("Cannot increase stat: Not connected to game server or invalid state.");
-                MessageWindow.Show("Cannot add stat points: Not connected to server or not in game.");
-                return;
-            }
-
-            CharacterStatAttribute attributeToSend = statIndex switch
-            {
-                0 => CharacterStatAttribute.Strength,
-                1 => CharacterStatAttribute.Agility,
-                2 => CharacterStatAttribute.Vitality,
-                3 => CharacterStatAttribute.Energy,
-                4 => CharacterStatAttribute.Leadership,
-                _ => CharacterStatAttribute.Strength
-            };
-
-            if (_characterState == null)
-            {
-                return;
-            }
-
-            if (attributeToSend == CharacterStatAttribute.Leadership &&
-                !(_characterState.Class == CharacterClassNumber.DarkLord || _characterState.Class == CharacterClassNumber.LordEmperor))
-            {
-                _logger.LogInformation("Cannot add Leadership points for non-Dark Lord character.");
-                MessageWindow.Show("Only Dark Lords can add Leadership points.");
-                return;
-            }
-
-            var service = _networkManager.GetCharacterService();
-            if (service != null)
-            {
-                _ = service.SendIncreaseCharacterStatPointRequestAsync(attributeToSend);
-                _logger.LogInformation("Sent request to add point to {Attribute}.", attributeToSend);
-            }
-            else
-            {
-                _logger.LogError("CharacterService is null. Cannot send stat increase request.");
-                MessageWindow.Show("Internal error: Could not add points.");
-            }
-        }
-
-        private CharacterInfoTextEntry CreateText(Vector2 basePosition, float fontSize, Color color)
-            => CreateText(basePosition, fontSize, color, TextAlignment.Left);
+        // No stat assignment is exposed during Character visual phase 1.
 
         public void ShowWindow()
         {
             Visible = true;
             _pressedButtonIndex = -1;
             _hoveredButtonIndex = -1;
+            _clickFlashButtonIndex = -1;
+            _clickFlashSeconds = 0d;
             _hasCachedSnapshot = false;
             UpdateDisplayData();
             InvalidateStaticSurface();
