@@ -25,11 +25,11 @@ namespace Client.Main.Controls.UI.Game.Character
 
         private static readonly float[] s_statRowY =
         {
-            165f,
-            240f,
-            319f,
-            397f,
-            473f
+            196f,
+            269f,
+            347f,
+            421f,
+            495f
         };
 
         private static readonly string[] s_statShortNames = { "STR", "AGI", "STA", "ENE", "CMD" };
@@ -44,7 +44,8 @@ namespace Client.Main.Controls.UI.Game.Character
         // These are visual reconstructions, not original Scaleform placement records.
         private static readonly Rectangle s_panelSource = new(665, 4, 345, 629);
         private static readonly Rectangle s_informationSource = new(676, 645, 245, 56);
-        private static readonly Rectangle s_attributeBandSource = new(351, 724, 110, 23);
+        // Neutral charcoal box (fourth small box in I1), without the gold button ornament.
+        private static readonly Rectangle s_attributeBandSource = new(728, 720, 114, 26);
         private static readonly Rectangle s_buttonSource = new(353, 725, 109, 22);
         private static readonly Rectangle s_closeSource = new(986, 756, 26, 26);
         private static readonly Rectangle s_insetSource = new(3, 3, 316, 374);
@@ -73,6 +74,7 @@ namespace Client.Main.Controls.UI.Game.Character
             public float FontScale { get; set; }
             public TextAlignment Alignment { get; set; }
             public bool Visible { get; set; } = true;
+            public float MaxWidth { get; set; } = float.MaxValue;
         }
 
         private sealed class CharacterInfoButton
@@ -115,7 +117,8 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoTextEntry _nameText;
         private CharacterInfoTextEntry _classText;
         private CharacterInfoTextEntry _levelText;
-        private CharacterInfoTextEntry _expText;
+        private CharacterInfoTextEntry _informationClassText;
+        private CharacterInfoTextEntry _serverText;
         private CharacterInfoTextEntry _statPointsText;
         private readonly CharacterInfoTextEntry[] _statValueTexts = new CharacterInfoTextEntry[BTN_STAT_COUNT];
         private CharacterInfoTextEntry _strDetail1Text;
@@ -149,6 +152,8 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoSnapshot _cachedSnapshot;
         private bool _hasCachedSnapshot;
         private bool _lastIsDarkLordFamily;
+        private string _displayServerHost;
+        private int _displayServerPort = -1;
 
         public CharacterInfoWindowControl()
         {
@@ -207,14 +212,26 @@ namespace Client.Main.Controls.UI.Game.Character
             // All placements below are BroyalMU reconstruction coordinates, not movie coordinates.
             _nameText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 39f), 13f, Color.White, TextAlignment.Center);
             _classText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 57f), 11f, new Color(215, 202, 178), TextAlignment.Center);
-            _levelText = CreateText(new Vector2(27f, 85f), 11f, new Color(235, 210, 140));
-            _expText = CreateText(new Vector2(27f, 106f), 10f, Color.WhiteSmoke);
-            _statPointsText = CreateText(new Vector2(321f, 124f), 11f, new Color(255, 191, 88), TextAlignment.Right);
+            string[] informationLabels = { "Class", "Resets", "Level", "Points", "Server" };
+            for (int i = 0; i < informationLabels.Length; i++)
+            {
+                CreateText(new Vector2(29f, 84f + i * 18f), 10f, new Color(177, 172, 160)).Text = informationLabels[i];
+            }
+            _informationClassText = CreateInformationValue(84f);
+            // The current client state does not expose resets. Do not invent a server value.
+            CreateInformationValue(102f).Text = "--";
+            _levelText = CreateInformationValue(120f);
+            _statPointsText = CreateInformationValue(138f);
+            _statPointsText.Color = new Color(220, 204, 161);
+            _serverText = CreateInformationValue(156f);
+            _displayServerHost = null;
+            _displayServerPort = -1;
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
-                _statValueTexts[i] = CreateText(new Vector2(96f, s_statRowY[i] - 1f), 11f,
-                    new Color(240, 215, 111));
+                _statValueTexts[i] = CreateText(new Vector2(280f, s_statRowY[i] - 1f), 11f,
+                    new Color(226, 224, 216), TextAlignment.Right);
+                _statValueTexts[i].MaxWidth = 180f;
             }
 
             // A fixed-height row accommodates the native stat and all existing combat detail lines.
@@ -279,6 +296,13 @@ namespace Client.Main.Controls.UI.Game.Character
         {
             var entry = new CharacterInfoTextEntry(basePosition, fontSize / Constants.BASE_FONT_SIZE, color, alignment);
             _texts.Add(entry);
+            return entry;
+        }
+
+        private CharacterInfoTextEntry CreateInformationValue(float y)
+        {
+            var entry = CreateText(new Vector2(316f, y), 10f, new Color(222, 220, 213), TextAlignment.Right);
+            entry.MaxWidth = 218f;
             return entry;
         }
 
@@ -348,10 +372,10 @@ namespace Client.Main.Controls.UI.Game.Character
 
             if (_characterInset != null)
             {
-                spriteBatch.Draw(_characterInset, new Rectangle(13, 148, 322, 414), s_insetSource, Color.White);
+                spriteBatch.Draw(_characterInset, new Rectangle(13, 180, 322, 388), s_insetSource, Color.White);
             }
 
-            spriteBatch.Draw(_characterAtlas, new Rectangle(16, 80, 316, 62), s_informationSource, Color.White);
+            spriteBatch.Draw(_characterAtlas, new Rectangle(16, 77, 316, 97), s_informationSource, Color.White);
 
             var font = GraphicsManager.Instance.Font;
             for (int i = 0; i < BTN_STAT_COUNT; i++)
@@ -366,7 +390,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 if (font != null)
                 {
                     spriteBatch.DrawString(font, s_statShortNames[i],
-                        new Vector2(34f, s_statRowY[i] - 1f), new Color(241, 214, 148),
+                        new Vector2(34f, s_statRowY[i] - 1f), new Color(205, 198, 180),
                         0f, Vector2.Zero, 11f / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0f);
                 }
             }
@@ -512,6 +536,7 @@ namespace Client.Main.Controls.UI.Game.Character
                     TextAlignment.Center => WINDOW_WIDTH - 46f,
                     _ => WINDOW_WIDTH - entry.BasePosition.X - 24f
                 };
+                widthLimit = Math.Min(widthLimit, entry.MaxWidth);
                 Vector2 size = font.MeasureString(entry.Text) * textScale;
                 if (size.X > widthLimit * controlScale && size.X > 0f)
                 {
@@ -605,6 +630,15 @@ namespace Client.Main.Controls.UI.Game.Character
             }
 
             var snapshot = CharacterInfoSnapshot.Create(_characterState);
+            // Connection metadata is independent of the character snapshot cache.
+            string serverHost = _networkManager?.CurrentHost;
+            int serverPort = _networkManager?.CurrentPort ?? 0;
+            if (serverHost != _displayServerHost || serverPort != _displayServerPort)
+            {
+                _displayServerHost = serverHost;
+                _displayServerPort = serverPort;
+                _serverText.Text = string.IsNullOrWhiteSpace(serverHost) ? "--" : $"{serverHost}:{serverPort}";
+            }
             if (_hasCachedSnapshot && snapshot.Equals(_cachedSnapshot))
             {
                 return;
@@ -628,37 +662,18 @@ namespace Client.Main.Controls.UI.Game.Character
             _nameText.Text = snapshot.Name;
             _classText.Text = $"({CharacterClassDatabase.GetClassName(snapshot.Class)})";
 
-            if (snapshot.MasterLevel > 0)
-            {
-                _levelText.Text = $"Master Lv. {snapshot.MasterLevel}";
-                _expText.Text = "----------";
-                if (snapshot.MasterLevelUpPoints > 0)
-                {
-                    _statPointsText.Visible = true;
-                    _statPointsText.Text = $"Points: {snapshot.MasterLevelUpPoints}";
-                }
-                else
-                {
-                    _statPointsText.Visible = false;
-                    _statPointsText.Text = string.Empty;
-                }
-            }
-            else
-            {
-                _levelText.Text = $"Level: {snapshot.Level}";
-                _expText.Text = $"Exp: {snapshot.Experience} / {snapshot.ExperienceForNextLevel}";
-                _statPointsText.Visible = snapshot.LevelUpPoints > 0;
-                _statPointsText.Text = snapshot.LevelUpPoints > 0 ? $"Points: {snapshot.LevelUpPoints}" : string.Empty;
-            }
-
-
+            _informationClassText.Text = CharacterClassDatabase.GetClassName(snapshot.Class);
+            _levelText.Text = snapshot.MasterLevel > 0
+                ? $"{snapshot.Level} (Master {snapshot.MasterLevel})" : snapshot.Level.ToString();
+            // These are the regular points consumed by the existing + buttons, including at master level.
+            _statPointsText.Text = snapshot.LevelUpPoints.ToString();
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
                 ushort baseValue = snapshot.GetBaseStat(i);
                 ushort addedValue = snapshot.GetAddedStat(i);
                 int total = baseValue + addedValue;
                 _statValueTexts[i].Text = addedValue > 0 ? $"{baseValue}+{addedValue}" : total.ToString();
-                _statValueTexts[i].Color = addedValue > 0 ? new Color(100, 150, 255) : new Color(230, 230, 0);
+                _statValueTexts[i].Color = addedValue > 0 ? new Color(160, 190, 220) : new Color(226, 224, 216);
             }
 
             if (snapshot.HasPhysicalDamage)
@@ -708,8 +723,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 _eneDetail3Text.Text = string.Empty;
             }
 
-            _pvmInfo1Text.BasePosition = new Vector2(29f, isDarkLordFamily ? 530f : 502f);
-            _pvmInfo2Text.BasePosition = new Vector2(29f, isDarkLordFamily ? 546f : 518f);
+            _pvmInfo1Text.BasePosition = new Vector2(29f, isDarkLordFamily ? 537f : 510f);
+            _pvmInfo2Text.BasePosition = new Vector2(29f, isDarkLordFamily ? 553f : 526f);
             _pvmInfo1Text.Visible = true;
             _pvmInfo1Text.Text = $"PvM Attack Success Rate: {snapshot.PvMAttackRate}%";
             _pvmInfo2Text.Visible = true;
