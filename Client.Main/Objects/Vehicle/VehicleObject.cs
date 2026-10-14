@@ -1,4 +1,5 @@
 using Client.Main.Content;
+using Client.Main.ClassicFX.Data;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
 using Client.Main.Objects.Effects;
@@ -74,6 +75,9 @@ public class VehicleObject : ModelObject
     // belong to VehicleDatabase instead of being hardcoded here.
     //
     private VehicleDefinition _activeDefinition;
+
+    // Native Dark Horse breath runs on reference 25 Hz ticks, not on each render frame.
+    private float _darkHorseBreathAccumulator;
 
 
     /// <summary>
@@ -558,7 +562,56 @@ public class VehicleObject : ModelObject
             UpdateFenrirBodyThunder(gameTime);
             UpdateFenrirFaceLights(gameTime);
             UpdateFenrirSkillSpark(gameTime);
+            UpdateNativeDarkHorseBreath(gameTime);
         }
+
+    /// <summary>
+    /// MuMain GOBoid.cpp / MODEL_DARK_HORSE:
+    /// rand_fps_check(3) emits BITMAP_SMOKE at bone 27 + (50,-4,0).
+    /// The emission is transformed by the live animated BMD pose so it follows
+    /// the nostrils; once emitted it remains a world-space ClassicFX particle.
+    /// Underwater the original substitutes BITMAP_BUBBLE.
+    /// </summary>
+    private void UpdateNativeDarkHorseBreath(GameTime gameTime)
+    {
+        if (itemIndex != 0 || Hidden || Model == null || World == null)
+        {
+            _darkHorseBreathAccumulator = 0f;
+            return;
+        }
+
+        var fx = World.ClassicFx;
+        if (fx == null || !fx.Enabled || fx.IsDisposed)
+            return;
+
+        const float nativeTick = 1f / 25f;
+        _darkHorseBreathAccumulator = Math.Min(
+            _darkHorseBreathAccumulator + (float)gameTime.ElapsedGameTime.TotalSeconds,
+            nativeTick * 4f);
+
+        int ticks = 0;
+        while (_darkHorseBreathAccumulator >= nativeTick && ticks++ < 4)
+        {
+            _darkHorseBreathAccumulator -= nativeTick;
+            if (Random.Shared.Next(3) != 0)
+                continue;
+
+            var bones = GetBoneTransforms();
+            if (bones == null || bones.Length <= 27)
+                continue;
+
+            Vector3 nostrils = Vector3.Transform(
+                new Vector3(50f, -4f, 0f),
+                bones[27] * WorldPosition);
+
+            int texture = World.MapId == 7 || World.MapId == 67
+                ? ClassicTextureIds.BitmapBubble
+                : ClassicTextureIds.BitmapSmoke;
+
+            fx.CreateParticle(texture, nostrils, Angle, Vector3.One);
+        }
+    }
+
     private bool IsFenrir()
                 {
                     // VehicleDatabase:
