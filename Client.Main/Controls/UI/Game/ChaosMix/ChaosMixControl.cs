@@ -26,13 +26,30 @@ using MUnique.OpenMU.Network.Packets.ServerToClient;
 
 namespace Client.Main.Controls.UI.Game
 {
-    public class ChaosMixControl : UIControl
+    public class ChaosMixControl : UIControl, IUiTexturePreloadable
     {
         // ═══════════════════════════════════════════════════════════════
         // WINDOW DIMENSIONS
         // ═══════════════════════════════════════════════════════════════
         public const int Columns = 8;
         public const int Rows = 4;
+
+        private const string TrainerFramePath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
+        private const string TrainerSlotsPath = "Interface/GFx/NpcShop_I3.ozd";
+        private const string TrainerButtonNormalPath = "Interface/GFx/btn_l01.ozd";
+        private const string TrainerButtonHoverPath = "Interface/GFx/btn_l02.ozd";
+        private const string TrainerButtonPressedPath = "Interface/GFx/btn_l03.ozd";
+        private const string TrainerCloseNormalPath = "Interface/GFx/btn_close01.ozd";
+        private const string TrainerCloseHoverPath = "Interface/GFx/btn_close02.ozd";
+        private const string TrainerClosePressedPath = "Interface/GFx/btn_close03.ozd";
+
+        private static readonly Rectangle TrainerFrameSource = new(656, 0, 354, 638);
+        private static readonly Rectangle TrainerInfoSource = new(676, 645, 245, 56);
+        // Same verified NpcShop_I3 inventory slot crop used in Inventory/NpcShop.
+        private static readonly Rectangle TrainerSlotSource = new(548, 223, 25, 25);
+        private const int TrainerTopSourceHeight = 96;
+        private const int TrainerBottomSourceHeight = 39;
+
         private const int SLOT_WIDTH = 34;
         private const int SLOT_HEIGHT = 34;
 
@@ -101,6 +118,17 @@ namespace Client.Main.Controls.UI.Game
             Theme.GlowLegendary);
 
         private static ChaosMixControl _instance;
+
+        private MixInventoryType _mixInventoryType = MixInventoryType.GoblinNormal;
+        private bool IsTrainerMix => _mixInventoryType == MixInventoryType.Trainer;
+        private Texture2D _trainerFrame;
+        private Texture2D _trainerSlots;
+        private Texture2D _trainerButtonNormal;
+        private Texture2D _trainerButtonHover;
+        private Texture2D _trainerButtonPressed;
+        private Texture2D _trainerCloseNormal;
+        private Texture2D _trainerCloseHover;
+        private Texture2D _trainerClosePressed;
 
         private readonly NetworkManager _networkManager;
         private readonly ILogger<ChaosMixControl> _logger;
@@ -173,27 +201,72 @@ namespace Client.Main.Controls.UI.Game
 
         public static bool IsOpen => _instance?.Visible == true;
 
+        public IEnumerable<string> GetPreloadTexturePaths()
+        {
+            yield return TrainerFramePath;
+            yield return TrainerSlotsPath;
+            yield return TrainerButtonNormalPath;
+            yield return TrainerButtonHoverPath;
+            yield return TrainerButtonPressedPath;
+            yield return TrainerCloseNormalPath;
+            yield return TrainerCloseHoverPath;
+            yield return TrainerClosePressedPath;
+        }
+
         public override async Task Load()
         {
             await base.Load();
             _font = GraphicsManager.Instance.Font;
+
+            var loader = TextureLoader.Instance;
+            var textures = await Task.WhenAll(
+                loader.PrepareAndGetTexture(TrainerFramePath),
+                loader.PrepareAndGetTexture(TrainerSlotsPath),
+                loader.PrepareAndGetTexture(TrainerButtonNormalPath),
+                loader.PrepareAndGetTexture(TrainerButtonHoverPath),
+                loader.PrepareAndGetTexture(TrainerButtonPressedPath),
+                loader.PrepareAndGetTexture(TrainerCloseNormalPath),
+                loader.PrepareAndGetTexture(TrainerCloseHoverPath),
+                loader.PrepareAndGetTexture(TrainerClosePressedPath));
+
+            _trainerFrame = textures[0];
+            _trainerSlots = textures[1];
+            _trainerButtonNormal = textures[2];
+            _trainerButtonHover = textures[3];
+            _trainerButtonPressed = textures[4];
+            _trainerCloseNormal = textures[5];
+            _trainerCloseHover = textures[6];
+            _trainerClosePressed = textures[7];
             InvalidateStaticSurface();
         }
 
-        public void Show()
+        // The existing Chaos Goblin entry point continues using its own recipes/skin.
+        public void Show() => ShowFor(MixInventoryType.GoblinNormal);
+
+        public void ShowTrainer() => ShowFor(MixInventoryType.Trainer);
+
+        private void ShowFor(MixInventoryType mode)
         {
+            _mixInventoryType = mode;
+            BuildLayoutMetrics();
+            ControlSize = new Point(WINDOW_WIDTH, _mixButtonRect.Bottom + WINDOW_MARGIN);
+            ViewSize = ControlSize;
+            Align = ControlAlign.VerticalCenter | ControlAlign.Left;
             ForceAlignNow();
             Align = ControlAlign.None;
 
             Visible = true;
             BringToFront();
-            Scene.FocusControl = this;
+            if (Scene != null)
+            {
+                Scene.FocusControl = this;
+            }
 
             _closeRequestSent = false;
             _mixInProgress = false;
+            _warningLine = "Failure may consume materials.";
             EnsureCharacterState();
             RefreshChaosMachineContent();
-
             InvalidateStaticSurface();
         }
 
@@ -273,7 +346,10 @@ namespace Client.Main.Controls.UI.Game
             EnsureStaticSurface();
 
             var sb = GraphicsManager.Instance.Sprite;
-            using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend, GraphicsManager.GetQualityLinearSamplerState(), transform: UiScaler.SpriteTransform);
+            using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred,
+                IsTrainerMix ? BlendState.NonPremultiplied : BlendState.AlphaBlend,
+                IsTrainerMix ? SamplerState.PointClamp : GraphicsManager.GetQualityLinearSamplerState(),
+                transform: UiScaler.SpriteTransform);
 
             sb.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
 
@@ -315,10 +391,11 @@ namespace Client.Main.Controls.UI.Game
 
         private void BuildLayoutMetrics()
         {
-            _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, HEADER_HEIGHT);
+            int currentHeaderHeight = IsTrainerMix ? TrainerTopSourceHeight : HEADER_HEIGHT;
+            _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, currentHeaderHeight);
 
             int frameX = WINDOW_MARGIN;
-            int frameY = HEADER_HEIGHT;
+            int frameY = currentHeaderHeight;
             int frameW = WINDOW_WIDTH - WINDOW_MARGIN * 2;
             int frameH = SECTION_HEADER_HEIGHT + GRID_PADDING * 2 + GRID_HEIGHT;
             _gridFrameRect = new Rectangle(frameX, frameY, frameW, frameH);
@@ -331,7 +408,9 @@ namespace Client.Main.Controls.UI.Game
 
             _infoRect = new Rectangle(frameX, _gridFrameRect.Bottom + SECTION_SPACING, frameW, INFO_PANEL_HEIGHT);
             _mixButtonRect = new Rectangle(frameX, _infoRect.Bottom + SECTION_SPACING, frameW, BUTTON_AREA_HEIGHT);
-            _closeButtonRect = new Rectangle(WINDOW_WIDTH - 30, 14, 20, 20);
+            _closeButtonRect = IsTrainerMix
+                ? new Rectangle(WINDOW_WIDTH - 42, 35, 25, 25)
+                : new Rectangle(WINDOW_WIDTH - 30, 14, 20, 20);
         }
 
         private void ForceAlignNow()
@@ -381,7 +460,9 @@ namespace Client.Main.Controls.UI.Game
             gd.Clear(Color.Transparent);
 
             var sb = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend))
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred,
+                IsTrainerMix ? BlendState.NonPremultiplied : BlendState.AlphaBlend,
+                IsTrainerMix ? SamplerState.PointClamp : SamplerState.LinearClamp))
             {
                 DrawStaticElements(sb);
             }
@@ -400,10 +481,80 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            DrawWindowBackground(sb, new Rectangle(0, 0, ControlSize.X, ControlSize.Y));
+            if (IsTrainerMix && _trainerFrame != null && !_trainerFrame.IsDisposed)
+            {
+                DrawTrainerFrame(sb);
+            }
+            else
+            {
+                DrawWindowBackground(sb, new Rectangle(0, 0, ControlSize.X, ControlSize.Y));
+            }
+
             DrawHeader(sb);
             DrawGridSection(sb);
             DrawInfoPanel(sb);
+        }
+
+        private void DrawTrainerFrame(SpriteBatch sb)
+        {
+            int middleHeight = ControlSize.Y - TrainerTopSourceHeight - TrainerBottomSourceHeight;
+            sb.Draw(_trainerFrame, new Rectangle(0, 0, ControlSize.X, TrainerTopSourceHeight),
+                new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Y,
+                    TrainerFrameSource.Width, TrainerTopSourceHeight), Color.White);
+            sb.Draw(_trainerFrame, new Rectangle(0, TrainerTopSourceHeight, ControlSize.X, middleHeight),
+                new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Y + TrainerTopSourceHeight,
+                    TrainerFrameSource.Width,
+                    TrainerFrameSource.Height - TrainerTopSourceHeight - TrainerBottomSourceHeight), Color.White);
+            sb.Draw(_trainerFrame,
+                new Rectangle(0, ControlSize.Y - TrainerBottomSourceHeight, ControlSize.X, TrainerBottomSourceHeight),
+                new Rectangle(TrainerFrameSource.X, TrainerFrameSource.Bottom - TrainerBottomSourceHeight,
+                    TrainerFrameSource.Width, TrainerBottomSourceHeight), Color.White);
+        }
+
+        private static void DrawTrainerNineSlice(SpriteBatch sb, Texture2D atlas,
+            Rectangle source, Rectangle destination, int border)
+        {
+            if (atlas == null || atlas.IsDisposed) return;
+
+            for (int row = 0; row < 3; row++)
+            {
+                int sy = row == 0 ? source.Y : row == 1 ? source.Y + border : source.Bottom - border;
+                int dy = row == 0 ? destination.Y : row == 1 ? destination.Y + border : destination.Bottom - border;
+                int sh = row == 1 ? source.Height - border * 2 : border;
+                int dh = row == 1 ? destination.Height - border * 2 : border;
+                for (int col = 0; col < 3; col++)
+                {
+                    int sx = col == 0 ? source.X : col == 1 ? source.X + border : source.Right - border;
+                    int dx = col == 0 ? destination.X : col == 1 ? destination.X + border : destination.Right - border;
+                    int sw = col == 1 ? source.Width - border * 2 : border;
+                    int dw = col == 1 ? destination.Width - border * 2 : border;
+                    sb.Draw(atlas, new Rectangle(dx, dy, dw, dh),
+                        new Rectangle(sx, sy, sw, sh), Color.White);
+                }
+            }
+        }
+
+        private static void DrawTrainerButton(SpriteBatch sb, Texture2D texture, Rectangle rect)
+        {
+            if (texture == null || texture.IsDisposed) return;
+
+            // Preserve the full 128x64 OZD texture (including bottom edge).
+            // Stretch the center only, as in the already fixed PetTrainerControl.
+            int sourceCap = Math.Max(1, Math.Min(16, texture.Width / 4));
+            int cap = Math.Max(1, (int)MathF.Round(sourceCap * (float)rect.Height / texture.Height));
+            if (rect.Width <= cap * 2)
+            {
+                sb.Draw(texture, rect, Color.White);
+                return;
+            }
+
+            sb.Draw(texture, new Rectangle(rect.Left, rect.Top, cap, rect.Height),
+                new Rectangle(0, 0, sourceCap, texture.Height), Color.White);
+            sb.Draw(texture, new Rectangle(rect.Left + cap, rect.Top,
+                    rect.Width - 2 * cap, rect.Height),
+                new Rectangle(sourceCap, 0, texture.Width - 2 * sourceCap, texture.Height), Color.White);
+            sb.Draw(texture, new Rectangle(rect.Right - cap, rect.Top, cap, rect.Height),
+                new Rectangle(texture.Width - sourceCap, 0, sourceCap, texture.Height), Color.White);
         }
 
         private void DrawWindowBackground(SpriteBatch sb, Rectangle rect)
@@ -451,6 +602,22 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawHeader(SpriteBatch sb)
         {
+            if (IsTrainerMix && _trainerFrame != null)
+            {
+                if (_font != null)
+                {
+                    const string title = "Resurrect Spirit";
+                    float scale = 0.43f;
+                    Vector2 size = _font.MeasureString(title) * scale;
+                    Vector2 pos = new((ControlSize.X - size.X) / 2, 52 - size.Y / 2);
+                    sb.DrawString(_font, title, pos + Vector2.One, Color.Black * 0.7f,
+                        0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                    sb.DrawString(_font, title, pos, new Color(233, 219, 195),
+                        0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                }
+                return;
+            }
+
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null) return;
 
@@ -480,7 +647,14 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawInfoPanel(SpriteBatch sb)
         {
-            DrawPanel(sb, _infoRect, Theme.BgMid);
+            if (IsTrainerMix && _trainerFrame != null)
+            {
+                DrawTrainerNineSlice(sb, _trainerFrame, TrainerInfoSource, _infoRect, 10);
+            }
+            else
+            {
+                DrawPanel(sb, _infoRect, Theme.BgMid);
+            }
         }
 
         private void DrawGridSection(SpriteBatch sb)
@@ -488,8 +662,33 @@ namespace Client.Main.Controls.UI.Game
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null) return;
 
-            DrawPanel(sb, _gridFrameRect, Theme.BgMid);
-            DrawSectionHeader(sb, "MIX BOX", _gridFrameRect.X, _gridFrameRect.Y + 2, _gridFrameRect.Width);
+            if (IsTrainerMix && _trainerFrame != null)
+            {
+                DrawTrainerNineSlice(sb, _trainerFrame, TrainerInfoSource, _gridFrameRect, 10);
+                DrawSectionHeader(sb, "SPIRIT COMBINATION", _gridFrameRect.X,
+                    _gridFrameRect.Y + 2, _gridFrameRect.Width);
+
+                if (_trainerSlots != null && !_trainerSlots.IsDisposed)
+                {
+                    for (int y = 0; y < Rows; y++)
+                    {
+                        for (int x = 0; x < Columns; x++)
+                        {
+                            sb.Draw(_trainerSlots,
+                                new Rectangle(_gridRect.X + x * SLOT_WIDTH,
+                                    _gridRect.Y + y * SLOT_HEIGHT, SLOT_WIDTH, SLOT_HEIGHT),
+                                TrainerSlotSource, Color.White);
+                        }
+                    }
+                    return;
+                }
+            }
+            else
+            {
+                DrawPanel(sb, _gridFrameRect, Theme.BgMid);
+                DrawSectionHeader(sb, "MIX BOX", _gridFrameRect.X,
+                    _gridFrameRect.Y + 2, _gridFrameRect.Width);
+            }
 
             sb.Draw(pixel, _gridRect, Theme.SlotBg);
 
@@ -526,6 +725,18 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawCloseButton(SpriteBatch sb)
         {
+            if (IsTrainerMix)
+            {
+                var texture = _closeHovered
+                    ? _trainerCloseHover ?? _trainerCloseNormal
+                    : _trainerCloseNormal;
+                if (texture != null && !texture.IsDisposed)
+                {
+                    sb.Draw(texture, Translate(_closeButtonRect), Color.White * Alpha);
+                    return;
+                }
+            }
+
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null) return;
 
@@ -583,9 +794,23 @@ namespace Client.Main.Controls.UI.Game
             if (pixel == null) return;
 
             var rect = Translate(_mixButtonRect);
-            Color bg = _mixHovered ? Color.Lerp(Theme.BgLight, Theme.AccentDim, 0.35f) : Theme.BgDarkest;
-            if (_mixInProgress) bg = Color.Lerp(bg, Theme.SecondaryDim, 0.35f);
-            UiDrawHelper.DrawPanel(sb, rect, bg, Theme.BorderInner, Theme.BorderOuter, Theme.BorderHighlight * 0.3f, _mixHovered, Theme.Accent * 0.15f);
+            if (IsTrainerMix)
+            {
+                var texture = _mixInProgress ? _trainerButtonPressed ?? _trainerButtonNormal
+                    : _mixHovered ? _trainerButtonHover ?? _trainerButtonNormal
+                    : _trainerButtonNormal;
+                if (texture != null && !texture.IsDisposed)
+                {
+                    DrawTrainerButton(sb, texture, rect);
+                }
+            }
+            else
+            {
+                Color bg = _mixHovered ? Color.Lerp(Theme.BgLight, Theme.AccentDim, 0.35f) : Theme.BgDarkest;
+                if (_mixInProgress) bg = Color.Lerp(bg, Theme.SecondaryDim, 0.35f);
+                UiDrawHelper.DrawPanel(sb, rect, bg, Theme.BorderInner, Theme.BorderOuter,
+                    Theme.BorderHighlight * 0.3f, _mixHovered, Theme.Accent * 0.15f);
+            }
 
             if (_font == null) return;
 
@@ -594,7 +819,10 @@ namespace Client.Main.Controls.UI.Game
             Vector2 size = _font.MeasureString(text) * scale;
             Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
 
-            sb.Draw(pixel, new Rectangle((int)pos.X - 18, (int)pos.Y - 4, (int)size.X + 36, (int)size.Y + 8), Theme.AccentGlow * (_mixHovered ? 0.35f : 0.22f));
+            if (!IsTrainerMix)
+                sb.Draw(pixel, new Rectangle((int)pos.X - 18, (int)pos.Y - 4,
+                    (int)size.X + 36, (int)size.Y + 8),
+                    Theme.AccentGlow * (_mixHovered ? 0.35f : 0.22f));
 
             Color textColor = _mixInProgress ? Theme.TextGray : Theme.TextWhite;
             sb.DrawString(_font, text, pos + new Vector2(2, 2), Color.Black * 0.55f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
@@ -806,10 +1034,20 @@ namespace Client.Main.Controls.UI.Game
             }
 
             int mixId = _evaluation.CurrentRecipe.MixId;
+            if (IsTrainerMix && mixId != 13 && mixId != 14)
+            {
+                RequestDialog.ShowInfo("This recipe is not supported by the Pet Trainer.");
+                return;
+            }
+
             int chance = _evaluation.SuccessRate;
             uint cost = _evaluation.RequiredZen;
 
-            string message = $"Proceed with mix?\\nChance: {chance}%\\nCost: {FormatZen(cost)} Zen\\n\\nFailure may destroy items.";
+            string message = IsTrainerMix
+                ? $"Resurrect {(mixId == 13 ? "Dark Horse" : "Dark Raven")}?\n" +
+                  $"Base chance: {chance}%\nBase cost: {FormatZen(cost)} Zen\n" +
+                  "Server taxes may apply. Failure can consume materials."
+                : $"Proceed with mix?\\nChance: {chance}%\\nCost: {FormatZen(cost)} Zen\\n\\nFailure may destroy items.";
 
             RequestDialog.Show(
                 message,
@@ -926,7 +1164,9 @@ namespace Client.Main.Controls.UI.Game
 
         private void UpdateRecipeInfo()
         {
-            _evaluation = MixRecipeDatabase.EvaluateChaosMachine(_items);
+            _evaluation = IsTrainerMix
+                ? MixRecipeDatabase.EvaluateTrainer(_items)
+                : MixRecipeDatabase.EvaluateChaosMachine(_items);
             _infoLines.Clear();
 
             var recipe = _evaluation?.CurrentRecipe;
@@ -936,7 +1176,9 @@ namespace Client.Main.Controls.UI.Game
             {
                 _infoLines.Add($"Mix: {FormatMixType(recipe.MixId)}");
                 _infoLines.Add($"Chance: {_evaluation.SuccessRate}%");
-                _infoLines.Add($"Cost: {FormatZen(_evaluation.RequiredZen)} Zen");
+                _infoLines.Add(IsTrainerMix
+                    ? $"Base cost: {FormatZen(_evaluation.RequiredZen)} Zen"
+                    : $"Cost: {FormatZen(_evaluation.RequiredZen)} Zen");
                 _infoLines.Add(string.Empty);
             }
             else
@@ -966,7 +1208,9 @@ namespace Client.Main.Controls.UI.Game
                 }
             }
 
-            _warningLine = "Failure may destroy items.";
+            _warningLine = IsTrainerMix
+                ? "Final cost may include Castle Siege tax."
+                : "Failure may destroy items.";
         }
 
         private static string FormatZen(uint value)
@@ -1540,7 +1784,9 @@ namespace Client.Main.Controls.UI.Game
 
             if (_items.Count > 0)
             {
-                blockReason = "Remove all items from the Chaos Mix box before closing.";
+                blockReason = IsTrainerMix
+                    ? "Remove all items from the Pet Trainer mix box before closing."
+                    : "Remove all items from the Chaos Mix box before closing.";
                 return false;
             }
 
