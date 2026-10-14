@@ -38,7 +38,6 @@ namespace Client.Main.Controls.UI.Game.Character
         // These are atlas coordinates, NOT recovered GFx/Scaleform transforms.
         // Keep them centralized until the native movie's placement records are decoded.
         private const string CharacterAtlasPath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
-        private const string CharacterInsetPath = "Interface/GFx/CharacterInfoFrame_I24.ozd";
         private const string StatIncreaseButtonPath = "Interface/newui_chainfo_btn_level.tga";
         // Crop packed-sprite interior instead of including adjacent colored atlas gutters.
         // These are visual reconstructions, not original Scaleform placement records.
@@ -47,8 +46,10 @@ namespace Client.Main.Controls.UI.Game.Character
         // Neutral charcoal box (fourth small box in I1), without the gold button ornament.
         private static readonly Rectangle s_attributeBandSource = new(728, 720, 114, 26);
         private static readonly Rectangle s_buttonSource = new(353, 725, 109, 22);
-        private static readonly Rectangle s_closeSource = new(986, 756, 26, 26);
-        private static readonly Rectangle s_insetSource = new(3, 3, 316, 374);
+        // Only the X sprite; the old crop included the neighboring button's border.
+        private static readonly Rectangle s_closeSource = new(991, 752, 21, 21);
+        // Complete inner panel in I1, including the top edge missing from I24.
+        private static readonly Rectangle s_insetSource = new(16, 76, 322, 551);
 
 
         private enum TextAlignment
@@ -104,8 +105,16 @@ namespace Client.Main.Controls.UI.Game.Character
         }
 
         private Texture2D _characterAtlas;
-        private Texture2D _characterInset;
         private Texture2D _statIncreaseButtonTexture;
+
+        // OZD stores straight alpha. Convert RGB while preserving alpha in the cached surface.
+        private readonly BlendState _atlasCacheBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha,
+            ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One,
+            AlphaDestinationBlend = Blend.InverseSourceAlpha
+        };
 
 
         private RenderTarget2D _staticSurface;
@@ -115,7 +124,6 @@ namespace Client.Main.Controls.UI.Game.Character
         private readonly List<CharacterInfoButton> _buttons = new();
 
         private CharacterInfoTextEntry _nameText;
-        private CharacterInfoTextEntry _classText;
         private CharacterInfoTextEntry _levelText;
         private CharacterInfoTextEntry _informationClassText;
         private CharacterInfoTextEntry _serverText;
@@ -152,8 +160,7 @@ namespace Client.Main.Controls.UI.Game.Character
         private CharacterInfoSnapshot _cachedSnapshot;
         private bool _hasCachedSnapshot;
         private bool _lastIsDarkLordFamily;
-        private string _displayServerHost;
-        private int _displayServerPort = -1;
+        private ushort? _displayServerId;
 
         public CharacterInfoWindowControl()
         {
@@ -181,21 +188,19 @@ namespace Client.Main.Controls.UI.Game.Character
         }
 
         public IEnumerable<string> GetPreloadTexturePaths()
-            => new[] { CharacterAtlasPath, CharacterInsetPath, StatIncreaseButtonPath };
+            => new[] { CharacterAtlasPath, StatIncreaseButtonPath };
 
         public override async Task Load()
         {
             await base.Load();
             var textures = await Task.WhenAll(
                 TextureLoader.Instance.PrepareAndGetTexture(CharacterAtlasPath),
-                TextureLoader.Instance.PrepareAndGetTexture(CharacterInsetPath),
                 TextureLoader.Instance.PrepareAndGetTexture(StatIncreaseButtonPath));
             _characterAtlas = textures[0];
-            _characterInset = textures[1];
-            _statIncreaseButtonTexture = textures[2];
-            if (_characterAtlas == null || _characterInset == null)
+            _statIncreaseButtonTexture = textures[1];
+            if (_characterAtlas == null)
             {
-                _logger.LogWarning("Character GFx atlases could not be loaded from Data. Check CharacterInfoFrame_I1/I24.ozd.");
+                _logger.LogWarning("Character GFx atlas could not be loaded from Data. Check CharacterInfoFrame_I1.ozd.");
             }
             InitializeLayout();
             InvalidateStaticSurface();
@@ -211,7 +216,7 @@ namespace Client.Main.Controls.UI.Game.Character
             // CharacterInfoFrame's right-hand panel is composed at 1:1 atlas scale.
             // All placements below are BroyalMU reconstruction coordinates, not movie coordinates.
             _nameText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 39f), 13f, Color.White, TextAlignment.Center);
-            _classText = CreateText(new Vector2(WINDOW_WIDTH / 2f, 57f), 11f, new Color(215, 202, 178), TextAlignment.Center);
+            _nameText.MaxWidth = 240f;
             string[] informationLabels = { "Class", "Resets", "Level", "Points", "Server" };
             for (int i = 0; i < informationLabels.Length; i++)
             {
@@ -224,8 +229,8 @@ namespace Client.Main.Controls.UI.Game.Character
             _statPointsText = CreateInformationValue(138f);
             _statPointsText.Color = new Color(220, 204, 161);
             _serverText = CreateInformationValue(156f);
-            _displayServerHost = null;
-            _displayServerPort = -1;
+            _serverText.Text = "--";
+            _displayServerId = null;
 
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
@@ -247,6 +252,7 @@ namespace Client.Main.Controls.UI.Game.Character
             _eneDetail3Text = CreateText(new Vector2(29f, s_statRowY[3] + 54f), 10f, Color.LightGray);
             _pvmInfo1Text = CreateText(new Vector2(29f, 530f), 10f, new Color(225, 197, 148));
             _pvmInfo2Text = CreateText(new Vector2(29f, 546f), 10f, new Color(225, 197, 148));
+            _pvmInfo1Text.MaxWidth = _pvmInfo2Text.MaxWidth = 286f;
 
             // Reuse native S6 single-point buttons; the numeric allocation UI is phase 2.
             int frames = GetTextureFrameCount(_statIncreaseButtonTexture);
@@ -284,7 +290,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 buttonNormal, buttonNormal, buttonNormal,
                 () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "MASTER");
 
-            _exitButton = CreateButton(new Rectangle(307, 45, 28, 26), _characterAtlas,
+            _exitButton = CreateButton(new Rectangle(309, 39, 22, 22), _characterAtlas,
                 s_closeSource, s_closeSource, s_closeSource, () =>
                 {
                     HideWindow();
@@ -351,9 +357,14 @@ namespace Client.Main.Controls.UI.Game.Character
             var spriteBatch = GraphicsManager.Instance.Sprite;
             // Point sampling prevents colors from neighboring packed atlas sprites bleeding in.
             using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred,
-                BlendState.AlphaBlend, SamplerState.PointClamp))
+                _atlasCacheBlend, SamplerState.PointClamp))
             {
                 DrawStaticElements(spriteBatch);
+            }
+            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.PointClamp))
+            {
+                DrawStaticLabels(spriteBatch);
             }
 
             graphicsDevice.SetRenderTargets(previousTargets);
@@ -370,14 +381,10 @@ namespace Client.Main.Controls.UI.Game.Character
             // Authentic GFx OZD sprites, drawn by the existing MonoGame SpriteBatch.
             spriteBatch.Draw(_characterAtlas, new Rectangle(0, 0, WINDOW_WIDTH, 638), s_panelSource, Color.White);
 
-            if (_characterInset != null)
-            {
-                spriteBatch.Draw(_characterInset, new Rectangle(13, 180, 322, 388), s_insetSource, Color.White);
-            }
+            DrawAtlasNineSlice(spriteBatch, _characterAtlas, s_insetSource, new Rectangle(22, 180, 304, 394), 6);
 
             spriteBatch.Draw(_characterAtlas, new Rectangle(16, 77, 316, 97), s_informationSource, Color.White);
 
-            var font = GraphicsManager.Instance.Font;
             for (int i = 0; i < BTN_STAT_COUNT; i++)
             {
                 if (i == 4 && !_lastIsDarkLordFamily)
@@ -385,13 +392,43 @@ namespace Client.Main.Controls.UI.Game.Character
                     break;
                 }
 
-                var band = new Rectangle(22, (int)s_statRowY[i] - 7, 304, 27);
+                var band = new Rectangle(28, (int)s_statRowY[i] - 7, 292, 27);
                 DrawAtlasThreeSlice(spriteBatch, _characterAtlas, s_attributeBandSource, band, 10);
+            }
+        }
+
+        private void DrawStaticLabels(SpriteBatch spriteBatch)
+        {
+            var font = GraphicsManager.Instance.Font;
+            for (int i = 0; i < BTN_STAT_COUNT; i++)
+            {
+                if (i == 4 && !_lastIsDarkLordFamily) break;
                 if (font != null)
                 {
                     spriteBatch.DrawString(font, s_statShortNames[i],
                         new Vector2(34f, s_statRowY[i] - 1f), new Color(205, 198, 180),
                         0f, Vector2.Zero, 11f / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0f);
+                }
+            }
+        }
+
+        private static void DrawAtlasNineSlice(SpriteBatch batch, Texture2D atlas,
+            Rectangle source, Rectangle target, int border)
+        {
+            // Keep all four corners and border thickness intact; stretch only the interior.
+            for (int row = 0; row < 3; row++)
+            {
+                int sy = row == 0 ? source.Y : row == 1 ? source.Y + border : source.Bottom - border;
+                int dy = row == 0 ? target.Y : row == 1 ? target.Y + border : target.Bottom - border;
+                int sh = row == 1 ? source.Height - border * 2 : border;
+                int dh = row == 1 ? target.Height - border * 2 : border;
+                for (int column = 0; column < 3; column++)
+                {
+                    int sx = column == 0 ? source.X : column == 1 ? source.X + border : source.Right - border;
+                    int dx = column == 0 ? target.X : column == 1 ? target.X + border : target.Right - border;
+                    int sw = column == 1 ? source.Width - border * 2 : border;
+                    int dw = column == 1 ? target.Width - border * 2 : border;
+                    batch.Draw(atlas, new Rectangle(dx, dy, dw, dh), new Rectangle(sx, sy, sw, sh), Color.White);
                 }
             }
         }
@@ -583,7 +620,12 @@ namespace Client.Main.Controls.UI.Game.Character
                 // The atlas holds the native ornament. Tint and a one-pixel press offset
                 // supply feedback; do not claim these are recovered native GFx frames.
                 var tint = pressed ? new Color(203, 189, 161) : hovered ? new Color(255, 236, 192) : Color.White;
-                spriteBatch.Draw(button.Texture, target, source, tint * Alpha);
+                using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred,
+                    BlendState.NonPremultiplied, SamplerState.PointClamp, transform: UiScaler.SpriteTransform))
+                {
+                    // Both OZD and the native TGA button use straight alpha.
+                    spriteBatch.Draw(button.Texture, target, source, new Color(tint.R, tint.G, tint.B, (byte)(255 * Alpha)));
+                }
 
                 if (font != null && !string.IsNullOrEmpty(button.Label))
                 {
@@ -631,13 +673,11 @@ namespace Client.Main.Controls.UI.Game.Character
 
             var snapshot = CharacterInfoSnapshot.Create(_characterState);
             // Connection metadata is independent of the character snapshot cache.
-            string serverHost = _networkManager?.CurrentHost;
-            int serverPort = _networkManager?.CurrentPort ?? 0;
-            if (serverHost != _displayServerHost || serverPort != _displayServerPort)
+            ushort? serverId = _networkManager?.SelectedServerId;
+            if (serverId != _displayServerId)
             {
-                _displayServerHost = serverHost;
-                _displayServerPort = serverPort;
-                _serverText.Text = string.IsNullOrWhiteSpace(serverHost) ? "--" : $"{serverHost}:{serverPort}";
+                _displayServerId = serverId;
+                _serverText.Text = serverId?.ToString() ?? "--";
             }
             if (_hasCachedSnapshot && snapshot.Equals(_cachedSnapshot))
             {
@@ -660,7 +700,6 @@ namespace Client.Main.Controls.UI.Game.Character
             }
 
             _nameText.Text = snapshot.Name;
-            _classText.Text = $"({CharacterClassDatabase.GetClassName(snapshot.Class)})";
 
             _informationClassText.Text = CharacterClassDatabase.GetClassName(snapshot.Class);
             _levelText.Text = snapshot.MasterLevel > 0
@@ -822,6 +861,7 @@ namespace Client.Main.Controls.UI.Game.Character
             base.Dispose();
             _staticSurface?.Dispose();
             _staticSurface = null;
+            _atlasCacheBlend.Dispose();
         }
 
         protected override void OnScreenSizeChanged()

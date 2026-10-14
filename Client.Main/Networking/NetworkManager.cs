@@ -79,6 +79,8 @@ namespace Client.Main.Networking
         public TargetProtocolVersion TargetVersion => _packetRouter.TargetVersion;
         public string CurrentHost => _currentHost;
         public int CurrentPort => _currentPort;
+        // Selection metadata for UI; independent of the game server's host/port.
+        public ushort? SelectedServerId { get; private set; }
         public IReadOnlyList<(string Name, CharacterClassNumber Class, ushort Level, byte[] Appearance)> GetCachedCharacterList()
             => _lastCharacterList is null ? Array.Empty<(string, CharacterClassNumber, ushort, byte[])>() : new List<(string, CharacterClassNumber, ushort, byte[])>(_lastCharacterList);
 
@@ -226,6 +228,7 @@ namespace Client.Main.Networking
             var cancellationToken = _managerCts.Token;
             if (cancellationToken.IsCancellationRequested) return;
 
+            SelectedServerId = null;
             UpdateState(ClientConnectionState.ConnectingToConnectServer);
             _packetRouter.SetRoutingMode(true); // Set routing to CS mode
 
@@ -320,6 +323,7 @@ namespace Client.Main.Networking
             }
 
             _logger.LogInformation("Requesting connection info for Server ID: {ServerId}", serverId);
+            SelectedServerId = serverId;
             UpdateState(ClientConnectionState.RequestingConnectionInfo);
             await _connectServerService.RequestConnectionInfoAsync(serverId);
         }
@@ -447,6 +451,10 @@ namespace Client.Main.Networking
 
         internal void UpdateState(ClientConnectionState newState)
         {
+            if (newState == ClientConnectionState.Disconnected)
+            {
+                SelectedServerId = null;
+            }
             if (_currentState != newState)
             {
                 var oldState = _currentState;
