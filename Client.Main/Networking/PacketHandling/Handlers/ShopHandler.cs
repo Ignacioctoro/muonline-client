@@ -153,8 +153,16 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                 _logger.LogInformation("StoreItemList received: Type={Type}, Count={Count}, DataSize={Size}", list.Type, count, dataSize);
 
-                bool toChaosMachine = _lastWindow == NpcWindowResponse.NpcWindow.ChaosMachine || list.Type == StoreItemList.ItemWindow.ChaosMachine;
-                bool toVault = !toChaosMachine && _lastWindow == NpcWindowResponse.NpcWindow.VaultStorage;
+                // The Pet Trainer reuses the crafting storage (4) without an
+                // additional NpcWindowResponse after choosing Resurrect Spirit.
+                // On failure OpenMU sends StoreItemList type 5, not type 3.
+                bool toChaosMachine =
+                    _lastWindow == NpcWindowResponse.NpcWindow.ChaosMachine ||
+                    list.Type == StoreItemList.ItemWindow.ChaosMachine ||
+                    (_lastWindow == NpcWindowResponse.NpcWindow.PetTrainer &&
+                     list.Type == StoreItemList.ItemWindow.ResurrectionFailed);
+                bool toVault = !toChaosMachine &&
+                    _lastWindow == NpcWindowResponse.NpcWindow.VaultStorage;
 
                 if (toChaosMachine)
                 {

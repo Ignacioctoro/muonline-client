@@ -223,6 +223,27 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
+        private void OpenResurrectSpirit()
+        {
+            // The NPC conversation remains open while the existing ChaosMix
+            // inventory operates in Trainer mode. Do NOT send CloseNpcRequest
+            // here: OpenMU requires OpenedNpc to validate recipes 13 and 14.
+            var state = MuGame.Network?.GetCharacterState();
+            var scene = MuGame.Instance?.ActiveScene as Client.Main.Scenes.GameScene;
+            if (state == null || scene == null)
+            {
+                return;
+            }
+
+            state.ClearChaosMachineItems();
+            HideWithoutServerRequest();
+
+            var mixWindow = ChaosMixControl.Instance;
+            mixWindow.ShowTrainer();
+            scene.InventoryControl?.Show();
+            mixWindow.BringToFront();
+        }
+
         private void SetPage(TrainerPage page)
         {
             _page = page;
@@ -423,6 +444,7 @@ namespace Client.Main.Controls.UI.Game
                                 RestoreLifeRequested?.Invoke();
                                 break;
                             case 1:
+                                OpenResurrectSpirit();
                                 ResurrectSpiritRequested?.Invoke();
                                 break;
                             case 2:
