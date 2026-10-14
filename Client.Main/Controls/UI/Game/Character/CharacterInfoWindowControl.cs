@@ -614,13 +614,14 @@ namespace Client.Main.Controls.UI.Game.Character
             if (p != null && _selectedStatIndex >= 0 && (_selectedStatIndex < 4 || _lastIsDarkLordFamily))
                 b.Draw(p, ScreenRect(new Rectangle(18, (int)s_statRowY[_selectedStatIndex] - 3, 3, 58)),
                     new Color(227, 160, 84) * Alpha);
+            DrawPanelString(b, font, "ASIGNACION DE PUNTOS", 28, 466, 10, new Color(223, 151, 101));
             DrawPanelRectangle(b, s_amountBounds, new Color(8, 9, 12, 245),
                 _amountFocused ? new Color(236, 170, 88) : new Color(117, 91, 68));
             DrawPanelRectangle(b, s_confirmBounds, new Color(107, 39, 35, 238),
                 new Color(178, 105, 67));
             DrawPanelString(b, font, string.IsNullOrEmpty(_amountText) ? "0" : _amountText, 128, 490,
                 11, Color.WhiteSmoke);
-            DrawPanelString(b, font, _remaining > 0 ? "ENVIANDO" : "ASIGNAR", 215, 491,
+            DrawPanelString(b, font, _remaining > 0 ? "CANCELAR" : "ASIGNAR", 215, 491,
                 9, Color.WhiteSmoke);
             if (!_keypadOpen) return;
 
@@ -768,7 +769,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 }
                 if (ScreenRect(s_confirmBounds).Contains(mousePosition))
                 {
-                    ConfirmAmount();
+                    if (_remaining > 0) StopAllocation("Asignacion cancelada; se conservan los puntos confirmados.");
+                    else ConfirmAmount();
                     _pressedButtonIndex = -1;
                     return;
                 }
@@ -1015,7 +1017,7 @@ namespace Client.Main.Controls.UI.Game.Character
             }
             else
             {
-                ushort totalStr = (ushort)(snapshot.BaseStrength + snapshot.AddedStrength);
+                int totalStr = snapshot.BaseStrength + snapshot.AddedStrength;
                 _strDetail1Text.Visible = true;
                 _strDetail1Text.Text = $"Strength: {totalStr}";
                 _strDetail2Text.Visible = false;
@@ -1199,7 +1201,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 int applied = Math.Min(result.amount, _remaining);
                 _completed += applied;
                 _remaining -= applied;
-                _sendCooldown = 0.09; // Avoid flooding the connection even on fast replies.
+                _sendCooldown = 0.02; // Wait for each ACK, then apply modest pacing.
                 if (_remaining == 0)
                     StopAllocation($"Completado: {_completed} puntos en {s_statShortNames[_selectedStatIndex]}.");
             }
