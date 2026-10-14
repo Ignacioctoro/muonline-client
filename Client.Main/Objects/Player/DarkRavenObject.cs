@@ -38,6 +38,8 @@ namespace Client.Main.Objects.Player
         private bool _equipped;
         private bool _loadingModel;
 
+        public bool IsEquipped => _equipped;
+
         public DarkRavenObject(PlayerObject owner)
         {
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
