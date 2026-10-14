@@ -307,7 +307,8 @@ namespace Client.Main.Controls.UI.Game.Character
                 buttonNormal, buttonNormal, buttonNormal,
                 () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "MASTER");
 
-            _exitButton = CreateButton(new Rectangle(307, 37, 26, 26), _characterAtlas,
+            // Keep the native GFx X compact and slightly inset/lower inside the title plaque.
+            _exitButton = CreateButton(new Rectangle(303, 44, 20, 20), _characterAtlas,
                 s_closeSource, s_closeSource, s_closeSource, () =>
                 {
                     HideWindow();
