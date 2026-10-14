@@ -15,6 +15,12 @@ public static class VehicleDatabase
                 IdleActionIndex = 0,
                 RunActionIndex = 2,
                 SkillActionIndex = 3, // MuMain: MODEL_DARK_HORSE action 3 during PLAYER_ATTACK_DARKHORSE
+                // MuMain ZzzObject.cpp: normal textured body, followed by RENDER_CHROME | RENDER_BRIGHT
+                // for the original gold-material meshes 12, 13, 14 and 15.
+                // Do not add a generic aura or modify the Fenrir chrome configuration.
+                ClassicChromeMeshes = new[] { 12, 13, 14, 15 },
+                ClassicChromeColor = new Vector3(1f, 0.8f, 0.3f),
+                ClassicChromeIntensity = 1f,
                 ActionPlaySpeedOverrides = new Dictionary<int, float>
                 {
                     [0] = 0.3f,  // default
