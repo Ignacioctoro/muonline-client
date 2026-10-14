@@ -21,9 +21,11 @@ namespace Client.Main.Controls.UI.Game
     public sealed class PetTrainerControl : UIControl, IUiTexturePreloadable
     {
         private const int WindowWidth = 350;
-        private const int WindowHeight = 360;
+        private const int WindowHeight = 342;
 
-        private const string DialogueAtlasPath = "Interface/GFx/NpcDialogue_I1.ozd";
+        // Match CharacterInfoWindowControl: use the same verified right-side GFx panel.
+        // Do not crop across the separate NpcDialogue sprites (arrows / separator).
+        private const string CharacterAtlasPath = "Interface/GFx/CharacterInfoFrame_I1.ozd";
         private const string ButtonNormalPath = "Interface/GFx/btn_l01.ozd";
         private const string ButtonHoverPath = "Interface/GFx/btn_l02.ozd";
         private const string ButtonPressedPath = "Interface/GFx/btn_l03.ozd";
@@ -31,25 +33,25 @@ namespace Client.Main.Controls.UI.Game
         private const string CloseHoverPath = "Interface/GFx/btn_close02.ozd";
         private const string ClosePressedPath = "Interface/GFx/btn_close03.ozd";
 
-        // Source rectangles from the 1024x512 NpcDialogue_I1 atlas preview.
-        // Keep gutters and adjacent glyphs out of the source rectangles.
-        private static readonly Rectangle PanelSource = new(1, 1, 309, 380);
-        private static readonly Rectangle HeaderSource = new(656, 1, 321, 91);
-        // Standalone GFx button sprites have transparent padding below the ornament.
-        private static readonly Rectangle ButtonSource = new(0, 0, 128, 46);
+        // Same Character GFx source regions as CharacterInfoWindowControl.cs.
+        // Original Character panel is 354 x 633: preserve the complete 96px title
+        // and 34px footer when shortening it into a compact trainer dialog.
+        private static readonly Rectangle FrameSource = new(656, 0, 354, 633);
+        private static readonly Rectangle InformationSource = new(676, 645, 245, 56);
+        private const int FrameTopHeight = 96;
+        private const int FrameBottomHeight = 34;
 
-        private static readonly Rectangle PanelTarget = new(0, 0, WindowWidth, WindowHeight);
-        private static readonly Rectangle HeaderTarget = new(11, 9, 328, 94);
-        private static readonly Rectangle RestoreButtonTarget = new(61, 188, 228, 52);
-        private static readonly Rectangle ResurrectButtonTarget = new(61, 250, 228, 52);
-        private static readonly Rectangle CloseButtonTarget = new(313, 18, 28, 28);
+        private static readonly Rectangle InformationTarget = new(27, 99, 296, 75);
+        private static readonly Rectangle RestoreButtonTarget = new(57, 187, 236, 56);
+        private static readonly Rectangle ResurrectButtonTarget = new(57, 249, 236, 56);
+        private static readonly Rectangle CloseButtonTarget = new(307, 36, 25, 25);
 
         private static PetTrainerControl _instance;
 
         private readonly ILogger<PetTrainerControl> _logger =
             MuGame.AppLoggerFactory?.CreateLogger<PetTrainerControl>();
 
-        private Texture2D _dialogueAtlas;
+        private Texture2D _characterAtlas;
         private Texture2D _buttonNormal;
         private Texture2D _buttonHover;
         private Texture2D _buttonPressed;
@@ -82,7 +84,7 @@ namespace Client.Main.Controls.UI.Game
 
         public IEnumerable<string> GetPreloadTexturePaths()
         {
-            yield return DialogueAtlasPath;
+            yield return CharacterAtlasPath;
             yield return ButtonNormalPath;
             yield return ButtonHoverPath;
             yield return ButtonPressedPath;
@@ -97,7 +99,7 @@ namespace Client.Main.Controls.UI.Game
 
             var loader = TextureLoader.Instance;
             var textures = await Task.WhenAll(
-                loader.PrepareAndGetTexture(DialogueAtlasPath),
+                loader.PrepareAndGetTexture(CharacterAtlasPath),
                 loader.PrepareAndGetTexture(ButtonNormalPath),
                 loader.PrepareAndGetTexture(ButtonHoverPath),
                 loader.PrepareAndGetTexture(ButtonPressedPath),
@@ -105,7 +107,7 @@ namespace Client.Main.Controls.UI.Game
                 loader.PrepareAndGetTexture(CloseHoverPath),
                 loader.PrepareAndGetTexture(ClosePressedPath));
 
-            _dialogueAtlas = textures[0];
+            _characterAtlas = textures[0];
             _buttonNormal = textures[1];
             _buttonHover = textures[2];
             _buttonPressed = textures[3];
@@ -113,9 +115,9 @@ namespace Client.Main.Controls.UI.Game
             _closeHover = textures[5];
             _closePressed = textures[6];
 
-            if (_dialogueAtlas == null || _buttonNormal == null)
+            if (_characterAtlas == null || _buttonNormal == null)
             {
-                _logger?.LogWarning("Pet Trainer GFx textures are missing from Data/Interface/GFx.");
+                _logger?.LogWarning("Pet Trainer Character/NewUI GFx textures are missing from Data/Interface/GFx.");
             }
         }
 
@@ -257,11 +259,13 @@ namespace Client.Main.Controls.UI.Game
         private Rectangle ToScreen(Rectangle local)
         {
             var origin = DisplayRectangle.Location;
-            return new Rectangle(
-                origin.X + (int)MathF.Round(local.X * Scale),
-                origin.Y + (int)MathF.Round(local.Y * Scale),
-                Math.Max(1, (int)MathF.Round(local.Width * Scale)),
-                Math.Max(1, (int)MathF.Round(local.Height * Scale)));
+            // Round edges, rather than independently rounding X/Y/width/height.
+            // This keeps the 3-slice frame continuous at fractional UI scales.
+            int left = origin.X + (int)MathF.Round(local.Left * Scale);
+            int top = origin.Y + (int)MathF.Round(local.Top * Scale);
+            int right = origin.X + (int)MathF.Round(local.Right * Scale);
+            int bottom = origin.Y + (int)MathF.Round(local.Bottom * Scale);
+            return new Rectangle(left, top, Math.Max(1, right - left), Math.Max(1, bottom - top));
         }
 
         public override void Draw(GameTime gameTime)
@@ -277,16 +281,18 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            // GFx OZD sprites use straight alpha; keep the existing NewUI draw path.
+            // Character and Inventory use point sampling for packed GFx atlases.
+            // Preserve the original header/footer/corners; never stretch the full
+            // 633px atlas panel vertically or clip the bottom of button textures.
             using (new SpriteBatchScope(sb, SpriteSortMode.Deferred,
                 BlendState.NonPremultiplied, SamplerState.PointClamp,
                 transform: UiScaler.SpriteTransform))
             {
-                DrawSprite(sb, _dialogueAtlas, PanelTarget, PanelSource);
-                DrawSprite(sb, _dialogueAtlas, HeaderTarget, HeaderSource);
-                DrawButtonSprite(sb, 0, RestoreButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, ButtonSource);
-                DrawButtonSprite(sb, 1, ResurrectButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, ButtonSource);
-                DrawButtonSprite(sb, 2, CloseButtonTarget, _closeNormal, _closeHover, _closePressed, null);
+                DrawCharacterFrame(sb);
+                DrawNineSlice(sb, _characterAtlas, InformationSource, InformationTarget, 10);
+                DrawButtonSprite(sb, 0, RestoreButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                DrawButtonSprite(sb, 1, ResurrectButtonTarget, _buttonNormal, _buttonHover, _buttonPressed, true);
+                DrawButtonSprite(sb, 2, CloseButtonTarget, _closeNormal, _closeHover, _closePressed, false);
             }
 
             var font = GraphicsManager.Instance.Font;
@@ -304,11 +310,11 @@ namespace Client.Main.Controls.UI.Game
                     ? "Hello!"
                     : $"Hello, {characterName}!";
 
-                DrawCenteredText(sb, font, "Pet Trainer", 55, 13f, new Color(233, 219, 195));
-                DrawCenteredText(sb, font, greeting, 134, 10f, new Color(215, 210, 200));
-                DrawCenteredText(sb, font, "What is your command?", 157, 10f, new Color(191, 182, 166));
-                DrawCenteredText(sb, font, "Restore Life", RestoreButtonTarget.Center.Y, 11f, new Color(226, 217, 202));
-                DrawCenteredText(sb, font, "Resurrect Spirit", ResurrectButtonTarget.Center.Y, 11f, new Color(226, 217, 202));
+                DrawCenteredText(sb, font, "Pet Trainer", 52, 12f, new Color(233, 219, 195));
+                DrawCenteredText(sb, font, greeting, 124, 10f, new Color(215, 210, 200));
+                DrawCenteredText(sb, font, "What is your command?", 148, 10f, new Color(191, 182, 166));
+                DrawCenteredText(sb, font, "Restore Life", RestoreButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
+                DrawCenteredText(sb, font, "Resurrect Spirit", ResurrectButtonTarget.Center.Y, 10.5f, new Color(226, 217, 202));
             }
         }
 
@@ -320,13 +326,106 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
+        private void DrawCharacterFrame(SpriteBatch sb)
+        {
+            if (_characterAtlas == null || _characterAtlas.IsDisposed)
+            {
+                return;
+            }
+
+            int middleHeight = WindowHeight - FrameTopHeight - FrameBottomHeight;
+            // Vertical three-slice: the complete original decorative title and
+            // bottom corners survive, only the uninterrupted side-wall is scaled.
+            DrawSprite(sb, _characterAtlas,
+                new Rectangle(0, 0, WindowWidth, FrameTopHeight),
+                new Rectangle(FrameSource.X, FrameSource.Y, FrameSource.Width, FrameTopHeight));
+
+            DrawSprite(sb, _characterAtlas,
+                new Rectangle(0, FrameTopHeight, WindowWidth, middleHeight),
+                new Rectangle(FrameSource.X, FrameSource.Y + FrameTopHeight,
+                    FrameSource.Width, FrameSource.Height - FrameTopHeight - FrameBottomHeight));
+
+            DrawSprite(sb, _characterAtlas,
+                new Rectangle(0, WindowHeight - FrameBottomHeight, WindowWidth, FrameBottomHeight),
+                new Rectangle(FrameSource.X, FrameSource.Bottom - FrameBottomHeight,
+                    FrameSource.Width, FrameBottomHeight));
+        }
+
+        private void DrawNineSlice(SpriteBatch sb, Texture2D atlas, Rectangle source,
+            Rectangle destination, int border)
+        {
+            if (atlas == null || atlas.IsDisposed)
+            {
+                return;
+            }
+
+            // Identical corner-preserving approach to CharacterInfoWindowControl.
+            // Crops contain only the verified Character information panel.
+            for (int row = 0; row < 3; row++)
+            {
+                int srcY = row == 0 ? source.Y : row == 1 ? source.Y + border : source.Bottom - border;
+                int dstY = row == 0 ? destination.Y : row == 1 ? destination.Y + border : destination.Bottom - border;
+                int srcH = row == 1 ? source.Height - border * 2 : border;
+                int dstH = row == 1 ? destination.Height - border * 2 : border;
+                for (int col = 0; col < 3; col++)
+                {
+                    int srcX = col == 0 ? source.X : col == 1 ? source.X + border : source.Right - border;
+                    int dstX = col == 0 ? destination.X : col == 1 ? destination.X + border : destination.Right - border;
+                    int srcW = col == 1 ? source.Width - border * 2 : border;
+                    int dstW = col == 1 ? destination.Width - border * 2 : border;
+                    DrawSprite(sb, atlas, new Rectangle(dstX, dstY, dstW, dstH),
+                        new Rectangle(srcX, srcY, srcW, srcH));
+                }
+            }
+        }
+
+        private void DrawThreeSliceButton(SpriteBatch sb, Texture2D texture, Rectangle destination)
+        {
+            if (texture == null || texture.IsDisposed)
+            {
+                return;
+            }
+
+            // btn_l01/02/03 are *individual* 128x64 OZD images. The old 128x46
+            // source rectangle discarded the lower button border. Use the full
+            // native height, and stretch only its flat horizontal center.
+            int sourceCap = Math.Max(1, Math.Min(16, texture.Width / 4));
+            int targetCap = Math.Max(1, (int)MathF.Round(sourceCap *
+                (float)destination.Height / texture.Height));
+            if (destination.Width <= targetCap * 2 || texture.Width <= sourceCap * 2)
+            {
+                DrawSprite(sb, texture, destination, null);
+                return;
+            }
+
+            int centerWidth = destination.Width - targetCap * 2;
+            int centerSourceWidth = texture.Width - sourceCap * 2;
+            DrawSprite(sb, texture,
+                new Rectangle(destination.Left, destination.Top, targetCap, destination.Height),
+                new Rectangle(0, 0, sourceCap, texture.Height));
+            DrawSprite(sb, texture,
+                new Rectangle(destination.Left + targetCap, destination.Top, centerWidth, destination.Height),
+                new Rectangle(sourceCap, 0, centerSourceWidth, texture.Height));
+            DrawSprite(sb, texture,
+                new Rectangle(destination.Right - targetCap, destination.Top, targetCap, destination.Height),
+                new Rectangle(texture.Width - sourceCap, 0, sourceCap, texture.Height));
+        }
+
         private void DrawButtonSprite(SpriteBatch sb, int index, Rectangle target,
-            Texture2D normal, Texture2D hover, Texture2D pressed, Rectangle? source)
+            Texture2D normal, Texture2D hover, Texture2D pressed, bool threeSlice)
         {
             bool isPressed = _pressedButton == index && _hoveredButton == index;
             var image = isPressed ? pressed ?? hover ?? normal
                 : _hoveredButton == index ? hover ?? normal : normal;
-            DrawSprite(sb, image, target, source);
+            if (threeSlice)
+            {
+                DrawThreeSliceButton(sb, image, target);
+            }
+            else
+            {
+                // Standalone close icon is already an isolated sprite.
+                DrawSprite(sb, image, target, null);
+            }
         }
 
         private void DrawCenteredText(SpriteBatch sb, SpriteFont font, string value,
