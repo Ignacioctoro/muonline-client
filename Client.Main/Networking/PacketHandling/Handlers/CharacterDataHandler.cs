@@ -292,6 +292,12 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 _characterState.UpdateMap(mapId);
                 _characterState.UpdateDirection(direction); // Update direction based on packet data or default
                 _characterState.UpdateLevelAndExperience(level, currentExp, nextExp, levelUpPoints);
+                if (_characterState.Class is CharacterClassNumber.DarkLord or CharacterClassNumber.LordEmperor)
+                {
+                    _logger.LogInformation("CMD diagnostic F3:03: client={Name}, packet length={Length}, STR={Strength}, AGI={Agility}, VIT={Vitality}, ENE={Energy}, CMD={Command}.",
+                        _characterState.Name, packet.Length, str, agi, vit, ene, cmd);
+                }
+
                 _characterState.UpdateStats(str, agi, vit, ene, cmd);
                 _characterState.UpdateMaximumHealthShield(maxHp, maxSd);
                 _characterState.UpdateMaximumManaAbility(maxMana, maxAbility);
@@ -922,8 +928,6 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 {
                     _logger.LogWarning("⚠️ Failed to increase stat {Attr}.", attr);
                 }
-
-                _characterState.NotifyStatIncreaseResponse(attr, success, success ? addedAmount : (ushort)0);
             }
             catch (Exception ex)
             {
@@ -1059,6 +1063,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         (ushort)stats.Vitality,
                         (ushort)stats.Energy,
                         (ushort)stats.Command);
+                    if (_characterState.Class is CharacterClassNumber.DarkLord or CharacterClassNumber.LordEmperor)
+                    {
+                        _logger.LogInformation("CMD diagnostic F3:32: client={Name}, packet length={Length}, CMD={Command}, STR={Strength}.",
+                            _characterState.Name, packet.Length, stats.Command, stats.Strength);
+                    }
                     _logger.LogInformation("📊 BaseStatsExtended received.");
                 }
                 else
