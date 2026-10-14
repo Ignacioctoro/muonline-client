@@ -413,12 +413,12 @@ namespace Client.Main.Controls.UI.Game
                 // Exact NewUI Inventory footprint. Use the additional height
                 // for readable ingredient/recipe descriptions.
                 _headerRect = new Rectangle(0, 0, TrainerWindowWidth, TrainerTopSourceHeight);
-                int frameX = 18;
-                int frameW = TrainerWindowWidth - frameX * 2;
-                _gridFrameRect = new Rectangle(frameX, 106, frameW, 190);
+                int trainerFrameX = 18;
+                int trainerFrameWidth = TrainerWindowWidth - trainerFrameX * 2;
+                _gridFrameRect = new Rectangle(trainerFrameX, 106, trainerFrameWidth, 190);
                 _gridRect = new Rectangle((TrainerWindowWidth - GRID_WIDTH) / 2, 142,
                     GRID_WIDTH, GRID_HEIGHT);
-                _infoRect = new Rectangle(frameX, 308, frameW, 270);
+                _infoRect = new Rectangle(trainerFrameX, 308, trainerFrameWidth, 270);
                 _mixButtonRect = new Rectangle(64, 595, TrainerWindowWidth - 128, 58);
                 _closeButtonRect = new Rectangle(TrainerWindowWidth - 44, 35, 25, 25);
                 return;
