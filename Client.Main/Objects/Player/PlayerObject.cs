@@ -1630,6 +1630,11 @@ namespace Client.Main.Objects.Player
                 UpdateRemotePlayer(world, gameTime);
 
             UpdateWingAnimationSpeed();
+
+            // WalkerObject updates movement after ModelObject has updated
+            // child objects. Keep a perched Raven exactly on the raised arm
+            // after this frame's owner position and animation selection.
+            DarkRaven?.SyncPerchAfterOwnerMovement();
         }
 
         public override void Draw(GameTime gameTime)
