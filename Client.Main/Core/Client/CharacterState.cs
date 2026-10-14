@@ -1217,8 +1217,17 @@ namespace Client.Main.Core.Client
         /// </summary>
         public void AddExperience(uint addedExperience)
         {
-            Experience += addedExperience;
+            Experience = ulong.MaxValue - Experience < addedExperience
+                ? ulong.MaxValue
+                : Experience + addedExperience;
             _logger.LogDebug("Added experience: {AddedExperience}. Total Experience: {Experience}", addedExperience, Experience);
+        }
+
+        public void AddMasterExperience(uint addedExperience)
+        {
+            MasterExperience = ulong.MaxValue - MasterExperience < addedExperience
+                ? ulong.MaxValue
+                : MasterExperience + addedExperience;
         }
 
         /// <summary>

@@ -376,6 +376,21 @@ namespace Client.Main.Networking
             }
             _logger.LogInformation("Sending select character request for: {CharacterName}", characterName);
             _selectedCharacterNameForLogin = characterName;
+
+            // C3 F3 03 supplies current/next EXP but no normal level.
+            // Retain the authoritative level from the character-list packet.
+            if (_lastCharacterList != null)
+            {
+                foreach (var entry in _lastCharacterList)
+                {
+                    if (string.Equals(entry.Name, characterName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _characterState.Level = entry.Level;
+                        break;
+                    }
+                }
+            }
+
             UpdateState(ClientConnectionState.SelectingCharacter);
             await _characterService.SelectCharacterAsync(characterName);
         }

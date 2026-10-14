@@ -1,66 +1,81 @@
 #nullable enable
+using System;
 using Client.Main.Core.Client;
-using Client.Main.Models;
+using Client.Main.Core.Utilities;
+using Client.Main.Controls.UI;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.Controls.UI.Game.Hud
 {
     /// <summary>
-    /// Experience bar control - displays current level progress as percentage.
-    /// Positioned near the skill quick slot at the bottom of the screen.
+    /// NewUI experience gauge. Its original main_IE atlas slice supplies the
+    /// frame; the original 4x8 EXP fill and 1024x16 cover are its only overlays.
+    /// All positions are virtual HUD coordinates and use the existing UiScaler.
     /// </summary>
-    public class ExperienceBarControl : UIControl
+    public sealed class ExperienceBarControl : TextureControl
     {
-        private readonly CharacterState _characterState;
-        private readonly LabelControl _expLabel;
+        private readonly CharacterState _state;
+        private readonly TextureControl _fill;
+        private readonly TextureControl _cover;
 
-        public ExperienceBarControl(CharacterState characterState)
+        public ExperienceBarControl(CharacterState state)
         {
-            _characterState = characterState;
-
-            // Position at bottom-center, below skill slot
-            Align = ControlAlign.HorizontalCenter | ControlAlign.Bottom;
-            Margin = new Margin { Bottom = 5 }; // Just above bottom edge, below skill slot
-
-            ViewSize = new Point(120, 20);
+            _state = state;
+            AutoViewSize = false;
             Interactive = false;
-            BackgroundColor = Color.Transparent;
-            BorderColor = Color.Transparent;
+            TexturePath = "Interface/GFx/main_IE.ozd";
+            TextureRectangle = new Rectangle(218, 90, 741, 14);
+            BlendState = BlendState.NonPremultiplied;
 
-            // Experience percentage label
-            _expLabel = new LabelControl
+            // Stretch the tiny original EXP gauge across the available track.
+            // The cover draws the ten divisions on top, preserving NewUI artwork.
+            _fill = new TextureControl
             {
-                Text = "EXP: 0.0%",
-                TextColor = Color.Cyan,
-                X = 0,
-                Y = 0,
-                ViewSize = new Point(120, 20),
-                Scale = 0.75f,
-                TextAlign = HorizontalAlign.Center
+                Name = "ExperienceFill",
+                AutoViewSize = false,
+                Interactive = false,
+                TexturePath = "Interface/GFx/guege_exp.ozd",
+                TextureRectangle = new Rectangle(0, 0, 4, 8),
+                BlendState = BlendState.NonPremultiplied,
+                ViewSize = Point.Zero
             };
-            Controls.Add(_expLabel);
+
+            _cover = new TextureControl
+            {
+                Name = "ExperienceCover",
+                AutoViewSize = false,
+                Interactive = false,
+                TexturePath = "Interface/GFx/guege_exp_cover.ozd",
+                TextureRectangle = new Rectangle(0, 0, 1024, 16),
+                BlendState = BlendState.NonPremultiplied,
+                ViewSize = Point.Zero
+            };
+
+            Controls.Add(_fill);
+            Controls.Add(_cover);
         }
 
         public override void Update(GameTime gameTime)
         {
+            // Keep the original layout rectangle untouched. Only the clipped
+            // length of the fill changes with server-authoritative experience.
+            const int insetX = 4;
+            int usableWidth = Math.Max(0, ViewSize.X - insetX * 2);
+            int usableHeight = Math.Max(0, ViewSize.Y - 6);
+            float fraction = ExperienceProgressCalculator.GetNormalLevelFraction(
+                _state.Level, _state.Experience, _state.ExperienceForNextLevel);
+
+            _fill.X = insetX;
+            _fill.Y = (ViewSize.Y - usableHeight) / 2;
+            _fill.ViewSize = new Point(
+                (int)Math.Round(usableWidth * fraction),
+                usableHeight);
+            _fill.Visible = fraction > 0f && usableHeight > 0;
+
+            // The overlay owns the ornamentation and all ten tick marks.
+            _cover.ViewSize = ViewSize;
             base.Update(gameTime);
-            UpdateExpLabel();
-        }
-
-        private void UpdateExpLabel()
-        {
-            // Calculate experience requirement for previous level
-            ushort currentLevel = _characterState.Level;
-            ulong prevLevelExp = currentLevel > 1 ? (ulong)((currentLevel - 1 + 9) * (currentLevel - 1) * (currentLevel - 1) * 10) : 0;
-
-            // Calculate experience range for current level
-            ulong expInCurrentLevel = _characterState.Experience - prevLevelExp;
-            ulong expNeededForLevel = _characterState.ExperienceForNextLevel - prevLevelExp;
-
-            // Calculate percentage (0-100%)
-            double expPercent = expNeededForLevel > 0 ? (expInCurrentLevel / (double)expNeededForLevel) * 100.0 : 0.0;
-
-            _expLabel.Text = $"EXP: {expPercent:F1}%";
         }
     }
 }

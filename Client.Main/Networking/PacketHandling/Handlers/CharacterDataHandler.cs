@@ -152,7 +152,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 ushort mapId = 0;
                 byte x = 0, y = 0;
                 ulong currentExp = 0, nextExp = 1;
-                ushort level = 1, levelUpPoints = 0;
+                // C3 F3 03 has no level field: retain the level from character selection.
+                ushort level = _characterState.Level, levelUpPoints = 0;
                 uint initialHp = 0, maxHp = 1;
                 uint initialSd = 0, maxSd = 0;
                 uint initialMana = 0, maxMana = 1;
@@ -520,10 +521,9 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     return Task.CompletedTask;
                 }
 
-                // Apply updates
-                // Calculate new experience requirement for next level
-                // Formula: ExpForNextLevel = (newLevel + 9) * newLevel * newLevel * 10
-                ulong nextExp = (ulong)((newLevel + 9) * newLevel * newLevel * 10);
+                // F3 05 does not transmit nextExp. Use the MU cumulative
+                // threshold, including the post-255 term, with 64-bit math.
+                ulong nextExp = ExperienceProgressCalculator.NextLevelThreshold(newLevel);
                 _characterState.UpdateLevelAndExperience(newLevel, _characterState.Experience, nextExp, newPoints);
                 _characterState.UpdateMaximumHealthShield(maxHp, maxSd);
                 _characterState.UpdateMaximumManaAbility(maxMana, maxAbility);
@@ -764,10 +764,14 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 uint addedExperience = 0;
                 ushort killedObjectId = 0;
+                byte experienceType = 1; // Legacy C3 16 always grants normal EXP.
 
                 if (_targetVersion >= TargetProtocolVersion.Season6
                     && packet.Length >= ExperienceGainedExtended.Length)
                 {
+                    // Extended OpenMU C3 16 includes AddResult at offset 3:
+                    // 1 normal, 2 master, other values are non-awards.
+                    experienceType = packet.Span[3];
                     var exp = new ExperienceGainedExtended(packet);
                     addedExperience = exp.AddedExperience;
                     killedObjectId = (ushort)(exp.KilledObjectId & 0x7FFF);
@@ -792,7 +796,19 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     return Task.CompletedTask;
                 }
 
-                _characterState.AddExperience(addedExperience);
+                if (experienceType == 1)
+                {
+                    _characterState.AddExperience(addedExperience);
+                }
+                else if (experienceType == 2)
+                {
+                    _characterState.AddMasterExperience(addedExperience);
+                }
+                else
+                {
+                    // Max level / monster too weak: don't award fictional EXP.
+                    return Task.CompletedTask;
+                }
 
                 MuGame.ScheduleOnMainThread(() =>
                 {

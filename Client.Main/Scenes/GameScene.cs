@@ -1972,9 +1972,7 @@ namespace Client.Main.Scenes
                         _mobilePvpTargetId = null;
                         _mobileTargetPanel?.ClearTarget();
                     };
-            // Experience bar
-            var experienceBar = new ExperienceBarControl(MuGame.Network.GetCharacterState());
-            Controls.Add(experienceBar);
+            // Experience is rendered once by MainControl's NewUI ExpBar.
 
             // Active buffs panel (top-left corner, no border)
             _activeBuffsPanel = new ActiveBuffsPanel(MuGame.Network.GetCharacterState());

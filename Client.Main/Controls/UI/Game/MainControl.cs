@@ -254,6 +254,11 @@ namespace Client.Main.Controls.UI.Game
             ControlFactories["arrow_right_2"] =
                 CreateHudButton;
 
+            // Replace the static atlas slice with its server-driven NewUI gauge.
+            // It retains the ExpBar layout and original render order.
+            ControlFactories["ExpBar"] =
+                _ => new ExperienceBarControl(state);
+
             CreateControls();
             UpdateLayout();
 
