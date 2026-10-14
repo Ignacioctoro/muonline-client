@@ -40,6 +40,7 @@ namespace Client.Main.Controls.UI.Game
         private readonly ItemHotkeyHudControl _itemHotkeys;
         private readonly SkillHotkeyHudControl _skillHotkeys;
         private readonly MapPositionHudControl _mapPositionHud;
+        private readonly PetStatusHudControl _petStatusHud;
         private ExperienceBarControl _experienceBar;
         private TextureControl _experienceDigit;
         private int _lastExperienceDigit = -1;
@@ -191,6 +192,14 @@ namespace Client.Main.Controls.UI.Game
                     Y = 0
                 };
 
+            // Original pet endurance frames, repositioned below the modern
+            // 37px map panel so they never overlap its left-hand atlas.
+            _petStatusHud = new PetStatusHudControl(state)
+            {
+                X = 8,
+                Y = 44
+            };
+
             _mapPositionHud.MapNameClicked +=
                 (_, _) =>
                 {
@@ -245,6 +254,7 @@ namespace Client.Main.Controls.UI.Game
             Controls.Add(_itemHotkeys);
             Controls.Add(_skillHotkeys);
             Controls.Add(_mapPositionHud);
+            Controls.Add(_petStatusHud);
 
             ControlFactories["InventoryButton"] =
                 CreateHudButton;

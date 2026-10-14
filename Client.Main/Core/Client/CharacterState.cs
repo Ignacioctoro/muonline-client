@@ -1096,6 +1096,13 @@ namespace Client.Main.Core.Client
         /// </summary>
         public bool HasInventoryItem(byte slot) => _inventoryItems.ContainsKey(slot);
 
+        /// <summary>
+        /// Allocation-free lookup for equipped item state used by compact HUDs.
+        /// The inventory still owns the item data; callers must not mutate it.
+        /// </summary>
+        public bool TryGetInventoryItem(byte slot, out byte[] itemData) =>
+            _inventoryItems.TryGetValue(slot, out itemData);
+
         private void RaiseHealth() => HealthChanged?.Invoke(CurrentHealth, MaximumHealth);
         private void RaiseMana() => ManaChanged?.Invoke(CurrentMana, MaximumMana);
 
