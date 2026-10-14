@@ -136,17 +136,76 @@ namespace Client.Main.Core.Utilities
                 .ToList();
         }
 
+        /// <summary>
+        /// Keep Chaos Goblin recipes isolated from the Pet Trainer recipes.
+        /// Both modes share the same item matcher and UI inventory model.
+        /// </summary>
         public static ChaosMixEvaluation EvaluateChaosMachine(IReadOnlyList<InventoryItem> items)
+            => EvaluateRecipes(items, GetChaosMachineRecipes());
+
+        public static ChaosMixEvaluation EvaluateTrainer(IReadOnlyList<InventoryItem> items)
+            => EvaluateRecipes(items, GetOpenMuTrainerRecipes());
+
+        private static IReadOnlyList<MixRecipe> GetOpenMuTrainerRecipes()
         {
-            var recipes = GetChaosMachineRecipes();
-            if (recipes.Count == 0)
+            // OpenMU SeasonSix/ChaosMixes.cs defines crafting IDs 13 and 14,
+            // with 60% base success. Its server remains authoritative over
+            // money, ingredients, taxes, item loss and result.
+            // The original mix.bmd Trainer group is kept available separately
+            // via GetRecipes(MixInventoryType.Trainer), but need not match the
+            // custom OpenMU crafting definitions or local configuration.
+            return s_openMuTrainerRecipes;
+        }
+
+        private static readonly IReadOnlyList<MixRecipe> s_openMuTrainerRecipes = new[]
+        {
+            CreateOpenMuTrainerRecipe(13, 5, 5, 5_000_000, false),
+            CreateOpenMuTrainerRecipe(14, 2, 2, 1_000_000, true),
+        };
+
+        private static MixRecipe CreateOpenMuTrainerRecipe(int mixId, int bless, int soul,
+            uint zen, bool raven)
+        {
+            // Item IDs are encoded group*512 + number by the original mix engine.
+            // A raven requires Spirit (13,31) +1, whereas OpenMU's horse
+            // recipe currently accepts any item level of Spirit.
+            static MixRecipeItem Req(int group, int number, int amount,
+                int minLevel = 0, int maxLevel = 255)
+                => new((short)(group * 512 + number), (short)(group * 512 + number),
+                    minLevel, maxLevel, 0, 255, 0, 255, amount, amount, MixSpecialItem.None);
+
+            var ingredients = new MixRecipeItem[8];
+            ingredients[0] = Req(13, 31, 1, raven ? 1 : 0, raven ? 1 : 255);
+            ingredients[1] = Req(14, 13, bless); // Jewel of Bless
+            ingredients[2] = Req(14, 14, soul);  // Jewel of Soul
+            ingredients[3] = Req(12, 15, 1);    // Jewel of Chaos
+            ingredients[4] = Req(14, 22, 1);    // Jewel of Creation
+            var tokens = new MixRateToken[32];
+            tokens[0] = new MixRateToken(MixRateOp.Number, 60f);
+            return new MixRecipe
+            {
+                MixId = mixId,
+                MixIndex = mixId,
+                NumSources = 5,
+                Sources = ingredients,
+                RequiredZenType = 'A',
+                RequiredZen = zen,
+                MaxSuccessRate = 60,
+                RateTokens = tokens,
+                NumRateData = 1,
+            };
+        }
+
+        private static ChaosMixEvaluation EvaluateRecipes(IReadOnlyList<InventoryItem> items,
+            IReadOnlyList<MixRecipe> recipes)
+        {
+            if (recipes == null || recipes.Count == 0)
             {
                 return new ChaosMixEvaluation();
             }
 
             var mixItems = BuildMixItems(items);
 
-            // 1) Exact match
             foreach (var recipe in recipes)
             {
                 ResetTestCounts(mixItems);
@@ -164,7 +223,6 @@ namespace Client.Main.Core.Utilities
                 }
             }
 
-            // 2) Similar recipe (best effort)
             ResetTestCounts(mixItems);
             var similar = FindMostSimilarRecipe(recipes, mixItems);
             return new ChaosMixEvaluation
