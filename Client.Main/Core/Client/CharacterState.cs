@@ -62,6 +62,12 @@ namespace Client.Main.Core.Client
     }
 
     /// <summary>
+    /// Authoritative OpenMU A9 trainable-pet data (distinct from item +level).
+    /// </summary>
+    public readonly record struct PetInfoSnapshot(
+        byte PetType, byte Level, uint Experience, byte Health);
+
+    /// <summary>
     /// Holds the state of the currently logged-in character, including basic info, stats, inventory, and skills.
     /// This class is responsible for tracking and updating the character's attributes as received from the server.
     /// </summary>
@@ -151,6 +157,22 @@ namespace Client.Main.Core.Client
 
         // Inventory and Money
         private readonly ConcurrentDictionary<byte, byte[]> _inventoryItems = new();
+        private readonly ConcurrentDictionary<byte, PetInfoSnapshot> _petInfoBySlot = new();
+
+        public void UpdatePetInfo(byte slot, byte petType, byte level,
+            uint experience, byte health)
+        {
+            if (petType > 1 ||
+                !_inventoryItems.TryGetValue(slot, out var rawItem) ||
+                !ItemDatabase.TryGetItemGroupAndNumber(rawItem, out var group, out var number) ||
+                group != 13 || number != (petType == 0 ? 5 : 4))
+                return;
+
+            _petInfoBySlot[slot] = new PetInfoSnapshot(petType, level, experience, health);
+        }
+
+        public bool TryGetPetInfo(byte slot, out PetInfoSnapshot info) =>
+            _petInfoBySlot.TryGetValue(slot, out info);
         public byte InventoryExpansionState { get; set; } = 0;
         public uint InventoryZen { get; set; } = 0;
         public event Action MoneyChanged;
@@ -1439,6 +1461,7 @@ namespace Client.Main.Core.Client
         public void ClearInventory()
         {
             _inventoryItems.Clear();
+            _petInfoBySlot.Clear();
             InventoryChanged?.Invoke();
             _logger.LogDebug("Inventory cleared.");
         }
@@ -1448,6 +1471,7 @@ namespace Client.Main.Core.Client
         /// </summary>
         public void AddOrUpdateInventoryItem(byte slot, byte[] itemData)
         {
+            _petInfoBySlot.TryRemove(slot, out _);
             _inventoryItems[slot] = itemData;
             InventoryChanged?.Invoke();
             if (slot < 12) // equipment slots 0..11
@@ -1471,6 +1495,7 @@ namespace Client.Main.Core.Client
         public void RemoveInventoryItem(byte slot)
         {
             bool removed = _inventoryItems.TryRemove(slot, out _);
+            _petInfoBySlot.TryRemove(slot, out _);
             if (removed)
             {
                 InventoryChanged?.Invoke();
@@ -1547,6 +1572,8 @@ namespace Client.Main.Core.Client
             {
                 if (ItemDatabase.TrySetItemDurability(itemData, durability))
                 {
+                    if (_petInfoBySlot.TryGetValue(slot, out var petInfo))
+                        _petInfoBySlot[slot] = petInfo with { Health = durability };
                     _logger.LogDebug("Item durability updated for slot {Slot} to {Durability}", slot, durability);
                     RaiseInventoryChanged(); // Trigger UI refresh after durability update
                 }

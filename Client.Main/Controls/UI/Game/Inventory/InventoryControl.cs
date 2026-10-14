@@ -302,6 +302,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private InventoryItem _hoveredItem;
         private Point _hoveredSlot = new(-1, -1);
         private int _hoveredEquipSlot = -1;
+        private int _lastPetInfoRequestSlot = -1;
+        private double _nextPetInfoRequestAt;
         private int _pickedFromEquipSlot = -1;
         private Point _pickedItemOriginalGrid = new(-1, -1);
         private Point _pickedAtMousePos;
@@ -1011,7 +1013,48 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 }
             }
 
+            RequestHoveredPetInfo(gameTime);
             _pickedItemRenderer.Update(gameTime);
+        }
+
+        private byte? GetHoveredInventorySlot()
+        {
+            if (_hoveredItem == null)
+                return null;
+
+            if (_hoveredEquipSlot >= 0 &&
+                _equippedItems.TryGetValue((byte)_hoveredEquipSlot, out var equipped) &&
+                ReferenceEquals(equipped, _hoveredItem))
+                return (byte)_hoveredEquipSlot;
+
+            Point pos = _hoveredItem.GridPosition;
+            if (pos.X < 0 || pos.X >= Columns || pos.Y < 0 || pos.Y >= Rows)
+                return null;
+            return (byte)(InventorySlotOffsetConstant + pos.Y * Columns + pos.X);
+        }
+
+        private void RequestHoveredPetInfo(GameTime gameTime)
+        {
+            var item = _hoveredItem;
+            if (item?.Definition == null ||
+                item.Definition.Group != 13 ||
+                item.Definition.Id is not (4 or 5) ||
+                GetHoveredInventorySlot() is not byte slot)
+            {
+                _lastPetInfoRequestSlot = -1;
+                return;
+            }
+
+            double now = gameTime.TotalGameTime.TotalSeconds;
+            if (_lastPetInfoRequestSlot == slot && now < _nextPetInfoRequestAt)
+                return;
+
+            _lastPetInfoRequestSlot = slot;
+            _nextPetInfoRequestAt = now + 5.0;
+            byte petType = item.Definition.Id == 5 ? (byte)0 : (byte)1;
+            var service = _networkManager?.GetCharacterService();
+            if (service != null)
+                _ = service.SendPetInfoRequestAsync(petType, slot);
         }
 
         private void ToggleRepairMode()
@@ -3524,7 +3567,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
             if (_pickedItem_renderer_item() != null || _hoveredItem == null || _font == null)
                 return;
 
-            var lines = ClassicItemTooltipBuilder.Build(_hoveredItem);
+            Client.Main.Core.Client.PetInfoSnapshot? petInfo = null;
+            if (GetHoveredInventorySlot() is byte slot &&
+                _networkManager?.GetCharacterState() is { } state &&
+                state.TryGetPetInfo(slot, out var info))
+                petInfo = info;
+
+            var lines = ClassicItemTooltipBuilder.Build(_hoveredItem, petInfo);
             if (NpcShopControl.IsOpen)
             {
                 int sellPrice = ItemPriceCalculator.CalculateSellPrice(_hoveredItem);

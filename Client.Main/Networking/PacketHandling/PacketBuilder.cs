@@ -308,6 +308,26 @@ namespace Client.Main.Networking.PacketHandling
 
 
         /// <summary>
+        /// OpenMU C1 06 A9 PetInfoRequest, Inventory storage 0.
+        /// </summary>
+        public static int BuildPetInfoRequestPacket(
+            IBufferWriter<byte> writer, byte petType, byte inventorySlot)
+        {
+            if (petType > 1)
+                throw new ArgumentOutOfRangeException(nameof(petType));
+
+            const int length = 6;
+            var data = writer.GetMemory(length).Span;
+            data[0] = 0xC1;
+            data[1] = length;
+            data[2] = 0xA9;
+            data[3] = petType;
+            data[4] = 0; // Inventory (also covers equipped slots)
+            data[5] = inventorySlot;
+            return length;
+        }
+
+        /// <summary>
         /// Original MU C1 A7 PetCommandRequest (seven bytes, not an ordinary
         /// TargetedSkill). Pet type 0 = Dark Raven; modes 0..3 match OpenMU.
         /// The final two bytes contain the big-endian target NetworkId.

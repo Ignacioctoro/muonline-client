@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
 using Client.Main.Core.Utilities;
 using System;
+using System.Buffers.Binary;
 using System.Threading.Tasks;
 using Client.Main.Core.Client;
 using Client.Main.Controllers;
@@ -39,6 +40,27 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         }
 
         // ─────────────────────── Packet Handlers ────────────────────────
+
+        /// <summary>
+        /// OpenMU C1 0D A9 PetInfoResponse. Storage 254 is sent on level up.
+        /// </summary>
+        [PacketHandler(0xA9, PacketRouter.NoSubCode)]
+        public Task HandlePetInfoResponseAsync(Memory<byte> packet)
+        {
+            ReadOnlySpan<byte> data = packet.Span;
+            if (data.Length < 13 || data[0] != 0xC1 ||
+                data[1] != 13 || data[2] != 0xA9 ||
+                data[3] > 1 || (data[4] != 0 && data[4] != 254))
+                return Task.CompletedTask;
+
+            byte petType = data[3];
+            byte slot = data[5];
+            byte level = data[6];
+            uint experience = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(8, 4));
+            byte health = data[12];
+            _characterState.UpdatePetInfo(slot, petType, level, experience, health);
+            return Task.CompletedTask;
+        }
 
         [PacketHandler(0xF3, 0x10)]  // CharacterInventory
         public Task HandleCharacterInventoryAsync(Memory<byte> packet)

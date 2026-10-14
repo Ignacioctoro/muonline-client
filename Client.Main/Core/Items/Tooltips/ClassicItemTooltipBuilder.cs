@@ -4,6 +4,7 @@ using Client.Data.BMD.Tooltip;
 using Client.Main.Controls.UI.Game;
 using Client.Main.Controls.UI.Game.Common;
 using Client.Main.Controls.UI.Game.Inventory;
+using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
 
@@ -149,7 +150,7 @@ namespace Client.Main.Core.Items.Tooltips
             return string.Empty;
         }
         public static List<(string text, Color color)> Build(
-            InventoryItem item)
+            InventoryItem item, PetInfoSnapshot? petInfo = null)
         {
             if (item?.Definition == null)
             {
@@ -158,6 +159,11 @@ namespace Client.Main.Core.Items.Tooltips
 
             var def = item.Definition;
             var details = item.Details;
+
+            // Trainable pets use OpenMU A9, not the serialized item +level.
+            if (def.Group == 13 && (def.Id == 4 || def.Id == 5))
+                return BuildTrainablePetTooltip(item, petInfo);
+
             // ---------------------------------------------------------
             // CLASSIC TOOLTIP COVERAGE
             //
@@ -511,6 +517,36 @@ namespace Client.Main.Core.Items.Tooltips
 
             return result;
         }
+        private static List<(string text, Color color)> BuildTrainablePetTooltip(
+            InventoryItem item, PetInfoSnapshot? info)
+        {
+            bool isRaven = item.Definition.Id == 5;
+            var result = new List<(string text, Color color)>();
+            // Tooltips may be drawn before the asynchronous BMD repository
+            // finishes loading. Do not call GetLegacyItem in that state.
+            string name = ItemTooltipDataRepository.IsLoaded
+                ? ItemTooltipDataRepository.GetLegacyItem(
+                    (byte)item.Definition.Group, (ushort)item.Definition.Id)?.Name
+                : null;
+            if (string.IsNullOrWhiteSpace(name))
+                name = item.Definition.Name ?? (isRaven ? "Dark Raven" : "Dark Horse");
+
+            result.Add((name.Trim(), Color.CornflowerBlue));
+            if (info is { } pet && pet.PetType == (isRaven ? 0 : 1))
+            {
+                result.Add(($"Experience: {pet.Experience:N0}", Color.White));
+                result.Add(($"Level: {pet.Level}", Color.White));
+                result.Add(($"Life (Durability): {pet.Health}", Color.White));
+            }
+            else
+            {
+                result.Add(("Level: Loading...", Color.LightGray));
+                result.Add(($"Life (Durability): {item.Durability}", Color.White));
+            }
+            result.Add(("Can be equipped by Dark Lord", Color.LightGray));
+            return result;
+        }
+
         private static bool IsFenrir(
             InventoryItem item)
         {
