@@ -69,6 +69,12 @@ namespace Client.Main.Objects.Player
         // Native CSPetDarkSpirit::RenderPet passes the server pet level as WeaponLevel.
         private int _nativePetLevel;
 
+        // C1 A9 is normally requested on inventory hover. Request it for the
+        // equipped local Raven without requiring the inventory to be open.
+        // Retry slowly only while the server snapshot is unavailable.
+        private const double PetInfoRetrySeconds = 3.0;
+        private double _nextPetInfoRequestSeconds;
+
         public bool IsEquipped => _equipped;
 
         public DarkRavenObject(PlayerObject owner)
@@ -102,6 +108,9 @@ namespace Client.Main.Objects.Player
             _queuedTarget = null;
             _attackTicks = 0;
             _nativePetLevel = 0;
+            // A new equip needs fresh server data, even if the old pet was
+            // already queried before it was unequipped.
+            _nextPetInfoRequestSeconds = 0.0;
 
             if (equipped && Model == null && !_loadingModel)
                 _ = LoadRavenModelAsync();
@@ -204,15 +213,39 @@ namespace Client.Main.Objects.Player
             if (!_equipped || World == null)
                 return;
 
-            // Only the local pet receives the C1 A9 level/experience snapshot.
-            // Other players have no equivalent known level data; use the native
-            // base mesh tier rather than fabricate a high-level glow.
-            if (_owner.IsMainWalker &&
-                MuGame.Network?.GetCharacterState() is { } characterState &&
-                characterState.TryGetPetInfo(1, out var petInfo) &&
-                petInfo.PetType == 0)
+            // C1 A9 supplies the authoritative pet level used by the native
+            // Raven mesh tiers. The inventory tooltip previously triggered
+            // this request, so an equipped Raven stayed at level 0 visually
+            // until the player hovered over the inventory slot.
+            //
+            // Only request local, server-equipped slot 1 (pet type 0).
+            // Never request for other players or for an unequipped Raven.
+            if (_owner.IsMainWalker && MuGame.Network is { } network &&
+                network.GetCharacterState() is { } characterState)
             {
-                _nativePetLevel = petInfo.Level;
+                if (characterState.TryGetPetInfo(1, out var petInfo) &&
+                    petInfo.PetType == 0)
+                {
+                    _nativePetLevel = petInfo.Level;
+                }
+                else
+                {
+                    // Inventory updates invalidate the cached C1 A9 snapshot.
+                    // Do not retain the prior pet's visual level after a swap.
+                    _nativePetLevel = 0;
+
+                    double now = gameTime.TotalGameTime.TotalSeconds;
+                    if (characterState.HasEquippedDarkRaven &&
+                        now >= _nextPetInfoRequestSeconds)
+                    {
+                        var service = network.GetCharacterService();
+                        if (service != null)
+                        {
+                            _nextPetInfoRequestSeconds = now + PetInfoRetrySeconds;
+                            _ = service.SendPetInfoRequestAsync(petType: 0, inventorySlot: 1);
+                        }
+                    }
+                }
             }
 
             // Keep native world size despite PlayerObject's 0.85 model scale.
