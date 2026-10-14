@@ -28,6 +28,9 @@ namespace Client.Main.Objects.Player
         private const float PerchArrivalDistanceSquared = 50f * 50f;
         private const float NativeScale = 0.7f;
         private const float DegToRad = MathF.PI / 180f;
+        // CSPetSystem::CreatePetPointer starts the Raven's native light at 0.5.
+        // Use its native BMD lighting instead of a full-intensity white gust.
+        private static readonly Vector3 NativeRavenLight = new(0.5f, 0.5f, 0.5f);
 
         // These states mirror CSPetDarkSpirit: flight, physical rush/escape,
         // and magic/range cast. They NEVER calculate hits or damage.
@@ -431,8 +434,11 @@ namespace Client.Main.Objects.Player
                 {
                     Vector3 origin = Vector3.Transform(new Vector3(50f, 0f, 0f),
                         bones[6] * WorldPosition);
+                    // MODEL_AIR_FORCE subtype 0 is intentionally a short
+                    // world-space gust (15 native ticks). Native expands and
+                    // fades it; it does NOT remain attached to the flying pet.
                     fx.CreateEffect(ClassicFxEffectType.AirForce, origin, Angle,
-                        Vector3.One, ClassicFxOwner.FromWorldObject(this));
+                        NativeRavenLight, ClassicFxOwner.FromWorldObject(this));
                 }
             }
             else if (_visualState == RavenVisualState.Magic && _attackTicks < 15)
