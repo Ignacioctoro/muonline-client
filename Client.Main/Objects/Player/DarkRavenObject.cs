@@ -215,6 +215,7 @@ namespace Client.Main.Objects.Player
                 _previousPitch = _pitch;
             }
 
+            int simulatedTicks = 0;
             bool isSafeZone = _owner.World?.Terrain != null
                 && _owner.World.Terrain.RequestTerrainFlag(
                     (int)_owner.Location.X, (int)_owner.Location.Y)
@@ -281,6 +282,7 @@ namespace Client.Main.Objects.Player
                         StepAttack(ownerWorld);
 
                     _stepAccumulator -= NativeTickSeconds;
+                    simulatedTicks++;
                 }
             }
 
@@ -296,7 +298,10 @@ namespace Client.Main.Objects.Player
             ApplyWorldSpaceTransform(displayPosition, displayYaw, displayPitch);
             base.Update(gameTime);
 
-            if (!isSafeZone && _visualState != RavenVisualState.Flight)
+            // Emit on actual native ticks, not on every rendered frame.
+            // Otherwise 120 FPS would create 4.8x the original pet particles.
+            if (!isSafeZone && simulatedTicks > 0 &&
+                _visualState != RavenVisualState.Flight)
                 EmitNativeAttackEffects();
         }
 
