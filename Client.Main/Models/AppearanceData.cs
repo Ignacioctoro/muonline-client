@@ -117,6 +117,33 @@ namespace Client.Main.Models
         /// </summary>
         public bool IsExtendedFormat => Format == AppearanceFormat.Extended25Byte || Format == AppearanceFormat.Extended27Byte;
 
+        /// <summary>
+        /// Visual Raven tier supplied by BroyalMU OpenMU in the two reserved bits
+        /// of the right-hand ShinyItem third byte of character-list appearance.
+        /// 0: level 0..19, 20: 20..39, 40: 40+. This is *not* the pet's exact
+        /// level, and is ignored for all other equipment and classic 18-byte
+        /// appearance data. In-game C1 A9 remains authoritative.
+        /// </summary>
+        public int DarkRavenPreviewVisualLevel
+        {
+            get
+            {
+                if (!IsExtendedFormat ||
+                    RightHandItemGroup != 13 || RightHandItemNumber != 5)
+                    return 0;
+
+                // Extended27 = 2-byte class/pose header + 25 bytes of
+                // equipment. Extended25 begins directly at left-hand slot.
+                int offset = Format == AppearanceFormat.Extended27Byte ? 7 : 5;
+                ReadOnlySpan<byte> bytes = RawData;
+                if (bytes.Length <= offset)
+                    return 0;
+
+                int tier = bytes[offset] & 0x03;
+                return tier == 2 ? 40 : tier == 1 ? 20 : 0;
+            }
+        }
+
         // ------------------------------------------------------------------
         // Extended format parsing helpers (25/27-byte SourceMain5.2 format)
         // Structure per equipment slot (3 bytes):
