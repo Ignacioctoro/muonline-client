@@ -1,6 +1,8 @@
 using Client.Main.Content;
 using Client.Main.Models;
 using Client.Main.Controls;
+using Client.Main.ClassicFX.Core;
+using Client.Main.ClassicFX.Data;
 using Microsoft.Xna.Framework;
 using System;
 using System.Threading.Tasks;
@@ -26,6 +28,26 @@ namespace Client.Main.Objects.Player
         private const float PerchArrivalDistanceSquared = 50f * 50f;
         private const float NativeScale = 0.7f;
         private const float DegToRad = MathF.PI / 180f;
+
+        // These states mirror CSPetDarkSpirit: flight, physical rush/escape,
+        // and magic/range cast. They NEVER calculate hits or damage.
+        private enum RavenVisualState { Flight, Rush, Escape, Magic }
+        private RavenVisualState _visualState;
+        private WalkerObject _attackTarget;
+        private WalkerObject _queuedTarget;
+        private bool _queuedMagic;
+        private float _attackVelocity;
+        private float _attackGravity;
+        private int _attackTicks;
+
+        // Interpolate the DISPLAY between original 25-Hz simulation samples.
+        // Never interpolate the perched attachment: it must stay on bone 37.
+        private Vector3 _previousFlightPosition;
+        private float _previousYaw;
+        private float _previousPitch;
+
+        protected override bool RequiresPerFrameAnimation => true;
+        public override bool IsStaticForCaching => false;
 
         private readonly PlayerObject _owner;
         private readonly Random _random = new();
@@ -70,6 +92,10 @@ namespace Client.Main.Objects.Player
             _isPerched = false;
             _stepAccumulator = 0f;
             _recoveryFrames = 0f;
+            _visualState = RavenVisualState.Flight;
+            _attackTarget = null;
+            _queuedTarget = null;
+            _attackTicks = 0;
 
             if (equipped && Model == null && !_loadingModel)
                 _ = LoadRavenModelAsync();
@@ -102,6 +128,71 @@ namespace Client.Main.Objects.Player
             }
         }
 
+        /// <summary>
+        /// Consume an OpenMU C1 A8 attack notification, on the world/update
+        /// thread only. In a fast 3-hit ranged burst, update the magic target
+        /// without restarting its fifteen native-tick effect phase.
+        /// </summary>
+        public void StartServerAttack(WalkerObject target, bool isRangeAttack)
+        {
+            if (!_equipped || target == null || World == null ||
+                !ReferenceEquals(target.World, World) || _isPerched)
+                return;
+
+            if (_visualState == RavenVisualState.Magic && isRangeAttack)
+            {
+                _attackTarget = target;
+                return;
+            }
+
+            if (_visualState == RavenVisualState.Rush && !isRangeAttack &&
+                ReferenceEquals(_attackTarget, target))
+                return;
+
+            if (_visualState != RavenVisualState.Flight)
+            {
+                // Keep the newest event only. Never queue unbounded animations
+                // when a high-level raven attacks every 100 milliseconds.
+                _queuedTarget = target;
+                _queuedMagic = isRangeAttack;
+                return;
+            }
+
+            BeginServerAttack(target, isRangeAttack);
+        }
+
+        private void BeginServerAttack(WalkerObject target, bool isRangeAttack)
+        {
+            _attackTarget = target;
+            _attackTicks = 0;
+            _visualState = isRangeAttack ? RavenVisualState.Magic : RavenVisualState.Rush;
+            if (isRangeAttack)
+            {
+                CurrentAction = 0; // Original magic action uses light effects.
+            }
+            else
+            {
+                _attackVelocity = 20f + _random.Next(10);
+                _attackGravity = 0.5f;
+                CurrentAction = 3; // darkspirit.bmd rush/escape action
+            }
+        }
+
+        private void FinishServerAttack()
+        {
+            _visualState = RavenVisualState.Flight;
+            _attackTarget = null;
+            _attackTicks = 0;
+            if (_queuedTarget != null)
+            {
+                var nextTarget = _queuedTarget;
+                bool nextIsMagic = _queuedMagic;
+                _queuedTarget = null;
+                if (ReferenceEquals(nextTarget.World, World))
+                    BeginServerAttack(nextTarget, nextIsMagic);
+            }
+        }
+
         public override void Update(GameTime gameTime)
         {
             if (!_equipped || World == null)
@@ -119,8 +210,12 @@ namespace Client.Main.Objects.Player
                 _velocityY = -3f;
                 _velocityZ = 0f;
                 _hasPosition = true;
+                _previousFlightPosition = _flightPosition;
+                _previousYaw = _yaw;
+                _previousPitch = _pitch;
             }
 
+            int simulatedTicks = 0;
             bool isSafeZone = _owner.World?.Terrain != null
                 && _owner.World.Terrain.RequestTerrainFlag(
                     (int)_owner.Location.X, (int)_owner.Location.Y)
@@ -128,6 +223,9 @@ namespace Client.Main.Objects.Player
 
             if (isSafeZone)
             {
+                _visualState = RavenVisualState.Flight;
+                _attackTarget = null;
+                _queuedTarget = null;
                 // The original client has two distinct states:
                 // PET_STAND_START approaches the arm; PET_STAND is attached
                 // to bone 37 on every frame (including walking frames).
@@ -160,6 +258,9 @@ namespace Client.Main.Objects.Player
                 CurrentAction = _isPerched ? 2 : 1;
                 _stepAccumulator = 0f;
                 _recoveryFrames = 0f;
+                _previousFlightPosition = _flightPosition;
+                _previousYaw = _yaw;
+                _previousPitch = _pitch;
             }
             else
             {
@@ -168,18 +269,40 @@ namespace Client.Main.Objects.Player
                     _stepAccumulator + (float)gameTime.ElapsedGameTime.TotalSeconds,
                     NativeTickSeconds * 4f);
 
-                // Original pet movement is expressed per simulation tick.
-                // Fixed steps prevent FPS-dependent speed on Windows / Android.
+                // Native 25-Hz simulation, with independent visual interpolation.
+                // At most four ticks after a hitch, without taking huge steps.
                 while (_stepAccumulator >= NativeTickSeconds)
                 {
-                    StepFlight(ownerWorld);
+                    _previousFlightPosition = _flightPosition;
+                    _previousYaw = _yaw;
+                    _previousPitch = _pitch;
+                    if (_visualState == RavenVisualState.Flight)
+                        StepFlight(ownerWorld);
+                    else
+                        StepAttack(ownerWorld);
+
                     _stepAccumulator -= NativeTickSeconds;
+                    simulatedTicks++;
                 }
             }
 
-            ApplyWorldSpaceTransform();
+            float alpha = isSafeZone ? 1f :
+                MathHelper.Clamp(_stepAccumulator / NativeTickSeconds, 0f, 1f);
+            Vector3 displayPosition = isSafeZone ? _flightPosition :
+                Vector3.Lerp(_previousFlightPosition, _flightPosition, alpha);
+            float displayYaw = isSafeZone ? _yaw :
+                _previousYaw + WrapAngle(_yaw - _previousYaw) * alpha;
+            float displayPitch = isSafeZone ? _pitch :
+                MathHelper.Lerp(_previousPitch, _pitch, alpha);
 
+            ApplyWorldSpaceTransform(displayPosition, displayYaw, displayPitch);
             base.Update(gameTime);
+
+            // Emit on actual native ticks, not on every rendered frame.
+            // Otherwise 120 FPS would create 4.8x the original pet particles.
+            if (!isSafeZone && simulatedTicks > 0 &&
+                _visualState != RavenVisualState.Flight)
+                EmitNativeAttackEffects();
         }
 
         /// <summary>
@@ -205,7 +328,7 @@ namespace Client.Main.Objects.Player
                 _owner.WorldPosition.Translation);
             _yaw = _owner.Angle.Z - 120f * DegToRad;
             _pitch = 0f;
-            ApplyWorldSpaceTransform();
+            ApplyWorldSpaceTransform(_flightPosition, _yaw, _pitch);
         }
 
         private Vector3 GetPerchWorldPosition(Vector3 ownerWorld)
@@ -219,14 +342,116 @@ namespace Client.Main.Objects.Player
                 : ownerWorld + new Vector3(0f, 0f, 250f);
         }
 
-        private void ApplyWorldSpaceTransform()
+        private void ApplyWorldSpaceTransform(Vector3 worldPosition, float yaw, float pitch)
         {
-            // Raven remains an owner child for lifetime/visibility, but
-            // its flight position is world-space. Avoid applying the
-            // owner's transform twice.
+            // World-space flight; compensate the owner matrix once, not twice.
             Matrix parentInverse = Matrix.Invert(_owner.WorldPosition);
-            Position = Vector3.Transform(_flightPosition, parentInverse);
-            Angle = new Vector3(_pitch, 0f, _yaw - _owner.Angle.Z);
+            Position = Vector3.Transform(worldPosition, parentInverse);
+            Angle = new Vector3(pitch, 0f, yaw - _owner.Angle.Z);
+        }
+
+        private void StepAttack(Vector3 ownerWorld)
+        {
+            // Native PET_ATTACK/PET_ESCAPE uses action 3 and an accelerating
+            // forward velocity. PET_ATTACK_MAGIC tracks the notified target
+            // for 15 reference ticks and returns to flight.
+            if (_visualState == RavenVisualState.Magic)
+            {
+                if (_attackTarget == null || !ReferenceEquals(_attackTarget.World, World))
+                {
+                    FinishServerAttack();
+                    return;
+                }
+                Vector3 target = _attackTarget.WorldPosition.Translation;
+                float wanted = MathF.Atan2(target.X - _flightPosition.X,
+                    -(target.Y - _flightPosition.Y));
+                _yaw += Math.Clamp(WrapAngle(wanted - _yaw), -40f * DegToRad, 40f * DegToRad);
+                CurrentAction = 0;
+                if (++_attackTicks >= 15)
+                    FinishServerAttack();
+                return;
+            }
+
+            if (_visualState == RavenVisualState.Rush &&
+                (_attackTarget == null || !ReferenceEquals(_attackTarget.World, World)))
+            {
+                FinishServerAttack();
+                return;
+            }
+
+            Matrix rotation = Matrix.CreateRotationX(_pitch) * Matrix.CreateRotationZ(_yaw);
+            _flightPosition += Vector3.Transform(
+                new Vector3(0f, -Math.Max(0f, _attackVelocity), 0f), rotation);
+
+            if (_visualState == RavenVisualState.Rush)
+            {
+                Vector3 target = _attackTarget.WorldPosition.Translation + new Vector3(0f, 0f, 50f);
+                Vector3 delta = target - _flightPosition;
+                float horizontal = MathF.Sqrt(delta.X * delta.X + delta.Y * delta.Y);
+                float wantedYaw = MathF.Atan2(delta.X, -delta.Y);
+                float wantedPitch = -MathF.Atan2(delta.Z, Math.Max(1f, horizontal));
+                float maxTurn = _attackVelocity * DegToRad;
+                _yaw += Math.Clamp(WrapAngle(wantedYaw - _yaw), -maxTurn, maxTurn);
+                _pitch += Math.Clamp(wantedPitch - _pitch, -maxTurn, maxTurn);
+                _attackVelocity += _attackGravity;
+                _attackGravity += 0.2f;
+                if (delta.LengthSquared() < 20f * 20f || ++_attackTicks > 20)
+                {
+                    _visualState = RavenVisualState.Escape;
+                    _pitch = -45f * DegToRad;
+                    _attackTicks = 0;
+                }
+            }
+            else if (_visualState == RavenVisualState.Escape)
+            {
+                float dx = ownerWorld.X - _flightPosition.X;
+                float dy = ownerWorld.Y - _flightPosition.Y;
+                _attackVelocity = Math.Max(0f, _attackVelocity - 1f);
+                if (dx * dx + dy * dy >= 250f * 250f || ++_attackTicks >= 45)
+                    FinishServerAttack();
+            }
+            CurrentAction = 3;
+        }
+
+        private void EmitNativeAttackEffects()
+        {
+            var fx = World?.ClassicFx;
+            if (fx == null || !fx.Enabled || fx.IsDisposed)
+                return;
+
+            // These are original CSPetDarkSpirit::AttackEffect primitives.
+            // Unsupported native DarkLordSkill subtype 3 is intentionally
+            // not substituted with an unrelated client-side effect.
+            if (_visualState == RavenVisualState.Rush &&
+                _attackTicks > 3 && (_attackTicks & 1) == 1 &&
+                _flightPosition.Z > _owner.WorldPosition.Translation.Z + 100f)
+            {
+                var bones = GetBoneTransforms();
+                if (bones != null && bones.Length > 6)
+                {
+                    Vector3 origin = Vector3.Transform(new Vector3(50f, 0f, 0f),
+                        bones[6] * WorldPosition);
+                    fx.CreateEffect(ClassicFxEffectType.AirForce, origin, Angle,
+                        Vector3.One, ClassicFxOwner.FromWorldObject(this));
+                }
+            }
+            else if (_visualState == RavenVisualState.Magic && _attackTicks < 15)
+            {
+                var bones = GetBoneTransforms();
+                if (bones == null || bones.Length == 0)
+                    return;
+                // Original uses every other non-dummy BMD bone. Sample a
+                // bounded subset to avoid overwhelming mobile particle pools.
+                int count = Math.Min(66, bones.Length);
+                int stride = count > 24 ? 4 : 2;
+                for (int bone = _attackTicks & 1; bone < count; bone += stride)
+                {
+                    Vector3 origin = Vector3.Transform(Vector3.Zero,
+                        bones[bone] * WorldPosition);
+                    fx.CreateParticle(ClassicTextureIds.BitmapLight, origin, Angle,
+                        new Vector3(1f, 0.6f, 0.4f), subType: 6, scale: 1.3f);
+                }
+            }
         }
 
         private void StepFlight(Vector3 ownerWorld)
@@ -290,6 +515,7 @@ namespace Client.Main.Objects.Player
             {
                 // Classic lost-pet recovery, not a persistent teleport loop.
                 _flightPosition = ownerWorld + new Vector3(0f, 0f, 250f);
+                _previousFlightPosition = _flightPosition; // never interpolate a recovery teleport
                 _recoveryFrames = 0f;
             }
         }
