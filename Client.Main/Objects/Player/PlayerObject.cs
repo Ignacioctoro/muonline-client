@@ -2524,8 +2524,22 @@ namespace Client.Main.Objects.Player
             return PlayerAction.PlayerWalkFemale;
         }
 
-        private PlayerAction GetRelaxedIdleAction() => _isFemale ? PlayerAction.PlayerStopFemale : PlayerAction.PlayerStopMale;
-        private PlayerAction GetRelaxedWalkAction() => _isFemale ? PlayerAction.PlayerWalkFemale : PlayerAction.PlayerWalkMale;
+        // MuMain ZzzCharacter.cpp: standing/walking in a safe zone while
+        // the Dark Spirit is equipped uses the special raised-arm DL poses.
+        // The raven can only perch on bone 37 once that pose is selected.
+        // Keep normal idle/walk for other classes and unequipped Dark Lords.
+        private bool ShouldPerchDarkRaven =>
+            IsDarkLordClass(CharacterClass) && DarkRaven?.IsEquipped == true;
+
+        private PlayerAction GetRelaxedIdleAction() =>
+            ShouldPerchDarkRaven
+                ? PlayerAction.PlayerDarklordStand
+                : (_isFemale ? PlayerAction.PlayerStopFemale : PlayerAction.PlayerStopMale);
+
+        private PlayerAction GetRelaxedWalkAction() =>
+            ShouldPerchDarkRaven
+                ? PlayerAction.PlayerDarklordWalk
+                : (_isFemale ? PlayerAction.PlayerWalkFemale : PlayerAction.PlayerWalkMale);
 
         // ───────────────────────────────── VEHICLE/MOUNT SUPPORT ─────────────────────────────────
 

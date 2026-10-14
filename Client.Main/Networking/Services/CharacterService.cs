@@ -34,6 +34,27 @@ namespace Client.Main.Networking.Services
         }
 
         /// <summary>
+        /// Sends Season 6 Dark Raven behavior requests to OpenMU (C1 A7).
+        /// This is intentionally separate from normal skill cast packets.
+        /// </summary>
+        public async Task SendDarkRavenCommandAsync(byte mode, ushort targetId = 0xFFFF)
+        {
+            if (!_connectionManager.IsConnected || mode > 3)
+                return;
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                    PacketBuilder.BuildDarkRavenCommandPacket(
+                        _connectionManager.Connection.Output, mode, targetId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not send Dark Raven command {Mode} target {Target}", mode, targetId);
+            }
+        }
+
+        /// <summary>
         /// Sends a request to drop an item from inventory onto the ground at the specified tile.
         /// </summary>
         /// <param name="tileX">Target tile X.</param>

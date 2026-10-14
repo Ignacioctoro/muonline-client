@@ -71,6 +71,10 @@ namespace Client.Main.Core.Utilities
         public static string GetSkillName(
             int skillId)
         {
+            // UI-only commands; never use skill.bmd for 120..123.
+            if (DarkRavenCommands.IsCommandSkill((ushort)skillId))
+                return DarkRavenCommands.GetName((ushort)skillId);
+
             if (Season6SkillActionDatabase.TryGet(
                     (ushort)skillId,
                     out var route))
