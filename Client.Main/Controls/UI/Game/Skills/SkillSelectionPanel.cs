@@ -714,7 +714,7 @@ namespace Client.Main.Controls.UI.Game.Skills
 
             _allSkills =
                 characterState
-                    .GetSkills()
+                    .GetSelectableSkills()
                     .OrderBy(
                         skill =>
                             skill.SkillId)
