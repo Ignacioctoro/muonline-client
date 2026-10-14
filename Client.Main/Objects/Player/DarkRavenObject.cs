@@ -116,6 +116,20 @@ namespace Client.Main.Objects.Player
                 _ = LoadRavenModelAsync();
         }
 
+        /// <summary>
+        /// Character selection has only the appearance packet, not an active
+        /// character inventory for a C1 A9 request. Use the visual tier
+        /// embedded by our OpenMU character-list serializer. This never changes
+        /// the live pet's server-authoritative level, commands or damage.
+        /// </summary>
+        public void SetCharacterSelectionVisualLevel(int visualLevel)
+        {
+            if (!_equipped || _owner.IsMainWalker)
+                return;
+
+            _nativePetLevel = visualLevel >= 40 ? 40 : visualLevel >= 20 ? 20 : 0;
+        }
+
         private async Task LoadRavenModelAsync()
         {
             _loadingModel = true;
