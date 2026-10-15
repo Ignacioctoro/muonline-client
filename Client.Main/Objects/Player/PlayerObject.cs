@@ -1646,6 +1646,62 @@ namespace Client.Main.Objects.Player
             base.Draw(gameTime);
         }
 
+        /// <summary>
+        /// Always-visible Season 6 Personal Store title, separate from hover names.
+        /// Uses the server-advertised network ID and existing world projection.
+        /// </summary>
+        public override void DrawAfter(GameTime gameTime)
+        {
+            base.DrawAfter(gameTime);
+            if (!Visible || NetworkId == 0 || World == null)
+                return;
+
+            var scope = MuGame.Network?.GetScopeManager();
+            if (scope == null || !scope.TryGetPlayerShop(NetworkId, out string shopName) ||
+                string.IsNullOrWhiteSpace(shopName))
+                return;
+
+            var graphics = GraphicsManager.Instance;
+            var font = graphics?.Font;
+            var sprite = graphics?.Sprite;
+            var pixel = graphics?.Pixel;
+            if (font == null || sprite == null || pixel == null)
+                return;
+
+            var bounds = BoundingBoxWorld;
+            Vector3 anchor = new((bounds.Min.X + bounds.Max.X) * 0.5f,
+                (bounds.Min.Y + bounds.Max.Y) * 0.5f, bounds.Max.Z + 65f);
+            Vector3 screen = GraphicsDevice.Viewport.Project(anchor,
+                Camera.Instance.Projection, Camera.Instance.View, Matrix.Identity);
+            if (screen.Z < 0f || screen.Z > 1f)
+                return;
+
+            float scale = MathF.Max(0.25f, 0.42f * Constants.RENDER_SCALE);
+            Vector2 size = font.MeasureString(shopName) * scale;
+            var rect = new Rectangle(
+                (int)MathF.Round(screen.X - size.X * 0.5f - 6f),
+                (int)MathF.Round(screen.Y - size.Y - 6f),
+                (int)MathF.Ceiling(size.X + 12f),
+                (int)MathF.Ceiling(size.Y + 8f));
+            if (rect.Right < 0 || rect.Left >= GraphicsDevice.Viewport.Width ||
+                rect.Bottom < 0 || rect.Top >= GraphicsDevice.Viewport.Height)
+                return;
+
+            using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
+                BlendState.NonPremultiplied, SamplerState.LinearClamp,
+                DepthStencilState.None, RasterizerState.CullNone))
+            {
+                sprite.Draw(pixel, rect, new Color(22, 19, 13, 205));
+                sprite.DrawString(font, shopName,
+                    new Vector2(rect.X + 6, rect.Y + 4) + Vector2.One,
+                    Color.Black, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                sprite.DrawString(font, shopName,
+                    new Vector2(rect.X + 6, rect.Y + 4),
+                    new Color(249, 206, 100), 0f, Vector2.Zero, scale,
+                    SpriteEffects.None, 0f);
+            }
+        }
+
         private void UpdateEquipmentAnimationStride()
         {
             int desiredStride = 1;
