@@ -107,7 +107,7 @@ namespace Client.Main.Controls.UI.Game
         private int _previewIndex;
         private double _missingPreviewCooldown;
         private readonly Dictionary<string, int> _previewRetryCounts = new(StringComparer.Ordinal);
-        private const int MaxMissingPreviewRetries = 24;
+        private const int MaxMissingPreviewRetries = 90; // allow slower Android/reconnect asset loading
         private readonly TextFieldControl _priceInput;
         private readonly TextFieldControl _storeNameInput;
         private bool _priceEditorVisible;
