@@ -1038,6 +1038,41 @@ namespace Client.Main.Networking.Services
             }
         }
         /// <summary>
+        /// Set Zen price on an absolute player-shop item slot (204..235).
+        /// OpenMU expects C3 3F 01 with little-endian uint price and only
+        /// accepts the change when the personal shop is not publicly open.
+        /// Returns whether the request was sent, NOT whether it was accepted.
+        /// </summary>
+        public async Task<bool> SendPlayerShopSetItemPriceAsync(byte absoluteSlot, uint zen)
+        {
+            if (!_connectionManager.IsConnected || zen > int.MaxValue ||
+                absoluteSlot < 204 || absoluteSlot > 235)
+                return false;
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    var packet = new PlayerShopSetItemPrice(
+                        _connectionManager.Connection.Output.GetMemory(PlayerShopSetItemPrice.Length)
+                            .Slice(0, PlayerShopSetItemPrice.Length));
+                    packet.ItemSlot = absoluteSlot;
+                    packet.Price = zen;
+                    return PlayerShopSetItemPrice.Length;
+                });
+                _logger.LogInformation("Personal Store price request sent: slot {Slot}, {Zen} Zen",
+                    absoluteSlot, zen);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send Personal Store price request for slot {Slot}.",
+                    absoluteSlot);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Requests the item list of another player's personal store.
         /// </summary>
         public async Task SendPlayerStoreListRequestAsync(ushort targetPlayerId, string targetPlayerName)
