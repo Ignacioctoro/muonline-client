@@ -1653,7 +1653,7 @@ namespace Client.Main.Objects.Player
         public override void DrawAfter(GameTime gameTime)
         {
             base.DrawAfter(gameTime);
-            if (!Visible || NetworkId == 0 || World == null)
+            if (!Visible || World == null)
                 return;
 
             var scope = MuGame.Network?.GetScopeManager();
