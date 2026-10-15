@@ -140,28 +140,32 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
         /// <summary>
         /// C2 3F 05: the real item list for another player's public shop.
-        /// Extended format has variable-size item data; the classic format
-        /// has fixed 20-byte records. Offsets account for the C2 subcode.
+        /// OpenMU's generated packet definition writes Action at byte 4,
+        /// overlapping the nominal C2 subcode. Success is byte 5, not 6.
+        /// Extended items are variable-sized; classic items are 20 bytes.
         /// </summary>
         [PacketHandler(0x3F, 0x05)]
         public Task HandlePlayerShopItemListAsync(Memory<byte> packet)
         {
             var span = packet.Span;
-            if (span.Length < 56 || span[0] != 0xC2 ||
-                span[3] != 0x3F || span[4] != 0x05)
+            if (span.Length < 55 || span[0] != 0xC2 ||
+                span[3] != 0x3F || (span[4] != 0x05 && span[4] != 0x13))
             {
                 _logger.LogWarning("Invalid Personal Store item list packet, length {Length}.", span.Length);
                 return Task.CompletedTask;
             }
 
-            byte action = span[5];
+            // Byte 4 is Action (05=ByRequest, 13=UpdateAfterItemChange).
+            // The generated OpenMU Ref structure deliberately writes this at
+            // the nominal subcode position. Byte 5 is Success.
+            byte action = span[4];
             if (action != 5 && action != 19)
             {
                 _logger.LogWarning("Unexpected Personal Store list action {Action}.", action);
                 return Task.CompletedTask;
             }
 
-            if (span[6] == 0)
+            if (span[5] == 0)
             {
                 MuGame.ScheduleOnMainThread(() =>
                 {
@@ -173,11 +177,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 return Task.CompletedTask;
             }
 
-            ushort sellerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(7, 2));
-            string sellerName = Encoding.UTF8.GetString(span.Slice(9, 10)).TrimEnd('\0');
-            string shopName = Encoding.UTF8.GetString(span.Slice(19, 36)).TrimEnd('\0');
-            int itemCount = span[55];
-            int position = 56;
+            ushort sellerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(6, 2));
+            string sellerName = Encoding.UTF8.GetString(span.Slice(8, 10)).TrimEnd('\0');
+            string shopName = Encoding.UTF8.GetString(span.Slice(18, 36)).TrimEnd('\0');
+            int itemCount = span[54];
+            int position = 55;
             bool classic = span.Length - position == itemCount * 20;
             var entries = new System.Collections.Generic.List<(byte Slot, uint Price, byte[] Data)>(itemCount);
             for (int i = 0; i < itemCount; i++)
@@ -245,6 +249,14 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             });
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// OpenMU sends action 0x13 at C2 offset 4 after item changes,
+        /// so route those updates through the same verified parser.
+        /// </summary>
+        [PacketHandler(0x3F, 0x13)]
+        public Task HandlePlayerShopItemListUpdateAsync(Memory<byte> packet) =>
+            HandlePlayerShopItemListAsync(packet);
 
         /// <summary>
         /// C1 3F 06: purchase acknowledgement. Server-provided inventory slot,
