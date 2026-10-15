@@ -2308,7 +2308,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             if (_storeButtonHovered)
             {
-                // TODO: Open Personal Store.
+                PersonalStoreControl.Instance.ShowWindow();
                 return true;
             }
 
