@@ -71,6 +71,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 // Closures are broadcast to everyone in scope, not just owner.
                 MuGame.Network?.GetScopeManager()?.RemovePlayerShop(ownerId);
+                MuGame.ScheduleOnMainThread(() =>
+                    PersonalStoreBuyerControl.Instance.HandleSellerClosed(ownerId));
                 if ((ownerId & 0x7FFF) == (_characterState.Id & 0x7FFF))
                 {
                     MuGame.ScheduleOnMainThread(() =>
@@ -116,6 +118,144 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         PersonalStoreControl.Instance.HandleOwnStoreAnnounced(ownName));
                 }
             }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// C2 3F 05: the real item list for another player's public shop.
+        /// Extended format has variable-size item data; the classic format
+        /// has fixed 20-byte records. Offsets account for the C2 subcode.
+        /// </summary>
+        [PacketHandler(0x3F, 0x05)]
+        public Task HandlePlayerShopItemListAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 56 || span[0] != 0xC2 ||
+                span[3] != 0x3F || span[4] != 0x05)
+            {
+                _logger.LogWarning("Invalid Personal Store item list packet, length {Length}.", span.Length);
+                return Task.CompletedTask;
+            }
+
+            byte action = span[5];
+            if (action != 5 && action != 19)
+            {
+                _logger.LogWarning("Unexpected Personal Store list action {Action}.", action);
+                return Task.CompletedTask;
+            }
+
+            if (span[6] == 0)
+            {
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    var scene = MuGame.Instance?.ActiveScene as GameScene;
+                    scene?.ChatLog?.AddMessage("Personal Store",
+                        "OpenMU refused the request to view this store.",
+                        Client.Main.Models.MessageType.System);
+                });
+                return Task.CompletedTask;
+            }
+
+            ushort sellerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(7, 2));
+            string sellerName = Encoding.UTF8.GetString(span.Slice(9, 10)).TrimEnd('\0');
+            string shopName = Encoding.UTF8.GetString(span.Slice(19, 36)).TrimEnd('\0');
+            int itemCount = span[55];
+            int position = 56;
+            bool classic = span.Length - position == itemCount * 20;
+            var entries = new System.Collections.Generic.List<(byte Slot, uint Price, byte[] Data)>(itemCount);
+            for (int i = 0; i < itemCount; i++)
+            {
+                byte slot;
+                uint price;
+                byte[] data;
+                if (classic)
+                {
+                    if (position + 20 > span.Length)
+                    {
+                        _logger.LogWarning("Truncated classic Personal Store list.");
+                        return Task.CompletedTask;
+                    }
+                    slot = span[position];
+                    data = span.Slice(position + 1, 12).ToArray();
+                    price = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(position + 16, 4));
+                    position += 20;
+                }
+                else
+                {
+                    if (position + 9 > span.Length)
+                    {
+                        _logger.LogWarning("Truncated extended Personal Store list.");
+                        return Task.CompletedTask;
+                    }
+                    price = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(position, 4));
+                    slot = span[position + 8];
+                    position += 9;
+                    if (!ItemDataParser.TryGetExtendedItemLength(span.Slice(position),
+                        out int itemLength) || itemLength <= 0 ||
+                        position + itemLength > span.Length)
+                    {
+                        _logger.LogWarning("Unparseable extended Personal Store item {Index}.", i);
+                        return Task.CompletedTask;
+                    }
+                    data = span.Slice(position, itemLength).ToArray();
+                    position += itemLength;
+                }
+                if (slot < PersonalStoreControl.FirstStoreSlot ||
+                    slot >= PersonalStoreControl.FirstStoreSlot + PersonalStoreControl.SlotCount)
+                {
+                    _logger.LogWarning("Ignoring invalid Personal Store slot {Slot}.", slot);
+                    continue;
+                }
+                entries.Add((slot, price, data));
+            }
+
+            if (position != span.Length)
+            {
+                _logger.LogWarning("Personal Store list has {Bytes} unexpected trailing bytes.",
+                    span.Length - position);
+                return Task.CompletedTask;
+            }
+
+            _logger.LogInformation("Personal Store list from {Name} id={Id:X4}: {Count} items, action={Action}, classic={Classic}",
+                sellerName, sellerId, entries.Count, action, classic);
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                var buyer = PersonalStoreBuyerControl.Instance;
+                if (action == 5 || buyer.IsViewing(sellerId))
+                {
+                    buyer.ShowListing(sellerId, sellerName, shopName, entries);
+                }
+            });
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// C1 3F 06: purchase acknowledgement. Server-provided inventory slot,
+        /// item bytes and Zen updates are authoritative, not client projections.
+        /// </summary>
+        [PacketHandler(0x3F, 0x06)]
+        public Task HandlePlayerShopBuyResultAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 8 || span[0] != 0xC1 ||
+                span[2] != 0x3F || span[3] != 0x06)
+                return Task.CompletedTask;
+
+            // Season 6 uses PlayerShopBuyResultExtended. Earlier client versions
+            // use a fixed 21-byte packet with a different field order.
+            bool extended = _targetVersion >= TargetProtocolVersion.Season6;
+            byte result = extended ? span[6] : span[4];
+            byte inventorySlot = extended ? span[7] : span.Length >= 21 ? span[20] : (byte)255;
+            int dataStart = extended ? 8 : 7;
+            int dataLength = extended ? span.Length - 8 : Math.Min(13, span.Length - 8);
+            if (result == 1 && inventorySlot < PersonalStoreControl.FirstStoreSlot && dataLength > 0)
+            {
+                // OpenMU has already completed and committed the transfer.
+                _characterState.AddOrUpdateInventoryItem(inventorySlot,
+                    span.Slice(dataStart, dataLength).ToArray());
+            }
+            MuGame.ScheduleOnMainThread(() =>
+                PersonalStoreBuyerControl.Instance.HandleBuyResult(result));
             return Task.CompletedTask;
         }
 
