@@ -784,39 +784,30 @@ namespace Client.Main.Controls.UI.Game
             if (_layoutTexture != null &&
                 _layoutInfos.Count > 0)
             {
-                foreach (var info in
-                         _layoutInfos.OrderBy(i => i.Z))
+                // Board, ContentBorder and TopCorner are successive pieces of
+                // the same GFx frame. Their old layout widths (253 / 273)
+                // must not give them independent outer borders.
+                // Draw the top last to conceal the 6px vertical overlap.
+                foreach (var info in _layoutInfos
+                    .OrderBy(i => i.Name == "Board" ? 0 :
+                                  i.Name == "ContentBorder" ? 1 : 2))
                 {
-                    var destRect =
-                        new Rectangle(
-                            CenteredFrameX(info.Width),
-                            ScaleClassicY(info.ScreenY),
-                            (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X),
-                            ScaleClassicSize(info.Height));
+                    var destRect = new Rectangle(
+                        _headerRect.X,
+                        ScaleClassicY(info.ScreenY),
+                        _headerRect.Width,
+                        ScaleClassicSize(info.Height));
 
-                    if (_textureRectLookup.TryGetValue(
-                            info.Name,
-                            out var srcData))
+                    if (_textureRectLookup.TryGetValue(info.Name, out var srcData))
                     {
-                        var sourceRect =
-                            new Rectangle(
-                                srcData.X,
-                                srcData.Y,
-                                srcData.Width,
-                                srcData.Height);
+                        var sourceRect = new Rectangle(
+                            srcData.X, srcData.Y, srcData.Width, srcData.Height);
 
-                        spriteBatch.Draw(
-                            _layoutTexture,
-                            destRect,
-                            sourceRect,
-                            Color.White);
+                        DrawAlignedFramePiece(spriteBatch, info.Name, destRect, sourceRect);
                     }
                     else
                     {
-                        spriteBatch.Draw(
-                            _layoutTexture,
-                            destRect,
-                            Color.White);
+                        spriteBatch.Draw(_layoutTexture, destRect, Color.White);
                     }
                 }
             }
@@ -842,6 +833,45 @@ namespace Client.Main.Controls.UI.Game
 
             DrawClassicFooter(
                 spriteBatch);
+        }
+
+        // The middle and lower pieces use a 325px source crop, while the
+        // header uses 350px. Stretch ONLY the central strip horizontally:
+        // keeping the 16px side rails unscaled avoids distorted borders,
+        // and all three layers now meet the same left/right frame edges.
+        // Heights and the 8x15 item grid remain completely unchanged.
+        private void DrawAlignedFramePiece(
+            SpriteBatch spriteBatch,
+            string pieceName,
+            Rectangle destination,
+            Rectangle source)
+        {
+            const int rail = 16;
+            if (pieceName == "TopCorner" ||
+                source.Width <= rail * 2 ||
+                destination.Width <= rail * 2)
+            {
+                spriteBatch.Draw(_layoutTexture, destination, source, Color.White);
+                return;
+            }
+
+            spriteBatch.Draw(
+                _layoutTexture,
+                new Rectangle(destination.X, destination.Y, rail, destination.Height),
+                new Rectangle(source.X, source.Y, rail, source.Height),
+                Color.White);
+            spriteBatch.Draw(
+                _layoutTexture,
+                new Rectangle(destination.X + rail, destination.Y,
+                    destination.Width - rail * 2, destination.Height),
+                new Rectangle(source.X + rail, source.Y,
+                    source.Width - rail * 2, source.Height),
+                Color.White);
+            spriteBatch.Draw(
+                _layoutTexture,
+                new Rectangle(destination.Right - rail, destination.Y, rail, destination.Height),
+                new Rectangle(source.Right - rail, source.Y, rail, source.Height),
+                Color.White);
         }
 
         private void DrawVaultTitle(
