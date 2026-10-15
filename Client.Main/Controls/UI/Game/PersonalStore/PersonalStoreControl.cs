@@ -288,6 +288,11 @@ namespace Client.Main.Controls.UI.Game
             CancelPriceEditor();
             _storeNameInput.Blur();
             _storeNameInput.Visible = false;
+            // The scene focus must never remain on a hidden text field.
+            if (Scene != null &&
+                (Scene.FocusControl == _storeNameInput ||
+                 Scene.FocusControl == _priceInput))
+                Scene.FocusControl = null;
             _longPressItem = null;
             _longPressElapsedMilliseconds = 0;
             _suppressLongPressRelease = false;
@@ -696,6 +701,17 @@ namespace Client.Main.Controls.UI.Game
                                     previous.LeftButton == ButtonState.Pressed;
             bool leftJustPressed = current.LeftButton == ButtonState.Pressed &&
                                    previous.LeftButton == ButtonState.Released;
+
+            if (!_priceEditorVisible && _storeNameInput.IsFocused &&
+                MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
+                MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape))
+            {
+                Scene?.ConsumeKeyboardEscape();
+                _storeNameInput.Blur();
+                if (Scene?.FocusControl == _storeNameInput)
+                    Scene.FocusControl = this;
+                return;
+            }
 
             if (_priceEditorVisible)
             {
