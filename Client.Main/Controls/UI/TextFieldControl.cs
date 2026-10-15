@@ -340,6 +340,10 @@ namespace Client.Main.Controls.UI
             _inputText.Insert(_cursorIndex, text);
             _cursorIndex += text.Length;
 
+            // Mouse selection can leave a zero-length anchor behind. Once a
+            // character is inserted, selection must collapse at the caret.
+            // Otherwise the NEXT keystroke replaces the first character.
+            ClearSelection();
             UpdateScrollOffset();
             ResetCursorBlink();
             OnValueChanged();

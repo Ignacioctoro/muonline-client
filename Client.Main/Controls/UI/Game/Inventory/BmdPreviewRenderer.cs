@@ -338,7 +338,22 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public static Texture2D TryGetCachedPreview(InventoryItem item, int width, int height, float rotationAngle = 0f)
         {
             var key = BuildCacheKey(item?.Definition, width, height, rotationAngle, CreateRenderProperties(item));
-            return GetCacheEntry(key, rotationAngle != 0f)?.Texture;
+            var texture = GetCacheEntry(key, rotationAngle != 0f)?.Texture;
+            return texture != null && !texture.IsDisposed ? texture : null;
+        }
+
+        /// <summary>
+        /// Called by shop UI outside SpriteBatch while an item preview is missing
+        /// after reconnect/graphics reset. A transient render failure must not
+        /// permanently poison the cache key for this item.
+        /// </summary>
+        public static Texture2D RetryMissingPreview(InventoryItem item, int width, int height)
+        {
+            if (item?.Definition == null)
+                return null;
+            var key = BuildCacheKey(item.Definition, width, height, 0f, CreateRenderProperties(item));
+            _failedRenders.Remove(key);
+            return GetPreview(item, width, height);
         }
 
         /// <summary>
@@ -460,6 +475,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Constants.ENABLE_ITEM_MATERIAL_ANIMATION;
 
             PreviewCacheEntry entry = useCache ? GetCacheEntry(key, isRotating) : null;
+
+            // Cache survives scenes and account reconnects, but GPU render
+            // targets do not necessarily survive a GraphicsDevice reset.
+            if (entry != null && (entry.Texture == null || entry.Texture.IsDisposed))
+            {
+                if (isRotating) _rotatingCache.Remove(key);
+                else _cache.Remove(key);
+                entry = null;
+                _failedRenders.Remove(key);
+            }
 
             if (!useCache && _failedRenders.Contains(key) && entry == null)
             {

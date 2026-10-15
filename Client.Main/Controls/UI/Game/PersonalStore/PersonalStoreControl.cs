@@ -91,6 +91,10 @@ namespace Client.Main.Controls.UI.Game
 
         private bool _closeHovered;
         private bool _exitHovered;
+        private bool _storePublic;
+        private bool _openingRequested;
+        private bool _closingRequested;
+        private string _publishedStoreName = string.Empty;
         private readonly List<InventoryItem> _items = new();
         private readonly InventoryItem[,] _occupied = new InventoryItem[Columns, Rows];
         private readonly Dictionary<string, Texture2D> _textures = new(StringComparer.OrdinalIgnoreCase);
@@ -101,6 +105,9 @@ namespace Client.Main.Controls.UI.Game
         private Point _pickStartPoint;
         private bool _requestInFlight;
         private int _previewIndex;
+        private double _missingPreviewCooldown;
+        private readonly Dictionary<string, int> _previewRetryCounts = new(StringComparer.Ordinal);
+        private const int MaxMissingPreviewRetries = 90; // allow slower Android/reconnect asset loading
         private readonly TextFieldControl _priceInput;
         private readonly TextFieldControl _storeNameInput;
         private bool _priceEditorVisible;
@@ -203,6 +210,7 @@ namespace Client.Main.Controls.UI.Game
             _instance?._priceEditorVisible == true ||
             _instance?._storeNameInput?.IsFocused == true;
         public string StoreNameDraft => _storeNameInput.Value.Trim();
+        public bool IsStorePublic => _storePublic;
         public override bool NonDisposable => true;
 
         public IEnumerable<string> GetPreloadTexturePaths()
@@ -264,7 +272,7 @@ namespace Client.Main.Controls.UI.Game
 
             EnsureCharacterState();
             RefreshShopItems();
-            _storeNameInput.Visible = true;
+            _storeNameInput.Visible = !_storePublic;
             if (!Visible)
             {
                 SoundController.Instance.PlayBuffer("Sound/iCreateWindow.wav");
@@ -337,7 +345,8 @@ namespace Client.Main.Controls.UI.Game
         }
 
         public bool HasPickedItem => _pickedItem != null;
-        public InventoryItem GetPickedItem() => _requestInFlight ? null : _pickedItem;
+        public InventoryItem GetPickedItem() =>
+            _requestInFlight || _storePublic ? null : _pickedItem;
 
         /// <summary>
         /// Draws the shop selection in the final UI pass, above both windows.
@@ -361,7 +370,8 @@ namespace Client.Main.Controls.UI.Game
 
         public bool CanPlaceAt(Point target, InventoryItem item)
         {
-            if (item?.Definition == null) return false;
+            if (_storePublic || _openingRequested || _closingRequested ||
+                item?.Definition == null) return false;
             for (int y = 0; y < item.Definition.Height; y++)
                 for (int x = 0; x < item.Definition.Width; x++)
                 {
@@ -380,7 +390,7 @@ namespace Client.Main.Controls.UI.Game
         // An accepted move is NOT displayed locally until OpenMU replies 0x24.
         public bool TryHandleInventoryDrop(Point mouse, InventoryControl inventory)
         {
-            if (!Visible || _pickedItem == null || inventory == null ||
+            if (!Visible || _storePublic || _pickedItem == null || inventory == null ||
                 !inventory.Visible || !inventory.DisplayRectangle.Contains(mouse) ||
                 inventory.GetDraggedItem() != null)
                 return false;
@@ -414,6 +424,10 @@ namespace Client.Main.Controls.UI.Game
             _pendingPriceRaw = null;
             _priceFeedback = "Right-click an item to set its price.";
             _priceFeedbackError = false;
+            _storePublic = false;
+            _openingRequested = false;
+            _closingRequested = false;
+            _publishedStoreName = string.Empty;
             if (_state != null)
                 _state.InventoryChanged += OnInventoryChanged;
         }
@@ -471,12 +485,15 @@ namespace Client.Main.Controls.UI.Game
                     : null;
             }
             _previewIndex = 0;
+            _previewRetryCounts.Clear();
+            _missingPreviewCooldown = 0;
         }
 
         private void SendConfirmedStorageMove(byte fromSlot, ItemStorageKind targetStorage, byte toSlot)
         {
             var service = MuGame.Network?.GetCharacterService();
             if (service == null || _state == null || _pickedItem == null ||
+                _storePublic || _openingRequested || _closingRequested ||
                 _requestInFlight || _state.IsPlayerShopMovePending)
                 return;
 
@@ -505,7 +522,8 @@ namespace Client.Main.Controls.UI.Game
 
         private void FocusNameInput()
         {
-            if (!Visible || _priceEditorVisible)
+            if (!Visible || _priceEditorVisible || _storePublic ||
+                _openingRequested || _closingRequested)
                 return;
             _pickedItem = null;
             _storeNameInput.Focus();
@@ -516,6 +534,7 @@ namespace Client.Main.Controls.UI.Game
         private void OpenPriceEditor(InventoryItem item)
         {
             if (item == null || _pendingPriceSlot.HasValue ||
+                _storePublic || _openingRequested || _closingRequested ||
                 _requestInFlight || _state?.IsPlayerShopMovePending == true)
                 return;
 
@@ -553,7 +572,8 @@ namespace Client.Main.Controls.UI.Game
 
         private void SubmitPrice()
         {
-            if (!_priceEditorVisible || _pendingPriceSlot.HasValue) return;
+            if (!_priceEditorVisible || _pendingPriceSlot.HasValue || _storePublic)
+                return;
             if (!uint.TryParse(_priceInput.Value, NumberStyles.None, CultureInfo.InvariantCulture,
                     out var price) || price > MaximumPriceZen)
             {
@@ -646,6 +666,183 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
+        private void RequestOpenStore()
+        {
+            if (_storePublic || _openingRequested || _closingRequested ||
+                _priceEditorVisible || _pendingPriceSlot.HasValue ||
+                _requestInFlight || _state == null ||
+                _state.IsPlayerShopMovePending)
+                return;
+
+            string shopName = StoreNameDraft;
+            if (shopName.Length == 0 ||
+                System.Text.Encoding.UTF8.GetByteCount(shopName) > 25)
+            {
+                SetStoreFeedback("Enter a store name (maximum 25 UTF-8 bytes).", true);
+                FocusNameInput();
+                return;
+            }
+
+            if (_items.Count == 0)
+            {
+                SetStoreFeedback("Add at least one item before opening the store.", true);
+                return;
+            }
+
+            var inventory = _state.GetInventoryItems();
+            foreach (var item in _items)
+            {
+                byte slot = (byte)(FirstStoreSlot +
+                    item.GridPosition.Y * Columns + item.GridPosition.X);
+                if (!_confirmedPrices.TryGetValue(slot, out var price) ||
+                    price.Price == 0 || !inventory.TryGetValue(slot, out var raw) ||
+                    !raw.SequenceEqual(price.Raw))
+                {
+                    SetStoreFeedback("Set a confirmed Zen price on every shop item.", true);
+                    return;
+                }
+            }
+
+            var service = MuGame.Network?.GetCharacterService();
+            if (service == null)
+            {
+                SetStoreFeedback("Not connected to the game server.", true);
+                return;
+            }
+
+            _storeNameInput.Blur();
+            _storeNameInput.Visible = false;
+            if (Scene?.FocusControl == _storeNameInput)
+                Scene.FocusControl = this;
+            _pickedItem = null;
+            _openingRequested = true;
+            _publishedStoreName = shopName;
+            SetStoreFeedback("Waiting for OpenMU to publish the store...", false);
+            SoundController.Instance.PlayBuffer("Sound/iButton.wav");
+
+            _ = Task.Run(async () =>
+            {
+                bool sent = await service.SendPlayerShopOpenRequestAsync(shopName);
+                if (!sent)
+                {
+                    MuGame.ScheduleOnMainThread(() => FailStoreRequest(true,
+                        "Could not send store opening request."));
+                    return;
+                }
+                // OpenMU's OpenStoreAction can reject silently when a store
+                // contains unpriced/Harmony items. Do not assume success.
+                await Task.Delay(8000);
+                MuGame.ScheduleOnMainThread(() => FailStoreRequest(true,
+                    "No opening confirmation. Check prices and Harmony options."));
+            });
+        }
+
+        private void RequestCloseStore()
+        {
+            if (!_storePublic || _openingRequested || _closingRequested)
+                return;
+            var service = MuGame.Network?.GetCharacterService();
+            if (service == null)
+            {
+                SetStoreFeedback("Not connected to the game server.", true);
+                return;
+            }
+            _closingRequested = true;
+            SetStoreFeedback("Waiting for OpenMU to close the store...", false);
+            SoundController.Instance.PlayBuffer("Sound/iButton.wav");
+            _ = Task.Run(async () =>
+            {
+                bool sent = await service.SendPlayerShopCloseRequestAsync();
+                if (!sent)
+                {
+                    MuGame.ScheduleOnMainThread(() => FailStoreRequest(false,
+                        "Could not send store closing request."));
+                    return;
+                }
+                await Task.Delay(8000);
+                MuGame.ScheduleOnMainThread(() => FailStoreRequest(false,
+                    "No closing confirmation from OpenMU."));
+            });
+        }
+
+        private void SetStoreFeedback(string message, bool error)
+        {
+            _priceFeedback = message;
+            _priceFeedbackError = error;
+        }
+
+        private void FailStoreRequest(bool opening, string message)
+        {
+            if (opening)
+            {
+                if (!_openingRequested) return;
+                _openingRequested = false;
+                _storeNameInput.Visible = Visible;
+            }
+            else
+            {
+                if (!_closingRequested) return;
+                _closingRequested = false;
+            }
+            SetStoreFeedback(message, true);
+        }
+
+        public void HandleStoreOpenResult(bool successful)
+        {
+            // Only trust server packets; never turn a sent request into an
+            // open store without 3F 02 or the scope announcement.
+            if (!successful || (!_openingRequested && !_storePublic))
+            {
+                if (_openingRequested)
+                    FailStoreRequest(true, "OpenMU rejected the opening request.");
+                return;
+            }
+            _storePublic = true;
+            _openingRequested = false;
+            _closingRequested = false;
+            _storeNameInput.Visible = false;
+            _storeNameInput.Blur();
+            _pickedItem = null;
+            SetStoreFeedback("Store PUBLIC: nearby players can browse and buy.", false);
+        }
+
+        public void HandleOwnStoreAnnounced(string storeName)
+        {
+            // Scope announcement can arrive BEFORE the inventory/store window
+            // was ever opened, e.g. when OpenMU restores a shop after relog.
+            EnsureCharacterState();
+            if (_state == null || string.IsNullOrWhiteSpace(storeName))
+                return;
+            _publishedStoreName = storeName;
+            _storePublic = true;
+            _openingRequested = false;
+            _closingRequested = false;
+            _storeNameInput.Value = storeName;
+            _storeNameInput.Visible = false;
+            _storeNameInput.Blur();
+            _pickedItem = null;
+            SetStoreFeedback("Store PUBLIC: announced by OpenMU.", false);
+        }
+
+        public void HandleStoreClosed(bool successful)
+        {
+            if (!successful) return;
+            _storePublic = false;
+            _closingRequested = false;
+            _openingRequested = false;
+            _storeNameInput.Visible = Visible;
+            if (!string.IsNullOrWhiteSpace(_publishedStoreName))
+                _storeNameInput.Value = _publishedStoreName;
+            SetStoreFeedback("Store closed by OpenMU. You may edit items.", false);
+        }
+
+        public void HandleStoreItemSold(byte slot)
+        {
+            _confirmedPrices.Remove(slot);
+            if (Visible) RefreshShopItems();
+            SetStoreFeedback("An item was sold from your public store.", false);
+        }
+
         private InventoryItem ItemAt(Point mouse)
         {
             if (!TryGetVisualSlot(mouse, out int slot)) return null;
@@ -672,18 +869,36 @@ namespace Client.Main.Controls.UI.Game
             EnsureCharacterState();
             if (_requestInFlight && _state?.IsPlayerShopMovePending == false)
                 _requestInFlight = false;
-            // Cache 3D previews outside an active SpriteBatch/RenderTarget draw.
-            if (_previewIndex < _items.Count)
+            // Render 3D shop icons only in Update (never inside Draw's
+            // SpriteBatch). Assets can still be loading during the first
+            // frames after login, so one failed attempt must not hide an icon
+            // forever until a vault move forces another preview.
+            _missingPreviewCooldown -= gameTime.ElapsedGameTime.TotalSeconds;
+            if (_items.Count > 0 && _missingPreviewCooldown <= 0)
             {
-                var item = _items[_previewIndex++];
-                if (item.Definition.TexturePath?.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase) == true)
+                _missingPreviewCooldown = 0.20;
+                for (int inspected = 0; inspected < _items.Count; inspected++)
                 {
+                    var item = _items[_previewIndex++ % _items.Count];
+                    string path = item.Definition.TexturePath;
+                    if (string.IsNullOrEmpty(path) ||
+                        !path.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    int width = item.Definition.Width * CellSize;
+                    int height = item.Definition.Height * CellSize;
+                    if (BmdPreviewRenderer.TryGetCachedPreview(item, width, height) != null)
+                        continue;
+                    string key = path + ":" + width + "x" + height;
+                    _previewRetryCounts.TryGetValue(key, out int retryCount);
+                    if (retryCount >= MaxMissingPreviewRetries)
+                        continue;
+                    _previewRetryCounts[key] = retryCount + 1;
                     try
                     {
-                        BmdPreviewRenderer.GetPreview(item,
-                            item.Definition.Width * CellSize, item.Definition.Height * CellSize);
+                        BmdPreviewRenderer.RetryMissingPreview(item, width, height);
                     }
-                    catch { /* A missing model uses the standard item fallback. */ }
+                    catch { /* Keep the normal inventory placeholder on failure. */ }
+                    break; // At most one render attempt per 200 ms.
                 }
             }
             var current = MuGame.Instance.UiMouseState;
@@ -753,7 +968,8 @@ namespace Client.Main.Controls.UI.Game
 
             // Editable name field is inside the parent interactive store window.
             // Explicit focus protects it from parent mouse-down focus stealing.
-            if (leftJustPressed && ToScreen(StoreNameEditBox).Contains(current.Position))
+            if (leftJustPressed && !_storePublic &&
+                ToScreen(StoreNameEditBox).Contains(current.Position))
             {
                 FocusNameInput();
                 Scene?.SetMouseInputConsumed();
@@ -823,6 +1039,31 @@ namespace Client.Main.Controls.UI.Game
             if (leftJustReleased && (_closeHovered || _exitHovered))
             {
                 CloseWindow();
+                return;
+            }
+
+            if (leftJustPressed && inside)
+            {
+                if (ToScreen(OpenButton).Contains(current.Position))
+                {
+                    RequestOpenStore();
+                    Scene?.SetMouseInputConsumed();
+                    return;
+                }
+                if (ToScreen(CloseStoreButton).Contains(current.Position))
+                {
+                    RequestCloseStore();
+                    Scene?.SetMouseInputConsumed();
+                    return;
+                }
+            }
+
+            if (_storePublic || _openingRequested || _closingRequested)
+            {
+                _pickedItem = null;
+                _longPressItem = null;
+                if (inside && (leftJustPressed || current.LeftButton == ButtonState.Pressed))
+                    Scene?.SetMouseInputConsumed();
                 return;
             }
 
@@ -924,11 +1165,17 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 DrawItems(sprite);
-                DrawEditableText(sprite, _storeNameInput, StoreNameEditBox,
-                    "Click to name your store", 0.43f);
+                if (_storePublic)
+                    DrawTextInRect(sprite, _publishedStoreName,
+                        ToScreen(StoreNameEditBox), 0.43f * Scale,
+                        new Color(247, 223, 175) * Alpha);
+                else
+                    DrawEditableText(sprite, _storeNameInput, StoreNameEditBox,
+                        "Click to name your store", 0.43f);
                 if (!_priceEditorVisible)
                     DrawPlacementPreview(sprite);
                 DrawItemInformation(sprite);
+                DrawStoreActionButtons(sprite);
                 DrawExitButton(sprite);
                 DrawCloseButton(sprite);
                 if (_priceEditorVisible)
@@ -1022,15 +1269,7 @@ namespace Client.Main.Controls.UI.Game
                 new Color(221, 206, 179));
             // Dynamic price feedback is drawn here, without overlapping static text.
 
-            // Visible but explicitly disabled until OpenMU responses are wired.
-            DrawThreeSlice(sprite, _buttonNormal, OpenButton,
-                new Color(110, 103, 98, 160));
-            DrawThreeSlice(sprite, _buttonNormal, CloseStoreButton,
-                new Color(110, 103, 98, 160));
-            DrawTextInRect(sprite, "Open Store", OpenButton, 0.42f,
-                new Color(150, 144, 137));
-            DrawTextInRect(sprite, "Close Store", CloseStoreButton, 0.42f,
-                new Color(150, 144, 137));
+            // Action buttons are dynamic: their state changes on server ack.
         }
 
         private void DrawItems(SpriteBatch sprite)
@@ -1255,6 +1494,33 @@ namespace Client.Main.Controls.UI.Game
                         rect.Y + 5, 1, Math.Max(1, rect.Height - 10)),
                         new Color(245, 225, 180));
             }
+        }
+
+        private void DrawStoreActionButtons(SpriteBatch sprite)
+        {
+            bool busy = _openingRequested || _closingRequested || _requestInFlight ||
+                _pendingPriceSlot.HasValue;
+            bool canOpen = !busy && !_storePublic;
+            bool canClose = !busy && _storePublic;
+            var mouse = MuGame.Instance.UiMouseState;
+            DrawStoreActionButton(sprite, OpenButton, "Open Store", canOpen,
+                canOpen && ToScreen(OpenButton).Contains(mouse.Position));
+            DrawStoreActionButton(sprite, CloseStoreButton, "Close Store", canClose,
+                canClose && ToScreen(CloseStoreButton).Contains(mouse.Position));
+        }
+
+        private void DrawStoreActionButton(SpriteBatch sprite, Rectangle local, string label,
+            bool enabled, bool hovered)
+        {
+            bool pressed = hovered &&
+                MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed;
+            var tex = pressed ? _buttonPressed ?? _buttonNormal
+                : hovered ? _buttonHover ?? _buttonNormal : _buttonNormal;
+            DrawThreeSlice(sprite, tex, ToScreen(local),
+                enabled ? Color.White * Alpha : new Color(100, 95, 90, 160));
+            DrawTextInRect(sprite, label, ToScreen(local), 0.42f * Scale,
+                enabled ? new Color(241, 221, 188) * Alpha :
+                    new Color(151, 145, 138) * Alpha);
         }
 
         private void DrawExitButton(SpriteBatch sprite)

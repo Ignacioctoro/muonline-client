@@ -1,4 +1,6 @@
 using System;
+using System.Buffers.Binary;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
@@ -33,6 +35,95 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             _characterState = characterState;
             _networkManager = networkManager;
             _targetVersion = targetVersion;
+        }
+
+        /// <summary>
+        /// C1 3F 02: server accepted the owner's open request.
+        /// </summary>
+        [PacketHandler(0x3F, 0x02)]
+        public Task HandlePlayerShopOpenSuccessfulAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 5 || span[0] != 0xC1 ||
+                span[2] != 0x3F || span[3] != 0x02)
+                return Task.CompletedTask;
+            bool success = span[4] != 0;
+            _logger.LogInformation("Personal store opened: {Success}", success);
+            MuGame.ScheduleOnMainThread(() =>
+                PersonalStoreControl.Instance.HandleStoreOpenResult(success));
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// C1 3F 03: shop closure, broadcast to owner and observers.
+        /// Do not close our store when another player closes theirs.
+        /// </summary>
+        [PacketHandler(0x3F, 0x03)]
+        public Task HandlePlayerShopClosedAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 7 || span[0] != 0xC1 ||
+                span[2] != 0x3F || span[3] != 0x03)
+                return Task.CompletedTask;
+            bool success = span[4] != 0;
+            ushort ownerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(5, 2));
+            if (ownerId == _characterState.Id)
+            {
+                MuGame.ScheduleOnMainThread(() =>
+                    PersonalStoreControl.Instance.HandleStoreClosed(success));
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// C2 3F 00: store names in nearby player scope. Includes ourselves
+        /// after successful opening and (in supported clients) on relog.
+        /// </summary>
+        [PacketHandler(0x3F, 0x00)]
+        public Task HandlePlayerShopAnnouncementsAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 6 || span[0] != 0xC2 ||
+                span[3] != 0x3F || span[4] != 0x00)
+                return Task.CompletedTask;
+            int count = span[5];
+            for (int i = 0; i < count; i++)
+            {
+                int offset = 6 + i * 38;
+                if (offset + 38 > span.Length) break;
+                ushort ownerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(offset, 2));
+                if (ownerId != _characterState.Id)
+                    continue;
+                string name = Encoding.UTF8.GetString(span.Slice(offset + 2, 36))
+                    .TrimEnd('\0');
+                MuGame.ScheduleOnMainThread(() =>
+                    PersonalStoreControl.Instance.HandleOwnStoreAnnounced(name));
+                break;
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// C1 3F 08: an item from our public store was sold. OpenMU removes
+        /// it server-side and delivers this notification to the owner.
+        /// </summary>
+        [PacketHandler(0x3F, 0x08)]
+        public Task HandlePlayerShopItemSoldAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 15 || span[0] != 0xC1 ||
+                span[2] != 0x3F || span[3] != 0x08)
+                return Task.CompletedTask;
+            byte soldSlot = span[4];
+            if (soldSlot >= PersonalStoreControl.FirstStoreSlot &&
+                soldSlot < PersonalStoreControl.FirstStoreSlot + PersonalStoreControl.SlotCount)
+            {
+                _characterState.RemoveInventoryItem(soldSlot);
+                _logger.LogInformation("Personal store item sold at slot {Slot}.", soldSlot);
+                MuGame.ScheduleOnMainThread(() =>
+                    PersonalStoreControl.Instance.HandleStoreItemSold(soldSlot));
+            }
+            return Task.CompletedTask;
         }
 
         /// <summary>
