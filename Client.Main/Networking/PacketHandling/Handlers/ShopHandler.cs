@@ -261,7 +261,25 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             // Season 6 uses PlayerShopBuyResultExtended. Earlier client versions
             // use a fixed 21-byte packet with a different field order.
             bool extended = _targetVersion >= TargetProtocolVersion.Season6;
+            // A 21-byte result may be classic or extended with 13 item bytes.
+            // Resolve ambiguous layouts by comparing the server seller ID with
+            // the actual store currently being inspected.
+            if (span.Length == 21)
+            {
+                ushort classicSeller = (ushort)(BinaryPrimitives.ReadUInt16BigEndian(span.Slice(5, 2)) & 0x7FFF);
+                ushort extendedSeller = (ushort)(BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(4, 2)) & 0x7FFF);
+                ushort viewedSeller = PersonalStoreBuyerControl.Instance.SellerId;
+                if (classicSeller == viewedSeller && extendedSeller != viewedSeller)
+                    extended = false;
+                else if (extendedSeller == viewedSeller && classicSeller != viewedSeller)
+                    extended = true;
+            }
             byte result = extended ? span[6] : span[4];
+            if (result > 9)
+            {
+                _logger.LogWarning("Invalid Personal Store buy result: {Result}.", result);
+                return Task.CompletedTask;
+            }
             byte inventorySlot = extended ? span[7] : span.Length >= 21 ? span[20] : (byte)255;
             int dataStart = extended ? 8 : 7;
             int dataLength = extended ? span.Length - 8 : Math.Min(13, span.Length - 8);
