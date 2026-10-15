@@ -25,6 +25,9 @@ namespace Client.Main.Scenes
         private ushort? _playerMenuHoverId;
         private double _playerMenuHintCooldown;
         private float _playerMenuHintAlpha;
+        private ushort? _storeHoldPlayerId;
+        private double _storeHoldSeconds;
+        private bool _storeHoldTriggered;
 
         public GameScenePlayerMenuController(GameScene scene, Action<string> whisperRequested, Action<ushort, string> duelRequested)
         {
@@ -78,6 +81,9 @@ namespace Client.Main.Scenes
             _playerMenuHoverId = null;
             _playerMenuHintCooldown = 0;
             _playerMenuHintAlpha = 0;
+            _storeHoldPlayerId = null;
+            _storeHoldSeconds = 0;
+            _storeHoldTriggered = false;
         }
 
         public void Update(GameTime gameTime, KeyboardState keyboardState, MouseState uiMouse, MouseState prevUiMouse)
@@ -88,16 +94,51 @@ namespace Client.Main.Scenes
                 _scene.MouseHoverObject is PlayerObject hoveredPlayer &&
                 hoveredPlayer != _scene.Hero)
             {
+                bool shopAdvertised = MuGame.Network?.GetScopeManager()?
+                    .TryGetPlayerShop(hoveredPlayer.NetworkId, out _) == true;
                 bool altPressed = keyboardState.IsKeyDown(Keys.LeftAlt) || keyboardState.IsKeyDown(Keys.RightAlt);
                 bool rightClickReleased = prevUiMouse.RightButton == ButtonState.Pressed &&
                                           uiMouse.RightButton == ButtonState.Released;
 
-                if (altPressed && rightClickReleased)
+                // Season 6: right click a selling player to view their context menu.
+                // Keep ALT+right click for other player interactions.
+                if (rightClickReleased && (altPressed || shopAdvertised))
                 {
                     ShowPlayerContextMenu(hoveredPlayer, uiMouse.Position);
                     _scene.SetMouseInputConsumed();
                     contextMenuOpened = true;
                 }
+                else if (shopAdvertised && uiMouse.LeftButton == ButtonState.Pressed)
+                {
+                    // Touch systems map long presses to the virtual left button.
+                    // Opening the menu after 650 ms avoids accidental taps.
+                    if (_storeHoldPlayerId != hoveredPlayer.NetworkId)
+                    {
+                        _storeHoldPlayerId = hoveredPlayer.NetworkId;
+                        _storeHoldSeconds = 0;
+                        _storeHoldTriggered = false;
+                    }
+                    _storeHoldSeconds += gameTime.ElapsedGameTime.TotalSeconds;
+                    if (!_storeHoldTriggered && _storeHoldSeconds >= 0.65)
+                    {
+                        ShowPlayerContextMenu(hoveredPlayer, uiMouse.Position);
+                        _scene.SetMouseInputConsumed();
+                        _storeHoldTriggered = true;
+                        contextMenuOpened = true;
+                    }
+                }
+                else if (uiMouse.LeftButton != ButtonState.Pressed)
+                {
+                    _storeHoldPlayerId = null;
+                    _storeHoldSeconds = 0;
+                    _storeHoldTriggered = false;
+                }
+            }
+            else if (uiMouse.LeftButton != ButtonState.Pressed)
+            {
+                _storeHoldPlayerId = null;
+                _storeHoldSeconds = 0;
+                _storeHoldTriggered = false;
             }
 
             if (_playerContextMenu?.Visible == true && !contextMenuOpened)
@@ -130,6 +171,8 @@ namespace Client.Main.Scenes
             }
 
             _playerContextMenu.SetTarget(targetPlayer.NetworkId, targetPlayer.Name);
+            _playerContextMenu.SetStoreButtonEnabled(
+                MuGame.Network?.GetScopeManager()?.TryGetPlayerShop(targetPlayer.NetworkId, out _) == true);
             _playerContextMenu.SetDuelButtonEnabled(true);
             bool localHasGuild =
                 GuildInfoCache.PlayerHasGuild(
