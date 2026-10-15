@@ -2228,7 +2228,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 _equippedItems[slotIndex] = invItem;
             }
 
-            foreach (var entry in characterItems.Where(e => e.Key >= InventorySlotOffsetConstant))
+            foreach (var entry in characterItems.Where(e => e.Key >= InventorySlotOffsetConstant &&
+                                                        e.Key < PersonalStoreControl.FirstStoreSlot))
             {
                 byte slotIndex = entry.Key;
                 byte[] itemData = entry.Value;

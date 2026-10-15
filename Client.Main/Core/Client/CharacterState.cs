@@ -652,6 +652,8 @@ namespace Client.Main.Core.Client
             _pendingPlayerShopMoveTo = toSlot;
         }
 
+        public bool IsPlayerShopMovePending => _pendingPlayerShopMoveFrom.HasValue;
+
         public bool TryConsumePendingPlayerShopMove(out byte fromSlot, out byte toSlot)
         {
             fromSlot = _pendingPlayerShopMoveFrom.GetValueOrDefault();

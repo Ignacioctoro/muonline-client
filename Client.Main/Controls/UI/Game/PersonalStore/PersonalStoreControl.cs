@@ -321,7 +321,8 @@ namespace Client.Main.Controls.UI.Game
         private void SendConfirmedStorageMove(byte fromSlot, ItemStorageKind targetStorage, byte toSlot)
         {
             var service = MuGame.Network?.GetCharacterService();
-            if (service == null || _state == null || _pickedItem == null || _requestInFlight)
+            if (service == null || _state == null || _pickedItem == null ||
+                _requestInFlight || _state.IsPlayerShopMovePending)
                 return;
 
             var raw = _pickedItem.RawData ?? Array.Empty<byte>();
@@ -336,9 +337,10 @@ namespace Client.Main.Controls.UI.Game
                         targetStorage, toSlot,
                         MuGame.Network.TargetVersion, raw);
                 }
-                finally
+                catch (Exception)
                 {
-                    MuGame.ScheduleOnMainThread(() => _requestInFlight = false);
+                    // Keep the last confirmed snapshot on an unsuccessful send.
+                    // The game server remains the authority for these slots.
                 }
             });
         }
@@ -366,6 +368,8 @@ namespace Client.Main.Controls.UI.Game
 
             base.Update(gameTime);
             EnsureCharacterState();
+            if (_requestInFlight && _state?.IsPlayerShopMovePending == false)
+                _requestInFlight = false;
             // Cache 3D previews outside an active SpriteBatch/RenderTarget draw.
             if (_previewIndex < _items.Count)
             {
