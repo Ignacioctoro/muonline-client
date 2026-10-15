@@ -808,7 +808,9 @@ namespace Client.Main.Controls.UI.Game
 
         public void HandleOwnStoreAnnounced(string storeName)
         {
-            // Server can announce an already-open own store on re-login.
+            // Scope announcement can arrive BEFORE the inventory/store window
+            // was ever opened, e.g. when OpenMU restores a shop after relog.
+            EnsureCharacterState();
             if (_state == null || string.IsNullOrWhiteSpace(storeName))
                 return;
             _publishedStoreName = storeName;
@@ -1163,8 +1165,13 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 DrawItems(sprite);
-                DrawEditableText(sprite, _storeNameInput, StoreNameEditBox,
-                    "Click to name your store", 0.43f);
+                if (_storePublic)
+                    DrawTextInRect(sprite, _publishedStoreName,
+                        ToScreen(StoreNameEditBox), 0.43f * Scale,
+                        new Color(247, 223, 175) * Alpha);
+                else
+                    DrawEditableText(sprite, _storeNameInput, StoreNameEditBox,
+                        "Click to name your store", 0.43f);
                 if (!_priceEditorVisible)
                     DrawPlacementPreview(sprite);
                 DrawItemInformation(sprite);
