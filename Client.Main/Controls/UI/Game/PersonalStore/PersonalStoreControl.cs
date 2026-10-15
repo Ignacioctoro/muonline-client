@@ -541,8 +541,8 @@ namespace Client.Main.Controls.UI.Game
             _pendingPriceSlot = null;
             _pendingPriceRaw = null;
 
-            if (result == 1 &&
-                _state?.GetInventoryItems().TryGetValue(slot, out var currentRaw) == true &&
+            if (result == 1 && _state != null &&
+                _state.GetInventoryItems().TryGetValue(slot, out var currentRaw) &&
                 raw != null && currentRaw.SequenceEqual(raw))
             {
                 _confirmedPrices[slot] = (attempted, raw);
