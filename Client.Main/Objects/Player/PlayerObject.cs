@@ -1650,6 +1650,10 @@ namespace Client.Main.Objects.Player
         /// Always-visible Season 6 Personal Store title, separate from hover names.
         /// Uses the server-advertised network ID and existing world projection.
         /// </summary>
+        /// <summary>
+        /// Season 6 store plate: [Store] player name in the brown header, then
+        /// the white shop title below. Colours follow PersonalShopTitleImp.cpp.
+        /// </summary>
         private void DrawPersonalStoreTitle()
         {
             if (!Visible || World == null)
@@ -1668,36 +1672,78 @@ namespace Client.Main.Objects.Player
                 return;
 
             var bounds = BoundingBoxWorld;
-            Vector3 anchor = new((bounds.Min.X + bounds.Max.X) * 0.5f,
-                (bounds.Min.Y + bounds.Max.Y) * 0.5f, bounds.Max.Z + 65f);
-            Vector3 screen = GraphicsDevice.Viewport.Project(anchor,
-                Camera.Instance.Projection, Camera.Instance.View, Matrix.Identity);
+            Vector3 anchor = new(
+                (bounds.Min.X + bounds.Max.X) * 0.5f,
+                (bounds.Min.Y + bounds.Max.Y) * 0.5f,
+                bounds.Max.Z + 65f);
+            Vector3 screen = GraphicsDevice.Viewport.Project(
+                anchor, Camera.Instance.Projection, Camera.Instance.View, Matrix.Identity);
             if (screen.Z < 0f || screen.Z > 1f)
                 return;
 
-            float scale = MathF.Max(0.25f, 0.42f * Constants.RENDER_SCALE);
-            Vector2 size = font.MeasureString(shopName) * scale;
-            var rect = new Rectangle(
-                (int)MathF.Round(screen.X - size.X * 0.5f - 6f),
-                (int)MathF.Round(screen.Y - size.Y - 6f),
-                (int)MathF.Ceiling(size.X + 12f),
-                (int)MathF.Ceiling(size.Y + 8f));
-            if (rect.Right < 0 || rect.Left >= GraphicsDevice.Viewport.Width ||
-                rect.Bottom < 0 || rect.Top >= GraphicsDevice.Viewport.Height)
+            float renderScale = MathF.Max(0.1f, Constants.RENDER_SCALE);
+            float headerScale = 0.42f * renderScale;
+            float titleScale = 0.40f * renderScale;
+            string storeTag = "[Store]";
+            string ownerName = Name ?? string.Empty;
+            Vector2 tagSize = font.MeasureString(storeTag) * headerScale;
+            Vector2 nameSize = font.MeasureString(ownerName) * headerScale;
+            Vector2 titleSize = font.MeasureString(shopName) * titleScale;
+            int padX = Math.Max(4, (int)MathF.Round(6f * renderScale));
+            int padY = Math.Max(2, (int)MathF.Round(3f * renderScale));
+            int gap = Math.Max(3, (int)MathF.Round(5f * renderScale));
+            int headerHeight = (int)MathF.Ceiling(MathF.Max(tagSize.Y, nameSize.Y)) + padY * 2;
+            int titleHeight = (int)MathF.Ceiling(titleSize.Y) + padY * 2;
+            int width = Math.Max(
+                (int)MathF.Ceiling(tagSize.X + nameSize.X) + gap + padX * 2,
+                (int)MathF.Ceiling(titleSize.X) + padX * 2);
+            int height = headerHeight + titleHeight;
+            var viewport = GraphicsDevice.Viewport;
+
+            if (width > viewport.Width - 8)
+            {
+                float ratio = (viewport.Width - 8f) / width;
+                headerScale *= ratio;
+                titleScale *= ratio;
+                tagSize *= ratio;
+                nameSize *= ratio;
+                titleSize *= ratio;
+                headerHeight = (int)MathF.Ceiling(MathF.Max(tagSize.Y, nameSize.Y)) + padY * 2;
+                titleHeight = (int)MathF.Ceiling(titleSize.Y) + padY * 2;
+                width = Math.Max(
+                    (int)MathF.Ceiling(tagSize.X + nameSize.X) + gap + padX * 2,
+                    (int)MathF.Ceiling(titleSize.X) + padX * 2);
+                height = headerHeight + titleHeight;
+            }
+
+            int x = Math.Clamp((int)MathF.Round(screen.X - width * 0.5f),
+                4, Math.Max(4, viewport.Width - width - 4));
+            int y = (int)MathF.Round(screen.Y - height - 6f * renderScale);
+            if (y + height < 0 || y >= viewport.Height)
                 return;
+            y = Math.Max(2, y);
+
+            var top = new Rectangle(x, y, width, headerHeight);
+            var bottom = new Rectangle(x, y + headerHeight, width, titleHeight);
+            var tagPos = new Vector2(x + padX, y + (headerHeight - tagSize.Y) * 0.5f);
+            var namePos = new Vector2(tagPos.X + tagSize.X + gap,
+                y + (headerHeight - nameSize.Y) * 0.5f);
+            var titlePos = new Vector2(x + (width - titleSize.X) * 0.5f,
+                bottom.Y + (titleHeight - titleSize.Y) * 0.5f);
 
             using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
                 BlendState.NonPremultiplied, SamplerState.LinearClamp,
                 DepthStencilState.None, RasterizerState.CullNone))
             {
-                sprite.Draw(pixel, rect, new Color(22, 19, 13, 205));
-                sprite.DrawString(font, shopName,
-                    new Vector2(rect.X + 6, rect.Y + 4) + Vector2.One,
-                    Color.Black, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                sprite.DrawString(font, shopName,
-                    new Vector2(rect.X + 6, rect.Y + 4),
-                    new Color(249, 206, 100), 0f, Vector2.Zero, scale,
-                    SpriteEffects.None, 0f);
+                // Original Season 6 palette, unhighlighted shop title.
+                sprite.Draw(pixel, top, new Color(108, 57, 41, 128));
+                sprite.Draw(pixel, bottom, new Color(108, 57, 41, 200));
+                sprite.DrawString(font, storeTag, tagPos, new Color(250, 150, 0),
+                    0f, Vector2.Zero, headerScale, SpriteEffects.None, 0f);
+                sprite.DrawString(font, ownerName, namePos, new Color(230, 230, 0),
+                    0f, Vector2.Zero, headerScale, SpriteEffects.None, 0f);
+                sprite.DrawString(font, shopName, titlePos, Color.White,
+                    0f, Vector2.Zero, titleScale, SpriteEffects.None, 0f);
             }
         }
 
