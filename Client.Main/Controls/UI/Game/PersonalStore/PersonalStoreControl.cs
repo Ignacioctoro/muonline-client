@@ -60,6 +60,9 @@ namespace Client.Main.Controls.UI.Game
         private static readonly Rectangle PriceDialog = new(31, 226, 286, 181);
         private static readonly Rectangle PriceConfirmButton = new(48, 350, 119, 32);
         private static readonly Rectangle PriceCancelButton = new(180, 350, 119, 32);
+        private static readonly Rectangle StoreNameEditBox = new(37, 143, 274, 31);
+        private const double LongPressPriceMilliseconds = 620d;
+        private const int LongPressMovementTolerance = 10;
         private const uint MaximumPriceZen = int.MaxValue; // OpenMU casts the protocol price to int
 
         private static PersonalStoreControl _instance;
@@ -99,7 +102,13 @@ namespace Client.Main.Controls.UI.Game
         private bool _requestInFlight;
         private int _previewIndex;
         private readonly TextFieldControl _priceInput;
+        private readonly TextFieldControl _storeNameInput;
         private bool _priceEditorVisible;
+        private double _cursorTimeSeconds;
+        private InventoryItem _longPressItem;
+        private Point _longPressOrigin;
+        private double _longPressElapsedMilliseconds;
+        private bool _suppressLongPressRelease;
         private byte _priceEditorSlot;
         private string _priceInputError = string.Empty;
         private string _priceFeedback = "Right-click an item to set its price.";
@@ -157,11 +166,43 @@ namespace Client.Main.Controls.UI.Game
                 _priceInputError = string.Empty;
             };
             Controls.Add(_priceInput);
+
+            // 26-byte name field on OpenMU's C3 3F 02 shop-open packet.
+            // Reserve one byte for the terminator in a future server request.
+            // This is an editable draft; publication remains disabled.
+            _storeNameInput = TextFieldControl.Create();
+            _storeNameInput.X = StoreNameEditBox.X;
+            _storeNameInput.Y = StoreNameEditBox.Y;
+            _storeNameInput.ViewSize = new Point(StoreNameEditBox.Width, StoreNameEditBox.Height);
+            _storeNameInput.ControlSize = _storeNameInput.ViewSize;
+            _storeNameInput.AutoViewSize = false;
+            _storeNameInput.MaxLength = 25;
+            _storeNameInput.FontSize = 14f;
+            _storeNameInput.TextColor = new Color(246, 227, 186);
+            _storeNameInput.BackgroundColor = new Color(19, 18, 19, 255);
+            _storeNameInput.BorderColor = new Color(124, 101, 74);
+            _storeNameInput.BorderThickness = 1;
+            _storeNameInput.Placeholder = "Enter store name";
+            _storeNameInput.Visible = false;
+            _storeNameInput.Click += (sender, args) => FocusNameInput();
+            _storeNameInput.EnterKeyPressed += (sender, args) =>
+            {
+                Scene?.ConsumeKeyboardEnter();
+                _storeNameInput.Blur();
+                if (Scene != null)
+                    Scene.FocusControl = this;
+            };
+            Controls.Add(_storeNameInput);
         }
 
         public static PersonalStoreControl Instance => _instance ??= new PersonalStoreControl();
         public static bool IsOpen => _instance?.Visible == true;
         public static bool IsEditingPrice => _instance?._priceEditorVisible == true;
+        // Used by the inventory's Escape handler while either editor is active.
+        public static bool IsEditingText =>
+            _instance?._priceEditorVisible == true ||
+            _instance?._storeNameInput?.IsFocused == true;
+        public string StoreNameDraft => _storeNameInput.Value.Trim();
         public override bool NonDisposable => true;
 
         public IEnumerable<string> GetPreloadTexturePaths()
@@ -223,6 +264,7 @@ namespace Client.Main.Controls.UI.Game
 
             EnsureCharacterState();
             RefreshShopItems();
+            _storeNameInput.Visible = true;
             if (!Visible)
             {
                 SoundController.Instance.PlayBuffer("Sound/iCreateWindow.wav");
@@ -244,6 +286,11 @@ namespace Client.Main.Controls.UI.Game
             }
 
             CancelPriceEditor();
+            _storeNameInput.Blur();
+            _storeNameInput.Visible = false;
+            _longPressItem = null;
+            _longPressElapsedMilliseconds = 0;
+            _suppressLongPressRelease = false;
             Visible = false;
             _pickedItem = null;
             _requestInFlight = false;
@@ -357,6 +404,7 @@ namespace Client.Main.Controls.UI.Game
                 _state.InventoryChanged -= OnInventoryChanged;
             _state = current;
             _confirmedPrices.Clear();
+            _storeNameInput.Value = string.Empty;
             _pendingPriceSlot = null;
             _pendingPriceRaw = null;
             _priceFeedback = "Right-click an item to set its price.";
@@ -449,6 +497,16 @@ namespace Client.Main.Controls.UI.Game
 
         private static string FormatZen(uint amount) =>
             amount.ToString("N0", CultureInfo.InvariantCulture);
+
+        private void FocusNameInput()
+        {
+            if (!Visible || _priceEditorVisible)
+                return;
+            _pickedItem = null;
+            _storeNameInput.Focus();
+            if (Scene != null)
+                Scene.FocusControl = _storeNameInput;
+        }
 
         private void OpenPriceEditor(InventoryItem item)
         {
@@ -601,6 +659,7 @@ namespace Client.Main.Controls.UI.Game
             }
 
             base.Update(gameTime);
+            _cursorTimeSeconds += gameTime.ElapsedGameTime.TotalSeconds;
             EnsureCharacterState();
             if (_requestInFlight && _state?.IsPlayerShopMovePending == false)
                 _requestInFlight = false;
@@ -636,6 +695,9 @@ namespace Client.Main.Controls.UI.Game
 
             if (_priceEditorVisible)
             {
+                _longPressItem = null;
+                if (current.LeftButton == ButtonState.Released)
+                    _suppressLongPressRelease = false;
                 bool escPressed = MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
                                   MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape);
                 if (escPressed)
@@ -666,6 +728,61 @@ namespace Client.Main.Controls.UI.Game
                 if (leftJustPressed || current.LeftButton == ButtonState.Pressed ||
                     current.RightButton == ButtonState.Pressed)
                     Scene?.SetMouseInputConsumed();
+                return;
+            }
+
+            // Editable name field is inside the parent interactive store window.
+            // Explicit focus protects it from parent mouse-down focus stealing.
+            if (leftJustPressed && ToScreen(StoreNameEditBox).Contains(current.Position))
+            {
+                FocusNameInput();
+                Scene?.SetMouseInputConsumed();
+                return;
+            }
+
+            // Long press (~620 ms) opens the same price dialog on Android,
+            // using the touch-to-UiMouseState conversion already in BaseScene.
+            // Dragging farther than 10 virtual px cancels the gesture so item
+            // rearrangement and inventory transfers are unaffected.
+            if (_longPressItem != null)
+            {
+                if (current.LeftButton != ButtonState.Pressed)
+                {
+                    _longPressItem = null;
+                    _longPressElapsedMilliseconds = 0;
+                }
+                else if (Math.Abs(current.Position.X - _longPressOrigin.X) >
+                             LongPressMovementTolerance ||
+                         Math.Abs(current.Position.Y - _longPressOrigin.Y) >
+                             LongPressMovementTolerance)
+                {
+                    _longPressItem = null;
+                    _longPressElapsedMilliseconds = 0;
+                }
+                else
+                {
+                    _longPressElapsedMilliseconds += gameTime.ElapsedGameTime.TotalMilliseconds;
+                    if (_longPressElapsedMilliseconds >= LongPressPriceMilliseconds)
+                    {
+                        var pressedItem = _longPressItem;
+                        _longPressItem = null;
+                        _longPressElapsedMilliseconds = 0;
+                        _suppressLongPressRelease = true;
+                        OpenPriceEditor(pressedItem);
+                        if (_priceEditorVisible)
+                        {
+                            Scene?.SetMouseInputConsumed();
+                            return;
+                        }
+                        _suppressLongPressRelease = false;
+                    }
+                }
+            }
+
+            if (leftJustReleased && _suppressLongPressRelease)
+            {
+                _suppressLongPressRelease = false;
+                Scene?.SetMouseInputConsumed();
                 return;
             }
 
@@ -729,6 +846,9 @@ namespace Client.Main.Controls.UI.Game
                     if (_hoveredItem != null)
                     {
                         _pickedItem = _hoveredItem;
+                        _longPressItem = _hoveredItem;
+                        _longPressOrigin = current.Position;
+                        _longPressElapsedMilliseconds = 0;
                         _pickStartPoint = current.Position;
                         _pickedSlot = (byte)(FirstStoreSlot +
                             _hoveredItem.GridPosition.Y * Columns +
@@ -784,6 +904,8 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 DrawItems(sprite);
+                DrawEditableText(sprite, _storeNameInput, StoreNameEditBox,
+                    "Click to name your store", 0.43f);
                 if (!_priceEditorVisible)
                     DrawPlacementPreview(sprite);
                 DrawItemInformation(sprite);
@@ -792,10 +914,11 @@ namespace Client.Main.Controls.UI.Game
                 if (_priceEditorVisible)
                     DrawPriceEditor(sprite);
             }
-            // TextFieldControl owns its own SpriteBatchScope and must be rendered
-            // AFTER the store batch. It supports desktop and mobile input.
-            if (_priceEditorVisible && _priceInput.Visible)
-                _priceInput.Draw(gameTime);
+            // Input controls continue updating keyboard, clipboard and Android
+            // text handling through base.Update(). Their nested Draw() creates a
+            // scissored SpriteBatch with a different blend state, leaving digits
+            // almost black on the NewUI panel. Values are rendered legibly in
+            // the same NonPremultiplied batch as the surrounding NewUI text.
         }
 
         private void EnsureStaticSurface()
@@ -856,7 +979,7 @@ namespace Client.Main.Controls.UI.Game
             sprite.Draw(pixel, nameBox, new Color(18, 17, 18, 238));
             sprite.Draw(pixel, new Rectangle(nameBox.X, nameBox.Y, nameBox.Width, 1),
                 new Color(103, 87, 72, 180));
-            DrawCenteredText(sprite, "Name entry in phase C", 158, 0.37f, new Color(149, 142, 134));
+            // Store name is drawn dynamically, using the editable field's value.
 
             DrawCenteredText(sprite, "SHOP ITEMS (8 x 4)", 222, 0.43f,
                 new Color(221, 206, 179));
@@ -877,8 +1000,7 @@ namespace Client.Main.Controls.UI.Game
 
             DrawCenteredText(sprite, "ITEM INFORMATION", 425, 0.43f,
                 new Color(221, 206, 179));
-            DrawCenteredText(sprite, "Select item then click destination", 510, 0.35f,
-                new Color(169, 141, 125));
+            // Dynamic price feedback is drawn here, without overlapping static text.
 
             // Visible but explicitly disabled until OpenMU responses are wired.
             DrawThreeSlice(sprite, _buttonNormal, OpenButton,
@@ -1050,6 +1172,8 @@ namespace Client.Main.Controls.UI.Game
             DrawTextInRect(sprite, "Price in Zen (0 removes price)",
                 ToScreen(new Rectangle(51, 268, 246, 24)), 0.40f * Scale,
                 new Color(187, 181, 170));
+            DrawEditableText(sprite, _priceInput, new Rectangle(60, 301, 228, 31),
+                "Type Zen amount", 0.51f);
             DrawTextInRect(sprite, _priceInputError,
                 ToScreen(new Rectangle(44, 333, 260, 17)), 0.28f * Scale,
                 new Color(246, 123, 112));
@@ -1061,6 +1185,56 @@ namespace Client.Main.Controls.UI.Game
                 0.43f * Scale, new Color(240, 218, 182));
             DrawTextInRect(sprite, "Cancel", ToScreen(PriceCancelButton),
                 0.43f * Scale, new Color(240, 218, 182));
+        }
+
+        /// <summary>
+        /// Shares the NewUI batch for full-bright readable field text. The
+        /// TextFieldControl still handles all editing, selection and platform
+        /// keyboard input; this is only a visual replacement for its clipped
+        /// nested SpriteBatch rendering.
+        /// </summary>
+        private void DrawEditableText(SpriteBatch sprite, TextFieldControl field,
+            Rectangle localRect, string placeholder, float baseFontScale)
+        {
+            var pixel = GraphicsManager.Instance?.Pixel;
+            if (_font == null || pixel == null || field == null || !field.Visible)
+                return;
+            var rect = ToScreen(localRect);
+            sprite.Draw(pixel, rect, new Color(18, 20, 24, 255));
+            Color border = field.IsFocused
+                ? new Color(210, 167, 100, 255)
+                : new Color(116, 91, 61, 215);
+            sprite.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 1), border);
+            sprite.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), border);
+            sprite.Draw(pixel, new Rectangle(rect.X, rect.Y, 1, rect.Height), border);
+            sprite.Draw(pixel, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), border);
+
+            string value = field.Value ?? string.Empty;
+            bool placeholderActive = value.Length == 0;
+            string display = placeholderActive ? placeholder : value;
+            float scale = baseFontScale * Scale;
+            var measured = _font.MeasureString(display);
+            if (measured.X > 0 && measured.X * scale > rect.Width - 18)
+                scale = (rect.Width - 18f) / measured.X;
+            Vector2 textPosition = new(
+                rect.X + 8f,
+                rect.Y + (rect.Height - measured.Y * scale) * 0.5f);
+            Color color = placeholderActive ? new Color(160, 146, 130)
+                : new Color(250, 231, 193);
+            sprite.DrawString(_font, display, textPosition + Vector2.One,
+                Color.Black * 0.85f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            sprite.DrawString(_font, display, textPosition,
+                color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+
+            if (field.IsFocused && (int)(_cursorTimeSeconds * 2) % 2 == 0)
+            {
+                float caretX = textPosition.X + (placeholderActive ? 0 :
+                    measured.X * scale);
+                if (caretX < rect.Right - 4)
+                    sprite.Draw(pixel, new Rectangle((int)caretX + (placeholderActive ? 0 : 2),
+                        rect.Y + 5, 1, Math.Max(1, rect.Height - 10)),
+                        new Color(245, 225, 180));
+            }
         }
 
         private void DrawExitButton(SpriteBatch sprite)
@@ -1167,6 +1341,8 @@ namespace Client.Main.Controls.UI.Game
             _staticSurface?.Dispose();
             _staticSurface = null;
             if (_state != null) _state.InventoryChanged -= OnInventoryChanged;
+            _priceInput.Blur();
+            _storeNameInput.Blur();
             _surfaceBlend.Dispose();
         }
     }
