@@ -62,6 +62,11 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private const int WINDOW_WIDTH = GameWindowMetrics.InventoryWidth;
         private const int WINDOW_HEIGHT = GameWindowMetrics.InventoryHeight;
 
+        // InventoryLayout.json draws the TopCorner 20 logical pixels above
+        // the window. Render that overhang instead of clipping the GFx crest
+        // at the top edge of the cached static surface.
+        private const int TOP_FRAME_OVERHANG = 20;
+
         private const int HEADER_HEIGHT = 70;
         private const int FOOTER_HEIGHT = 48;
         private const int PAPERDOLL_TOP = HEADER_HEIGHT +10;
@@ -1099,7 +1104,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
             {
                 if (_staticSurface != null && !_staticSurface.IsDisposed)
                 {
-                    spriteBatch.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
+                    // The cached artwork includes a 20px crest above the logical
+                    // inventory bounds. Draw its expanded surface above the panel;
+                    // all items, hitboxes and text keep their original coordinates.
+                    int overhangOnScreen = (int)MathF.Round(TOP_FRAME_OVERHANG * Scale);
+                    var artworkBounds = new Rectangle(
+                        DisplayRectangle.X,
+                        DisplayRectangle.Y - overhangOnScreen,
+                        DisplayRectangle.Width,
+                        DisplayRectangle.Height + overhangOnScreen);
+                    spriteBatch.Draw(_staticSurface, artworkBounds, Color.White * Alpha);
                 }
 
                 // Draw overlays beneath items (consistent with vault/NPC shop)
@@ -1535,15 +1549,21 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             _staticSurface?.Dispose();
-            _staticSurface = new RenderTarget2D(graphicsDevice, WINDOW_WIDTH, WINDOW_HEIGHT, false, SurfaceFormat.Color, DepthFormat.None);
+            _staticSurface = new RenderTarget2D(
+                graphicsDevice, WINDOW_WIDTH, WINDOW_HEIGHT + TOP_FRAME_OVERHANG,
+                false, SurfaceFormat.Color, DepthFormat.None);
 
             var previousTargets = graphicsDevice.GetRenderTargets();
             graphicsDevice.SetRenderTarget(_staticSurface);
             graphicsDevice.Clear(Color.Transparent);
 
             var spriteBatch = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend))
+            using (new SpriteBatchScope(
+                spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend,
+                transform: Matrix.CreateTranslation(0f, TOP_FRAME_OVERHANG, 0f)))
             {
+                // The translation maps the existing Y=-20 TopCorner into
+                // the target without changing any other layout coordinates.
                 DrawStaticElements(spriteBatch);
             }
 
