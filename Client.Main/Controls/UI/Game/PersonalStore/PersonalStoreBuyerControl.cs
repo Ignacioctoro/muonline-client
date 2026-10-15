@@ -210,13 +210,15 @@ namespace Client.Main.Controls.UI.Game
                 for (int attempt = 0; attempt < values.Length; attempt++)
                 {
                     var item = values[_previewCursor++ % values.Length].Item;
-                    if (!item.Definition.TexturePath.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(item.Definition.TexturePath) ||
+                        !item.Definition.TexturePath.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
                         continue;
                     int w = item.Definition.Width * Cell;
                     int h = item.Definition.Height * Cell;
                     if (BmdPreviewRenderer.TryGetCachedPreview(item, w, h) == null)
                     {
-                        BmdPreviewRenderer.RetryMissingPreview(item, w, h);
+                        try { BmdPreviewRenderer.RetryMissingPreview(item, w, h); }
+                        catch { /* Asset can still be loading after reconnection. */ }
                         break;
                     }
                 }
