@@ -9,6 +9,7 @@ using Client.Main.Controls.UI.Game.Common;
 using Client.Main.Controls.UI.Game.Inventory;
 using Client.Main.Core.Utilities;
 using Client.Main.Helpers;
+using Client.Main.Models;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
