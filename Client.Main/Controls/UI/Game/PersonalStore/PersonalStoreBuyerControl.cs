@@ -54,6 +54,7 @@ namespace Client.Main.Controls.UI.Game
         private byte? _selectedSlot;
         private bool _confirm;
         private bool _buyPending;
+        private int _buyRequestGeneration;
         private string _feedback = "Select an item to see its Zen price.";
         private float _previewCooldown;
         private int _previewCursor;
@@ -127,7 +128,10 @@ namespace Client.Main.Controls.UI.Game
                 _selectedSlot = null;
             _confirm = false;
             if (!sameSeller)
+            {
                 _buyPending = false;
+                _buyRequestGeneration++;
+            }
             _feedback = _listings.Count == 0
                 ? "This store has no items for sale."
                 : "Select an item to see its Zen price.";
@@ -156,6 +160,7 @@ namespace Client.Main.Controls.UI.Game
             Visible = false;
             _confirm = false;
             _buyPending = false;
+            _buyRequestGeneration++;
             _listings.Clear();
             _selectedSlot = null;
         }
@@ -173,6 +178,7 @@ namespace Client.Main.Controls.UI.Game
             if (!_buyPending)
                 return;
             _buyPending = false;
+            _buyRequestGeneration++;
             _confirm = false;
             string reason = result switch
             {
@@ -291,22 +297,23 @@ namespace Client.Main.Controls.UI.Game
             byte slot = _selectedSlot.Value;
             _confirm = false;
             _buyPending = true;
+            int generation = ++_buyRequestGeneration;
             _feedback = "Waiting for purchase confirmation from OpenMU...";
             var service = MuGame.Network?.GetCharacterService();
             bool sent = service != null && await service.SendPlayerStoreBuyRequestAsync(
                 _sellerId, _sellerName, slot);
             if (!sent)
             {
-                MuGame.ScheduleOnMainThread(() => HandleBuyFailure("Could not send the purchase request."));
+                MuGame.ScheduleOnMainThread(() => HandleBuyFailure(generation, "Could not send the purchase request."));
                 return;
             }
             await Task.Delay(8000);
-            MuGame.ScheduleOnMainThread(() => HandleBuyFailure("No purchase response from OpenMU."));
+            MuGame.ScheduleOnMainThread(() => HandleBuyFailure(generation, "No purchase response from OpenMU."));
         }
 
-        private void HandleBuyFailure(string text)
+        private void HandleBuyFailure(int generation, string text)
         {
-            if (!_buyPending) return;
+            if (!_buyPending || generation != _buyRequestGeneration) return;
             _buyPending = false;
             _feedback = text;
             PostMessage(text);
