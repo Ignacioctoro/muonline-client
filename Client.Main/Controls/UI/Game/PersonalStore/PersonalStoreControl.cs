@@ -101,6 +101,9 @@ namespace Client.Main.Controls.UI.Game
         private Point _pickStartPoint;
         private bool _requestInFlight;
         private int _previewIndex;
+        private double _missingPreviewCooldown;
+        private readonly Dictionary<string, int> _previewRetryCounts = new(StringComparer.Ordinal);
+        private const int MaxMissingPreviewRetries = 24;
         private readonly TextFieldControl _priceInput;
         private readonly TextFieldControl _storeNameInput;
         private bool _priceEditorVisible;
@@ -471,6 +474,8 @@ namespace Client.Main.Controls.UI.Game
                     : null;
             }
             _previewIndex = 0;
+            _previewRetryCounts.Clear();
+            _missingPreviewCooldown = 0;
         }
 
         private void SendConfirmedStorageMove(byte fromSlot, ItemStorageKind targetStorage, byte toSlot)
@@ -672,18 +677,36 @@ namespace Client.Main.Controls.UI.Game
             EnsureCharacterState();
             if (_requestInFlight && _state?.IsPlayerShopMovePending == false)
                 _requestInFlight = false;
-            // Cache 3D previews outside an active SpriteBatch/RenderTarget draw.
-            if (_previewIndex < _items.Count)
+            // Render 3D shop icons only in Update (never inside Draw's
+            // SpriteBatch). Assets can still be loading during the first
+            // frames after login, so one failed attempt must not hide an icon
+            // forever until a vault move forces another preview.
+            _missingPreviewCooldown -= gameTime.ElapsedGameTime.TotalSeconds;
+            if (_items.Count > 0 && _missingPreviewCooldown <= 0)
             {
-                var item = _items[_previewIndex++];
-                if (item.Definition.TexturePath?.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase) == true)
+                _missingPreviewCooldown = 0.20;
+                for (int inspected = 0; inspected < _items.Count; inspected++)
                 {
+                    var item = _items[_previewIndex++ % _items.Count];
+                    string path = item.Definition.TexturePath;
+                    if (string.IsNullOrEmpty(path) ||
+                        !path.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    int width = item.Definition.Width * CellSize;
+                    int height = item.Definition.Height * CellSize;
+                    if (BmdPreviewRenderer.TryGetCachedPreview(item, width, height) != null)
+                        continue;
+                    string key = path + ":" + width + "x" + height;
+                    _previewRetryCounts.TryGetValue(key, out int retryCount);
+                    if (retryCount >= MaxMissingPreviewRetries)
+                        continue;
+                    _previewRetryCounts[key] = retryCount + 1;
                     try
                     {
-                        BmdPreviewRenderer.GetPreview(item,
-                            item.Definition.Width * CellSize, item.Definition.Height * CellSize);
+                        BmdPreviewRenderer.RetryMissingPreview(item, width, height);
                     }
-                    catch { /* A missing model uses the standard item fallback. */ }
+                    catch { /* Keep the normal inventory placeholder on failure. */ }
+                    break; // At most one render attempt per 200 ms.
                 }
             }
             var current = MuGame.Instance.UiMouseState;
