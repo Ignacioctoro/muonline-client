@@ -41,6 +41,8 @@ namespace Client.Main.Controls.UI.Game
         private static PersonalStoreBuyerControl _instance;
         public static PersonalStoreBuyerControl Instance => _instance ??= new PersonalStoreBuyerControl();
         public override bool NonDisposable => true;
+        public ushort SellerId => _sellerId;
+        public bool IsViewing(ushort sellerId) => Visible && _sellerId == (sellerId & 0x7FFF);
 
         private readonly Dictionary<byte, Listing> _listings = new();
         private readonly Dictionary<string, Texture2D> _textures = new(StringComparer.OrdinalIgnoreCase);
