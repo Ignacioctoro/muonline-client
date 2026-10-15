@@ -19,6 +19,24 @@ namespace Client.Main.Core.Client
         private readonly ILogger<ScopeManager> _logger;
         private readonly CharacterState _characterState; // Needed for position-based calculations to determine proximity
         private readonly ConcurrentDictionary<ushort, ScopeObject> _objectsInScope = new(); // Thread-safe dictionary to store objects in scope, using masked IDs as keys
+        // Server-confirmed shop advertisements (C2 3F 00). Keys are masked network IDs.
+        private readonly ConcurrentDictionary<ushort, string> _playerShopNames = new();
+
+        public void SetPlayerShop(ushort networkId, string storeName)
+        {
+            ushort id = (ushort)(networkId & 0x7FFF);
+            if (string.IsNullOrWhiteSpace(storeName))
+                _playerShopNames.TryRemove(id, out _);
+            else
+                _playerShopNames[id] = storeName;
+        }
+
+        public bool TryGetPlayerShop(ushort networkId, out string storeName) =>
+            _playerShopNames.TryGetValue((ushort)(networkId & 0x7FFF), out storeName);
+
+        public void RemovePlayerShop(ushort networkId) =>
+            _playerShopNames.TryRemove((ushort)(networkId & 0x7FFF), out _);
+
         private readonly Stack<PlayerScopeObject> _playerPool = new();
         private readonly Stack<NpcScopeObject> _npcPool = new();
         private readonly Stack<MoneyScopeObject> _moneyPool = new();
@@ -162,6 +180,7 @@ namespace Client.Main.Core.Client
         /// <returns><c>true</c> if the object was successfully removed; otherwise, <c>false</c>.</returns>
         public bool RemoveObjectFromScope(ushort maskedId)
         {
+            RemovePlayerShop(maskedId);
             if (_objectsInScope.TryRemove(maskedId, out var removedObject))
             {
                 ReturnScopeObject(removedObject);
@@ -335,6 +354,8 @@ namespace Client.Main.Core.Client
         /// <param name="clearSelf">If set to <c>true</c>, clears even the player's own character from scope. Default is <c>false</c>.</param>
         public void ClearScope(bool clearSelf = false)
         {
+            // Do not retain advertisements across map/connection transitions.
+            _playerShopNames.Clear();
             if (clearSelf || _characterState.Id == 0xFFFF)
             {
                 _objectsInScope.Clear();
