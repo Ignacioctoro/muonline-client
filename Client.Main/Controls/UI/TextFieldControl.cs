@@ -74,6 +74,13 @@ namespace Client.Main.Controls.UI
 
         public int MaxLength { get; set; } = int.MaxValue;
 
+        /// <summary>
+        /// For numeric dialogs on Windows, read digits from KeyboardState even
+        /// if the GameWindow.TextInput event is not raised by a MonoGame host.
+        /// Other text fields preserve normal OS text/keyboard-layout behavior.
+        /// </summary>
+        public bool CaptureDigitsFromKeyboardState { get; set; }
+
         public string Value
         {
             get => _inputText.ToString();
@@ -631,6 +638,22 @@ namespace Client.Main.Controls.UI
             }
         }
 
+        private static bool TryGetKeyboardDigit(Keys key, out char digit)
+        {
+            if (key >= Keys.D0 && key <= Keys.D9)
+            {
+                digit = (char)('0' + (key - Keys.D0));
+                return true;
+            }
+            if (key >= Keys.NumPad0 && key <= Keys.NumPad9)
+            {
+                digit = (char)('0' + (key - Keys.NumPad0));
+                return true;
+            }
+            digit = '\0';
+            return false;
+        }
+
         private void OnDesktopTextInput(object sender, Microsoft.Xna.Framework.TextInputEventArgs e)
         {
             if (!IsFocused || !Visible)
@@ -646,6 +669,11 @@ namespace Client.Main.Controls.UI
                 return;
 
             char character = e.Character;
+
+            // This field receives its digits from KeyboardState in Update().
+            // Suppress event-delivered digits to avoid inserting them twice.
+            if (CaptureDigitsFromKeyboardState && character >= '0' && character <= '9')
+                return;
 
             if (character == '\0' || char.IsControl(character))
                 return;
@@ -682,7 +710,17 @@ namespace Client.Main.Controls.UI
             {
                 if (previousKeyboard.IsKeyUp(key))
                 {
-                    HandleControlKey(key, shift, ctrl);
+                    if (CaptureDigitsFromKeyboardState && !ctrl &&
+                        !keyboard.IsKeyDown(Keys.LeftAlt) &&
+                        !keyboard.IsKeyDown(Keys.RightAlt) &&
+                        TryGetKeyboardDigit(key, out char digit))
+                    {
+                        InsertTextAtCursor(digit.ToString());
+                    }
+                    else
+                    {
+                        HandleControlKey(key, shift, ctrl);
+                    }
                 }
             }
 
