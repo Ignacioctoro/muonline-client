@@ -89,6 +89,7 @@ namespace Client.Main.Controls.UI.Game
         private InventoryItem _hoveredItem;
         private InventoryItem _pickedItem;
         private byte _pickedSlot;
+        private Point _pickStartPoint;
         private bool _requestInFlight;
         private int _previewIndex;
 
@@ -403,6 +404,37 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
+            // Support the classic press-drag-release gesture as well as the
+            // existing click-pick / click-place interaction.
+            if (leftJustReleased && _pickedItem != null &&
+                (Math.Abs(current.Position.X - _pickStartPoint.X) > 3 ||
+                 Math.Abs(current.Position.Y - _pickStartPoint.Y) > 3))
+            {
+                var inventory = InventoryControl.Instance;
+                if (inventory?.Visible == true &&
+                    inventory.DisplayRectangle.Contains(current.Position))
+                {
+                    TryHandleInventoryDrop(current.Position, inventory);
+                }
+                else if (TryGetVisualSlot(current.Position, out int dragSlot))
+                {
+                    var destination = new Point(dragSlot % Columns, dragSlot / Columns);
+                    if (CanPlaceAt(destination, _pickedItem))
+                    {
+                        byte toSlot = (byte)(FirstStoreSlot + dragSlot);
+                        if (toSlot != _pickedSlot)
+                            SendConfirmedStorageMove(_pickedSlot, ItemStorageKind.PlayerShop, toSlot);
+                        else
+                            _pickedItem = null;
+                    }
+                    else _pickedItem = null;
+                }
+                else _pickedItem = null;
+
+                Scene?.SetMouseInputConsumed();
+                return;
+            }
+
             _hoveredItem = inside ? ItemAt(current.Position) : null;
             bool leftJustPressed = current.LeftButton == ButtonState.Pressed &&
                                    previous.LeftButton == ButtonState.Released;
@@ -414,6 +446,7 @@ namespace Client.Main.Controls.UI.Game
                     if (_hoveredItem != null)
                     {
                         _pickedItem = _hoveredItem;
+                        _pickStartPoint = current.Position;
                         _pickedSlot = (byte)(FirstStoreSlot +
                             _hoveredItem.GridPosition.Y * Columns +
                             _hoveredItem.GridPosition.X);
