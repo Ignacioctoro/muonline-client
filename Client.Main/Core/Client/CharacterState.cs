@@ -183,6 +183,9 @@ namespace Client.Main.Core.Client
         private byte? _pendingVaultMoveTo;
         private byte? _pendingChaosMachineMoveFrom;
         private byte? _pendingChaosMachineMoveTo;
+        // Absolute inventory-backed shop slots 204..235 (OpenMU Season 6).
+        private byte? _pendingPlayerShopMoveFrom;
+        private byte? _pendingPlayerShopMoveTo;
 
         // NPC Shop items
         private readonly ConcurrentDictionary<byte, byte[]> _shopItems = new();
@@ -637,6 +640,27 @@ namespace Client.Main.Core.Client
         public IReadOnlyDictionary<byte, byte[]> GetShopItems()
         {
             return new ReadOnlyDictionary<byte, byte[]>(_shopItems.ToDictionary(k => k.Key, v => v.Value));
+        }
+
+        /// <summary>
+        /// Tracks a server-authoritative PlayerShop move until 0x24 replies.
+        /// The positions are absolute storage indices, not 0..31 display slots.
+        /// </summary>
+        public void StashPendingPlayerShopMove(byte fromSlot, byte toSlot)
+        {
+            _pendingPlayerShopMoveFrom = fromSlot;
+            _pendingPlayerShopMoveTo = toSlot;
+        }
+
+        public bool TryConsumePendingPlayerShopMove(out byte fromSlot, out byte toSlot)
+        {
+            fromSlot = _pendingPlayerShopMoveFrom.GetValueOrDefault();
+            toSlot = _pendingPlayerShopMoveTo.GetValueOrDefault();
+            if (!_pendingPlayerShopMoveFrom.HasValue || !_pendingPlayerShopMoveTo.HasValue)
+                return false;
+            _pendingPlayerShopMoveFrom = null;
+            _pendingPlayerShopMoveTo = null;
+            return true;
         }
 
         /// <summary>
