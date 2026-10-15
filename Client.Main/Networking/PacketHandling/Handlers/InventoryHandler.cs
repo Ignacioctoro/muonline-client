@@ -420,6 +420,18 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             gameScene?.ChatLog?.AddMessage("System", "Moving the item failed.", Client.Main.Models.MessageType.Error);
                         });
                     }
+                    // Player shop moves keep the authoritative inventory snapshot
+                    // intact until the server accepts the transaction.
+                    else if (_characterState.TryConsumePendingPlayerShopMove(out var pFrom, out var pTo))
+                    {
+                        _characterState.RaiseInventoryChanged();
+                        _logger.LogWarning("Personal Store move rejected: {From} -> {To}", pFrom, pTo);
+                        MuGame.ScheduleOnMainThread(() =>
+                        {
+                            var gameScene = MuGame.Instance?.ActiveScene as Client.Main.Scenes.GameScene;
+                            gameScene?.ChatLog?.AddMessage("System", "Personal Store item move failed.", Client.Main.Models.MessageType.Error);
+                        });
+                    }
                     // Then, try restore any pending storage move (vault <-> inventory)
                     else if (_characterState.TryConsumePendingVaultMove(out var vFrom, out var vTo))
                     {
@@ -469,7 +481,24 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     byte toSlot = moved.TargetSlot;
                     var itemData = moved.ItemData.ToArray();
 
-                    if (targetStore == ItemStorageKind.Vault)
+                    if (targetStore == ItemStorageKind.PlayerShop)
+                    {
+                        // OpenMU moves items to absolute inventory-backed slots
+                        // 204..235. Commit source removal only after 0x24 success.
+                        if (_characterState.TryConsumePendingPlayerShopMove(out var shopFrom, out var shopTo) &&
+                            shopFrom != toSlot)
+                        {
+                            _characterState.RemoveInventoryItem(shopFrom);
+                        }
+                        if (_characterState.TryConsumePendingInventoryMove(out var inventoryFrom, out var inventoryTo) &&
+                            inventoryFrom != toSlot)
+                        {
+                            _characterState.RemoveInventoryItem(inventoryFrom);
+                        }
+                        _characterState.AddOrUpdateInventoryItem(toSlot, itemData);
+                        _logger.LogInformation("Personal Store item confirmed at slot {Slot}.", toSlot);
+                    }
+                    else if (targetStore == ItemStorageKind.Vault)
                     {
                         // Clear any pending storage move information
                         if (_characterState.TryConsumePendingVaultMove(out var from, out var to))
@@ -513,6 +542,13 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     }
                     else // Inventory or others -> inventory fallback
                     {
+                        // A confirmed move from the personal store frees its old
+                        // absolute shop slot; never remove it before this reply.
+                        if (_characterState.TryConsumePendingPlayerShopMove(out var shopFrom, out var shopTo))
+                        {
+                            if (shopFrom != toSlot)
+                                _characterState.RemoveInventoryItem(shopFrom);
+                        }
                         // If we had a pending vault->inventory move, remove from vault
                         if (_characterState.TryConsumePendingVaultMove(out var vf, out var vt))
                         {

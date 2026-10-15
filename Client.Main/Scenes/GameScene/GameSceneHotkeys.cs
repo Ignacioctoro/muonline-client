@@ -169,6 +169,16 @@ namespace Client.Main.Scenes
 
             hotkeys.OnKeyPressed(Keys.I, ToggleInventory, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.V, ToggleInventory, when: WhenNotUiInput);
+            // S is only a shop shortcut while Inventory is open; otherwise it
+            // remains available to the game and never triggers during chat input.
+            hotkeys.OnKeyPressed(Keys.S, HotkeyModifiers.None,
+                context =>
+                {
+                    if (PersonalStoreControl.IsOpen) PersonalStoreControl.Instance.CloseWindow();
+                    else PersonalStoreControl.Instance.ShowWindow();
+                },
+                when: context => WhenNotUiInput(context) && _inventoryControl.Visible,
+                exactModifiers: true);
             hotkeys.OnKeyPressed(Keys.C, ToggleCharacterInfo, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.M, ToggleMoveCommand, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.Enter, OpenChatInput, when: WhenNotUiInput);

@@ -954,6 +954,12 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return;
             }
 
+            if (leftJustPressed && PersonalStoreControl.IsOpen &&
+                PersonalStoreControl.Instance.TryHandleInventoryDrop(mousePos, this))
+            {
+                return;
+            }
+
             if (leftJustPressed && IsMouseOverDragArea() && !_isDragging)
             {
                 DateTime now = DateTime.Now;
@@ -2222,7 +2228,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 _equippedItems[slotIndex] = invItem;
             }
 
-            foreach (var entry in characterItems.Where(e => e.Key >= InventorySlotOffsetConstant))
+            foreach (var entry in characterItems.Where(e => e.Key >= InventorySlotOffsetConstant &&
+                                                        e.Key < PersonalStoreControl.FirstStoreSlot))
             {
                 byte slotIndex = entry.Key;
                 byte[] itemData = entry.Value;
@@ -2614,6 +2621,41 @@ namespace Client.Main.Controls.UI.Game.Inventory
                         }
                     });
 
+                    ReleasePickedItem();
+                }
+                else
+                {
+                    AddItem(item);
+                    _networkManager?.GetCharacterState()?.RaiseInventoryChanged();
+                    ReleasePickedItem();
+                }
+            }
+            else if (PersonalStoreControl.IsOpen &&
+                     PersonalStoreControl.Instance is { } personalStore &&
+                     personalStore.DisplayRectangle.Contains(MuGame.Instance.UiMouseState.Position) &&
+                     _network_manager_exists())
+            {
+                var mouse = MuGame.Instance.UiMouseState.Position;
+                if (personalStore.TryGetVisualSlot(mouse, out var visualSlot) &&
+                    personalStore.CanPlaceAt(new Point(visualSlot % PersonalStoreControl.Columns,
+                                                       visualSlot / PersonalStoreControl.Columns), item))
+                {
+                    // Storage kind 4 expects absolute slot 204..235, not 0..31.
+                    byte toSlot = (byte)(PersonalStoreControl.FirstStoreSlot + visualSlot);
+                    var svc = _networkManager.GetCharacterService();
+                    var state = _networkManager.GetCharacterState();
+                    var raw = item.RawData ?? Array.Empty<byte>();
+                    state.StashPendingInventoryMove(slotIndex, slotIndex);
+                    _ = Task.Run(async () =>
+                    {
+                        await svc.SendStorageItemMoveAsync(ItemStorageKind.Inventory, slotIndex,
+                            ItemStorageKind.PlayerShop, toSlot, _networkManager.TargetVersion, raw);
+                        await Task.Delay(1200);
+                        if (state.IsInventoryMovePending(slotIndex, slotIndex))
+                        {
+                            MuGame.ScheduleOnMainThread(state.RaiseInventoryChanged);
+                        }
+                    });
                     ReleasePickedItem();
                 }
                 else
