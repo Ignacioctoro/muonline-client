@@ -272,6 +272,26 @@ namespace Client.Main.Controls.UI.Game
         private static int CenteredFrameX(float sourceWidth)
             => (WINDOW_WIDTH - (int)MathF.Round(sourceWidth * CLASSIC_UI_SCALE_X)) / 2;
 
+        // Keep the actual GFx widths rather than widening Board and
+        // ContentBorder to match TopCorner. The ContentBorder crop has
+        // asymmetric artwork; a small independent X adjustment is needed
+        // to align its visible inner edge with the 253-unit Board piece.
+        private const int CONTENT_BORDER_OFFSET_X = -4;
+
+        private static Rectangle GetFramePieceDestination(LayoutInfo info)
+        {
+            int width = (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X);
+            int offsetX = info.Name == "ContentBorder"
+                ? CONTENT_BORDER_OFFSET_X
+                : 0;
+
+            return new Rectangle(
+                CenteredFrameX(info.Width) + offsetX,
+                ScaleClassicY(info.ScreenY),
+                width,
+                ScaleClassicSize(info.Height));
+        }
+
         private void BuildLayoutMetrics()
         {
             // Keep the original vertical GFx offsets, but align the frame,
@@ -759,26 +779,19 @@ namespace Client.Main.Controls.UI.Game
             if (_layoutTexture != null &&
                 _layoutInfos.Count > 0)
             {
-                // Board, ContentBorder and TopCorner are successive pieces of
-                // the same GFx frame. Their old layout widths (253 / 273)
-                // must not give them independent outer borders.
-                // Draw the top last to conceal the 6px vertical overlap.
-                foreach (var info in _layoutInfos
-                    .OrderBy(i => i.Name == "Board" ? 0 :
-                                  i.Name == "ContentBorder" ? 1 : 2))
+                // Respect the atlas' original per-piece widths: the 273-unit
+                // header must stay visibly wider than the 253-unit body.
+                // Draw in layout order (Board, TopCorner, ContentBorder), as
+                // before the over-wide frame-rail regression.
+                foreach (var info in _layoutInfos.OrderBy(i => i.Z))
                 {
-                    var destRect = new Rectangle(
-                        _headerRect.X,
-                        ScaleClassicY(info.ScreenY),
-                        _headerRect.Width,
-                        ScaleClassicSize(info.Height));
+                    Rectangle destRect = GetFramePieceDestination(info);
 
                     if (_textureRectLookup.TryGetValue(info.Name, out var src))
                     {
                         var sourceRect = new Rectangle(
                             src.X, src.Y, src.Width, src.Height);
-
-                        DrawAlignedFramePiece(spriteBatch, info.Name, destRect, sourceRect);
+                        spriteBatch.Draw(_layoutTexture, destRect, sourceRect, Color.White);
                     }
                     else
                     {
@@ -806,45 +819,6 @@ namespace Client.Main.Controls.UI.Game
             }
 
             DrawFooter(spriteBatch);
-        }
-
-        // The middle and lower pieces use a 325px source crop, while the
-        // header uses 350px. Stretch ONLY the central strip horizontally:
-        // keeping the 16px side rails unscaled avoids distorted borders,
-        // and all three layers now meet the same left/right frame edges.
-        // Heights and the 8x15 item grid remain completely unchanged.
-        private void DrawAlignedFramePiece(
-            SpriteBatch spriteBatch,
-            string pieceName,
-            Rectangle destination,
-            Rectangle source)
-        {
-            const int rail = 16;
-            if (pieceName == "TopCorner" ||
-                source.Width <= rail * 2 ||
-                destination.Width <= rail * 2)
-            {
-                spriteBatch.Draw(_layoutTexture, destination, source, Color.White);
-                return;
-            }
-
-            spriteBatch.Draw(
-                _layoutTexture,
-                new Rectangle(destination.X, destination.Y, rail, destination.Height),
-                new Rectangle(source.X, source.Y, rail, source.Height),
-                Color.White);
-            spriteBatch.Draw(
-                _layoutTexture,
-                new Rectangle(destination.X + rail, destination.Y,
-                    destination.Width - rail * 2, destination.Height),
-                new Rectangle(source.X + rail, source.Y,
-                    source.Width - rail * 2, source.Height),
-                Color.White);
-            spriteBatch.Draw(
-                _layoutTexture,
-                new Rectangle(destination.Right - rail, destination.Y, rail, destination.Height),
-                new Rectangle(source.Right - rail, source.Y, rail, source.Height),
-                Color.White);
         }
 
         private void DrawShopTitle(SpriteBatch spriteBatch)
