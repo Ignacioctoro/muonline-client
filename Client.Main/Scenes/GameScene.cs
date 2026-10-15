@@ -3028,6 +3028,7 @@ namespace Client.Main.Scenes
                 var sprite = GraphicsManager.Instance.Sprite;
                 _inventoryControl?._pickedItemRenderer?.Draw(sprite, gameTime);
                 VaultControl.Instance?.DrawPickedPreview(sprite, gameTime);
+                PersonalStoreControl.Instance?.DrawPickedPreview(sprite, gameTime);
                 ChaosMixControl.Instance?.DrawPickedPreview(sprite, gameTime);
                 TradeControl.Instance?.DrawPickedPreview(sprite, gameTime);
             }
