@@ -67,10 +67,15 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 return Task.CompletedTask;
             bool success = span[4] != 0;
             ushort ownerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(5, 2));
-            if (ownerId == _characterState.Id)
+            if (success)
             {
-                MuGame.ScheduleOnMainThread(() =>
-                    PersonalStoreControl.Instance.HandleStoreClosed(success));
+                // Closures are broadcast to everyone in scope, not just owner.
+                MuGame.Network?.GetScopeManager()?.RemovePlayerShop(ownerId);
+                if ((ownerId & 0x7FFF) == (_characterState.Id & 0x7FFF))
+                {
+                    MuGame.ScheduleOnMainThread(() =>
+                        PersonalStoreControl.Instance.HandleStoreClosed(true));
+                }
             }
             return Task.CompletedTask;
         }
@@ -87,18 +92,29 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 span[3] != 0x3F || span[4] != 0x00)
                 return Task.CompletedTask;
             int count = span[5];
+            if (span.Length < 6 + count * 38)
+            {
+                _logger.LogWarning("Truncated PlayerShops packet: {Length} bytes, {Count} stores.", span.Length, count);
+                return Task.CompletedTask;
+            }
+
+            var scope = MuGame.Network?.GetScopeManager();
             for (int i = 0; i < count; i++)
             {
                 int offset = 6 + i * 38;
-                if (offset + 38 > span.Length) break;
                 ushort ownerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(offset, 2));
-                if (ownerId != _characterState.Id)
-                    continue;
                 string name = Encoding.UTF8.GetString(span.Slice(offset + 2, 36))
                     .TrimEnd('\0');
-                MuGame.ScheduleOnMainThread(() =>
-                    PersonalStoreControl.Instance.HandleOwnStoreAnnounced(name));
-                break;
+                // The packet can precede the player's spawn packet.
+                // Store by server network ID and resolve when the model appears.
+                scope?.SetPlayerShop(ownerId, name);
+                _logger.LogInformation("Personal Store advertised: networkId={Id:X4}, title={Title}", ownerId, name);
+                if ((ownerId & 0x7FFF) == (_characterState.Id & 0x7FFF))
+                {
+                    var ownName = name;
+                    MuGame.ScheduleOnMainThread(() =>
+                        PersonalStoreControl.Instance.HandleOwnStoreAnnounced(ownName));
+                }
             }
             return Task.CompletedTask;
         }
