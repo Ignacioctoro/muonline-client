@@ -1650,9 +1650,8 @@ namespace Client.Main.Objects.Player
         /// Always-visible Season 6 Personal Store title, separate from hover names.
         /// Uses the server-advertised network ID and existing world projection.
         /// </summary>
-        public override void DrawAfter(GameTime gameTime)
+        private void DrawPersonalStoreTitle()
         {
-            base.DrawAfter(gameTime);
             if (!Visible || World == null)
                 return;
 
@@ -4395,6 +4394,7 @@ namespace Client.Main.Objects.Player
         {
             base.DrawAfter(gameTime);
             DrawPartyHealthBar();
+            DrawPersonalStoreTitle();
         }
 
         private void DrawPartyHealthBar()
