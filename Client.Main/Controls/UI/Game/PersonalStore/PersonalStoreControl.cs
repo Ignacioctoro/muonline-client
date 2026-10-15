@@ -127,6 +127,9 @@ namespace Client.Main.Controls.UI.Game
             _priceInput.ControlSize = _priceInput.ViewSize;
             _priceInput.AutoViewSize = false;
             _priceInput.MaxLength = 10;
+            // WinDX can miss the GameWindow.TextInput event. Use the same
+            // KeyboardState digit path as the existing Trade/Vault Zen editors.
+            _priceInput.CaptureDigitsFromKeyboardState = true;
             _priceInput.FontSize = 15;
             _priceInput.TextColor = new Color(242, 224, 192);
             _priceInput.BackgroundColor = new Color(17, 18, 22, 245);
@@ -134,6 +137,12 @@ namespace Client.Main.Controls.UI.Game
             _priceInput.BorderThickness = 1;
             _priceInput.Placeholder = "Enter Zen amount";
             _priceInput.Visible = false;
+            _priceInput.Click += (sender, args) =>
+            {
+                _priceInput.Focus();
+                if (Scene != null)
+                    Scene.FocusControl = _priceInput;
+            };
             _priceInput.EnterKeyPressed += (sender, args) =>
             {
                 Scene?.ConsumeKeyboardEnter();
@@ -457,6 +466,8 @@ namespace Client.Main.Controls.UI.Game
             _priceEditorVisible = true;
             _priceInput.Visible = true;
             _priceInput.Focus();
+            if (Scene != null)
+                Scene.FocusControl = _priceInput;
             SoundController.Instance.PlayBuffer("Sound/iButton.wav");
         }
 
@@ -636,7 +647,16 @@ namespace Client.Main.Controls.UI.Game
 
                 if (leftJustPressed)
                 {
-                    if (ToScreen(PriceConfirmButton).Contains(current.Position))
+                    if (_priceInput.DisplayRectangle.Contains(current.Position))
+                    {
+                        // Preserve input focus when clicking directly inside the
+                        // price bar. The shop parent is itself interactive and
+                        // may otherwise steal focus on mouse-down.
+                        _priceInput.Focus();
+                        if (Scene != null)
+                            Scene.FocusControl = _priceInput;
+                    }
+                    else if (ToScreen(PriceConfirmButton).Contains(current.Position))
                         SubmitPrice();
                     else if (ToScreen(PriceCancelButton).Contains(current.Position))
                         CancelPriceEditor();
