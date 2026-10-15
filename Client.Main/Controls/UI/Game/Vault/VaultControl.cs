@@ -282,14 +282,23 @@ namespace Client.Main.Controls.UI.Game
         // ContentBorder to match TopCorner. The ContentBorder crop has
         // asymmetric artwork; a small independent X adjustment is needed
         // to align its visible inner edge with the 253-unit Board piece.
+        
+        private const int TOP_CORNER_OFFSET_X = 10;
         private const int CONTENT_BORDER_OFFSET_X = -4;
+        private const int BOARD_OFFSET_X = -2;
 
         private static Rectangle GetFramePieceDestination(LayoutInfo info)
         {
-            int width = (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X);
-            int offsetX = info.Name == "ContentBorder"
-                ? CONTENT_BORDER_OFFSET_X
-                : 0;
+            int width = (int)MathF.Round(
+                info.Width * CLASSIC_UI_SCALE_X);
+
+            int offsetX = info.Name switch
+            {
+                "TopCorner" => TOP_CORNER_OFFSET_X,
+                "ContentBorder" => CONTENT_BORDER_OFFSET_X,
+                "Board" => BOARD_OFFSET_X,
+                _ => 0
+            };
 
             return new Rectangle(
                 CenteredFrameX(info.Width) + offsetX,
