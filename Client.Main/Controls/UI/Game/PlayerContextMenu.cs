@@ -176,6 +176,11 @@ namespace Client.Main.Controls.UI.Game
                 enabled;
         }
 
+        public void SetStoreButtonEnabled(bool enabled)
+        {
+            _storeButton.Enabled = enabled;
+        }
+
         public void SetGuildRequestVisible(
             bool visible)
         {
@@ -382,6 +387,10 @@ namespace Client.Main.Controls.UI.Game
 
             if (characterService != null)
             {
+                if (MuGame.Instance?.ActiveScene is Client.Main.Scenes.GameScene scene)
+                    scene.ChatLog?.AddMessage("Personal Store",
+                        "Requesting store items from OpenMU...",
+                        Client.Main.Models.MessageType.System);
                 await characterService
                     .SendPlayerStoreListRequestAsync(
                         _targetPlayerId,
