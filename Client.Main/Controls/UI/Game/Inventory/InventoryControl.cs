@@ -58,10 +58,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             "Interface/newui_msgbox_back.jpg"
         };
 
-        // Compact Season 16-inspired proportions for the GFx inventory.
-        // Keep the 32px item pitch: shrinking the window must not shrink items or hitboxes.
-        private const int WINDOW_WIDTH = 360;
-        private const int WINDOW_HEIGHT = 690;
+        // Pre-redesign Naffis inventory layout (before commit e5d1988).
+        private const int WINDOW_WIDTH = GameWindowMetrics.InventoryWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.InventoryHeight;
 
         private const int HEADER_HEIGHT = 70;
         private const int FOOTER_HEIGHT = 48;
@@ -77,8 +76,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private const int FOOTER_BUTTON_SIZE = 30;
 
         // Mochila 8x8
-        public const int INVENTORY_SQUARE_WIDTH = 32;
-        public const int INVENTORY_SQUARE_HEIGHT = 32;
+        public const int INVENTORY_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        public const int INVENTORY_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
 
         // Equipamiento: un poco más compacto que la mochila
         private const int EQUIP_SQUARE_WIDTH = 32;
@@ -1426,8 +1425,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             int cell = EQUIP_SQUARE_WIDTH;
             int centerX = (WINDOW_WIDTH - cell * 2) / 2;
-            // Bring side equipment 8px closer to center so the 3x2 wings
-            // retain a safe outer margin inside the narrower inventory.
+            // Compact lateral spacing: keeps 3x2 wing art inside a 360px panel.
             int lateralOffset = COLUMN_SPACING + INVENTORY_SQUARE_WIDTH;
             int leftX = centerX - (cell * 2 + lateralOffset);
             int rightX = centerX + cell * 2 + lateralOffset;

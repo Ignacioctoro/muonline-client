@@ -19,6 +19,9 @@ namespace Client.Main.Controls.UI.Game.Common
         // Keep each source entirely inside its sprite, away from the gutters.
         public static readonly Rectangle PersonalShopFrameSource = new(0, 0, 575, 638);
         public static readonly Rectangle PersonalShopInsetSource = new(590, 1, 312, 376);
+        // The upper-right sprite starts outside the atlas: its top border is absent.
+        // The panel immediately below it supplies a complete matching top rail.
+        private static readonly Rectangle PersonalShopInsetTopSource = new(590, 386, 312, 12);
 
         public static void DrawPersonalShopWindow(SpriteBatch spriteBatch,
             Texture2D atlas, Rectangle destination)
@@ -32,6 +35,16 @@ namespace Client.Main.Controls.UI.Game.Common
         {
             DrawNineSlice(spriteBatch, atlas, PersonalShopInsetSource,
                 destination, 12, 12, 12, 12);
+            if (atlas == null || atlas.IsDisposed || destination.Width <= 24 || destination.Height <= 24)
+                return;
+
+            // Keep corner widths intact instead of stretching the rail as one sprite.
+            spriteBatch.Draw(atlas, new Rectangle(destination.X, destination.Y, 12, 12),
+                new Rectangle(PersonalShopInsetTopSource.X, PersonalShopInsetTopSource.Y, 12, 12), Color.White);
+            spriteBatch.Draw(atlas, new Rectangle(destination.X + 12, destination.Y, destination.Width - 24, 12),
+                new Rectangle(PersonalShopInsetTopSource.X + 12, PersonalShopInsetTopSource.Y, 288, 12), Color.White);
+            spriteBatch.Draw(atlas, new Rectangle(destination.Right - 12, destination.Y, 12, 12),
+                new Rectangle(PersonalShopInsetTopSource.Right - 12, PersonalShopInsetTopSource.Y, 12, 12), Color.White);
         }
 
         /// <summary>

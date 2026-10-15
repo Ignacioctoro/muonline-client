@@ -1,3 +1,4 @@
+using Client.Main.Controls.UI.Game.Common;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -22,7 +23,7 @@ namespace Client.Main.Controls.UI.Game
     /// </summary>
     public sealed class PetTrainerControl : UIControl, IUiTexturePreloadable
     {
-        private const int WindowWidth = 350;
+        private const int WindowWidth = GameWindowMetrics.SecondaryWidth;
         private const int MainWindowHeight = 346;
         private const int RestoreWindowHeight = 442;
         private const byte HorseSlot = 8;

@@ -50,14 +50,14 @@ namespace Client.Main.Controls.UI.Game
         private const int SHOP_ROWS = 15;
 
         // Tamaño elegido para los slots/items.
-        private const int SHOP_SQUARE_WIDTH = 32;
-        private const int SHOP_SQUARE_HEIGHT = 32;
+        private const int SHOP_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        private const int SHOP_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
 
         // El layout original de Naffis estaba construido para celdas de 25 px.
-        // Escalamos TODO el skin clásico en la misma proporción que la grilla:
-        // 32 / 25 = 1.28. Así fondo, grilla, botones e hitboxes vuelven a coincidir.
+        // El marco ocupa el tamaño del inventario; la grilla conserva celdas cuadradas.
+        // El atlas se ajusta por eje sin cambiar el tamaño de los objetos.
         private const float CLASSIC_UI_SCALE =
-            SHOP_SQUARE_WIDTH / 25f;
+            (GameWindowMetrics.FullHeightWindowHeight - 16f) / CLASSIC_PANEL_HEIGHT;
 
         // Bounding box real de NpcShopLayout.json:
         // X 148..423 / Y 89..624.
@@ -65,17 +65,13 @@ namespace Client.Main.Controls.UI.Game
         private const int CLASSIC_ORIGIN_Y = 89;
         private const int CLASSIC_PANEL_WIDTH = 275;
         private const int CLASSIC_PANEL_HEIGHT = 535;
-        private const int PANEL_MARGIN = 8;
-
-        private static readonly int WINDOW_WIDTH =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_WIDTH * CLASSIC_UI_SCALE);
-
-        private static readonly int WINDOW_HEIGHT =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_HEIGHT * CLASSIC_UI_SCALE);
+        // Same tall-panel footprint as the inventory; compact dialogs are separate.
+        private const int WINDOW_WIDTH = GameWindowMetrics.FullHeightWindowWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.FullHeightWindowHeight;
+        private const int PANEL_MARGIN_X = 8;
+        private const int PANEL_MARGIN_Y = 8;
+        private const float CLASSIC_UI_SCALE_X =
+            (GameWindowMetrics.FullHeightWindowWidth - PANEL_MARGIN_X * 2f) / CLASSIC_PANEL_WIDTH;
 
         // El crop antiguo 29x31 contiene margen/borde extra.
         // Usamos únicamente la celda interior real de 25x25 para evitar
@@ -95,7 +91,7 @@ namespace Client.Main.Controls.UI.Game
         private const int GRID_LOGIC_OFFSET_Y = 5;
 
         // La celda visual ahora es exactamente 25x25 en origen y se escala
-        // al mismo 32x32 que la lógica. No necesita desplazamiento adicional.
+        // al mismo tamaño que la lógica. No necesita desplazamiento adicional.
         private const int GRID_ART_OFFSET_X = 0;
         private const int GRID_ART_OFFSET_Y = 0;
 
@@ -256,13 +252,13 @@ namespace Client.Main.Controls.UI.Game
         }
 
         private static int ScaleClassicX(float sourceX)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_X +
                (int)MathF.Round(
                    (sourceX - CLASSIC_ORIGIN_X) *
-                   CLASSIC_UI_SCALE);
+                   CLASSIC_UI_SCALE_X);
 
         private static int ScaleClassicY(float sourceY)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_Y +
                (int)MathF.Round(
                    (sourceY - CLASSIC_ORIGIN_Y) *
                    CLASSIC_UI_SCALE);
@@ -271,20 +267,20 @@ namespace Client.Main.Controls.UI.Game
             => (int)MathF.Round(
                 value * CLASSIC_UI_SCALE);
 
-        // All frame layers use the same window center, independently of
-        // the source layout's former absolute stage coordinates.
-        private static int CenteredClassicX(float sourceWidth)
-            => (WINDOW_WIDTH - ScaleClassicSize(sourceWidth)) / 2;
+        // The cropped GFx frame pieces and logical grid share one X center.
+        // Preserve their individual widths and the original vertical spacing.
+        private static int CenteredFrameX(float sourceWidth)
+            => (WINDOW_WIDTH - (int)MathF.Round(sourceWidth * CLASSIC_UI_SCALE_X)) / 2;
 
         private void BuildLayoutMetrics()
         {
-            // Misma referencia central para el TopCorner, Board y grilla.
-            // Se preservan el pitch 32px y las coordenadas Y heredadas.
+            // Keep the original vertical GFx offsets, but align the frame,
+            // header and 8x15 grid on the same horizontal center.
 
             _headerRect = new Rectangle(
-                CenteredClassicX(273f),
+                CenteredFrameX(273f),
                 ScaleClassicY(89f),
-                ScaleClassicSize(273f),
+                (int)MathF.Round(273f * CLASSIC_UI_SCALE_X),
                 ScaleClassicSize(70f));
 
             _gridRect = new Rectangle(
@@ -767,9 +763,9 @@ namespace Client.Main.Controls.UI.Game
                          _layoutInfos.OrderBy(i => i.Z))
                 {
                     var destRect = new Rectangle(
-                        CenteredClassicX(info.Width),
+                        CenteredFrameX(info.Width),
                         ScaleClassicY(info.ScreenY),
-                        ScaleClassicSize(info.Width),
+                        (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X),
                         ScaleClassicSize(info.Height));
 
                     if (_textureRectLookup.TryGetValue(

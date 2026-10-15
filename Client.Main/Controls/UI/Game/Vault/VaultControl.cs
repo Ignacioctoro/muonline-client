@@ -44,27 +44,23 @@ namespace Client.Main.Controls.UI.Game
         public const int Columns = 8;
         public const int Rows = 15;
 
-        private const int VAULT_SQUARE_WIDTH = 32;
-        private const int VAULT_SQUARE_HEIGHT = 32;
+        private const int VAULT_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        private const int VAULT_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
 
         private const float CLASSIC_UI_SCALE =
-            VAULT_SQUARE_WIDTH / 25f;
+            (GameWindowMetrics.FullHeightWindowHeight - 16f) / CLASSIC_PANEL_HEIGHT;
 
         private const int CLASSIC_ORIGIN_X = 148;
         private const int CLASSIC_ORIGIN_Y = 89;
         private const int CLASSIC_PANEL_WIDTH = 275;
         private const int CLASSIC_PANEL_HEIGHT = 535;
-        private const int PANEL_MARGIN = 8;
-
-        private static readonly int WINDOW_WIDTH =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_WIDTH * CLASSIC_UI_SCALE);
-
-        private static readonly int WINDOW_HEIGHT =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_HEIGHT * CLASSIC_UI_SCALE);
+        // Same tall-panel footprint as the inventory; compact dialogs are separate.
+        private const int WINDOW_WIDTH = GameWindowMetrics.FullHeightWindowWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.FullHeightWindowHeight;
+        private const int PANEL_MARGIN_X = 8;
+        private const int PANEL_MARGIN_Y = 8;
+        private const float CLASSIC_UI_SCALE_X =
+            (GameWindowMetrics.FullHeightWindowWidth - PANEL_MARGIN_X * 2f) / CLASSIC_PANEL_WIDTH;
 
         // Misma celda interior usada por el NPC Shop limpio.
         private static readonly Rectangle SlotSourceRect =
@@ -262,13 +258,13 @@ namespace Client.Main.Controls.UI.Game
         }
 
         private static int ScaleClassicX(float sourceX)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_X +
                (int)MathF.Round(
                    (sourceX - CLASSIC_ORIGIN_X) *
-                   CLASSIC_UI_SCALE);
+                   CLASSIC_UI_SCALE_X);
 
         private static int ScaleClassicY(float sourceY)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_Y +
                (int)MathF.Round(
                    (sourceY - CLASSIC_ORIGIN_Y) *
                    CLASSIC_UI_SCALE);
@@ -277,22 +273,22 @@ namespace Client.Main.Controls.UI.Game
             => (int)MathF.Round(
                 value * CLASSIC_UI_SCALE);
 
-        // All frame layers use the same window center, independently of
-        // the source layout's former absolute stage coordinates.
-        private static int CenteredClassicX(float sourceWidth)
-            => (WINDOW_WIDTH - ScaleClassicSize(sourceWidth)) / 2;
+        // The cropped GFx frame pieces and logical grid share one X center.
+        // Preserve their individual widths and the original vertical spacing.
+        private static int CenteredFrameX(float sourceWidth)
+            => (WINDOW_WIDTH - (int)MathF.Round(sourceWidth * CLASSIC_UI_SCALE_X)) / 2;
 
         private void BuildLayoutMetrics()
         {
             // Mismo TopCorner del NPC Shop clásico.
             _headerRect = new Rectangle(
-                CenteredClassicX(273f),
+                CenteredFrameX(273f),
                 ScaleClassicY(89f),
-                ScaleClassicSize(273f),
+                (int)MathF.Round(273f * CLASSIC_UI_SCALE_X),
                 ScaleClassicSize(70f));
 
-            // Alineación simétrica de la cuadrícula 8x15 dentro del panel.
-            // Mantiene el pitch original de 32px para items y hitboxes.
+            // El baúl también es 8x15 y 32x32, así que usa exactamente
+            // el mismo encaje de grilla que ya quedó correcto en el Shop.
             _gridRect = new Rectangle(
                 (WINDOW_WIDTH - GRID_WIDTH) / 2,
                 ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
@@ -793,9 +789,9 @@ namespace Client.Main.Controls.UI.Game
                 {
                     var destRect =
                         new Rectangle(
-                            CenteredClassicX(info.Width),
+                            CenteredFrameX(info.Width),
                             ScaleClassicY(info.ScreenY),
-                            ScaleClassicSize(info.Width),
+                            (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X),
                             ScaleClassicSize(info.Height));
 
                     if (_textureRectLookup.TryGetValue(
