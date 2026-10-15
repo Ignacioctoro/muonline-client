@@ -1,9 +1,9 @@
 [
   {
     "Name": "Board",
-    "ScreenX": 2,
+    "ScreenX": 0,
     "ScreenY": 2,
-    "Width": 420,
+    "Width": 360,
     "Height": 690,
     "Z": 1
   },
@@ -11,15 +11,15 @@
     "Name": "TopCorner",
     "ScreenX": 0,
     "ScreenY": -20,
-    "Width": 420,
+    "Width": 360,
     "Height": 90,
     "Z": 3
   },
   {
     "Name": "ContentBorder",
-    "ScreenX": -1,
+    "ScreenX": 0,
     "ScreenY": 60,
-    "Width": 420,
+    "Width": 360,
     "Height": 210,
     "Z": 2
   }

@@ -77,7 +77,6 @@ namespace Client.Main.Controls.UI.Game
             Rows * VAULT_SQUARE_HEIGHT;
 
         // Mismos offsets lógicos del NPC Shop terminado.
-        private const int GRID_LOGIC_OFFSET_X = 4;
         private const int GRID_LOGIC_OFFSET_Y = 5;
 
         private const int GRID_ART_OFFSET_X = 0;
@@ -278,19 +277,24 @@ namespace Client.Main.Controls.UI.Game
             => (int)MathF.Round(
                 value * CLASSIC_UI_SCALE);
 
+        // All frame layers use the same window center, independently of
+        // the source layout's former absolute stage coordinates.
+        private static int CenteredClassicX(float sourceWidth)
+            => (WINDOW_WIDTH - ScaleClassicSize(sourceWidth)) / 2;
+
         private void BuildLayoutMetrics()
         {
             // Mismo TopCorner del NPC Shop clásico.
             _headerRect = new Rectangle(
-                ScaleClassicX(149.3f),
+                CenteredClassicX(273f),
                 ScaleClassicY(89f),
                 ScaleClassicSize(273f),
                 ScaleClassicSize(70f));
 
-            // El baúl también es 8x15 y 32x32, así que usa exactamente
-            // el mismo encaje de grilla que ya quedó correcto en el Shop.
+            // Alineación simétrica de la cuadrícula 8x15 dentro del panel.
+            // Mantiene el pitch original de 32px para items y hitboxes.
             _gridRect = new Rectangle(
-                ScaleClassicX(170f) + GRID_LOGIC_OFFSET_X,
+                (WINDOW_WIDTH - GRID_WIDTH) / 2,
                 ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
                 GRID_WIDTH,
                 GRID_HEIGHT);
@@ -789,7 +793,7 @@ namespace Client.Main.Controls.UI.Game
                 {
                     var destRect =
                         new Rectangle(
-                            ScaleClassicX(info.ScreenX),
+                            CenteredClassicX(info.Width),
                             ScaleClassicY(info.ScreenY),
                             ScaleClassicSize(info.Width),
                             ScaleClassicSize(info.Height));

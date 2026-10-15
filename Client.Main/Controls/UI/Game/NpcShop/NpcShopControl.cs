@@ -92,7 +92,6 @@ namespace Client.Main.Controls.UI.Game
 
         // Posición LÓGICA del grid: items, hover, clicks e hitboxes.
         // No usar estos valores para corregir el dibujo blanco del grid.
-        private const int GRID_LOGIC_OFFSET_X = 4;
         private const int GRID_LOGIC_OFFSET_Y = 5;
 
         // La celda visual ahora es exactamente 25x25 en origen y se escala
@@ -272,22 +271,24 @@ namespace Client.Main.Controls.UI.Game
             => (int)MathF.Round(
                 value * CLASSIC_UI_SCALE);
 
+        // All frame layers use the same window center, independently of
+        // the source layout's former absolute stage coordinates.
+        private static int CenteredClassicX(float sourceWidth)
+            => (WINDOW_WIDTH - ScaleClassicSize(sourceWidth)) / 2;
+
         private void BuildLayoutMetrics()
         {
-            // Coordenadas originales del renderer pre-redesign:
-            // TopCorner 149.3,89 / grid 170,180.
-            // El skin completo se escala con CLASSIC_UI_SCALE, mientras que
-            // estos offsets de pocos píxeles corrigen únicamente el calce
-            // visual del grid con el dibujo del Board.
+            // Misma referencia central para el TopCorner, Board y grilla.
+            // Se preservan el pitch 32px y las coordenadas Y heredadas.
 
             _headerRect = new Rectangle(
-                ScaleClassicX(149.3f),
+                CenteredClassicX(273f),
                 ScaleClassicY(89f),
                 ScaleClassicSize(273f),
                 ScaleClassicSize(70f));
 
             _gridRect = new Rectangle(
-                ScaleClassicX(170f) + GRID_LOGIC_OFFSET_X,
+                (WINDOW_WIDTH - GRID_WIDTH) / 2,
                 ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
                 GRID_WIDTH,
                 GRID_HEIGHT);
@@ -766,7 +767,7 @@ namespace Client.Main.Controls.UI.Game
                          _layoutInfos.OrderBy(i => i.Z))
                 {
                     var destRect = new Rectangle(
-                        ScaleClassicX(info.ScreenX),
+                        CenteredClassicX(info.Width),
                         ScaleClassicY(info.ScreenY),
                         ScaleClassicSize(info.Width),
                         ScaleClassicSize(info.Height));

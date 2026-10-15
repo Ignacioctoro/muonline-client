@@ -58,8 +58,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             "Interface/newui_msgbox_back.jpg"
         };
 
-        // Pre-redesign Naffis inventory layout (before commit e5d1988).
-        private const int WINDOW_WIDTH = 420;
+        // Compact Season 16-inspired proportions for the GFx inventory.
+        // Keep the 32px item pitch: shrinking the window must not shrink items or hitboxes.
+        private const int WINDOW_WIDTH = 360;
         private const int WINDOW_HEIGHT = 690;
 
         private const int HEADER_HEIGHT = 70;
@@ -1425,7 +1426,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             int cell = EQUIP_SQUARE_WIDTH;
             int centerX = (WINDOW_WIDTH - cell * 2) / 2;
-            int lateralOffset = COLUMN_SPACING + INVENTORY_SQUARE_WIDTH + 8;
+            // Bring side equipment 8px closer to center so the 3x2 wings
+            // retain a safe outer margin inside the narrower inventory.
+            int lateralOffset = COLUMN_SPACING + INVENTORY_SQUARE_WIDTH;
             int leftX = centerX - (cell * 2 + lateralOffset);
             int rightX = centerX + cell * 2 + lateralOffset;
             int topY = PAPERDOLL_TOP;
