@@ -1038,6 +1038,64 @@ namespace Client.Main.Networking.Services
             }
         }
         /// <summary>
+        /// Sends the OpenMU Season 6 personal store open request (C3 3F 02).
+        /// Sending is not evidence of opening; wait for server 3F 02 response.
+        /// </summary>
+        public async Task<bool> SendPlayerShopOpenRequestAsync(string storeName)
+        {
+            if (!_connectionManager.IsConnected ||
+                string.IsNullOrWhiteSpace(storeName) ||
+                System.Text.Encoding.UTF8.GetByteCount(storeName) > 25)
+                return false;
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    var memory = _connectionManager.Connection.Output
+                        .GetMemory(PlayerShopOpen.Length).Slice(0, PlayerShopOpen.Length);
+                    memory.Span.Clear();
+                    var packet = new PlayerShopOpen(memory);
+                    packet.StoreName = storeName;
+                    return PlayerShopOpen.Length;
+                });
+                _logger.LogInformation("Sent personal store open request: {Name}.", storeName);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send personal store open request.");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sends C3 3F 03. Store remains publicly open until the server
+        /// confirms closure with C1 3F 03.
+        /// </summary>
+        public async Task<bool> SendPlayerShopCloseRequestAsync()
+        {
+            if (!_connectionManager.IsConnected)
+                return false;
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    var packet = new PlayerShopClose(
+                        _connectionManager.Connection.Output.GetMemory(PlayerShopClose.Length)
+                            .Slice(0, PlayerShopClose.Length));
+                    return PlayerShopClose.Length;
+                });
+                _logger.LogInformation("Sent personal store close request.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send personal store close request.");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Set Zen price on an absolute player-shop item slot (204..235).
         /// OpenMU expects C3 3F 01 with little-endian uint price and only
         /// accepts the change when the personal shop is not publicly open.
