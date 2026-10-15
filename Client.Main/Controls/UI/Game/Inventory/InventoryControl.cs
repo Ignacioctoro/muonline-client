@@ -918,7 +918,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             _currentGameTime = gameTime;
 
-            if (MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
+            if (!PersonalStoreControl.IsEditingPrice &&
+                MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
                 MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape))
             {
                 Hide();

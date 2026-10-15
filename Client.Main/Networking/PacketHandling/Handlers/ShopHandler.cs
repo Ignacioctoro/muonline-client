@@ -36,6 +36,32 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         }
 
         /// <summary>
+        /// Personal Store item-price acknowledgement (C3 3F 01).
+        /// Byte 4 is ItemPriceSetResult and byte 5 the absolute item slot.
+        /// Only a matching pending request may update the displayed price.
+        /// </summary>
+        [PacketHandler(0x3F, 0x01)]
+        public Task HandlePlayerShopSetItemPriceResponseAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length < 6 || span[0] != 0xC3 ||
+                span[2] != 0x3F || span[3] != 0x01)
+            {
+                _logger.LogWarning("Invalid PlayerShopSetItemPriceResponse length/header: {Length}",
+                    packet.Length);
+                return Task.CompletedTask;
+            }
+
+            byte result = span[4];
+            byte slot = span[5];
+            _logger.LogInformation("Personal Store price response: slot {Slot}, result {Result}",
+                slot, result);
+            MuGame.ScheduleOnMainThread(() =>
+                PersonalStoreControl.Instance.HandlePriceSetResponse(slot, result));
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// NpcWindowResponse: Open shop window when server requests a merchant window.
         /// </summary>
         [PacketHandler(0x30, PacketRouter.NoSubCode)]

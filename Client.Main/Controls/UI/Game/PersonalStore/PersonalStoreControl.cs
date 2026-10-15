@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Client.Main.Content;
 using Client.Main.Controllers;
@@ -55,6 +57,10 @@ namespace Client.Main.Controls.UI.Game
         private static readonly Rectangle CloseStoreButton = new(181, 542, 142, 35);
         private static readonly Rectangle ExitButton = new(105, 584, 138, 33);
         private static readonly Rectangle CloseButton = new(WindowWidth - 44, 35, 25, 25);
+        private static readonly Rectangle PriceDialog = new(31, 226, 286, 181);
+        private static readonly Rectangle PriceConfirmButton = new(48, 350, 119, 32);
+        private static readonly Rectangle PriceCancelButton = new(180, 350, 119, 32);
+        private const uint MaximumPriceZen = int.MaxValue; // OpenMU casts the protocol price to int
 
         private static PersonalStoreControl _instance;
 
@@ -92,6 +98,18 @@ namespace Client.Main.Controls.UI.Game
         private Point _pickStartPoint;
         private bool _requestInFlight;
         private int _previewIndex;
+        private readonly TextFieldControl _priceInput;
+        private bool _priceEditorVisible;
+        private byte _priceEditorSlot;
+        private string _priceInputError = string.Empty;
+        private string _priceFeedback = "Right-click an item to set its price.";
+        private bool _priceFeedbackError;
+        private byte? _pendingPriceSlot;
+        private uint _pendingPriceZen;
+        private byte[] _pendingPriceRaw;
+        // Confirmed by OpenMU in this session; item bytes guard against
+        // displaying an old price when another item occupies the same slot.
+        private readonly Dictionary<byte, (uint Price, byte[] Raw)> _confirmedPrices = new();
 
         private PersonalStoreControl()
         {
@@ -101,10 +119,40 @@ namespace Client.Main.Controls.UI.Game
             Interactive = true;
             Visible = false;
             Align = ControlAlign.None;
+
+            _priceInput = TextFieldControl.Create();
+            _priceInput.X = 60;
+            _priceInput.Y = 301;
+            _priceInput.ViewSize = new Point(228, 31);
+            _priceInput.ControlSize = _priceInput.ViewSize;
+            _priceInput.AutoViewSize = false;
+            _priceInput.MaxLength = 10;
+            _priceInput.FontSize = 15;
+            _priceInput.TextColor = new Color(242, 224, 192);
+            _priceInput.BackgroundColor = new Color(17, 18, 22, 245);
+            _priceInput.BorderColor = new Color(129, 103, 65);
+            _priceInput.BorderThickness = 1;
+            _priceInput.Placeholder = "Enter Zen amount";
+            _priceInput.Visible = false;
+            _priceInput.EnterKeyPressed += (sender, args) =>
+            {
+                Scene?.ConsumeKeyboardEnter();
+                SubmitPrice();
+            };
+            _priceInput.ValueChanged += (sender, args) =>
+            {
+                string oldValue = _priceInput.Value;
+                string numeric = new string(oldValue.Where(c => c >= '0' && c <= '9').ToArray());
+                if (!string.Equals(oldValue, numeric, StringComparison.Ordinal))
+                    _priceInput.Value = numeric;
+                _priceInputError = string.Empty;
+            };
+            Controls.Add(_priceInput);
         }
 
         public static PersonalStoreControl Instance => _instance ??= new PersonalStoreControl();
         public static bool IsOpen => _instance?.Visible == true;
+        public static bool IsEditingPrice => _instance?._priceEditorVisible == true;
         public override bool NonDisposable => true;
 
         public IEnumerable<string> GetPreloadTexturePaths()
@@ -186,6 +234,7 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
+            CancelPriceEditor();
             Visible = false;
             _pickedItem = null;
             _requestInFlight = false;
@@ -298,6 +347,11 @@ namespace Client.Main.Controls.UI.Game
             if (_state != null)
                 _state.InventoryChanged -= OnInventoryChanged;
             _state = current;
+            _confirmedPrices.Clear();
+            _pendingPriceSlot = null;
+            _pendingPriceRaw = null;
+            _priceFeedback = "Right-click an item to set its price.";
+            _priceFeedbackError = false;
             if (_state != null)
                 _state.InventoryChanged += OnInventoryChanged;
         }
@@ -314,6 +368,12 @@ namespace Client.Main.Controls.UI.Game
             _items.Clear();
             Array.Clear(_occupied, 0, _occupied.Length);
             var snapshot = _state.GetInventoryItems();
+            foreach (var entry in _confirmedPrices.ToArray())
+            {
+                if (!snapshot.TryGetValue(entry.Key, out var raw) ||
+                    !raw.SequenceEqual(entry.Value.Raw))
+                    _confirmedPrices.Remove(entry.Key);
+            }
             foreach (var pair in snapshot)
             {
                 int index = pair.Key - FirstStoreSlot;
@@ -378,6 +438,136 @@ namespace Client.Main.Controls.UI.Game
             });
         }
 
+        private static string FormatZen(uint amount) =>
+            amount.ToString("N0", CultureInfo.InvariantCulture);
+
+        private void OpenPriceEditor(InventoryItem item)
+        {
+            if (item == null || _pendingPriceSlot.HasValue ||
+                _requestInFlight || _state?.IsPlayerShopMovePending == true)
+                return;
+
+            _pickedItem = null;
+            _priceEditorSlot = (byte)(FirstStoreSlot +
+                item.GridPosition.Y * Columns + item.GridPosition.X);
+            _priceInputError = string.Empty;
+            _priceInput.Value = _confirmedPrices.TryGetValue(_priceEditorSlot, out var price)
+                ? price.Price.ToString(CultureInfo.InvariantCulture)
+                : string.Empty;
+            _priceEditorVisible = true;
+            _priceInput.Visible = true;
+            _priceInput.Focus();
+            SoundController.Instance.PlayBuffer("Sound/iButton.wav");
+        }
+
+        private void CancelPriceEditor()
+        {
+            _priceEditorVisible = false;
+            if (_priceInput != null)
+            {
+                _priceInput.Blur();
+                _priceInput.Visible = false;
+            }
+            if (Scene != null && Scene.FocusControl == _priceInput)
+                Scene.FocusControl = this;
+            _priceInputError = string.Empty;
+        }
+
+        private void SubmitPrice()
+        {
+            if (!_priceEditorVisible || _pendingPriceSlot.HasValue) return;
+            if (!uint.TryParse(_priceInput.Value, NumberStyles.None, CultureInfo.InvariantCulture,
+                    out var price) || price > MaximumPriceZen)
+            {
+                _priceInputError = "Enter 0 to 2,147,483,647 Zen (0 clears the price).";
+                return;
+            }
+
+            var service = MuGame.Network?.GetCharacterService();
+            if (service == null || _state == null ||
+                !_state.GetInventoryItems().TryGetValue(_priceEditorSlot, out var itemRaw))
+            {
+                _priceInputError = "This item is unavailable or the server is disconnected.";
+                return;
+            }
+
+            byte slot = _priceEditorSlot;
+            _pendingPriceSlot = slot;
+            _pendingPriceZen = price;
+            _pendingPriceRaw = (byte[])itemRaw.Clone();
+            CancelPriceEditor();
+            _priceFeedback = "Waiting for OpenMU price confirmation...";
+            _priceFeedbackError = false;
+            SoundController.Instance.PlayBuffer("Sound/iButton.wav");
+
+            _ = Task.Run(async () =>
+            {
+                bool sent;
+                try { sent = await service.SendPlayerShopSetItemPriceAsync(slot, price); }
+                catch { sent = false; }
+                if (!sent)
+                {
+                    MuGame.ScheduleOnMainThread(() => FailPriceRequest(slot,
+                        "Could not send price to OpenMU."));
+                    return;
+                }
+
+                await Task.Delay(6000);
+                MuGame.ScheduleOnMainThread(() => FailPriceRequest(slot,
+                    "No price confirmation received from OpenMU. Try again."));
+            });
+        }
+
+        private void FailPriceRequest(byte slot, string message)
+        {
+            if (!_pendingPriceSlot.HasValue || _pendingPriceSlot.Value != slot) return;
+            _pendingPriceSlot = null;
+            _pendingPriceRaw = null;
+            _priceFeedback = message;
+            _priceFeedbackError = true;
+        }
+
+        /// <summary>
+        /// Called on the UI thread by the C3 3F 01 response packet handler.
+        /// No price becomes visible as confirmed before result == Success.
+        /// </summary>
+        public void HandlePriceSetResponse(byte slot, byte result)
+        {
+            if (!_pendingPriceSlot.HasValue || _pendingPriceSlot.Value != slot)
+                return;
+
+            uint attempted = _pendingPriceZen;
+            byte[] raw = _pendingPriceRaw;
+            _pendingPriceSlot = null;
+            _pendingPriceRaw = null;
+
+            if (result == 1 && _state != null &&
+                _state.GetInventoryItems().TryGetValue(slot, out var currentRaw) &&
+                raw != null && currentRaw.SequenceEqual(raw))
+            {
+                _confirmedPrices[slot] = (attempted, raw);
+                _priceFeedback = attempted == 0
+                    ? "Price removed. Item is not for sale."
+                    : $"Price confirmed by OpenMU: {FormatZen(attempted)} Zen.";
+                _priceFeedbackError = false;
+            }
+            else
+            {
+                _priceFeedbackError = true;
+                _priceFeedback = result switch
+                {
+                    0 => "OpenMU rejected price (shop may already be open).",
+                    2 => "OpenMU rejected: invalid item slot.",
+                    3 => "OpenMU rejected: item not found.",
+                    4 => "OpenMU rejected: invalid price.",
+                    5 => "OpenMU rejected: item is blocked.",
+                    6 => "OpenMU requires character level 6 or higher.",
+                    1 => "Item changed before price confirmation.",
+                    _ => "OpenMU rejected the price request."
+                };
+            }
+        }
+
         private InventoryItem ItemAt(Point mouse)
         {
             if (!TryGetVisualSlot(mouse, out int slot)) return null;
@@ -430,6 +620,49 @@ namespace Client.Main.Controls.UI.Game
 
             bool leftJustReleased = current.LeftButton == ButtonState.Released &&
                                     previous.LeftButton == ButtonState.Pressed;
+            bool leftJustPressed = current.LeftButton == ButtonState.Pressed &&
+                                   previous.LeftButton == ButtonState.Released;
+
+            if (_priceEditorVisible)
+            {
+                bool escPressed = MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
+                                  MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape);
+                if (escPressed)
+                {
+                    Scene?.ConsumeKeyboardEscape();
+                    CancelPriceEditor();
+                    return;
+                }
+
+                if (leftJustPressed)
+                {
+                    if (ToScreen(PriceConfirmButton).Contains(current.Position))
+                        SubmitPrice();
+                    else if (ToScreen(PriceCancelButton).Contains(current.Position))
+                        CancelPriceEditor();
+                    // Price dialog is modal; never pick up or move the item behind it.
+                }
+
+                if (leftJustPressed || current.LeftButton == ButtonState.Pressed ||
+                    current.RightButton == ButtonState.Pressed)
+                    Scene?.SetMouseInputConsumed();
+                return;
+            }
+
+            bool rightJustPressed = current.RightButton == ButtonState.Pressed &&
+                                    previous.RightButton == ButtonState.Released;
+            if (rightJustPressed && inside && !_requestInFlight &&
+                !_pendingPriceSlot.HasValue)
+            {
+                var itemForPrice = ItemAt(current.Position);
+                if (itemForPrice != null)
+                {
+                    OpenPriceEditor(itemForPrice);
+                    Scene?.SetMouseInputConsumed();
+                    return;
+                }
+            }
+
             if (leftJustReleased && (_closeHovered || _exitHovered))
             {
                 CloseWindow();
@@ -468,8 +701,6 @@ namespace Client.Main.Controls.UI.Game
             }
 
             _hoveredItem = inside ? ItemAt(current.Position) : null;
-            bool leftJustPressed = current.LeftButton == ButtonState.Pressed &&
-                                   previous.LeftButton == ButtonState.Released;
             if (leftJustPressed && inside && !_requestInFlight &&
                 TryGetVisualSlot(current.Position, out int targetSlot))
             {
@@ -501,7 +732,7 @@ namespace Client.Main.Controls.UI.Game
                 }
                 Scene?.SetMouseInputConsumed();
             }
-            // Shop activation and pricing are not sent before Phase C.
+            // Shop publication remains disabled until the next phase.
         }
 
         public override void Draw(GameTime gameTime)
@@ -533,11 +764,18 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 DrawItems(sprite);
-                DrawPlacementPreview(sprite);
+                if (!_priceEditorVisible)
+                    DrawPlacementPreview(sprite);
                 DrawItemInformation(sprite);
                 DrawExitButton(sprite);
                 DrawCloseButton(sprite);
+                if (_priceEditorVisible)
+                    DrawPriceEditor(sprite);
             }
+            // TextFieldControl owns its own SpriteBatchScope and must be rendered
+            // AFTER the store batch. It supports desktop and mobile input.
+            if (_priceEditorVisible && _priceInput.Visible)
+                _priceInput.Draw(gameTime);
         }
 
         private void EnsureStaticSurface()
@@ -658,6 +896,17 @@ namespace Client.Main.Controls.UI.Game
                     item.Definition.MagicDurability == 0 && item.Durability > 1)
                     ItemGridRenderHelper.DrawItemStackCount(sprite, _font, rect, item.Durability,
                         new Color(240, 210, 140), Alpha);
+
+                byte itemSlot = (byte)(FirstStoreSlot +
+                    item.GridPosition.Y * Columns + item.GridPosition.X);
+                if (_confirmedPrices.TryGetValue(itemSlot, out var price) && price.Price > 0)
+                {
+                    var badge = new Rectangle(rect.X + 1, rect.Bottom - 14,
+                        Math.Max(1, rect.Width - 2), 13);
+                    sprite.Draw(pixel, badge, new Color(17, 18, 21, 205));
+                    DrawTextInRect(sprite, FormatZen(price.Price), badge,
+                        0.28f * Scale, new Color(245, 216, 132) * Alpha);
+                }
             }
         }
 
@@ -746,9 +995,52 @@ namespace Client.Main.Controls.UI.Game
             string name = item?.Definition.Name ?? "Selected item: none";
             DrawTextInRect(sprite, name, ToScreen(new Rectangle(32, 443, 284, 31)),
                 0.41f * Scale, new Color(222, 208, 188) * Alpha);
-            DrawTextInRect(sprite, "Price: -- Zen (phase C)",
+            byte slot = item == null ? (byte)0
+                : (byte)(FirstStoreSlot + item.GridPosition.Y * Columns +
+                          item.GridPosition.X);
+            string priceText = item != null && _confirmedPrices.TryGetValue(slot, out var entry)
+                ? (entry.Price == 0 ? "Price: not for sale" :
+                   $"Price: {FormatZen(entry.Price)} Zen")
+                : "Price: -- Zen (right-click to set)";
+            DrawTextInRect(sprite, priceText,
                 ToScreen(new Rectangle(32, 478, 284, 27)),
                 0.40f * Scale, new Color(210, 190, 145) * Alpha);
+            DrawTextInRect(sprite, _priceFeedback,
+                ToScreen(new Rectangle(32, 504, 284, 25)),
+                0.32f * Scale,
+                (_priceFeedbackError ? new Color(247, 130, 105) :
+                    new Color(172, 205, 148)) * Alpha);
+        }
+
+        private void DrawPriceEditor(SpriteBatch sprite)
+        {
+            var pixel = GraphicsManager.Instance?.Pixel;
+            if (pixel == null) return;
+            var modal = ToScreen(PriceDialog);
+            sprite.Draw(pixel, modal, new Color(16, 19, 25, 248));
+            Color outline = new Color(142, 111, 69, 220);
+            sprite.Draw(pixel, new Rectangle(modal.X, modal.Y, modal.Width, 2), outline);
+            sprite.Draw(pixel, new Rectangle(modal.X, modal.Bottom - 2, modal.Width, 2), outline);
+            sprite.Draw(pixel, new Rectangle(modal.X, modal.Y, 2, modal.Height), outline);
+            sprite.Draw(pixel, new Rectangle(modal.Right - 2, modal.Y, 2, modal.Height), outline);
+
+            DrawTextInRect(sprite, "SET ITEM PRICE",
+                ToScreen(new Rectangle(45, 238, 257, 30)), 0.50f * Scale,
+                new Color(245, 221, 183));
+            DrawTextInRect(sprite, "Price in Zen (0 removes price)",
+                ToScreen(new Rectangle(51, 268, 246, 24)), 0.40f * Scale,
+                new Color(187, 181, 170));
+            DrawTextInRect(sprite, _priceInputError,
+                ToScreen(new Rectangle(44, 333, 260, 17)), 0.28f * Scale,
+                new Color(246, 123, 112));
+            DrawThreeSlice(sprite, _buttonNormal, ToScreen(PriceConfirmButton),
+                Color.White * Alpha);
+            DrawThreeSlice(sprite, _buttonNormal, ToScreen(PriceCancelButton),
+                Color.White * Alpha);
+            DrawTextInRect(sprite, "Confirm", ToScreen(PriceConfirmButton),
+                0.43f * Scale, new Color(240, 218, 182));
+            DrawTextInRect(sprite, "Cancel", ToScreen(PriceCancelButton),
+                0.43f * Scale, new Color(240, 218, 182));
         }
 
         private void DrawExitButton(SpriteBatch sprite)
