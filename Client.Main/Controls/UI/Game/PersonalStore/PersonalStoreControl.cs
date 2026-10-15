@@ -227,6 +227,27 @@ namespace Client.Main.Controls.UI.Game
         }
 
         public bool HasPickedItem => _pickedItem != null;
+        public InventoryItem GetPickedItem() => _requestInFlight ? null : _pickedItem;
+
+        /// <summary>
+        /// Draws the shop selection in the final UI pass, above both windows.
+        /// Never removes local items before a 0x24 server confirmation.
+        /// </summary>
+        public void DrawPickedPreview(SpriteBatch spriteBatch, GameTime gameTime)
+        {
+            if (!Visible || _pickedItem == null || spriteBatch == null || _requestInFlight)
+                return;
+
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            int width = Math.Max(1, (int)MathF.Round(_pickedItem.Definition.Width * CellSize * Scale));
+            int height = Math.Max(1, (int)MathF.Round(_pickedItem.Definition.Height * CellSize * Scale));
+            Rectangle target = new(mouse.X - width / 2, mouse.Y - height / 2, width, height);
+            var texture = ResolveItemTexture(_pickedItem);
+            if (texture != null && !texture.IsDisposed)
+                spriteBatch.Draw(texture, target, Color.White * 0.82f);
+            else if (GraphicsManager.Instance?.Pixel is { } pixel)
+                spriteBatch.Draw(pixel, target, new Color(190, 172, 130, 115));
+        }
 
         public bool CanPlaceAt(Point target, InventoryItem item)
         {
@@ -249,7 +270,9 @@ namespace Client.Main.Controls.UI.Game
         // An accepted move is NOT displayed locally until OpenMU replies 0x24.
         public bool TryHandleInventoryDrop(Point mouse, InventoryControl inventory)
         {
-            if (!Visible || _pickedItem == null || !inventory.DisplayRectangle.Contains(mouse))
+            if (!Visible || _pickedItem == null || inventory == null ||
+                !inventory.Visible || !inventory.DisplayRectangle.Contains(mouse) ||
+                inventory.GetDraggedItem() != null)
                 return false;
 
             var target = inventory.GetSlotAtScreenPositionPublic(mouse);
@@ -258,6 +281,7 @@ namespace Client.Main.Controls.UI.Game
                 byte to = (byte)(InventoryControl.InventorySlotOffsetConstant +
                     target.Y * InventoryControl.Columns + target.X);
                 SendConfirmedStorageMove(_pickedSlot, ItemStorageKind.Inventory, to);
+                SoundController.Instance.PlayBuffer("Sound/iButton.wav");
             }
             else if (!_requestInFlight)
             {
@@ -314,8 +338,16 @@ namespace Client.Main.Controls.UI.Game
                     !def.TexturePath.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
                     _ = TextureLoader.Instance.Prepare(def.TexturePath);
             }
-            if (_pickedItem != null && !snapshot.ContainsKey(_pickedSlot))
-                _pickedItem = null;
+            // InventoryChanged rebuilds InventoryItem objects. Keep a picked
+            // shop item bound to its confirmed absolute slot, not a stale
+            // InventoryItem reference (which would fail CanPlaceAt checks).
+            if (_pickedItem != null)
+            {
+                int selected = _pickedSlot - FirstStoreSlot;
+                _pickedItem = selected >= 0 && selected < SlotCount
+                    ? _occupied[selected % Columns, selected / Columns]
+                    : null;
+            }
             _previewIndex = 0;
         }
 
@@ -501,6 +533,7 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 DrawItems(sprite);
+                DrawPlacementPreview(sprite);
                 DrawItemInformation(sprite);
                 DrawExitButton(sprite);
                 DrawCloseButton(sprite);
@@ -613,25 +646,10 @@ namespace Client.Main.Controls.UI.Game
                                       item.GridPosition.X + FirstStoreSlot == _pickedSlot && _pickedItem != null))
                     sprite.Draw(pixel, rect, new Color(170, 125, 65, 75));
 
-                Texture2D texture = null;
-                var path = item.Definition.TexturePath;
-                if (!string.IsNullOrEmpty(path))
-                {
-                    if (path.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
-                        texture = BmdPreviewRenderer.TryGetCachedPreview(item,
-                            item.Definition.Width * CellSize, item.Definition.Height * CellSize);
-                    else
-                    {
-                        if (!_textures.TryGetValue(path, out texture) || texture?.IsDisposed == true)
-                        {
-                            texture = TextureLoader.Instance.GetTexture2D(path);
-                            if (texture != null) _textures[path] = texture;
-                        }
-                    }
-                }
-
+                var texture = ResolveItemTexture(item);
+                bool selectedFromStore = item == _pickedItem;
                 if (texture != null && !texture.IsDisposed)
-                    sprite.Draw(texture, rect, Color.White * Alpha);
+                    sprite.Draw(texture, rect, Color.White * (selectedFromStore ? 0.28f : Alpha));
                 else
                     ItemGridRenderHelper.DrawItemPlaceholder(sprite, pixel, _font, rect,
                         item, new Color(39, 34, 32, 225), new Color(225, 213, 196));
@@ -641,6 +659,85 @@ namespace Client.Main.Controls.UI.Game
                     ItemGridRenderHelper.DrawItemStackCount(sprite, _font, rect, item.Durability,
                         new Color(240, 210, 140), Alpha);
             }
+        }
+
+
+        /// <summary>
+        /// Match the inventory/vault slot shadows. The entire item's footprint
+        /// is painted, not just the slot under the mouse. Invalid targets are
+        /// red; valid targets use the same green-yellow as Inventory.
+        /// </summary>
+        private void DrawPlacementPreview(SpriteBatch sprite)
+        {
+            var pixel = GraphicsManager.Instance?.Pixel;
+            if (pixel == null || _requestInFlight ||
+                !TryGetVisualSlot(MuGame.Instance.UiMouseState.Position, out int targetIndex))
+                return;
+
+            InventoryItem item = InventoryControl.Instance?.GetDraggedItem() ?? _pickedItem;
+            if (item?.Definition == null)
+            {
+                // An empty square still gets a subtle hover, matching vault.
+                var emptyCell = ToScreen(new Rectangle(
+                    ItemGrid.X + (targetIndex % Columns) * CellSize,
+                    ItemGrid.Y + (targetIndex / Columns) * CellSize, CellSize, CellSize));
+                sprite.Draw(pixel, emptyCell, new Color(95, 92, 83, 45));
+                return;
+            }
+
+            Point target = new(targetIndex % Columns, targetIndex / Columns);
+            bool canPlace = CanPlaceAt(target, item);
+            Color fill = canPlace ? Color.GreenYellow * 0.36f : Color.Red * 0.48f;
+            Color border = canPlace ? new Color(184, 243, 112, 195) : new Color(242, 106, 94, 215);
+
+            for (int y = 0; y < item.Definition.Height; y++)
+                for (int x = 0; x < item.Definition.Width; x++)
+                {
+                    int gx = target.X + x, gy = target.Y + y;
+                    if (gx < 0 || gy < 0 || gx >= Columns || gy >= Rows)
+                        continue;
+
+                    var cell = ToScreen(new Rectangle(
+                        ItemGrid.X + gx * CellSize, ItemGrid.Y + gy * CellSize,
+                        CellSize, CellSize));
+                    sprite.Draw(pixel, cell, fill);
+                    sprite.Draw(pixel, new Rectangle(cell.Left, cell.Top, cell.Width, 1), border);
+                    sprite.Draw(pixel, new Rectangle(cell.Left, cell.Bottom - 1, cell.Width, 1), border);
+                    sprite.Draw(pixel, new Rectangle(cell.Left, cell.Top, 1, cell.Height), border);
+                    sprite.Draw(pixel, new Rectangle(cell.Right - 1, cell.Top, 1, cell.Height), border);
+                }
+
+            // A faint item image is useful when moving a multi-cell item.
+            // Clipped preview is not drawn outside the 8x4 grid.
+            if (canPlace)
+            {
+                var ghost = ResolveItemTexture(item);
+                if (ghost != null && !ghost.IsDisposed)
+                {
+                    var rect = ToScreen(new Rectangle(ItemGrid.X + target.X * CellSize,
+                        ItemGrid.Y + target.Y * CellSize,
+                        item.Definition.Width * CellSize, item.Definition.Height * CellSize));
+                    sprite.Draw(ghost, rect, Color.White * 0.38f);
+                }
+            }
+        }
+
+        private Texture2D ResolveItemTexture(InventoryItem item)
+        {
+            if (item?.Definition == null) return null;
+            string path = item.Definition.TexturePath;
+            if (string.IsNullOrEmpty(path)) return null;
+            if (path.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
+                return BmdPreviewRenderer.TryGetCachedPreview(item,
+                    item.Definition.Width * CellSize, item.Definition.Height * CellSize);
+
+            if (!_textures.TryGetValue(path, out var texture) ||
+                texture == null || texture.IsDisposed)
+            {
+                texture = TextureLoader.Instance.GetTexture2D(path);
+                if (texture != null) _textures[path] = texture;
+            }
+            return texture;
         }
 
         private void DrawItemInformation(SpriteBatch sprite)

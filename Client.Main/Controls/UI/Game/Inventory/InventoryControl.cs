@@ -3410,7 +3410,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             Rectangle gridRect = Translate(_gridRect);
-            var dragged = _pickedItem_renderer_item() ?? VaultControl.Instance?.GetDraggedItem();
+            var dragged = _pickedItem_renderer_item() ??
+                          VaultControl.Instance?.GetDraggedItem() ??
+                          (PersonalStoreControl.IsOpen ? PersonalStoreControl.Instance.GetPickedItem() : null);
 
             if (dragged != null)
             {
