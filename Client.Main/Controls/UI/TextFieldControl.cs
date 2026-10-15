@@ -642,12 +642,12 @@ namespace Client.Main.Controls.UI
         {
             if (key >= Keys.D0 && key <= Keys.D9)
             {
-                digit = (char)('0' + key - Keys.D0);
+                digit = (char)('0' + (key - Keys.D0));
                 return true;
             }
             if (key >= Keys.NumPad0 && key <= Keys.NumPad9)
             {
-                digit = (char)('0' + key - Keys.NumPad0);
+                digit = (char)('0' + (key - Keys.NumPad0));
                 return true;
             }
             digit = '\0';
