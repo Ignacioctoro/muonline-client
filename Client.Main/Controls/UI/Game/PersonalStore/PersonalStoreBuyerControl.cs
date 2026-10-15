@@ -102,6 +102,7 @@ namespace Client.Main.Controls.UI.Game
         public void ShowListing(ushort sellerId, string sellerName, string storeName,
             IReadOnlyList<(byte Slot, uint Price, byte[] Data)> received)
         {
+            bool sameSeller = Visible && IsViewing(sellerId);
             _sellerId = (ushort)(sellerId & 0x7FFF);
             _sellerName = sellerName ?? string.Empty;
             _shopName = storeName ?? string.Empty;
@@ -125,7 +126,8 @@ namespace Client.Main.Controls.UI.Game
             if (!_selectedSlot.HasValue || !_listings.ContainsKey(_selectedSlot.Value))
                 _selectedSlot = null;
             _confirm = false;
-            _buyPending = false;
+            if (!sameSeller)
+                _buyPending = false;
             _feedback = _listings.Count == 0
                 ? "This store has no items for sale."
                 : "Select an item to see its Zen price.";
@@ -143,8 +145,14 @@ namespace Client.Main.Controls.UI.Game
             BringToFront();
         }
 
-        public void HideWindow()
+        public void HideWindow(bool notifyServer = true)
         {
+            if (notifyServer && Visible && _sellerName.Length > 0)
+            {
+                var service = MuGame.Network?.GetCharacterService();
+                if (service != null)
+                    _ = service.SendPlayerStoreCloseOtherAsync(_sellerId, _sellerName);
+            }
             Visible = false;
             _confirm = false;
             _buyPending = false;
@@ -156,7 +164,7 @@ namespace Client.Main.Controls.UI.Game
         {
             if ((id & 0x7FFF) != _sellerId || !Visible)
                 return;
-            HideWindow();
+            HideWindow(false);
             PostMessage("The seller closed the store.");
         }
 
