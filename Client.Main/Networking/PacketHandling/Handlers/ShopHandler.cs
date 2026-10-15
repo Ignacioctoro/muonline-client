@@ -83,6 +83,23 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         }
 
         /// <summary>
+        /// C1 3F 12: OpenMU orders clients viewing this seller to close the dialog.
+        /// </summary>
+        [PacketHandler(0x3F, 0x12)]
+        public Task HandleClosePlayerShopDialogAsync(Memory<byte> packet)
+        {
+            var span = packet.Span;
+            if (span.Length >= 6 && span[0] == 0xC1 &&
+                span[2] == 0x3F && span[3] == 0x12)
+            {
+                ushort sellerId = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(4, 2));
+                MuGame.ScheduleOnMainThread(() =>
+                    PersonalStoreBuyerControl.Instance.HandleSellerClosed(sellerId));
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// C2 3F 00: store names in nearby player scope. Includes ourselves
         /// after successful opening and (in supported clients) on relog.
         /// </summary>
