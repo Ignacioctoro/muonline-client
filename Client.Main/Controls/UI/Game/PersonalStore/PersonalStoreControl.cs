@@ -771,6 +771,12 @@ namespace Client.Main.Controls.UI.Game
             _priceFeedbackError = error;
         }
 
+        private static void NotifyStoreInChat(string message)
+        {
+            var scene = MuGame.Instance?.ActiveScene as Client.Main.Scenes.GameScene;
+            scene?.ChatLog?.AddMessage("Personal Store", message, MessageType.System);
+        }
+
         private void FailStoreRequest(bool opening, string message)
         {
             if (opening)
@@ -785,6 +791,7 @@ namespace Client.Main.Controls.UI.Game
                 _closingRequested = false;
             }
             SetStoreFeedback(message, true);
+            NotifyStoreInChat(message);
         }
 
         public void HandleStoreOpenResult(bool successful)
@@ -797,9 +804,12 @@ namespace Client.Main.Controls.UI.Game
                     FailStoreRequest(true, "OpenMU rejected the opening request.");
                 return;
             }
+            bool wasPublic = _storePublic;
             _storePublic = true;
             _openingRequested = false;
             _closingRequested = false;
+            if (!wasPublic)
+                NotifyStoreInChat($"Store opened: {_publishedStoreName}.");
             _storeNameInput.Visible = false;
             _storeNameInput.Blur();
             _pickedItem = null;
@@ -813,8 +823,11 @@ namespace Client.Main.Controls.UI.Game
             EnsureCharacterState();
             if (_state == null || string.IsNullOrWhiteSpace(storeName))
                 return;
+            bool wasPublic = _storePublic;
             _publishedStoreName = storeName;
             _storePublic = true;
+            if (!wasPublic)
+                NotifyStoreInChat($"Store published by OpenMU: {storeName}.");
             _openingRequested = false;
             _closingRequested = false;
             _storeNameInput.Value = storeName;
@@ -827,7 +840,10 @@ namespace Client.Main.Controls.UI.Game
         public void HandleStoreClosed(bool successful)
         {
             if (!successful) return;
+            bool wasPublic = _storePublic;
             _storePublic = false;
+            if (wasPublic)
+                NotifyStoreInChat("Store closed. Items and prices can be edited again.");
             _closingRequested = false;
             _openingRequested = false;
             _storeNameInput.Visible = Visible;
