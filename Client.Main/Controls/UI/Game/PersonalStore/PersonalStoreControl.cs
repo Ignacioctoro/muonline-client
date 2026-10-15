@@ -521,6 +521,8 @@ namespace Client.Main.Controls.UI.Game
             _priceInput.Value = _confirmedPrices.TryGetValue(_priceEditorSlot, out var price)
                 ? price.Price.ToString(CultureInfo.InvariantCulture)
                 : string.Empty;
+            _storeNameInput.Blur();
+            _storeNameInput.Visible = false;
             _priceEditorVisible = true;
             _priceInput.Visible = true;
             _priceInput.Focus();
@@ -532,6 +534,8 @@ namespace Client.Main.Controls.UI.Game
         private void CancelPriceEditor()
         {
             _priceEditorVisible = false;
+            // Restore the name editor only while the shop panel is active.
+            _storeNameInput.Visible = Visible;
             if (_priceInput != null)
             {
                 _priceInput.Blur();
