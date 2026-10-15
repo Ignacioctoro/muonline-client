@@ -1263,6 +1263,7 @@ namespace Client.Main.Scenes
             Controls.Add(NpcShopControl.Instance);
             Controls.Add(VaultControl.Instance);
             Controls.Add(ChaosMixControl.Instance);
+            Controls.Add(PersonalStoreControl.Instance);
             Controls.Add(PetTrainerControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
