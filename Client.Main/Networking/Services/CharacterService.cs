@@ -1197,6 +1197,32 @@ namespace Client.Main.Networking.Services
         }
 
         /// <summary>
+        /// C3 3F 07: tell OpenMU we stopped browsing this seller's shop.
+        /// </summary>
+        public async Task SendPlayerStoreCloseOtherAsync(ushort sellerId, string sellerName)
+        {
+            if (!_connectionManager.IsConnected || string.IsNullOrEmpty(sellerName))
+                return;
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    var memory = _connectionManager.Connection.Output
+                        .GetMemory(PlayerShopCloseOther.Length).Slice(0, PlayerShopCloseOther.Length);
+                    memory.Span.Clear();
+                    var packet = new PlayerShopCloseOther(memory);
+                    packet.PlayerId = sellerId;
+                    packet.PlayerName = sellerName;
+                    return PlayerShopCloseOther.Length;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not unsubscribe from Personal Store {Name}.", sellerName);
+            }
+        }
+
+        /// <summary>
         /// Sets the money amount in the trade.
         /// </summary>
         public async Task SendTradeMoneyAsync(uint amount)
