@@ -1,3 +1,4 @@
+using Client.Main.Controls.UI.Game.Common;
 using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Core.Client;
@@ -19,8 +20,8 @@ namespace Client.Main.Controls.UI.Game.Character
 {
     public class CharacterInfoWindowControl : UIControl, IUiTexturePreloadable
     {
-        private const int WINDOW_WIDTH = 348;
-        private const int WINDOW_HEIGHT = 640;
+        private const int WINDOW_WIDTH = GameWindowMetrics.SecondaryWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.SecondaryHeight;
         private const int BTN_STAT_COUNT = 5;
 
         private static readonly float[] s_statRowY =

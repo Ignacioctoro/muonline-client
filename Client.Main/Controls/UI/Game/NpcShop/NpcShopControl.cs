@@ -50,14 +50,14 @@ namespace Client.Main.Controls.UI.Game
         private const int SHOP_ROWS = 15;
 
         // Tamaño elegido para los slots/items.
-        private const int SHOP_SQUARE_WIDTH = 32;
-        private const int SHOP_SQUARE_HEIGHT = 32;
+        private const int SHOP_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        private const int SHOP_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
 
         // El layout original de Naffis estaba construido para celdas de 25 px.
-        // Escalamos TODO el skin clásico en la misma proporción que la grilla:
-        // 32 / 25 = 1.28. Así fondo, grilla, botones e hitboxes vuelven a coincidir.
+        // El marco ocupa el tamaño del inventario; la grilla conserva celdas cuadradas.
+        // El atlas se ajusta por eje sin cambiar el tamaño de los objetos.
         private const float CLASSIC_UI_SCALE =
-            SHOP_SQUARE_WIDTH / 25f;
+            (GameWindowMetrics.InventoryHeight - 16f) / CLASSIC_PANEL_HEIGHT;
 
         // Bounding box real de NpcShopLayout.json:
         // X 148..423 / Y 89..624.
@@ -65,17 +65,12 @@ namespace Client.Main.Controls.UI.Game
         private const int CLASSIC_ORIGIN_Y = 89;
         private const int CLASSIC_PANEL_WIDTH = 275;
         private const int CLASSIC_PANEL_HEIGHT = 535;
-        private const int PANEL_MARGIN = 8;
-
-        private static readonly int WINDOW_WIDTH =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_WIDTH * CLASSIC_UI_SCALE);
-
-        private static readonly int WINDOW_HEIGHT =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_HEIGHT * CLASSIC_UI_SCALE);
+        private const int WINDOW_WIDTH = GameWindowMetrics.InventoryWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.InventoryHeight;
+        private const int PANEL_MARGIN_X = 8;
+        private const int PANEL_MARGIN_Y = 8;
+        private const float CLASSIC_UI_SCALE_X =
+            (GameWindowMetrics.InventoryWidth - PANEL_MARGIN_X * 2f) / CLASSIC_PANEL_WIDTH;
 
         // El crop antiguo 29x31 contiene margen/borde extra.
         // Usamos únicamente la celda interior real de 25x25 para evitar
@@ -96,7 +91,7 @@ namespace Client.Main.Controls.UI.Game
         private const int GRID_LOGIC_OFFSET_Y = 5;
 
         // La celda visual ahora es exactamente 25x25 en origen y se escala
-        // al mismo 32x32 que la lógica. No necesita desplazamiento adicional.
+        // al mismo tamaño que la lógica. No necesita desplazamiento adicional.
         private const int GRID_ART_OFFSET_X = 0;
         private const int GRID_ART_OFFSET_Y = 0;
 
@@ -257,13 +252,13 @@ namespace Client.Main.Controls.UI.Game
         }
 
         private static int ScaleClassicX(float sourceX)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_X +
                (int)MathF.Round(
                    (sourceX - CLASSIC_ORIGIN_X) *
-                   CLASSIC_UI_SCALE);
+                   CLASSIC_UI_SCALE_X);
 
         private static int ScaleClassicY(float sourceY)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_Y +
                (int)MathF.Round(
                    (sourceY - CLASSIC_ORIGIN_Y) *
                    CLASSIC_UI_SCALE);
@@ -283,11 +278,11 @@ namespace Client.Main.Controls.UI.Game
             _headerRect = new Rectangle(
                 ScaleClassicX(149.3f),
                 ScaleClassicY(89f),
-                ScaleClassicSize(273f),
+                (int)MathF.Round(273f * CLASSIC_UI_SCALE_X),
                 ScaleClassicSize(70f));
 
             _gridRect = new Rectangle(
-                ScaleClassicX(170f) + GRID_LOGIC_OFFSET_X,
+                (WINDOW_WIDTH - GRID_WIDTH) / 2,
                 ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
                 GRID_WIDTH,
                 GRID_HEIGHT);
@@ -768,7 +763,7 @@ namespace Client.Main.Controls.UI.Game
                     var destRect = new Rectangle(
                         ScaleClassicX(info.ScreenX),
                         ScaleClassicY(info.ScreenY),
-                        ScaleClassicSize(info.Width),
+                        (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X),
                         ScaleClassicSize(info.Height));
 
                     if (_textureRectLookup.TryGetValue(

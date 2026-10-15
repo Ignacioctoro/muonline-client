@@ -59,8 +59,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         };
 
         // Pre-redesign Naffis inventory layout (before commit e5d1988).
-        private const int WINDOW_WIDTH = 420;
-        private const int WINDOW_HEIGHT = 690;
+        private const int WINDOW_WIDTH = GameWindowMetrics.InventoryWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.InventoryHeight;
 
         private const int HEADER_HEIGHT = 70;
         private const int FOOTER_HEIGHT = 48;
@@ -76,8 +76,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private const int FOOTER_BUTTON_SIZE = 30;
 
         // Mochila 8x8
-        public const int INVENTORY_SQUARE_WIDTH = 32;
-        public const int INVENTORY_SQUARE_HEIGHT = 32;
+        public const int INVENTORY_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        public const int INVENTORY_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
 
         // Equipamiento: un poco más compacto que la mochila
         private const int EQUIP_SQUARE_WIDTH = 32;

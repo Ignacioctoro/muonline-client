@@ -44,27 +44,22 @@ namespace Client.Main.Controls.UI.Game
         public const int Columns = 8;
         public const int Rows = 15;
 
-        private const int VAULT_SQUARE_WIDTH = 32;
-        private const int VAULT_SQUARE_HEIGHT = 32;
+        private const int VAULT_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        private const int VAULT_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
 
         private const float CLASSIC_UI_SCALE =
-            VAULT_SQUARE_WIDTH / 25f;
+            (GameWindowMetrics.InventoryHeight - 16f) / CLASSIC_PANEL_HEIGHT;
 
         private const int CLASSIC_ORIGIN_X = 148;
         private const int CLASSIC_ORIGIN_Y = 89;
         private const int CLASSIC_PANEL_WIDTH = 275;
         private const int CLASSIC_PANEL_HEIGHT = 535;
-        private const int PANEL_MARGIN = 8;
-
-        private static readonly int WINDOW_WIDTH =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_WIDTH * CLASSIC_UI_SCALE);
-
-        private static readonly int WINDOW_HEIGHT =
-            PANEL_MARGIN * 2 +
-            (int)MathF.Ceiling(
-                CLASSIC_PANEL_HEIGHT * CLASSIC_UI_SCALE);
+        private const int WINDOW_WIDTH = GameWindowMetrics.InventoryWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.InventoryHeight;
+        private const int PANEL_MARGIN_X = 8;
+        private const int PANEL_MARGIN_Y = 8;
+        private const float CLASSIC_UI_SCALE_X =
+            (GameWindowMetrics.InventoryWidth - PANEL_MARGIN_X * 2f) / CLASSIC_PANEL_WIDTH;
 
         // Misma celda interior usada por el NPC Shop limpio.
         private static readonly Rectangle SlotSourceRect =
@@ -263,13 +258,13 @@ namespace Client.Main.Controls.UI.Game
         }
 
         private static int ScaleClassicX(float sourceX)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_X +
                (int)MathF.Round(
                    (sourceX - CLASSIC_ORIGIN_X) *
-                   CLASSIC_UI_SCALE);
+                   CLASSIC_UI_SCALE_X);
 
         private static int ScaleClassicY(float sourceY)
-            => PANEL_MARGIN +
+            => PANEL_MARGIN_Y +
                (int)MathF.Round(
                    (sourceY - CLASSIC_ORIGIN_Y) *
                    CLASSIC_UI_SCALE);
@@ -284,13 +279,13 @@ namespace Client.Main.Controls.UI.Game
             _headerRect = new Rectangle(
                 ScaleClassicX(149.3f),
                 ScaleClassicY(89f),
-                ScaleClassicSize(273f),
+                (int)MathF.Round(273f * CLASSIC_UI_SCALE_X),
                 ScaleClassicSize(70f));
 
             // El baúl también es 8x15 y 32x32, así que usa exactamente
             // el mismo encaje de grilla que ya quedó correcto en el Shop.
             _gridRect = new Rectangle(
-                ScaleClassicX(170f) + GRID_LOGIC_OFFSET_X,
+                (WINDOW_WIDTH - GRID_WIDTH) / 2,
                 ScaleClassicY(180f) + GRID_LOGIC_OFFSET_Y,
                 GRID_WIDTH,
                 GRID_HEIGHT);
@@ -791,7 +786,7 @@ namespace Client.Main.Controls.UI.Game
                         new Rectangle(
                             ScaleClassicX(info.ScreenX),
                             ScaleClassicY(info.ScreenY),
-                            ScaleClassicSize(info.Width),
+                            (int)MathF.Round(info.Width * CLASSIC_UI_SCALE_X),
                             ScaleClassicSize(info.Height));
 
                     if (_textureRectLookup.TryGetValue(

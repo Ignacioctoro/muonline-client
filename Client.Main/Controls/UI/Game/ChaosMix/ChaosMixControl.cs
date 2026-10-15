@@ -48,11 +48,11 @@ namespace Client.Main.Controls.UI.Game
         // Use the exact source crop already used by the NewUI Inventory.
         private static readonly Rectangle TrainerSlotSource = new(546, 220, 29, 29);
         private const int TrainerTopSourceHeight = NewUiFrameRenderer.PersonalShopHeaderHeight;
-        private const int TrainerWindowWidth = 420;
-        private const int TrainerWindowHeight = 690;
+        private const int TrainerWindowWidth = GameWindowMetrics.SecondaryWidth;
+        private const int TrainerWindowHeight = GameWindowMetrics.SecondaryHeight;
 
-        private const int SLOT_WIDTH = 34;
-        private const int SLOT_HEIGHT = 34;
+        private const int SLOT_WIDTH = GameWindowMetrics.SecondaryCell;
+        private const int SLOT_HEIGHT = GameWindowMetrics.SecondaryCell;
 
         private const int HEADER_HEIGHT = 52;
         private const int SECTION_HEADER_HEIGHT = 22;
@@ -64,7 +64,7 @@ namespace Client.Main.Controls.UI.Game
 
         private static readonly int GRID_WIDTH = Columns * SLOT_WIDTH;
         private static readonly int GRID_HEIGHT = Rows * SLOT_HEIGHT;
-        private static readonly int WINDOW_WIDTH = GRID_WIDTH + GRID_PADDING * 2 + WINDOW_MARGIN * 2;
+        private const int WINDOW_WIDTH = GameWindowMetrics.SecondaryWidth;
 
         // ═══════════════════════════════════════════════════════════════
         // MODERN DARK THEME (muonline-ui-design skill)
@@ -145,6 +145,15 @@ namespace Client.Main.Controls.UI.Game
         private readonly Dictionary<(InventoryItem item, int width, int height, bool animated), Texture2D> _bmdPreviewCache = new();
 
         private RenderTarget2D _staticSurface;
+        // Straight-alpha OZD colors, but standard coverage accumulation for alpha.
+        // NonPremultiplied squares source alpha, making opaque backing translucent.
+        private readonly BlendState _trainerSurfaceBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha,
+            ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One,
+            AlphaDestinationBlend = Blend.InverseSourceAlpha
+        };
         private bool _staticSurfaceDirty = true;
 
         private SpriteFont _font;
@@ -267,7 +276,7 @@ namespace Client.Main.Controls.UI.Game
             if (IsTrainerMix && inventory?.Visible == true)
             {
                 X = Math.Max(12, inventory.X - ControlSize.X - 12);
-                Y = inventory.Y;
+                Y = Math.Max(12, inventory.Y);
             }
 
             Visible = true;
@@ -361,12 +370,18 @@ namespace Client.Main.Controls.UI.Game
             EnsureStaticSurface();
 
             var sb = GraphicsManager.Instance.Sprite;
+            // A composited render target contains premultiplied colors.
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.PointClamp,
+                transform: UiScaler.SpriteTransform))
+            {
+                sb.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
+            }
+
             using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred,
                 IsTrainerMix ? BlendState.NonPremultiplied : BlendState.AlphaBlend,
                 IsTrainerMix ? SamplerState.PointClamp : GraphicsManager.GetQualityLinearSamplerState(),
                 transform: UiScaler.SpriteTransform);
-
-            sb.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
 
             DrawDynamicContent(sb);
         }
@@ -398,6 +413,7 @@ namespace Client.Main.Controls.UI.Game
             base.Dispose();
             _staticSurface?.Dispose();
             _staticSurface = null;
+            _trainerSurfaceBlend.Dispose();
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -408,16 +424,21 @@ namespace Client.Main.Controls.UI.Game
         {
             if (IsTrainerMix)
             {
-                // Exact NewUI Inventory footprint. Use the additional height
-                // for readable ingredient/recipe descriptions.
+                // Share the secondary window footprint with Character, Shop and Vault.
+                // Keep the original atlas borders; only the central surfaces stretch.
                 _headerRect = new Rectangle(0, 0, TrainerWindowWidth, TrainerTopSourceHeight);
-                int trainerFrameX = 18;
+                int trainerFrameX = GameWindowMetrics.ContentMargin;
                 int trainerFrameWidth = TrainerWindowWidth - trainerFrameX * 2;
-                _gridFrameRect = new Rectangle(trainerFrameX, 106, trainerFrameWidth, 190);
-                _gridRect = new Rectangle((TrainerWindowWidth - GRID_WIDTH) / 2, 142,
-                    GRID_WIDTH, GRID_HEIGHT);
-                _infoRect = new Rectangle(trainerFrameX, 308, trainerFrameWidth, 270);
-                _mixButtonRect = new Rectangle(64, 595, TrainerWindowWidth - 128, 58);
+                _gridFrameRect = new Rectangle(trainerFrameX, 104, trainerFrameWidth,
+                    SECTION_HEADER_HEIGHT + 14 * 2 + GRID_HEIGHT);
+                _gridRect = new Rectangle((TrainerWindowWidth - GRID_WIDTH) / 2,
+                    _gridFrameRect.Y + SECTION_HEADER_HEIGHT + 14, GRID_WIDTH, GRID_HEIGHT);
+                _mixButtonRect = new Rectangle(54,
+                    TrainerWindowHeight - 32 - GameWindowMetrics.ActionHeight,
+                    TrainerWindowWidth - 108, GameWindowMetrics.ActionHeight);
+                int infoTop = _gridFrameRect.Bottom + GameWindowMetrics.SectionGap;
+                _infoRect = new Rectangle(trainerFrameX, infoTop, trainerFrameWidth,
+                    _mixButtonRect.Top - GameWindowMetrics.SectionGap - infoTop);
                 _closeButtonRect = new Rectangle(TrainerWindowWidth - 44, 35, 25, 25);
                 return;
             }
@@ -432,7 +453,7 @@ namespace Client.Main.Controls.UI.Game
             _gridFrameRect = new Rectangle(frameX, frameY, frameW, frameH);
 
             _gridRect = new Rectangle(
-                frameX + GRID_PADDING,
+                (WINDOW_WIDTH - GRID_WIDTH) / 2,
                 frameY + SECTION_HEADER_HEIGHT + GRID_PADDING,
                 GRID_WIDTH,
                 GRID_HEIGHT);
@@ -492,7 +513,7 @@ namespace Client.Main.Controls.UI.Game
 
             var sb = GraphicsManager.Instance.Sprite;
             using (new SpriteBatchScope(sb, SpriteSortMode.Deferred,
-                IsTrainerMix ? BlendState.NonPremultiplied : BlendState.AlphaBlend,
+                IsTrainerMix ? _trainerSurfaceBlend : BlendState.AlphaBlend,
                 IsTrainerMix ? SamplerState.PointClamp : SamplerState.LinearClamp))
             {
                 DrawStaticElements(sb);
@@ -675,7 +696,7 @@ namespace Client.Main.Controls.UI.Game
             {
                 NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _gridFrameRect);
                 DrawSectionHeader(sb, "SPIRIT COMBINATION", _gridFrameRect.X,
-                    _gridFrameRect.Y + 2, _gridFrameRect.Width);
+                    _gridFrameRect.Y + 12, _gridFrameRect.Width);
 
                 if (_trainerSlots != null && !_trainerSlots.IsDisposed)
                 {
@@ -779,8 +800,13 @@ namespace Client.Main.Controls.UI.Game
 
             foreach (string line in _infoLines)
             {
-                sb.DrawString(_font, line, new Vector2(x + 1, y + 1), Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                sb.DrawString(_font, line, new Vector2(x, y), Theme.TextGray, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                float lineScale = scale;
+                float textWidth = _font.MeasureString(line).X;
+                if (textWidth > 0)
+                    lineScale = Math.Min(lineScale, (_infoRect.Width - 28) / textWidth);
+                Color color = line == "Requirements:" ? Theme.TextGold : Theme.TextGray;
+                sb.DrawString(_font, line, new Vector2(x + 1, y + 1), Color.Black * 0.6f, 0f, Vector2.Zero, lineScale, SpriteEffects.None, 0f);
+                sb.DrawString(_font, line, new Vector2(x, y), color, 0f, Vector2.Zero, lineScale, SpriteEffects.None, 0f);
                 y += (int)(_font.LineSpacing * scale) + (IsTrainerMix ? 4 : 2);
                 if (y > DisplayRectangle.Y + _infoRect.Bottom - 28) break;
             }
@@ -789,6 +815,9 @@ namespace Client.Main.Controls.UI.Game
             if (!string.IsNullOrWhiteSpace(warn))
             {
                 float warnScale = IsTrainerMix ? 0.37f : 0.30f;
+                float warningWidth = _font.MeasureString(warn).X;
+                if (warningWidth > 0)
+                    warnScale = Math.Min(warnScale, (_infoRect.Width - 28) / warningWidth);
                 Vector2 warnSize = _font.MeasureString(warn) * warnScale;
                 Vector2 warnPos = new(
                     DisplayRectangle.X + _infoRect.X + (_infoRect.Width - warnSize.X) / 2,
@@ -825,7 +854,7 @@ namespace Client.Main.Controls.UI.Game
 
             if (_font == null) return;
 
-            string text = _mixInProgress ? "MIXING..." : "MIX";
+            string text = _mixInProgress ? "MIXING..." : IsTrainerMix ? "RESURRECT" : "MIX";
             float scale = IsTrainerMix ? 0.54f : 0.45f;
             Vector2 size = _font.MeasureString(text) * scale;
             Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
