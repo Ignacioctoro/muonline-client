@@ -1160,6 +1160,43 @@ namespace Client.Main.Networking.Services
         }
 
         /// <summary>
+        /// C3 3F 06: buy one absolute slot (204..235) from an inspected store.
+        /// Sending is not proof of purchase; C1 3F 06 is authoritative.
+        /// </summary>
+        public async Task<bool> SendPlayerStoreBuyRequestAsync(ushort sellerId, string sellerName, byte absoluteSlot)
+        {
+            if (!_connectionManager.IsConnected ||
+                absoluteSlot < 204 || absoluteSlot > 235 ||
+                string.IsNullOrWhiteSpace(sellerName) ||
+                System.Text.Encoding.UTF8.GetByteCount(sellerName) > 10)
+                return false;
+
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    var memory = _connectionManager.Connection.Output
+                        .GetMemory(PlayerShopItemBuyRequest.Length).Slice(0, PlayerShopItemBuyRequest.Length);
+                    memory.Span.Clear();
+                    var packet = new PlayerShopItemBuyRequest(memory);
+                    packet.PlayerId = sellerId;
+                    packet.PlayerName = sellerName;
+                    packet.ItemSlot = absoluteSlot;
+                    return PlayerShopItemBuyRequest.Length;
+                });
+                _logger.LogInformation("Personal Store buy request sent: seller {Seller}, slot {Slot}.",
+                    sellerName, absoluteSlot);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Personal Store buy request failed for {Seller} slot {Slot}.",
+                    sellerName, absoluteSlot);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Sets the money amount in the trade.
         /// </summary>
         public async Task SendTradeMoneyAsync(uint amount)
