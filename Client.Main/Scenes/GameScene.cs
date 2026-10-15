@@ -1264,6 +1264,7 @@ namespace Client.Main.Scenes
             Controls.Add(VaultControl.Instance);
             Controls.Add(ChaosMixControl.Instance);
             Controls.Add(PersonalStoreControl.Instance);
+            Controls.Add(PersonalStoreBuyerControl.Instance);
             Controls.Add(PetTrainerControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
