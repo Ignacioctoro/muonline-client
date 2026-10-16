@@ -29,21 +29,13 @@ namespace Client.Main.Controls.UI.Game.Trade
         // ═══════════════════════════════════════════════════════════════
         // WINDOW DIMENSIONS
         // ═══════════════════════════════════════════════════════════════
-        private const int WINDOW_WIDTH = 396;
-        private const int WINDOW_HEIGHT = 650;
-
-        private const int HEADER_HEIGHT = 52;
-        private const int PARTNER_INFO_HEIGHT = 30;
-        private const int GRID_PADDING = 10;
-        private const int WINDOW_MARGIN = 12;
-        private const int MONEY_INPUT_HEIGHT = 32;
-        private const int TRADE_BUTTON_HEIGHT = 48;
-        private const int DIVIDER_HEIGHT = 30;
+        private const int WINDOW_WIDTH = GameWindowMetrics.InventoryWidth;
+        private const int WINDOW_HEIGHT = GameWindowMetrics.InventoryHeight;
 
         private const int TRADE_COLUMNS = 8;
         private const int TRADE_ROWS = 4;
-        private const int TRADE_SQUARE_WIDTH = 34;
-        private const int TRADE_SQUARE_HEIGHT = 34;
+        private const int TRADE_SQUARE_WIDTH = GameWindowMetrics.InventoryCell;
+        private const int TRADE_SQUARE_HEIGHT = GameWindowMetrics.InventoryCell;
         // Matches the original client behavior (~150 frames @ 60fps).
         private const int TRADE_RED_SECONDS = 3;
 
@@ -51,7 +43,7 @@ namespace Client.Main.Controls.UI.Game.Trade
         private static readonly int GRID_HEIGHT = TRADE_ROWS * TRADE_SQUARE_HEIGHT;
 
         // ═══════════════════════════════════════════════════════════════
-        // MODERN DARK THEME
+        // NEWUI COLORS AND TRADE STATUS COLORS
         // ═══════════════════════════════════════════════════════════════
         private static class Theme
         {
@@ -72,8 +64,8 @@ namespace Client.Main.Controls.UI.Game.Trade
             public static readonly Color BorderHighlight = new(100, 110, 130, 120);
 
             public static readonly Color SlotBg = new(12, 15, 20, 240);
-            public static readonly Color SlotBorder = new(45, 52, 65, 180);
-            public static readonly Color SlotHover = new(70, 85, 110, 150);
+            public static readonly Color SlotBorder = new(90, 74, 49, 180);
+            public static readonly Color SlotHover = new(132, 104, 61, 150);
             public static readonly Color SlotSelected = new(212, 175, 85, 100);
 
             public static readonly Color GlowNormal = new(150, 150, 150, 25);
@@ -129,6 +121,17 @@ namespace Client.Main.Controls.UI.Game.Trade
         private Rectangle _myMoneyInputRect;
         private Rectangle _tradeButtonRect;
         private Rectangle _closeButtonRect;
+
+        private Rectangle _priceButtonRect;
+        private bool _priceButtonHovered;
+        // All skins come from the verified NewUI GFx directory, not classic OZT UI.
+        private static readonly string[] SkinNames = {
+            "PersonalShop_I1", "NpcShop_I3", "invenframe_01", "invenframe_02",
+            "coin", "btn_l01", "btn_l02", "btn_l03",
+            "btn_close01", "btn_close02", "btn_close03"
+        };
+        private Texture2D[] _skin;
+        public override bool BlocksPointerInput => true;
 
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
@@ -289,63 +292,19 @@ namespace Client.Main.Controls.UI.Game.Trade
         // ═══════════════════════════════════════════════════════════════
         private void BuildLayoutMetrics()
         {
-            int currentY = 0;
-
-            // Header
-            _headerRect = new Rectangle(0, currentY, WINDOW_WIDTH, HEADER_HEIGHT);
-            currentY += HEADER_HEIGHT;
-
-            // Partner info
-            _partnerInfoRect = new Rectangle(WINDOW_MARGIN, currentY, WINDOW_WIDTH - WINDOW_MARGIN * 2, PARTNER_INFO_HEIGHT);
-            currentY += PARTNER_INFO_HEIGHT;
-
-            // Partner grid frame
-            int gridFrameWidth = GRID_WIDTH + GRID_PADDING * 2;
-            int gridFrameHeight = GRID_PADDING * 2 + GRID_HEIGHT;
-            _partnerGridFrameRect = new Rectangle(WINDOW_MARGIN, currentY, gridFrameWidth, gridFrameHeight);
-
-            _partnerGridRect = new Rectangle(
-                _partnerGridFrameRect.X + GRID_PADDING,
-                _partnerGridFrameRect.Y + GRID_PADDING,
-                GRID_WIDTH,
-                GRID_HEIGHT);
-            currentY += gridFrameHeight + 4;
-
-            // Partner money display
-            _partnerMoneyRect = new Rectangle(WINDOW_MARGIN + 50, currentY, 200, 24);
-            currentY += 28;
-
-            // Divider with warning
-            _dividerRect = new Rectangle(0, currentY, WINDOW_WIDTH, DIVIDER_HEIGHT);
-            currentY += DIVIDER_HEIGHT;
-
-            // My info
-            _myInfoRect = new Rectangle(WINDOW_MARGIN, currentY, WINDOW_WIDTH - WINDOW_MARGIN * 2, 20);
-            currentY += 20;
-
-            // My grid frame
-            _myGridFrameRect = new Rectangle(WINDOW_MARGIN, currentY, gridFrameWidth, gridFrameHeight);
-
-            _myGridRect = new Rectangle(
-                _myGridFrameRect.X + GRID_PADDING,
-                _myGridFrameRect.Y + GRID_PADDING,
-                GRID_WIDTH,
-                GRID_HEIGHT);
-            currentY += gridFrameHeight + 4;
-
-            // My money input
-            _myMoneyInputRect = new Rectangle(WINDOW_MARGIN + 50, currentY, 200, MONEY_INPUT_HEIGHT);
-            currentY += MONEY_INPUT_HEIGHT + 8;
-
-            // Trade button
-            _tradeButtonRect = new Rectangle(
-                WINDOW_MARGIN + 40,
-                currentY,
-                gridFrameWidth - 80,
-                TRADE_BUTTON_HEIGHT);
-
-            // Close button
-            _closeButtonRect = new Rectangle(WINDOW_WIDTH - 30, 10, 20, 20);
+            _headerRect = new Rectangle(16, 24, WINDOW_WIDTH - 32, 48);
+            _closeButtonRect = new Rectangle(WINDOW_WIDTH - 44, 35, 25, 25);
+            _partnerInfoRect = new Rectangle(32, 94, 296, 24);
+            _partnerGridRect = new Rectangle(52, 176, GRID_WIDTH, GRID_HEIGHT);
+            _partnerGridFrameRect = new Rectangle(40, 164, GRID_WIDTH + 24, GRID_HEIGHT + 24);
+            _partnerMoneyRect = new Rectangle(66, 324, 164, 26);
+            _dividerRect = new Rectangle(20, 363, WINDOW_WIDTH - 40, 32);
+            _myInfoRect = new Rectangle(32, 401, 296, 24);
+            _myGridRect = new Rectangle(52, 446, GRID_WIDTH, GRID_HEIGHT);
+            _myGridFrameRect = new Rectangle(40, 434, GRID_WIDTH + 24, GRID_HEIGHT + 24);
+            _myMoneyInputRect = new Rectangle(66, 594, 164, 26);
+            _priceButtonRect = new Rectangle(248, 592, 68, 30);
+            _tradeButtonRect = new Rectangle(120, 638, 120, 32);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -355,11 +314,22 @@ namespace Client.Main.Controls.UI.Game.Trade
         {
             await base.Load();
             _font = GraphicsManager.Instance.Font;
+            var tasks = new Task<Texture2D>[SkinNames.Length];
+            for (int i = 0; i < tasks.Length; i++)
+                tasks[i] = TextureLoader.Instance.PrepareAndGetTexture($"Interface/GFx/{SkinNames[i]}.ozd");
+            _skin = await Task.WhenAll(tasks);
             InvalidateStaticSurface();
         }
 
         public void Show()
         {
+            var inventory = InventoryControl.Instance;
+            if (inventory?.Visible == true)
+            {
+                Align = ControlAlign.None;
+                X = Math.Max(0, inventory.X - WINDOW_WIDTH);
+                Y = Math.Max(12, inventory.Y);
+            }
             Visible = true;
             BringToFront();
             InvalidateStaticSurface();
@@ -402,6 +372,14 @@ namespace Client.Main.Controls.UI.Game.Trade
             if (!Visible) return;
 
             UpdateTradeLockTimers();
+            if (Scene?.IsPointerInputBlockedFor(this) == true)
+            {
+                _hoveredItem = null;
+                _hoveredSlot = new Point(-1, -1);
+                _pendingDropSlot = new Point(-1, -1);
+                _isDragging = false;
+                return;
+            }
 
             // ESC: close money input first, otherwise cancel trade
             if (MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
@@ -498,7 +476,8 @@ namespace Client.Main.Controls.UI.Game.Trade
             _tradeButtonHovered = tradeButtonRect.Contains(mousePos);
 
             var moneyRect = Translate(_myMoneyInputRect);
-            _moneyInputHovered = moneyRect.Contains(mousePos);
+            _priceButtonHovered = Translate(_priceButtonRect).Contains(mousePos);
+            _moneyInputHovered = moneyRect.Contains(mousePos) || _priceButtonHovered;
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -548,8 +527,14 @@ namespace Client.Main.Controls.UI.Game.Trade
                 }
 
                 DrawTradeLockOverlays(spriteBatch);
-                DrawTradeButton(spriteBatch);
-                DrawCloseButton(spriteBatch);
+                using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred,
+                    BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform))
+                {
+                    DrawTradeButton(spriteBatch);
+                    DrawCloseButton(spriteBatch);
+                    DrawSkinButton(spriteBatch, Translate(_priceButtonRect), "Price",
+                        _priceButtonHovered, IsMyTradeLocked ? Color.Gray : Color.White);
+                }
                 DrawDynamicText(spriteBatch);
             }
             finally
@@ -603,12 +588,11 @@ namespace Client.Main.Controls.UI.Game.Trade
             _staticSurface = new RenderTarget2D(gd, WINDOW_WIDTH, WINDOW_HEIGHT, false, SurfaceFormat.Color, DepthFormat.None);
 
             var previousTargets = gd.GetRenderTargets();
-            gd.SetRenderTarget(_staticSurface);
-            gd.Clear(Color.Transparent);
-
             var spriteBatch = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend))
+            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.NonPremultiplied))
             {
+                gd.SetRenderTarget(_staticSurface);
+                gd.Clear(Color.Transparent);
                 DrawStaticElements(spriteBatch);
             }
 
@@ -618,266 +602,107 @@ namespace Client.Main.Controls.UI.Game.Trade
 
         private void InvalidateStaticSurface() => _staticSurfaceDirty = true;
 
+        private Texture2D Skin(int index)
+        {
+            var texture = _skin?[index];
+            return texture != null && !texture.IsDisposed ? texture : null;
+        }
+
         private void DrawStaticElements(SpriteBatch spriteBatch)
         {
             var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var fullRect = new Rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-            DrawWindowBackground(spriteBatch, fullRect);
-            DrawModernHeader(spriteBatch);
-            DrawPartnerSection(spriteBatch);
-            DrawDivider(spriteBatch);
-            DrawMySection(spriteBatch);
+            spriteBatch.Draw(pixel, new Rectangle(12, 90, WINDOW_WIDTH - 24, WINDOW_HEIGHT - 112), new Color(25, 23, 23));
+            NewUiFrameRenderer.DrawPersonalShopWindow(spriteBatch, Skin(0), new Rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT));
+            DrawLabel(spriteBatch, "Trade", new Rectangle(40, 36, WINDOW_WIDTH - 80, 32), Theme.TextGold, 0.48f);
+            DrawOfferGrid(spriteBatch, _partnerGridRect, _partnerGridFrameRect);
+            DrawOfferGrid(spriteBatch, _myGridRect, _myGridFrameRect);
+            DrawMoneyField(spriteBatch, _partnerMoneyRect);
+            DrawMoneyField(spriteBatch, _myMoneyInputRect);
+            DrawField(spriteBatch, new Rectangle(84, 126, 114, 24));
+            DrawField(spriteBatch, new Rectangle(252, 126, 56, 24));
+            DrawLabel(spriteBatch, "Guild", new Rectangle(32, 126, 48, 24), Theme.TextGray);
+            DrawLabel(spriteBatch, "Level", new Rectangle(204, 126, 46, 24), Theme.TextGray);
+            spriteBatch.Draw(pixel, new Rectangle(20, _dividerRect.Y, WINDOW_WIDTH - 40, 1), new Color(107, 83, 52));
+            DrawLabel(spriteBatch, "Warning: Check items before trading.", _dividerRect, Theme.Warning, 0.32f);
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // DRAWING PRIMITIVES
-        // ═══════════════════════════════════════════════════════════════
-        private void DrawWindowBackground(SpriteBatch spriteBatch, Rectangle rect)
+        private void DrawOfferGrid(SpriteBatch spriteBatch, Rectangle grid, Rectangle frame)
         {
             var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            spriteBatch.Draw(pixel, rect, Theme.BorderOuter);
-
-            var innerRect = new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4);
-            UiDrawHelper.DrawVerticalGradient(spriteBatch, innerRect, Theme.BgDark, Theme.BgDarkest);
-
-            spriteBatch.Draw(pixel, new Rectangle(innerRect.X, innerRect.Y, innerRect.Width, 1), Theme.BorderInner * 0.5f);
-            spriteBatch.Draw(pixel, new Rectangle(innerRect.X, innerRect.Y, 1, innerRect.Height), Theme.BorderInner * 0.3f);
-
-            UiDrawHelper.DrawCornerAccents(spriteBatch, rect, Theme.Secondary * 0.5f);
+            spriteBatch.Draw(pixel, frame, new Color(14, 13, 11));
+            for (int y = 0; y < TRADE_ROWS; y++)
+            for (int x = 0; x < TRADE_COLUMNS; x++)
+            {
+                var cell = new Rectangle(grid.X + x * TRADE_SQUARE_WIDTH, grid.Y + y * TRADE_SQUARE_HEIGHT,
+                    TRADE_SQUARE_WIDTH, TRADE_SQUARE_HEIGHT);
+                spriteBatch.Draw(pixel, cell, new Color(14, 15, 13));
+                if (Skin(1) is Texture2D slots)
+                    spriteBatch.Draw(slots, cell, new Rectangle(546, 220, 29, 29), Color.White);
+            }
+            // The same standalone ornamental frame used by NewUI Inventory.
+            if (Skin(3) is Texture2D sides)
+                spriteBatch.Draw(sides, frame, Color.White);
+            if (Skin(2) is Texture2D rail)
+            {
+                spriteBatch.Draw(rail, new Rectangle(frame.X, frame.Y, frame.Width, 32), Color.White);
+                spriteBatch.Draw(rail, new Rectangle(frame.X, frame.Bottom - 32, frame.Width, 32), null,
+                    Color.White, 0f, Vector2.Zero, SpriteEffects.FlipVertically, 0f);
+            }
         }
 
-        private void DrawPanel(SpriteBatch spriteBatch, Rectangle rect, Color bgColor, bool withBorder = true)
+        private void DrawField(SpriteBatch spriteBatch, Rectangle rect)
         {
-            UiDrawHelper.DrawPanel(spriteBatch, rect, bgColor,
-                withBorder ? Theme.BorderInner * 0.8f : (Color?)null,
-                withBorder ? Theme.BorderOuter : (Color?)null,
-                withBorder ? Theme.BorderInner * 0.6f : null);
+            UiDrawHelper.DrawPanel(spriteBatch, rect, new Color(12, 11, 9), new Color(68, 57, 39));
         }
 
-        private void DrawSectionHeader(SpriteBatch spriteBatch, string title, int x, int y, int width)
+        private void DrawMoneyField(SpriteBatch spriteBatch, Rectangle rect)
+        {
+            DrawField(spriteBatch, rect);
+            if (Skin(4) is Texture2D coin)
+                spriteBatch.Draw(coin, new Rectangle(rect.X - 30, rect.Y + 1, 24, 24), Color.White);
+        }
+
+        private void DrawLabel(SpriteBatch spriteBatch, string text, Rectangle rect, Color color, float scale = 0.35f)
         {
             if (_font == null) return;
-
-            float scale = 0.32f;
-            Vector2 size = _font.MeasureString(title) * scale;
-            float textX = x + (width - size.X) / 2;
-
-            spriteBatch.DrawString(_font, title, new Vector2(textX + 1, y + 1), Color.Black * 0.6f,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, title, new Vector2(textX, y), Theme.TextGold,
-                                   0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            var measured = _font.MeasureString(text);
+            if (measured.X > 0) scale = Math.Min(scale, (rect.Width - 8) / measured.X);
+            var size = measured * scale;
+            var pos = new Vector2(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
+            spriteBatch.DrawString(_font, text, pos + Vector2.One, Color.Black, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            spriteBatch.DrawString(_font, text, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
-        private void DrawModernHeader(SpriteBatch spriteBatch)
+        private void DrawSkinButton(SpriteBatch spriteBatch, Rectangle rect, string text, bool hovered, Color tint)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var headerBg = new Rectangle(8, 6, WINDOW_WIDTH - 16, HEADER_HEIGHT - 8);
-            DrawPanel(spriteBatch, headerBg, Theme.BgMid);
-
-            spriteBatch.Draw(pixel, new Rectangle(20, 8, WINDOW_WIDTH - 40, 2), Theme.Accent * 0.8f);
-            spriteBatch.Draw(pixel, new Rectangle(30, 10, WINDOW_WIDTH - 60, 1), Theme.AccentDim * 0.4f);
-
-            if (_font != null)
-            {
-                string title = "TRADE";
-                float scale = 0.50f;
-                Vector2 size = _font.MeasureString(title) * scale;
-                Vector2 pos = new((WINDOW_WIDTH - size.X) / 2, (HEADER_HEIGHT - size.Y) / 2 + 2);
-
-                spriteBatch.Draw(pixel, new Rectangle((int)pos.X - 20, (int)pos.Y - 4, (int)size.X + 40, (int)size.Y + 8),
-                                Theme.AccentGlow * 0.3f);
-
-                spriteBatch.DrawString(_font, title, pos + new Vector2(2, 2), Color.Black * 0.5f,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, title, pos, Theme.TextWhite,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
-
-            int sepY = HEADER_HEIGHT - 2;
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(20, sepY, (WINDOW_WIDTH - 40) / 2, 1),
-                                  Color.Transparent, Theme.BorderInner);
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(WINDOW_WIDTH / 2, sepY, (WINDOW_WIDTH - 40) / 2, 1),
-                                  Theme.BorderInner, Color.Transparent);
-        }
-
-        private void DrawPartnerSection(SpriteBatch spriteBatch)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            // Partner info panel (name will be drawn dynamically)
-            DrawPanel(spriteBatch, _partnerInfoRect, Theme.BgMid);
-
-            // Partner grid frame
-            DrawPanel(spriteBatch, _partnerGridFrameRect, Theme.BgMid);
-            spriteBatch.Draw(pixel, _partnerGridRect, Theme.SlotBg);
-
-            // Grid lines
-            DrawGridLines(spriteBatch, _partnerGridRect);
-
-            // Money label
-            if (_font != null)
-            {
-                string label = "Zen:";
-                float scale = 0.35f;
-                Vector2 size = _font.MeasureString(label) * scale;
-                Vector2 pos = new(_partnerMoneyRect.X - size.X - 8, _partnerMoneyRect.Y + (_partnerMoneyRect.Height - size.Y) / 2);
-                spriteBatch.DrawString(_font, label, pos, Theme.TextGold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
-        }
-
-        private void DrawDivider(SpriteBatch spriteBatch)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            int sepY = _dividerRect.Y + 2;
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(30, sepY, (WINDOW_WIDTH - 60) / 2, 1),
-                                  Color.Transparent, Theme.BorderInner);
-            UiDrawHelper.DrawHorizontalGradient(spriteBatch, new Rectangle(WINDOW_WIDTH / 2, sepY, (WINDOW_WIDTH - 60) / 2, 1),
-                                  Theme.BorderInner, Color.Transparent);
-
-            // Warning text
-            if (_font != null)
-            {
-                string warning = "⚠ CHECK ITEMS BEFORE ACCEPTING";
-                float scale = 0.32f;
-                Vector2 size = _font.MeasureString(warning) * scale;
-                Vector2 pos = new((WINDOW_WIDTH - size.X) / 2, _dividerRect.Y + 12);
-                spriteBatch.DrawString(_font, warning, pos + Vector2.One, Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, warning, pos, Theme.Warning, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
-        }
-
-        private void DrawMySection(SpriteBatch spriteBatch)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            // My info panel (name will be drawn dynamically)
-            DrawPanel(spriteBatch, _myInfoRect, Theme.BgMid);
-
-            // My grid frame
-            DrawPanel(spriteBatch, _myGridFrameRect, Theme.BgMid);
-            spriteBatch.Draw(pixel, _myGridRect, Theme.SlotBg);
-
-            // Grid lines
-            DrawGridLines(spriteBatch, _myGridRect);
-
-            // Money input background
-            DrawPanel(spriteBatch, _myMoneyInputRect, Theme.SlotBg);
-
-            // Money label
-            if (_font != null)
-            {
-                string label = "Zen:";
-                float scale = 0.35f;
-                Vector2 size = _font.MeasureString(label) * scale;
-                Vector2 pos = new(_myMoneyInputRect.X - size.X - 8, _myMoneyInputRect.Y + (_myMoneyInputRect.Height - size.Y) / 2);
-                spriteBatch.DrawString(_font, label, pos, Theme.TextGold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
-        }
-
-        private void DrawGridLines(SpriteBatch spriteBatch, Rectangle gridRect)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            spriteBatch.Draw(pixel, new Rectangle(gridRect.X, gridRect.Y, gridRect.Width, 2), Color.Black * 0.4f);
-            spriteBatch.Draw(pixel, new Rectangle(gridRect.X, gridRect.Y, 2, gridRect.Height), Color.Black * 0.3f);
-
-            Color gridLine = new(40, 48, 60, 100);
-            Color gridLineMajor = new(55, 65, 80, 120);
-
-            for (int x = 1; x < TRADE_COLUMNS; x++)
-            {
-                int lineX = gridRect.X + x * TRADE_SQUARE_WIDTH;
-                bool isMajor = x == TRADE_COLUMNS / 2;
-                spriteBatch.Draw(pixel, new Rectangle(lineX, gridRect.Y, 1, gridRect.Height), isMajor ? gridLineMajor : gridLine);
-            }
-
-            for (int y = 1; y < TRADE_ROWS; y++)
-            {
-                int lineY = gridRect.Y + y * TRADE_SQUARE_HEIGHT;
-                spriteBatch.Draw(pixel, new Rectangle(gridRect.X, lineY, gridRect.Width, 1), gridLine);
-            }
-
-            spriteBatch.Draw(pixel, new Rectangle(gridRect.X, gridRect.Bottom - 1, gridRect.Width, 1), Theme.BorderHighlight * 0.2f);
-            spriteBatch.Draw(pixel, new Rectangle(gridRect.Right - 1, gridRect.Y, 1, gridRect.Height), Theme.BorderHighlight * 0.15f);
+            bool pressed = hovered && MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed;
+            if (Skin(pressed ? 7 : hovered ? 6 : 5) is Texture2D button)
+                spriteBatch.Draw(button, rect, tint * Alpha);
+            DrawLabel(spriteBatch, text, rect, Theme.TextGold * Alpha);
         }
 
         private void DrawCloseButton(SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var rect = Translate(_closeButtonRect);
-            Color btnColor = _closeHovered ? Theme.Accent : Theme.TextGray;
-
-            // Draw X symbol
-            int cx = rect.X + rect.Width / 2;
-            int cy = rect.Y + rect.Height / 2;
-            int halfSize = 6;
-            int thickness = 2;
-
-            for (int i = -halfSize; i <= halfSize; i++)
-            {
-                spriteBatch.Draw(pixel, new Rectangle(cx + i - thickness / 2, cy + i - thickness / 2, thickness, thickness), btnColor);
-                spriteBatch.Draw(pixel, new Rectangle(cx + i - thickness / 2, cy - i - thickness / 2, thickness, thickness), btnColor);
-            }
+            bool pressed = _closeHovered && MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed;
+            if (Skin(pressed ? 10 : _closeHovered ? 9 : 8) is Texture2D close)
+                spriteBatch.Draw(close, Translate(_closeButtonRect), Color.White * Alpha);
         }
 
         private void DrawTradeButton(SpriteBatch spriteBatch)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null || _font == null) return;
-
-            var rect = Translate(_tradeButtonRect);
-
-            // Determine button color based on state
-            Color bgColor = _myButtonState switch
-            {
-                TradeButtonStateChanged.TradeButtonState.Red => Theme.Danger,
-                TradeButtonStateChanged.TradeButtonState.Checked => Theme.Success,
-                _ => Theme.BgMid
-            };
-
-            Color borderColor = _myButtonState switch
-            {
-                TradeButtonStateChanged.TradeButtonState.Red => Theme.Danger,
-                TradeButtonStateChanged.TradeButtonState.Checked => Theme.Success,
-                _ => _tradeButtonHovered ? Theme.Accent : Theme.BorderInner
-            };
-
-            // Background
-            spriteBatch.Draw(pixel, rect, bgColor);
-
-            // Border
-            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 2), borderColor);
-            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 2, rect.Width, 2), borderColor);
-            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, 2, rect.Height), borderColor);
-            spriteBatch.Draw(pixel, new Rectangle(rect.Right - 2, rect.Y, 2, rect.Height), borderColor);
-
-            // Text
             string text = _myButtonState switch
             {
-                TradeButtonStateChanged.TradeButtonState.Red =>
-                    $"CHANGED ({Math.Max(1, GetRemainingSeconds(_myLockEndTime))}s)",
-                TradeButtonStateChanged.TradeButtonState.Checked => "ACCEPTED",
-                _ => "TRADE",
+                TradeButtonStateChanged.TradeButtonState.Red => $"Changed ({Math.Max(1, GetRemainingSeconds(_myLockEndTime))}s)",
+                TradeButtonStateChanged.TradeButtonState.Checked => "Accepted",
+                _ => "Trade"
             };
-            float scale = 0.45f;
-            Vector2 size = _font.MeasureString(text) * scale;
-            Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
-
-            spriteBatch.DrawString(_font, text, pos + Vector2.One, Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            spriteBatch.DrawString(_font, text, pos, Theme.TextWhite, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            Color tint = _myButtonState switch
+            {
+                TradeButtonStateChanged.TradeButtonState.Red => Theme.Danger,
+                TradeButtonStateChanged.TradeButtonState.Checked => Theme.Success,
+                _ => Color.White
+            };
+            DrawSkinButton(spriteBatch, Translate(_tradeButtonRect), text, _tradeButtonHovered, tint);
         }
 
         private void DrawDynamicText(SpriteBatch spriteBatch)
@@ -886,39 +711,12 @@ namespace Client.Main.Controls.UI.Game.Trade
 
             var pixel = GraphicsManager.Instance.Pixel;
 
-            // Partner name with level-based color
-            if (!string.IsNullOrEmpty(_partnerName))
-            {
-                Color nameColor = GetLevelColor(_partnerLevel);
-                string partnerText = $"{_partnerName} [{_partnerGuild}] Lv.{_partnerLevel}";
-                if (string.IsNullOrEmpty(_partnerGuild))
-                {
-                    partnerText = $"{_partnerName} Lv.{_partnerLevel}";
-                }
-
-                float scale = 0.35f;
-                Vector2 size = _font.MeasureString(partnerText) * scale;
-                Vector2 pos = new(
-                    DisplayRectangle.X + _partnerInfoRect.X + (_partnerInfoRect.Width - size.X) / 2,
-                    DisplayRectangle.Y + _partnerInfoRect.Y + (_partnerInfoRect.Height - size.Y) / 2);
-
-                spriteBatch.DrawString(_font, partnerText, pos + Vector2.One, Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, partnerText, pos, nameColor, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
-
+            DrawLabel(spriteBatch, $"Trade Target: {_partnerName}", Translate(_partnerInfoRect), GetLevelColor(_partnerLevel));
+            DrawLabel(spriteBatch, string.IsNullOrEmpty(_partnerGuild) ? "--" : _partnerGuild,
+                Translate(new Rectangle(84, 126, 114, 24)), Theme.TextGold);
+            DrawLabel(spriteBatch, _partnerLevel.ToString(), Translate(new Rectangle(252, 126, 56, 24)), Theme.TextGold);
             if (IsPartnerTradeLocked)
-            {
-                const string status = "PARTNER ACCEPTED";
-
-                float scale = 0.30f;
-                Vector2 size = _font.MeasureString(status) * scale;
-                Vector2 pos = new(
-                    DisplayRectangle.X + _partnerInfoRect.Right - size.X - 8,
-                    DisplayRectangle.Y + _partnerInfoRect.Y + 2);
-
-                spriteBatch.DrawString(_font, status, pos + Vector2.One, Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                spriteBatch.DrawString(_font, status, pos, Theme.Success, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
+                DrawLabel(spriteBatch, "Accepted", Translate(new Rectangle(234, 324, 92, 26)), Theme.Success, 0.30f);
 
             // Partner money
             {
@@ -933,7 +731,7 @@ namespace Client.Main.Controls.UI.Game.Trade
             // My name
             if (_characterState != null)
             {
-                string myText = $"YOU: {_characterState.Name}";
+                string myText = $"Name: {_characterState.Name}";
                 float scale = 0.32f;
                 Vector2 size = _font.MeasureString(myText) * scale;
                 Vector2 pos = new(
@@ -1339,7 +1137,15 @@ namespace Client.Main.Controls.UI.Game.Trade
             // Money input focus
             if (_moneyInputHovered && _draggedItem == null)
             {
-                BeginMoneyInput();
+                if (_priceButtonHovered && _isMoneyInputActive)
+                {
+                    CommitMoneyInput();
+                    _isMoneyInputActive = false;
+                }
+                else if (!_isMoneyInputActive)
+                {
+                    BeginMoneyInput();
+                }
                 Scene?.SetMouseInputConsumed();
                 return;
             }
@@ -1531,11 +1337,10 @@ namespace Client.Main.Controls.UI.Game.Trade
 
             MuGame.ScheduleOnMainThread(() =>
             {
-                Show();
-
-                // Auto-open inventory as well
+                // Inventory must be positioned first so Trade opens beside it.
                 var inventory = InventoryControl.Instance;
                 inventory?.Show();
+                Show();
             });
         }
 
