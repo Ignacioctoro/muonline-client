@@ -77,17 +77,9 @@ namespace Client.Main.Controls.UI.Game
         private Texture2D _closePressed;
         private SpriteFont _font;
 
-        private RenderTarget2D _staticSurface;
-        private bool _surfaceDirty = true;
-        // GFx OZD has straight alpha; the cached surface must accumulate alpha
-        // normally before being composited with premultiplied AlphaBlend.
-        private readonly BlendState _surfaceBlend = new()
-        {
-            ColorSourceBlend = Blend.SourceAlpha,
-            ColorDestinationBlend = Blend.InverseSourceAlpha,
-            AlphaSourceBlend = Blend.One,
-            AlphaDestinationBlend = Blend.InverseSourceAlpha
-        };
+        // Static panels render directly in the UI batch. Keeping them in a
+        // RenderTarget2D loses their contents on certain scene/device resets
+        // (Select Character / Select Server), even though the UI is still Ready.
 
         private bool _closeHovered;
         private bool _exitHovered;
@@ -249,7 +241,6 @@ namespace Client.Main.Controls.UI.Game
             _closeHover = textures[6];
             _closePressed = textures[7];
             _font = GraphicsManager.Instance.Font;
-            _surfaceDirty = true;
         }
 
         public void ShowWindow()
@@ -1166,21 +1157,13 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            EnsureStaticSurface();
-            if (_staticSurface != null && !_staticSurface.IsDisposed)
-            {
-                using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
-                    BlendState.AlphaBlend, SamplerState.PointClamp,
-                    transform: UiScaler.SpriteTransform))
-                {
-                    sprite.Draw(_staticSurface, DisplayRectangle, Color.White * Alpha);
-                }
-            }
-
             using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
                 BlendState.NonPremultiplied, SamplerState.PointClamp,
                 transform: UiScaler.SpriteTransform))
             {
+                // Both fixed and dynamic elements share a single draw batch,
+                // avoiding stale RenderTarget2D content after character/server selection.
+                DrawStaticSurface(sprite);
                 DrawItems(sprite);
                 if (_storePublic)
                     DrawTextInRect(sprite, _publishedStoreName,
@@ -1205,41 +1188,6 @@ namespace Client.Main.Controls.UI.Game
             // the same NonPremultiplied batch as the surrounding NewUI text.
         }
 
-        private void EnsureStaticSurface()
-        {
-            if (!_surfaceDirty && _staticSurface != null && !_staticSurface.IsDisposed)
-            {
-                return;
-            }
-
-            var device = GraphicsManager.Instance?.GraphicsDevice;
-            if (device == null)
-            {
-                return;
-            }
-
-            _staticSurface?.Dispose();
-            _staticSurface = new RenderTarget2D(device, WindowWidth, WindowHeight,
-                false, SurfaceFormat.Color, DepthFormat.None);
-            var previousTargets = device.GetRenderTargets();
-            try
-            {
-                device.SetRenderTarget(_staticSurface);
-                device.Clear(Color.Transparent);
-                using (new SpriteBatchScope(GraphicsManager.Instance.Sprite,
-                    SpriteSortMode.Deferred, _surfaceBlend, SamplerState.PointClamp))
-                {
-                    DrawStaticSurface(GraphicsManager.Instance.Sprite);
-                }
-            }
-            finally
-            {
-                device.SetRenderTargets(previousTargets);
-            }
-
-            _surfaceDirty = false;
-        }
-
         private void DrawStaticSurface(SpriteBatch sprite)
         {
             var pixel = GraphicsManager.Instance.Pixel;
@@ -1249,20 +1197,20 @@ namespace Client.Main.Controls.UI.Game
             }
 
             // Underlay prevents holes in translucent atlas pixels.
-            sprite.Draw(pixel, new Rectangle(12, 90, WindowWidth - 24, WindowHeight - 112),
-                new Color(25, 23, 23, 255));
+            sprite.Draw(pixel, ToScreen(new Rectangle(12, 90, WindowWidth - 24, WindowHeight - 112)),
+                new Color(25, 23, 23, 255) * Alpha);
             NewUiFrameRenderer.DrawPersonalShopWindow(sprite, _frameAtlas,
-                new Rectangle(0, 0, WindowWidth, WindowHeight));
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, NameFrame);
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, GridFrame);
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, InfoFrame);
+                ToScreen(new Rectangle(0, 0, WindowWidth, WindowHeight)));
+            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, ToScreen(NameFrame));
+            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, ToScreen(GridFrame));
+            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, ToScreen(InfoFrame));
 
             DrawCenteredText(sprite, "PERSONAL STORE", 52, 0.53f, new Color(233, 219, 195));
             DrawCenteredText(sprite, "STORE NAME", 124, 0.42f, new Color(221, 206, 179));
             var nameBox = new Rectangle(NameFrame.X + 19, 143, NameFrame.Width - 38, 31);
-            sprite.Draw(pixel, nameBox, new Color(18, 17, 18, 238));
-            sprite.Draw(pixel, new Rectangle(nameBox.X, nameBox.Y, nameBox.Width, 1),
-                new Color(103, 87, 72, 180));
+            sprite.Draw(pixel, ToScreen(nameBox), new Color(18, 17, 18, 238) * Alpha);
+            sprite.Draw(pixel, ToScreen(new Rectangle(nameBox.X, nameBox.Y, nameBox.Width, 1)),
+                new Color(103, 87, 72, 180) * Alpha);
             // Store name is drawn dynamically, using the editable field's value.
 
             DrawCenteredText(sprite, "SHOP ITEMS (8 x 4)", 222, 0.43f,
@@ -1274,10 +1222,11 @@ namespace Client.Main.Controls.UI.Game
                     var destination = new Rectangle(
                         ItemGrid.X + column * CellSize,
                         ItemGrid.Y + row * CellSize, CellSize, CellSize);
-                    sprite.Draw(pixel, destination, new Color(17, 20, 25, 255));
+                    var gridCell = ToScreen(destination);
+                    sprite.Draw(pixel, gridCell, new Color(17, 20, 25, 255) * Alpha);
                     if (_slotAtlas != null && !_slotAtlas.IsDisposed)
                     {
-                        sprite.Draw(_slotAtlas, destination, SlotSource, Color.White);
+                        sprite.Draw(_slotAtlas, gridCell, SlotSource, Color.White * Alpha);
                     }
                 }
             }
@@ -1593,8 +1542,8 @@ namespace Client.Main.Controls.UI.Game
         private void DrawCenteredText(SpriteBatch sprite, string text, int centerY,
             float fontScale, Color color)
         {
-            DrawTextInRect(sprite, text, new Rectangle(0, centerY - 15, WindowWidth, 30),
-                fontScale, color);
+            DrawTextInRect(sprite, text, ToScreen(new Rectangle(0, centerY - 15, WindowWidth, 30)),
+                fontScale * Scale, color * Alpha);
         }
 
         private void DrawTextInRect(SpriteBatch sprite, string text, Rectangle rect,
@@ -1632,12 +1581,6 @@ namespace Client.Main.Controls.UI.Game
                 Math.Max(1, right - left), Math.Max(1, bottom - top));
         }
 
-        protected override void OnScreenSizeChanged()
-        {
-            base.OnScreenSizeChanged();
-            _surfaceDirty = true;
-        }
-
         public override void Dispose()
         {
             // Release resources belonging to the outgoing GameScene. The next
@@ -1647,13 +1590,10 @@ namespace Client.Main.Controls.UI.Game
             _state = null;
             _priceInput.Blur();
             _storeNameInput.Blur();
-            _staticSurface?.Dispose();
-            _staticSurface = null;
             _textures.Clear(); // TextureLoader owns the underlying textures.
             _items.Clear();
             _previewRetryCounts.Clear();
             _confirmedPrices.Clear();
-            _surfaceBlend.Dispose();
             if (ReferenceEquals(_instance, this))
                 _instance = null;
             base.Dispose();
