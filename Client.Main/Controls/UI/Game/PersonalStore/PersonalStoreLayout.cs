@@ -1,5 +1,6 @@
 using Client.Main.Controls.UI.Game.Common;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.Controls.UI.Game
 {
@@ -20,6 +21,17 @@ namespace Client.Main.Controls.UI.Game
         public static readonly Rectangle CloseStore = new(178, FooterY, 78, 32);
         public static readonly Rectangle State = new(28, FooterY - 62, Width - 56, 24);
         public static readonly Rectangle Feedback = new(24, FooterY - 34, Width - 48, 24);
+
+        public static void DrawNameField(SpriteBatch sprite, Texture2D pixel, Rectangle rect, float alpha)
+        {
+            // Match the warm NewUI trim, keeping a visible frame in both read-only views.
+            sprite.Draw(pixel, rect, new Color(37, 28, 20) * alpha);
+            Color border = new Color(159, 121, 70) * alpha;
+            sprite.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 1), new Color(209, 165, 99) * alpha);
+            sprite.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), border);
+            sprite.Draw(pixel, new Rectangle(rect.X, rect.Y, 1, rect.Height), border);
+            sprite.Draw(pixel, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), border);
+        }
 
         public static bool IsTopmostAtPointer(GameControl window, Point pointer)
         {

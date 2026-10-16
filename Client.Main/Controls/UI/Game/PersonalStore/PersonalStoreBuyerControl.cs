@@ -43,6 +43,7 @@ namespace Client.Main.Controls.UI.Game
         public static PersonalStoreBuyerControl Instance => _instance ??= new PersonalStoreBuyerControl();
         // Buyer and seller windows belong to the current GameScene, not the app lifetime.
         public override bool NonDisposable => false;
+        public override bool BlocksPointerInput => true;
         public ushort SellerId => _sellerId;
         public bool IsViewing(ushort sellerId) => Visible && _sellerId == (sellerId & 0x7FFF);
 
@@ -262,6 +263,11 @@ namespace Client.Main.Controls.UI.Game
 
             var mouse = MuGame.Instance.UiMouseState;
             var previous = MuGame.Instance.PrevUiMouseState;
+            if (Scene?.IsPointerInputBlockedFor(this) == true)
+            {
+                _hoveredSlot = null;
+                return;
+            }
             bool inside = DisplayRectangle.Contains(mouse.Position);
             _hoveredSlot = !_confirm && inside ? FindItemAt(mouse.Position)?.Slot : null;
             if (inside && mouse.LeftButton == ButtonState.Pressed)
@@ -386,9 +392,9 @@ namespace Client.Main.Controls.UI.Game
                     NewUiFrameRenderer.DrawPersonalShopWindow(sprite, _atlas, DisplayRectangle);
                 }
                 var nameBox = ToScreen(PersonalStoreLayout.Name);
-                sprite.Draw(pixel, nameBox, new Color(18, 17, 18, 238));
+                PersonalStoreLayout.DrawNameField(sprite, pixel, nameBox, Alpha);
                 Text(sprite, "PERSONAL STORE", ToScreen(new Rectangle(15, 38, WidthPx - 30, 28)), .53f * Scale, Color.Wheat);
-                Text(sprite, _shopName, nameBox, .43f * Scale, Color.Wheat);
+                Text(sprite, _shopName, nameBox, .48f * Scale, new Color(255, 233, 184));
                 Text(sprite, "Seller: " + _sellerName, ToScreen(PersonalStoreLayout.State), .40f * Scale, Color.LightGray);
 
                 for (int y = 0; y < Rows; y++)

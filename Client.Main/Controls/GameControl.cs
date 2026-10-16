@@ -36,6 +36,7 @@ namespace Client.Main.Controls
         public ControlAlign Align { get; set; }
         public bool AutoViewSize { get; set; } = true;
         public bool Interactive { get; set; }
+        public virtual bool BlocksPointerInput => false;
         public int X { get; set; }
         public int Y { get; set; }
         public Point ControlSize { get => _controlSize; set => _controlSize = value; }
@@ -88,6 +89,7 @@ namespace Client.Main.Controls
         // Public Methods
         public virtual bool OnClick()
         {
+            if (Scene?.IsPointerInputBlockedFor(this) == true) return false;
             // Focus this control when clicked, if it's interactive.
             // Scene.FocusControl is now set in BaseScene's Update.
             // Here, we just invoke the event.
@@ -163,7 +165,13 @@ namespace Client.Main.Controls
             var prevMouse = PreviousMouseState;
             Rectangle rect = DisplayRectangle;
             Point mousePosition = mouse.Position;
-            IsMouseOver = Interactive &&
+            bool pointerBlocked = Scene?.IsPointerInputBlockedFor(this) == true;
+            if (pointerBlocked)
+            {
+                _isCurrentlyPressedByMouse = false;
+                IsMousePressed = false;
+            }
+            IsMouseOver = Interactive && !pointerBlocked &&
                           mousePosition.X >= rect.X && mousePosition.X <= rect.X + rect.Width &&
                           mousePosition.Y >= rect.Y && mousePosition.Y <= rect.Y + rect.Height;
 

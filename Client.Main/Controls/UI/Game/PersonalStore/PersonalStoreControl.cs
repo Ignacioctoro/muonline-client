@@ -200,6 +200,7 @@ namespace Client.Main.Controls.UI.Game
         public bool IsStorePublic => _storePublic;
         // Recreate the per-scene GPU render target and UI textures on each GameScene.
         public override bool NonDisposable => false;
+        public override bool BlocksPointerInput => true;
 
         public IEnumerable<string> GetPreloadTexturePaths()
         {
@@ -906,6 +907,11 @@ namespace Client.Main.Controls.UI.Game
             }
             var current = MuGame.Instance.UiMouseState;
             var previous = MuGame.Instance.PrevUiMouseState;
+            if (Scene?.IsPointerInputBlockedFor(this) == true)
+            {
+                _hoveredItem = null;
+                return;
+            }
             bool inside = DisplayRectangle.Contains(current.Position);
             _hoveredItem = !_priceEditorVisible && inside ? ItemAt(current.Position) : null;
             _closeHovered = inside && ToScreen(CloseButton).Contains(current.Position);
@@ -1162,6 +1168,7 @@ namespace Client.Main.Controls.UI.Game
                 // avoiding stale RenderTarget2D content after character/server selection.
                 DrawStaticSurface(sprite);
                 DrawItems(sprite);
+                PersonalStoreLayout.DrawNameField(sprite, GraphicsManager.Instance.Pixel, ToScreen(StoreNameEditBox), Alpha);
                 if (_storePublic)
                     DrawTextInRect(sprite, _publishedStoreName,
                         ToScreen(StoreNameEditBox), 0.43f * Scale,

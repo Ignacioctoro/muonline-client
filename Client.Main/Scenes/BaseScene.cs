@@ -1,7 +1,8 @@
-﻿using Client.Main.Controllers;
+using Client.Main.Controllers;
 using Client.Main.Core.Input;
 using Client.Main.Controls;
 using Client.Main.Controls.UI;
+using Client.Main.Controls.UI.Common;
 using Client.Main.Helpers;
 using Client.Main.Models;
 using Client.Main.Objects;
@@ -30,6 +31,8 @@ namespace Client.Main.Scenes
         public WorldObject MouseHoverObject { get; set; }
         public bool IsMouseHandledByUI { get; set; }
         public bool IsMouseInputConsumedThisFrame { get; private set; }
+        private readonly PointerInputBarrier _pointerInputBarrier = new();
+        public bool IsPointerInputBlockedFor(GameControl control) => _pointerInputBarrier.Blocks(control);
         public bool IsKeyboardEnterConsumedThisFrame { get; private set; }
         public bool IsKeyboardEscapeConsumedThisFrame { get; private set; }
 
@@ -195,10 +198,15 @@ namespace Client.Main.Scenes
                         ButtonState.Released);
             }
 
+            // Capture the blocking window before any HUD button processes this frame.
+            _pointerInputBarrier.Update(this, MuGame.Instance.UiMouseState, MuGame.Instance.PrevUiMouseState);
+            if (_pointerInputBarrier.HasBlocker)
+                IsMouseInputConsumedThisFrame = true;
+
             for (int i = Controls.Count - 1; i >= 0; i--)
             {
                 var uiCtrl = Controls[i];
-                if (uiCtrl.Visible && uiCtrl.IsMouseOver) // IsMouseOver is updated in control's own Update
+                if (uiCtrl.Visible && uiCtrl.IsMouseOver && !IsPointerInputBlockedFor(uiCtrl))
                 {
                     if (topmostHoverForTooltip == null)
                     {
@@ -262,7 +270,7 @@ namespace Client.Main.Scenes
             }
 
             // scroll handling - using the MouseControl determined above
-            if (MouseControl != null && MouseControl.Interactive) // MouseControl here is the target for scroll
+            if (MouseControl != null && MouseControl.Interactive && !IsPointerInputBlockedFor(MouseControl))
             {
                 int scrollWheelChange = MuGame.Instance.UiMouseState.ScrollWheelValue - MuGame.Instance.PrevUiMouseState.ScrollWheelValue;
                 if (scrollWheelChange != 0)
