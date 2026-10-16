@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Client.Main.Content;
 using Client.Main.Controllers;
+using Client.Main.Core.Items.Tooltips;
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Common;
 using Client.Main.Controls.UI.Game.Common;
@@ -53,6 +54,7 @@ namespace Client.Main.Controls.UI.Game
         private string _sellerName = string.Empty;
         private string _shopName = string.Empty;
         private byte? _selectedSlot;
+        private byte? _hoveredSlot;
         private bool _confirm;
         private bool _buyPending;
         private int _buyRequestGeneration;
@@ -109,6 +111,7 @@ namespace Client.Main.Controls.UI.Game
             _sellerName = sellerName ?? string.Empty;
             _shopName = storeName ?? string.Empty;
             _listings.Clear();
+            _hoveredSlot = null;
             foreach (var entry in received)
             {
                 int cell = entry.Slot - FirstSlot;
@@ -164,6 +167,7 @@ namespace Client.Main.Controls.UI.Game
             _buyRequestGeneration++;
             _listings.Clear();
             _selectedSlot = null;
+            _hoveredSlot = null;
         }
 
         public void HandleSellerClosed(ushort id)
@@ -242,6 +246,7 @@ namespace Client.Main.Controls.UI.Game
             var mouse = MuGame.Instance.UiMouseState;
             var previous = MuGame.Instance.PrevUiMouseState;
             bool inside = DisplayRectangle.Contains(mouse.Position);
+            _hoveredSlot = !_confirm && inside ? FindItemAt(mouse.Position)?.Slot : null;
             if (inside && mouse.LeftButton == ButtonState.Pressed)
                 Scene?.SetMouseInputConsumed();
 
@@ -282,13 +287,43 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            var cellX = (mouse.Position.X - ToScreen(Grid).X) / Math.Max(0.01f, Scale * Cell);
-            var cellY = (mouse.Position.Y - ToScreen(Grid).Y) / Math.Max(0.01f, Scale * Cell);
-            if (cellX >= 0 && cellX < Columns && cellY >= 0 && cellY < Rows)
+            // Hit-test item rectangles, not only their first cell. Boots/armor/
+            // large weapons must show the correct item on any occupied cell.
+            if (ToScreen(Grid).Contains(mouse.Position))
+                _selectedSlot = _hoveredSlot;
+        }
+
+        private Listing FindItemAt(Point mousePosition)
+        {
+            foreach (var listing in _listings.Values)
             {
-                byte slot = (byte)(FirstSlot + (int)cellY * Columns + (int)cellX);
-                _selectedSlot = _listings.ContainsKey(slot) ? slot : null;
+                if (GetItemRect(listing.Item).Contains(mousePosition))
+                    return listing;
             }
+            return null;
+        }
+
+        private Rectangle GetItemRect(InventoryItem item) =>
+            ToScreen(new Rectangle(Grid.X + item.GridPosition.X * Cell,
+                Grid.Y + item.GridPosition.Y * Cell,
+                item.Definition.Width * Cell, item.Definition.Height * Cell));
+
+        private static List<(string text, Color color)> BuildShopTooltip(Listing listing)
+        {
+            // The item name, +level, excellent/ancient/socket/Harmony options,
+            // requirements and other Season 6 lines come from Inventory.
+            var lines = ClassicItemTooltipBuilder.Build(listing.Item);
+            lines.Add(("Store Price: " + listing.Price.ToString("N0", CultureInfo.InvariantCulture)
+                + " Zen", new Color(255, 220, 130)));
+            return lines;
+        }
+
+        private static string GetDisplayName(Listing listing)
+        {
+            if (listing == null)
+                return "Select an item";
+            var lines = ClassicItemTooltipBuilder.Build(listing.Item);
+            return lines.Count > 0 ? lines[0].text : listing.Item.Definition.Name;
         }
 
         private async Task SendBuyRequestAsync()
@@ -332,15 +367,24 @@ namespace Client.Main.Controls.UI.Game
                 BlendState.NonPremultiplied, SamplerState.PointClamp,
                 transform: UiScaler.SpriteTransform))
             {
-                var bounds = DisplayRectangle;
-                sprite.Draw(pixel, bounds, new Color(17, 17, 21, 252));
-                if (_atlas != null)
+                // Match the seller's finished NewUI renderer: no black opaque
+                // full-window rectangle behind the transparent GFx atlas.
+                // Only the interior gets a dark backing like the original store.
+                sprite.Draw(pixel, ToScreen(new Rectangle(12, 90, WidthPx - 24, HeightPx - 112)),
+                    new Color(25, 23, 23, 255));
+                if (_atlas != null && !_atlas.IsDisposed)
                 {
-                    NewUiFrameRenderer.DrawPersonalShopWindow(sprite, _atlas, bounds);
+                    NewUiFrameRenderer.DrawPersonalShopWindow(sprite, _atlas, DisplayRectangle);
                     NewUiFrameRenderer.DrawPersonalShopInset(sprite, _atlas, ToScreen(new Rectangle(18, 103, 312, 86)));
                     NewUiFrameRenderer.DrawPersonalShopInset(sprite, _atlas, ToScreen(new Rectangle(18, 199, 312, 191)));
                     NewUiFrameRenderer.DrawPersonalShopInset(sprite, _atlas, ToScreen(new Rectangle(18, 402, 312, 129)));
                 }
+
+                // Same dark name field and subtle border as PersonalStoreControl.
+                var nameBox = ToScreen(new Rectangle(37, 143, 274, 31));
+                sprite.Draw(pixel, nameBox, new Color(18, 17, 18, 238));
+                sprite.Draw(pixel, new Rectangle(nameBox.X, nameBox.Y, nameBox.Width, 1),
+                    new Color(103, 87, 72, 180));
 
                 Text(sprite, "VIEW PERSONAL STORE", ToScreen(new Rectangle(15, 46, 318, 28)), .53f * Scale, new Color(247, 218, 172));
                 Text(sprite, _shopName, ToScreen(new Rectangle(32, 126, 284, 29)), .48f * Scale, Color.Wheat);
@@ -358,9 +402,7 @@ namespace Client.Main.Controls.UI.Game
                 foreach (var value in _listings.Values)
                 {
                     var item = value.Item;
-                    var rect = ToScreen(new Rectangle(Grid.X + item.GridPosition.X * Cell,
-                        Grid.Y + item.GridPosition.Y * Cell,
-                        item.Definition.Width * Cell, item.Definition.Height * Cell));
+                    var rect = GetItemRect(item);
                     if (value.Slot == _selectedSlot)
                         sprite.Draw(pixel, rect, new Color(181, 128, 56, 110));
                     var texture = ResolveTexture(item);
@@ -374,8 +416,9 @@ namespace Client.Main.Controls.UI.Game
                 Text(sprite, "ITEM INFORMATION", ToScreen(new Rectangle(20, 412, 308, 27)), .43f * Scale, Color.Wheat);
                 Listing current = _selectedSlot.HasValue &&
                     _listings.TryGetValue(_selectedSlot.Value, out var found) ? found : null;
-                Text(sprite, current?.Item.Definition.Name ?? "Select an item",
-                    ToScreen(new Rectangle(30, 445, 288, 30)), .42f * Scale, Color.Wheat);
+                Text(sprite, GetDisplayName(current),
+                    ToScreen(new Rectangle(30, 445, 288, 30)), .42f * Scale,
+                    current != null ? ClassicItemTooltipBuilder.Build(current.Item)[0].color : Color.Wheat);
                 Text(sprite, current != null ? "Price: " + current.Price.ToString("N0", CultureInfo.InvariantCulture) + " Zen" : "Price: --",
                     ToScreen(new Rectangle(30, 477, 288, 27)), .43f * Scale, Color.Goldenrod);
                 Text(sprite, _feedback, ToScreen(new Rectangle(22, 506, 304, 23)), .32f * Scale, new Color(172, 208, 154));
@@ -388,13 +431,39 @@ namespace Client.Main.Controls.UI.Game
                 {
                     sprite.Draw(pixel, ToScreen(ConfirmPanel), new Color(18, 19, 24, 250));
                     Text(sprite, "CONFIRM PURCHASE", ToScreen(new Rectangle(38, 241, 272, 35)), .53f * Scale, Color.Wheat);
-                    Text(sprite, current?.Item.Definition.Name ?? "",
+                    Text(sprite, current != null ? GetDisplayName(current) : "",
                         ToScreen(new Rectangle(38, 283, 272, 28)), .40f * Scale, Color.White);
                     Text(sprite, current == null ? "" : current.Price.ToString("N0", CultureInfo.InvariantCulture) + " Zen",
                         ToScreen(new Rectangle(38, 312, 272, 26)), .43f * Scale, Color.Goldenrod);
                     Button(sprite, ConfirmYes, "Confirm");
                     Button(sprite, ConfirmNo, "Cancel");
                 }
+            }
+        }
+
+        public override void DrawAfter(GameTime gameTime)
+        {
+            if (!Visible || Status != GameControlStatus.Ready || _confirm)
+                return;
+
+            byte? slot = _hoveredSlot ?? _selectedSlot;
+            if (!slot.HasValue || !_listings.TryGetValue(slot.Value, out var listing))
+                return;
+            var sprite = GraphicsManager.Instance?.Sprite;
+            if (sprite == null || _font == null)
+                return;
+
+            var itemRect = GetItemRect(listing.Item);
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            if (!_hoveredSlot.HasValue)
+                mouse = new Point(itemRect.Right + 8, itemRect.Top);
+
+            using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.LinearClamp,
+                transform: UiScaler.SpriteTransform))
+            {
+                ClassicItemTooltipRenderer.Draw(sprite, _font, listing.Item,
+                    BuildShopTooltip(listing), itemRect, mouse);
             }
         }
 
@@ -447,6 +516,7 @@ namespace Client.Main.Controls.UI.Game
             _buyPending = false;
             _buyRequestGeneration++;
             _selectedSlot = null;
+            _hoveredSlot = null;
             _atlas = null;
             _slots = null;
             _button = null;
