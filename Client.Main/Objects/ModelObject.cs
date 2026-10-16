@@ -79,6 +79,9 @@ namespace Client.Main.Objects
         private int[] _gpuSkinBoneCounts;
         private bool[] _gpuSkinMeshEnabled;
         private Texture2D[] _boneTextures;
+        // Some map/NPC models retain a GPU texture reference across scene
+        // transitions. Check infrequently and reacquire only invalid textures.
+        private double _nextTextureRecoveryCheckMs;
         private TextureScript[] _scriptTextures;
         private TextureData[] _dataTextures;
 
@@ -570,6 +573,7 @@ namespace Client.Main.Objects
             }
 
             base.Update(gameTime);
+            RecoverMissingModelTextures(gameTime.TotalGameTime.TotalMilliseconds);
 
             if (AllowLightingUpdates && !LinkParentAnimation && _contentLoaded)
             {
@@ -643,6 +647,44 @@ namespace Client.Main.Objects
                     if (FreezeDynamicBuffersAfterFirstBuild && _invalidatedBufferFlags == 0)
                         _dynamicBuffersFrozen = true;
                 }
+            }
+        }
+
+        /// <summary>
+        /// A texture uploaded during a prior scene can be disposed or fail to
+        /// initialize on the next Select Character/Server cycle. Retaining that
+        /// old reference makes the mesh invisible indefinitely, even though
+        /// TextureLoader still has the original BMD texture data.
+        /// </summary>
+        private void RecoverMissingModelTextures(double totalTimeMs)
+        {
+            if (totalTimeMs < _nextTextureRecoveryCheckMs)
+                return;
+
+            _nextTextureRecoveryCheckMs = totalTimeMs + 3000d;
+            if (_boneTextures == null || _meshTexturePath == null)
+                return;
+
+            int count = Math.Min(_boneTextures.Length, _meshTexturePath.Length);
+            for (int mesh = 0; mesh < count; mesh++)
+            {
+                Texture2D current = _boneTextures[mesh];
+                if (current != null && !current.IsDisposed)
+                    continue;
+
+                string path = _meshTexturePath[mesh];
+                if (string.IsNullOrWhiteSpace(path))
+                    continue;
+
+                var restored = TextureLoader.Instance.GetTexture2D(path);
+                if (restored == null || restored.IsDisposed)
+                    continue;
+
+                _boneTextures[mesh] = restored;
+                _sortTextureHint = null;
+                _sortTextureHintDirty = true;
+                _logger?.LogDebug("Restored missing BMD mesh texture {Path} on {ObjectName} (mesh {Mesh}).",
+                    path, ObjectName, mesh);
             }
         }
 
