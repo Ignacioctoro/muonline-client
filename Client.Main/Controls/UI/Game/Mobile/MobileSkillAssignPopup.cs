@@ -29,7 +29,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
         private const int RowHeight =
             36;
 
-        private const int Padding =
+        private const int PopupPadding =
             8;
 
         // Igual que un pequeño menú móvil.
@@ -470,7 +470,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
                             $"{prefix}{name}",
 
                         X =
-                            Padding,
+                            PopupPadding,
 
                         Y =
                             y,
@@ -478,14 +478,14 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                    Padding * 2,
+                                    PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                    Padding * 2,
+                                    PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -577,7 +577,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
                                 .SourceRectangle)
                         {
                             X =
-                                Padding + 7,
+                                PopupPadding + 7,
 
                             Y =
                                 y + 4,
@@ -617,7 +617,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
                             "No hay skills aprendidas",
 
                         X =
-                            Padding,
+                            PopupPadding,
 
                         Y =
                             y,
@@ -625,14 +625,14 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                    Padding * 2,
+                                    PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                    Padding * 2,
+                                    PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -683,7 +683,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
                             "<",
 
                         X =
-                            Padding,
+                            PopupPadding,
 
                         Y =
                             y,
@@ -734,7 +734,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
                         X =
                             PopupWidth -
-                            Padding -
+                            PopupPadding -
                             ButtonWidth,
 
                         Y =
@@ -848,7 +848,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
                             $"Quitar asignación { _slotIndex + 1 }",
 
                         X =
-                            Padding,
+                            PopupPadding,
 
                         Y =
                             y + 3,
@@ -856,14 +856,14 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                    Padding * 2,
+                                    PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                    Padding * 2,
+                                    PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -934,7 +934,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
             // =========================================================
 
             int panelHeight =
-                y + Padding;
+                y + PopupPadding;
 
             _panel.ControlSize =
                 new Point(

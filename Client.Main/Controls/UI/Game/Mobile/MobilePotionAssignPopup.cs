@@ -18,7 +18,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
         private const int PopupWidth = 250;
         private const int HeaderHeight = 34;
         private const int RowHeight = 36;
-        private const int Padding = 8;
+        private const int PopupPadding = 8;
         private const int MaxVisibleOptions = 8;
 
         private readonly InventoryControl _inventory;
@@ -409,20 +409,20 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         Text =
                             $"{prefix}{option.Name}   x{option.TotalCount}",
 
-                        X = Padding,
+                        X = PopupPadding,
                         Y = y,
 
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -516,7 +516,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         new ItemIconControl(
                             iconTexture)
                         {
-                            X = Padding + 6,
+                            X = PopupPadding + 6,
                             Y = y + 5,
 
                             ControlSize =
@@ -556,20 +556,20 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         Text =
                             "No hay pociones disponibles",
 
-                        X = Padding,
+                        X = PopupPadding,
                         Y = y,
 
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -617,20 +617,20 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         Text =
                             $"+{remaining} pociones más",
 
-                        X = Padding,
+                        X = PopupPadding,
                         Y = y,
 
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -672,20 +672,20 @@ namespace Client.Main.Controls.UI.Game.Mobile
                         Text =
                             $"Quitar asignación {_hotkey}",
 
-                        X = Padding,
+                        X = PopupPadding,
                         Y = y + 3,
 
                         ControlSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
                         ViewSize =
                             new Point(
                                 PopupWidth -
-                                Padding * 2,
+                                PopupPadding * 2,
 
                                 RowHeight - 2),
 
@@ -756,7 +756,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
             // ═════════════════════════════════════════
 
             int panelHeight =
-                y + Padding;
+                y + PopupPadding;
 
 
             _panel.ControlSize =
