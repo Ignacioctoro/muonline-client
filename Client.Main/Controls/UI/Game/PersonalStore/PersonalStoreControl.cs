@@ -211,7 +211,8 @@ namespace Client.Main.Controls.UI.Game
             _instance?._storeNameInput?.IsFocused == true;
         public string StoreNameDraft => _storeNameInput.Value.Trim();
         public bool IsStorePublic => _storePublic;
-        public override bool NonDisposable => true;
+        // Recreate the per-scene GPU render target and UI textures on each GameScene.
+        public override bool NonDisposable => false;
 
         public IEnumerable<string> GetPreloadTexturePaths()
         {
@@ -1639,13 +1640,23 @@ namespace Client.Main.Controls.UI.Game
 
         public override void Dispose()
         {
-            base.Dispose();
-            _staticSurface?.Dispose();
-            _staticSurface = null;
-            if (_state != null) _state.InventoryChanged -= OnInventoryChanged;
+            // Release resources belonging to the outgoing GameScene. The next
+            // character/session must initialize its own window and UI surface.
+            if (_state != null)
+                _state.InventoryChanged -= OnInventoryChanged;
+            _state = null;
             _priceInput.Blur();
             _storeNameInput.Blur();
+            _staticSurface?.Dispose();
+            _staticSurface = null;
+            _textures.Clear(); // TextureLoader owns the underlying textures.
+            _items.Clear();
+            _previewRetryCounts.Clear();
+            _confirmedPrices.Clear();
             _surfaceBlend.Dispose();
+            if (ReferenceEquals(_instance, this))
+                _instance = null;
+            base.Dispose();
         }
     }
 }
