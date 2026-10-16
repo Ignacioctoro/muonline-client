@@ -66,7 +66,7 @@ namespace Client.Main.Controls.UI.Game.Trade
 
             public static readonly Color SlotBg = new(12, 15, 20, 240);
             public static readonly Color SlotBorder = new(90, 74, 49, 180);
-            public static readonly Color SlotHover = new(132, 104, 61, 150);
+            public static readonly Color SlotHover = new(70, 85, 110, 150);
             public static readonly Color SlotSelected = new(212, 175, 85, 100);
 
             public static readonly Color GlowNormal = new(150, 150, 150, 25);
@@ -510,16 +510,16 @@ namespace Client.Main.Controls.UI.Game.Trade
 
                 var pixel = GraphicsManager.Instance.Pixel;
 
+                DrawPartnerItems(spriteBatch);
+                DrawMyItems(spriteBatch);
+
                 // Draw grid overlays
                 if (_hoveredItem != null)
                 {
                     Rectangle gridRect = _hoverIsPartnerGrid ? _partnerGridRect : _myGridRect;
                     ItemGridRenderHelper.DrawGridOverlays(spriteBatch, pixel, DisplayRectangle, gridRect, _hoveredItem, _hoveredSlot,
-                                     TRADE_SQUARE_WIDTH, TRADE_SQUARE_HEIGHT, Theme.SlotHover, Theme.Accent, Alpha);
+                                     TRADE_SQUARE_WIDTH, TRADE_SQUARE_HEIGHT, Theme.SlotHover, Theme.Secondary, Alpha);
                 }
-
-                DrawPartnerItems(spriteBatch);
-                DrawMyItems(spriteBatch);
 
                 // Draw pending drop overlay when dragging (internal or from inventory)
                 var inventoryDragging = InventoryControl.Instance?._pickedItemRenderer?.Item;
@@ -773,18 +773,9 @@ namespace Client.Main.Controls.UI.Game.Trade
 
                 // Glow
                 Color glowColor = ItemUiHelper.GetItemGlowColor(item, GlowPalette);
-                if (glowColor.A > 0 || isHovered)
+                if (glowColor.A > 0)
                 {
-                    Color finalGlow = isHovered ? Color.Lerp(glowColor, Theme.Accent, 0.4f) : glowColor;
-                    finalGlow.A = (byte)Math.Min(255, finalGlow.A + (isHovered ? 40 : 0));
-                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, finalGlow);
-                }
-
-                // Cell background
-                if (pixel != null)
-                {
-                    var bgRect = new Rectangle(rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2);
-                    spriteBatch.Draw(pixel, bgRect, isHovered ? Theme.SlotHover : Theme.SlotBg);
+                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, glowColor, glowSize: 1);
                 }
 
                 if (texture != null)
@@ -834,18 +825,9 @@ namespace Client.Main.Controls.UI.Game.Trade
 
                 // Glow
                 Color glowColor = ItemUiHelper.GetItemGlowColor(item, GlowPalette);
-                if (glowColor.A > 0 || isHovered)
+                if (glowColor.A > 0)
                 {
-                    Color finalGlow = isHovered ? Color.Lerp(glowColor, Theme.Accent, 0.4f) : glowColor;
-                    finalGlow.A = (byte)Math.Min(255, finalGlow.A + (isHovered ? 40 : 0));
-                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, finalGlow);
-                }
-
-                // Cell background
-                if (pixel != null)
-                {
-                    var bgRect = new Rectangle(rect.X + 1, rect.Y + 1, rect.Width - 2, rect.Height - 2);
-                    spriteBatch.Draw(pixel, bgRect, isHovered ? Theme.SlotHover : Theme.SlotBg);
+                    ItemUiHelper.DrawItemGlow(spriteBatch, pixel, rect, glowColor, glowSize: 1);
                 }
 
                 if (texture != null)
@@ -1745,10 +1727,6 @@ namespace Client.Main.Controls.UI.Game.Trade
                 return tex;
             }
 
-            var cacheKey = (item, width, height, animated);
-            if (_bmdPreviewCache.TryGetValue(cacheKey, out var cachedPreview) && cachedPreview != null)
-                return cachedPreview;
-
             bool isHovered = animated;
 
             // Material animation for non-hovered items (if enabled)
@@ -1769,15 +1747,19 @@ namespace Client.Main.Controls.UI.Game.Trade
             {
                 try
                 {
-                    var animatedTexture = BmdPreviewRenderer.GetAnimatedPreview(item, width, height, _currentGameTime);
+                    var animatedTexture = BmdPreviewRenderer.GetSmoothAnimatedPreview(item, width, height, _currentGameTime);
                     if (animatedTexture != null)
                     {
-                        _bmdPreviewCache[cacheKey] = animatedTexture;
                         return animatedTexture;
                     }
                 }
                 catch { return null; }
             }
+
+            // Animated previews must be refreshed each frame, exactly as in Inventory.
+            var cacheKey = (item, width, height, false);
+            if (_bmdPreviewCache.TryGetValue(cacheKey, out var cachedPreview) && cachedPreview != null)
+                return cachedPreview;
 
             try
             {
