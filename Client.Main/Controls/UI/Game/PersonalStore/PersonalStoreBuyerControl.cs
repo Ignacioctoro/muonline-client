@@ -67,6 +67,9 @@ namespace Client.Main.Controls.UI.Game
             public byte Slot { get; init; }
             public uint Price { get; init; }
             public InventoryItem Item { get; init; }
+            public List<(string text, Color color)> TooltipLines { get; init; }
+            public string DisplayName { get; init; }
+            public Color NameColor { get; init; }
         }
 
         private PersonalStoreBuyerControl()
@@ -122,7 +125,18 @@ namespace Client.Main.Controls.UI.Game
                         1, 1, "Interface/newui_item_box.tga");
                 var item = new InventoryItem(def, new Point(cell % Columns, cell / Columns),
                     entry.Data);
-                _listings[entry.Slot] = new Listing { Slot = entry.Slot, Price = entry.Price, Item = item };
+                // These options and the item title only change on authoritative
+                // list updates. Compute once, not every frame (important on Android).
+                var tooltip = ClassicItemTooltipBuilder.Build(item);
+                string fullName = tooltip.Count > 0 ? tooltip[0].text : def.Name;
+                Color nameColor = tooltip.Count > 0 ? tooltip[0].color : Color.Wheat;
+                tooltip.Add(("Store Price: " + entry.Price.ToString("N0", CultureInfo.InvariantCulture)
+                    + " Zen", new Color(255, 220, 130)));
+                _listings[entry.Slot] = new Listing
+                {
+                    Slot = entry.Slot, Price = entry.Price, Item = item,
+                    TooltipLines = tooltip, DisplayName = fullName, NameColor = nameColor
+                };
                 if (!string.IsNullOrEmpty(def.TexturePath) &&
                     !def.TexturePath.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
                     _ = TextureLoader.Instance.Prepare(def.TexturePath);
@@ -308,24 +322,6 @@ namespace Client.Main.Controls.UI.Game
                 Grid.Y + item.GridPosition.Y * Cell,
                 item.Definition.Width * Cell, item.Definition.Height * Cell));
 
-        private static List<(string text, Color color)> BuildShopTooltip(Listing listing)
-        {
-            // The item name, +level, excellent/ancient/socket/Harmony options,
-            // requirements and other Season 6 lines come from Inventory.
-            var lines = ClassicItemTooltipBuilder.Build(listing.Item);
-            lines.Add(("Store Price: " + listing.Price.ToString("N0", CultureInfo.InvariantCulture)
-                + " Zen", new Color(255, 220, 130)));
-            return lines;
-        }
-
-        private static string GetDisplayName(Listing listing)
-        {
-            if (listing == null)
-                return "Select an item";
-            var lines = ClassicItemTooltipBuilder.Build(listing.Item);
-            return lines.Count > 0 ? lines[0].text : listing.Item.Definition.Name;
-        }
-
         private async Task SendBuyRequestAsync()
         {
             if (!_selectedSlot.HasValue || !_listings.ContainsKey(_selectedSlot.Value) || _buyPending)
@@ -362,6 +358,16 @@ namespace Client.Main.Controls.UI.Game
             var sprite = GraphicsManager.Instance?.Sprite;
             var pixel = GraphicsManager.Instance?.Pixel;
             if (sprite == null || pixel == null) return;
+
+            var loader = TextureLoader.Instance;
+            if (_atlas == null || _atlas.IsDisposed)
+                _atlas = loader.GetTexture2D(NewUiFrameRenderer.PersonalShopAtlasPath);
+            if (_slots == null || _slots.IsDisposed)
+                _slots = loader.GetTexture2D("Interface/GFx/NpcShop_I3.ozd");
+            if (_button == null || _button.IsDisposed)
+                _button = loader.GetTexture2D("Interface/GFx/btn_l01.ozd");
+            if (_close == null || _close.IsDisposed)
+                _close = loader.GetTexture2D("Interface/GFx/btn_close01.ozd");
 
             using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
                 BlendState.NonPremultiplied, SamplerState.PointClamp,
@@ -416,9 +422,9 @@ namespace Client.Main.Controls.UI.Game
                 Text(sprite, "ITEM INFORMATION", ToScreen(new Rectangle(20, 412, 308, 27)), .43f * Scale, Color.Wheat);
                 Listing current = _selectedSlot.HasValue &&
                     _listings.TryGetValue(_selectedSlot.Value, out var found) ? found : null;
-                Text(sprite, GetDisplayName(current),
+                Text(sprite, current?.DisplayName ?? "Select an item",
                     ToScreen(new Rectangle(30, 445, 288, 30)), .42f * Scale,
-                    current != null ? ClassicItemTooltipBuilder.Build(current.Item)[0].color : Color.Wheat);
+                    current?.NameColor ?? Color.Wheat);
                 Text(sprite, current != null ? "Price: " + current.Price.ToString("N0", CultureInfo.InvariantCulture) + " Zen" : "Price: --",
                     ToScreen(new Rectangle(30, 477, 288, 27)), .43f * Scale, Color.Goldenrod);
                 Text(sprite, _feedback, ToScreen(new Rectangle(22, 506, 304, 23)), .32f * Scale, new Color(172, 208, 154));
@@ -431,7 +437,7 @@ namespace Client.Main.Controls.UI.Game
                 {
                     sprite.Draw(pixel, ToScreen(ConfirmPanel), new Color(18, 19, 24, 250));
                     Text(sprite, "CONFIRM PURCHASE", ToScreen(new Rectangle(38, 241, 272, 35)), .53f * Scale, Color.Wheat);
-                    Text(sprite, current != null ? GetDisplayName(current) : "",
+                    Text(sprite, current?.DisplayName ?? "",
                         ToScreen(new Rectangle(38, 283, 272, 28)), .40f * Scale, Color.White);
                     Text(sprite, current == null ? "" : current.Price.ToString("N0", CultureInfo.InvariantCulture) + " Zen",
                         ToScreen(new Rectangle(38, 312, 272, 26)), .43f * Scale, Color.Goldenrod);
@@ -463,7 +469,7 @@ namespace Client.Main.Controls.UI.Game
                 transform: UiScaler.SpriteTransform))
             {
                 ClassicItemTooltipRenderer.Draw(sprite, _font, listing.Item,
-                    BuildShopTooltip(listing), itemRect, mouse);
+                    listing.TooltipLines, itemRect, mouse);
             }
         }
 
