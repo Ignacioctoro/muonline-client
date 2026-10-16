@@ -40,7 +40,8 @@ namespace Client.Main.Controls.UI.Game
         private static readonly Rectangle SlotSource = new(546, 220, 29, 29);
         private static PersonalStoreBuyerControl _instance;
         public static PersonalStoreBuyerControl Instance => _instance ??= new PersonalStoreBuyerControl();
-        public override bool NonDisposable => true;
+        // Buyer and seller windows belong to the current GameScene, not the app lifetime.
+        public override bool NonDisposable => false;
         public ushort SellerId => _sellerId;
         public bool IsViewing(ushort sellerId) => Visible && _sellerId == (sellerId & 0x7FFF);
 
@@ -432,6 +433,28 @@ namespace Client.Main.Controls.UI.Game
                 0f, Vector2.Zero, scale, SpriteEffects.None, 0);
             sprite.DrawString(_font, text, pos, color,
                 0f, Vector2.Zero, scale, SpriteEffects.None, 0);
+        }
+
+        public override void Dispose()
+        {
+            // Do not send a network unsubscribe during an entire scene teardown.
+            // Drop stale listings, cached GPU references and the singleton so the
+            // next login receives a fully initialized buyer window.
+            Visible = false;
+            _listings.Clear();
+            _textures.Clear();
+            _confirm = false;
+            _buyPending = false;
+            _buyRequestGeneration++;
+            _selectedSlot = null;
+            _atlas = null;
+            _slots = null;
+            _button = null;
+            _close = null;
+            _font = null;
+            if (ReferenceEquals(_instance, this))
+                _instance = null;
+            base.Dispose();
         }
 
         private Rectangle ToScreen(Rectangle r)
