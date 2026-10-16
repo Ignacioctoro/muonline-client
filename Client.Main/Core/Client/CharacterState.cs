@@ -176,6 +176,9 @@ namespace Client.Main.Core.Client
         public bool TryGetPetInfo(byte slot, out PetInfoSnapshot info) =>
             _petInfoBySlot.TryGetValue(slot, out info);
         public byte InventoryExpansionState { get; set; } = 0;
+        // Account-wide flag from the Season 6 character list (F3 00).
+        public bool IsVaultExtended { get; set; }
+        public bool HasPendingVaultMove => _pendingVaultMoveFrom.HasValue;
         public uint InventoryZen { get; set; } = 0;
         public event Action MoneyChanged;
         private byte? _pendingSellSlot;

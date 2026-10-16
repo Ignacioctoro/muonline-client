@@ -161,7 +161,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             var network = MuGame.Network;
             var service = network?.GetCharacterService();
-            if (_state == null || service == null || network?.IsConnected != true || _state.PendingMoveFromSlot.HasValue || _state.HasPendingTradeMove) return false;
+            if (_state == null || service == null || network?.IsConnected != true || _state.PendingMoveFromSlot.HasValue || _state.HasPendingTradeMove || _state.HasPendingVaultMove) return false;
             if (from == to) return true;
             var state = _state;
             state.StashPendingInventoryMove(from, to);
@@ -219,7 +219,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Scene?.SetMouseInputConsumed();
                 return;
             }
-            if (_state?.PendingMoveFromSlot != null || _state?.HasPendingTradeMove == true) return;
+            if (_state?.PendingMoveFromSlot != null || _state?.HasPendingTradeMove == true || _state?.HasPendingVaultMove == true) return;
             if (InventoryControl.Instance.GetDraggedItem() != null) return;
             if (GetPickedItem() is { } picked)
             {

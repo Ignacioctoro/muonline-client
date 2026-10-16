@@ -832,7 +832,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             Align = ControlAlign.None; // Prevent auto-realignment
             var state = _networkManager?.GetCharacterState();
             // Reopening while an extension transfer is in flight must not lose its source slot.
-            if (state?.IsExtendedInventoryMovePending != true) state?.ClearPendingInventoryMove();
+            if (state?.IsExtendedInventoryMovePending != true && !VaultControl.Instance.Visible && state?.HasPendingVaultMove != true) state?.ClearPendingInventoryMove();
             UpdateZenFromNetwork();
             RefreshInventoryContent();
 
@@ -965,6 +965,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             bool leftJustReleased = !leftPressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Pressed;
 
             if (leftJustPressed && ExtendedInventoryControl.Instance.TryHandleInventoryDrop(mousePos, this)) return;
+            if (leftJustPressed && VaultControl.Instance.TryHandleInventoryDrop(mousePos, this)) return;
 
             if (leftJustPressed && HandleChromeClick())
             {
@@ -2355,7 +2356,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private void HandleInventoryInteraction(Point mousePos, bool leftJustPressed, bool leftJustReleased)
         {
             if (_networkManager?.GetCharacterState()?.HasPendingTradeMove == true ||
-                _networkManager?.GetCharacterState()?.IsExtendedInventoryMovePending == true ||
+                _networkManager?.GetCharacterState()?.PendingMoveFromSlot.HasValue == true ||
+                _networkManager?.GetCharacterState()?.HasPendingVaultMove == true ||
                 ExtendedInventoryControl.PickedItem != null) return;
             Point gridSlot = GetSlotAtScreenPosition(mousePos);
             _hoveredSlot = gridSlot;
@@ -2614,42 +2616,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                 ShowSellConfirmation(itemToSell, slotIndex, originalGrid, fromEquipSlot);
             }
-            else if (VaultControl.Instance is { } vault &&
-                     vault.Visible &&
-                     vault.DisplayRectangle.Contains(MuGame.Instance.UiMouseState.Position) &&
-                     _network_manager_exists())
+            else if (VaultControl.Instance is { } vault && vault.Visible &&
+                     vault.DisplayRectangle.Contains(MuGame.Instance.UiMouseState.Position))
             {
-                var drop = vault.GetSlotAtScreenPosition(MuGame.Instance.UiMouseState.Position);
-                if (drop.X >= 0 && vault.CanPlaceAt(drop, item))
-                {
-                    byte toSlot = (byte)(drop.Y * 8 + drop.X);
-                    var svc = _networkManager.GetCharacterService();
-                    var raw = item.RawData ?? Array.Empty<byte>();
-                    var state = _networkManager.GetCharacterState();
-                    state.StashPendingInventoryMove(slotIndex, slotIndex);
-
-                    _ = Task.Run(async () =>
-                    {
-                        await svc.SendStorageItemMoveAsync(ItemStorageKind.Inventory, slotIndex, ItemStorageKind.Vault, toSlot, _networkManager.TargetVersion, raw);
-                        await Task.Delay(1200);
-                        if (_networkManager != null && state.IsInventoryMovePending(slotIndex, slotIndex))
-                        {
-                            MuGame.ScheduleOnMainThread(() =>
-                            {
-                                state.RaiseInventoryChanged();
-                                state.RaiseVaultItemsChanged();
-                            });
-                        }
-                    });
-
-                    ReleasePickedItem();
-                }
-                else
-                {
-                    AddItem(item);
-                    _networkManager?.GetCharacterState()?.RaiseInventoryChanged();
-                    ReleasePickedItem();
-                }
+                vault.TryHandleInventoryDrop(MuGame.Instance.UiMouseState.Position, this);
             }
             else if (PersonalStoreControl.IsOpen &&
                      PersonalStoreControl.Instance is { } personalStore &&

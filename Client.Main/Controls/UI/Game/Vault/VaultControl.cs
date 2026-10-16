@@ -167,6 +167,15 @@ namespace Client.Main.Controls.UI.Game
         private Rectangle _depositButtonRect;
         private Rectangle _withdrawButtonRect;
         private Rectangle _closeButtonRect;
+        private Rectangle _pageButtonRect;
+        private Texture2D _pageNormal, _pageHover, _pagePressed;
+        private int _vaultPage;
+        private byte _draggedSourceSlot;
+        private bool _pageHovered;
+        private volatile bool _vaultContentDirty = true;
+        public override bool BlocksPointerInput => true;
+        private bool HasPendingMove => _characterState?.PendingMoveFromSlot.HasValue == true ||
+            _characterState?.HasPendingVaultMove == true || _characterState?.HasPendingTradeMove == true;
 
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
@@ -382,6 +391,7 @@ namespace Client.Main.Controls.UI.Game
                 buttonWidth,
                 fieldHeight);
 
+            _pageButtonRect = new Rectangle(_gridRect.Right - 112, _gridRect.Y - 30, 112, 26);
             _closeButtonRect = new Rectangle(
                 ScaleClassicX(392f),
                 ScaleClassicY(98f),
@@ -400,8 +410,10 @@ namespace Client.Main.Controls.UI.Game
                 await loader.PrepareAndGetTexture(
                     LayoutTexturePath);
 
-            _slotTexture =
-                _layoutTexture;
+            _slotTexture = _layoutTexture;
+            _pageNormal = await loader.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
+            _pageHover = await loader.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
+            _pagePressed = await loader.PrepareAndGetTexture("Interface/GFx/btn_l03.ozd");
 
             _font =
                 GraphicsManager.Instance.Font;
@@ -412,6 +424,9 @@ namespace Client.Main.Controls.UI.Game
         public IEnumerable<string> GetPreloadTexturePaths()
         {
             yield return LayoutTexturePath;
+            yield return "Interface/GFx/btn_l01.ozd";
+            yield return "Interface/GFx/btn_l02.ozd";
+            yield return "Interface/GFx/btn_l03.ozd";
         }
 
         private void LoadLayoutDefinitions()
@@ -479,6 +494,21 @@ namespace Client.Main.Controls.UI.Game
             base.Update(gameTime);
             EnsureCharacterState();
             _currentGameTime = gameTime;
+            if (Visible && !_wasVisible)
+            {
+                _vaultPage = 0;
+                _vaultContentDirty = true;
+                InvalidateStaticSurface();
+                ForceAlignNow();
+                Align = ControlAlign.None;
+            }
+            if (_vaultPage != 0 && _characterState?.IsVaultExtended != true)
+            {
+                _vaultPage = 0;
+                _vaultContentDirty = true;
+                InvalidateStaticSurface();
+            }
+            if (_vaultContentDirty) { _vaultContentDirty = false; RefreshVaultContent(); }
 
             // Handle deferred show - wait one frame after warmup to avoid black screen
             if (_pendingShow && !Visible)
@@ -530,7 +560,25 @@ namespace Client.Main.Controls.UI.Game
                 bool leftJustPressed = leftPressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released;
                 bool leftJustReleased = !leftPressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Pressed;
 
+                if (Scene?.IsPointerInputBlockedFor(this) == true &&
+                    !(_draggedItem != null && PersonalStoreLayout.IsTopmostAtPointer(InventoryControl.Instance, mousePos)))
+                { _hoveredItem = null; return; }
                 UpdateChromeHover(mousePos);
+                _pageHovered = Translate(_pageButtonRect).Contains(mousePos);
+                if (leftJustPressed && _pageHovered)
+                {
+                    if (_characterState?.IsVaultExtended == true && !HasPendingMove)
+                    {
+                        CancelZenInput();
+                        _vaultPage = 1 - _vaultPage;
+                        _hoveredItem = null;
+                        _hoveredSlot = _pendingDropSlot = new Point(-1, -1);
+                        RefreshVaultContent();
+                        InvalidateStaticSurface();
+                    }
+                    Scene?.SetMouseInputConsumed();
+                    return;
+                }
 
                 // Handle close button
                 if (leftJustPressed && _closeHovered)
@@ -643,6 +691,7 @@ namespace Client.Main.Controls.UI.Game
                 DrawCloseButton(spriteBatch);
                 DrawZenButtons(spriteBatch);
                 DrawZenText(spriteBatch);
+                DrawPageButton(spriteBatch);
             }
             finally
             {
@@ -658,7 +707,7 @@ namespace Client.Main.Controls.UI.Game
 
             if (_characterState != null)
             {
-                _characterState.VaultItemsChanged -= RefreshVaultContent;
+                _characterState.VaultItemsChanged -= OnVaultItemsChanged;
                 _characterState = null;
             }
 
@@ -718,7 +767,8 @@ namespace Client.Main.Controls.UI.Game
 
         public bool CanPlaceAt(Point gridSlot, InventoryItem item)
         {
-            if (item?.Definition == null) return false;
+            if (item?.Definition == null || HasPendingMove ||
+                !VaultPageLayout.Fits(_vaultPage, gridSlot, item.Definition.Width, item.Definition.Height, _characterState?.IsVaultExtended == true)) return false;
 
             for (int y = 0; y < item.Definition.Height; y++)
             {
@@ -844,7 +894,7 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            const string title = "VAULT";
+            string title = _vaultPage == 0 ? "VAULT" : "EXTENDED VAULT";
 
             float textScale =
                 (14f /
@@ -1337,6 +1387,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void HandleMouseInput()
         {
+            if (HasPendingMove || InventoryControl.Instance.GetDraggedItem() != null) return;
             var mouse = MuGame.Instance.UiMouseState;
             var prev = MuGame.Instance.PrevUiMouseState;
 
@@ -1429,6 +1480,8 @@ namespace Client.Main.Controls.UI.Game
 
         private void BeginDrag(InventoryItem item)
         {
+            if (HasPendingMove) return;
+            _draggedSourceSlot = (byte)VaultPageLayout.Slot(_vaultPage, item.GridPosition);
             _draggedItem = item;
             _draggedOriginalSlot = item.GridPosition;
             RemoveItemFromGrid(item);
@@ -1443,144 +1496,106 @@ namespace Client.Main.Controls.UI.Game
 
         private void AttemptDrop(Point mousePos)
         {
-            if (_draggedItem == null) return;
-
-            var dropSlot = GetSlotAtScreenPosition(mousePos);
+            if (_draggedItem == null || HasPendingMove) return;
+            var drop = GetSlotAtScreenPosition(mousePos);
             var inventory = InventoryControl.Instance;
-            bool dropped = false;
-
-            if (dropSlot.X >= 0 && CanPlaceAt(dropSlot, _draggedItem))
+            if (drop.X >= 0 && PersonalStoreLayout.IsTopmostAtPointer(this, mousePos) && CanPlaceAt(drop, _draggedItem))
             {
-                PlaceDraggedItem(dropSlot);
-                int w = _draggedItem.Definition.Width * VAULT_SQUARE_WIDTH;
-                int h = _draggedItem.Definition.Height * VAULT_SQUARE_HEIGHT;
-                _ = ResolveItemTexture(_draggedItem, w, h, animated: Constants.ENABLE_ITEM_MATERIAL_ANIMATION);
-                if (dropSlot != _draggedOriginalSlot)
-                {
-                    SendVaultMove(_draggedOriginalSlot, dropSlot);
-                }
-                dropped = true;
+                byte target = (byte)VaultPageLayout.Slot(_vaultPage, drop);
+                if (target != _draggedSourceSlot) RequestMove(ItemStorageKind.Vault,
+                    _draggedSourceSlot, ItemStorageKind.Vault, target, _draggedItem);
             }
-            else if (inventory != null && inventory.Visible && inventory.DisplayRectangle.Contains(mousePos))
+            else if (inventory.Visible && PersonalStoreLayout.IsTopmostAtPointer(inventory, mousePos))
             {
-                Point invSlot = inventory.GetSlotAtScreenPositionPublic(mousePos);
-                if (invSlot.X >= 0 && inventory.CanPlaceAt(invSlot, _draggedItem))
-                {
-                    MoveItemToInventory(invSlot, inventory);
-                    dropped = true;
-                }
+                var target = inventory.GetSlotAtScreenPositionPublic(mousePos);
+                if (target.X >= 0 && inventory.CanPlaceAt(target, _draggedItem))
+                    RequestMove(ItemStorageKind.Vault, _draggedSourceSlot, ItemStorageKind.Inventory,
+                        (byte)(InventoryControl.InventorySlotOffsetConstant + target.Y * InventoryControl.Columns + target.X), _draggedItem);
             }
-
-            if (!dropped)
-            {
-                ReturnDraggedItem();
-            }
-
+            // A rejected local placement cancels pickup. Both pages are rebuilt from server snapshots.
             _draggedItem = null;
-            _draggedOriginalSlot = new Point(-1, -1);
-            _pendingDropSlot = new Point(-1, -1);
+            _draggedOriginalSlot = _pendingDropSlot = new Point(-1, -1);
+            RefreshVaultContent();
         }
 
         private void ReturnDraggedItem()
         {
-            if (_draggedItem != null && _draggedOriginalSlot.X >= 0)
+            if (_draggedItem != null && VaultPageLayout.Contains(_vaultPage, _draggedSourceSlot))
             {
+                if (!_items.Contains(_draggedItem)) _items.Add(_draggedItem);
                 PlaceItemOnGrid(_draggedItem, _draggedOriginalSlot);
             }
         }
 
-        private void PlaceDraggedItem(Point newSlot)
-        {
-            if (_draggedItem == null) return;
-            PlaceItemOnGrid(_draggedItem, newSlot);
-        }
 
-        private void MoveItemToInventory(Point targetSlot, InventoryControl inventory)
-        {
-            if (_draggedItem == null) return;
 
-            byte fromSlot = (byte)(_draggedOriginalSlot.Y * Columns + _draggedOriginalSlot.X);
-            byte toSlot = (byte)(InventoryControl.InventorySlotOffsetConstant +
-                                 (targetSlot.Y * InventoryControl.Columns) + targetSlot.X);
 
-            var svc = _networkManager?.GetCharacterService();
-            var state = _networkManager?.GetCharacterState();
-            var version = _networkManager?.TargetVersion ?? TargetProtocolVersion.Season6;
 
-            if (svc != null && state != null)
-            {
-                state.StashPendingVaultMove(fromSlot, 0xFF);
 
-                var raw = _draggedItem.RawData ?? Array.Empty<byte>();
-
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await svc.SendStorageItemMoveAsync(ItemStorageKind.Vault, fromSlot, ItemStorageKind.Inventory, toSlot, version, raw);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Failed to move item from vault to inventory.");
-                    }
-
-                    await Task.Delay(1200);
-
-                    if (_networkManager != null && state.IsVaultMovePending(fromSlot, 0xFF))
-                    {
-                        MuGame.ScheduleOnMainThread(state.RaiseVaultItemsChanged);
-                    }
-
-                    if (_networkManager != null && state.IsInventoryMovePending(toSlot, toSlot))
-                    {
-                        MuGame.ScheduleOnMainThread(state.RaiseInventoryChanged);
-                    }
-                });
-            }
-
-            _items.Remove(_draggedItem);
-            inventory?.BringToFront();
-        }
-
-        private void SendVaultMove(Point fromSlot, Point toSlot)
-        {
-            byte from = (byte)(fromSlot.Y * Columns + fromSlot.X);
-            byte to = (byte)(toSlot.Y * Columns + toSlot.X);
-
-            if (_networkManager == null) return;
-
-            var svc = _networkManager.GetCharacterService();
-            var state = _networkManager.GetCharacterState();
-
-            if (svc == null || state == null) return;
-
-            state.StashPendingVaultMove(from, to);
-
-            var raw = _draggedItem?.RawData ?? Array.Empty<byte>();
-            var version = _networkManager.TargetVersion;
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await svc.SendStorageItemMoveAsync(ItemStorageKind.Vault, from, ItemStorageKind.Vault, to, version, raw);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to move item inside vault.");
-                }
-
-                await Task.Delay(1200);
-                if (_networkManager != null && state.IsVaultMovePending(from, to))
-                {
-                    MuGame.ScheduleOnMainThread(state.RaiseVaultItemsChanged);
-                }
-            });
-        }
 
         // ═══════════════════════════════════════════════════════════════
         // HELPERS
         // ═══════════════════════════════════════════════════════════════
+
+        public bool TryHandleInventoryDrop(Point mouse, InventoryControl inventory)
+        {
+            if (!Visible || !DisplayRectangle.Contains(mouse) || inventory.GetDraggedItem() is not { } item) return false;
+            if (Translate(_pageButtonRect).Contains(mouse)) return false; // Allow changing pages while holding a backpack item.
+            if (!PersonalStoreLayout.IsTopmostAtPointer(this, mouse)) return true;
+            var position = GetSlotAtScreenPosition(mouse);
+            if (inventory.GetPickedInventorySlot() is byte source && CanPlaceAt(position, item) &&
+                RequestMove(ItemStorageKind.Inventory, source, ItemStorageKind.Vault, (byte)VaultPageLayout.Slot(_vaultPage, position), item))
+                inventory.CompleteExtendedInventoryDrop();
+            Scene?.SetMouseInputConsumed();
+            return true;
+        }
+
+        private bool RequestMove(ItemStorageKind fromStore, byte source, ItemStorageKind toStore, byte target, InventoryItem item)
+        {
+            var state = _characterState;
+            var service = _networkManager?.GetCharacterService();
+            if (state == null || service == null || _networkManager?.IsConnected != true || HasPendingMove) return false;
+            if (fromStore == ItemStorageKind.Inventory) state.StashPendingInventoryMove(source, source);
+            else state.StashPendingVaultMove(source, toStore == ItemStorageKind.Vault ? target : (byte)0xFF);
+            _ = SendAsync();
+            return true;
+            async Task SendAsync()
+            {
+                try
+                {
+                    await service.SendStorageItemMoveAsync(fromStore, source, toStore, target,
+                        _networkManager.TargetVersion, item.RawData, throwOnFailure: true);
+                }
+                catch (Exception ex)
+                {
+                    if (fromStore == ItemStorageKind.Inventory && state.IsInventoryMovePending(source, source)) state.TryConsumePendingInventoryMove(out _, out _);
+                    else if (fromStore == ItemStorageKind.Vault && state.IsVaultMovePending(source, toStore == ItemStorageKind.Vault ? target : (byte)0xFF)) state.TryConsumePendingVaultMove(out _, out _);
+                    state.RaiseInventoryChanged();
+                    state.RaiseVaultItemsChanged();
+                    _logger?.LogError(ex, "Could not send vault item move.");
+                }
+            }
+        }
+
+        private void DrawPageButton(SpriteBatch sprite)
+        {
+            if (_pageNormal == null || _font == null) return;
+            bool enabled = _characterState?.IsVaultExtended == true;
+            var rect = Translate(_pageButtonRect);
+            using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred, BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform))
+            {
+                bool pressed = _pageHovered && MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed;
+                sprite.Draw(enabled && _pageHovered ? (pressed ? _pagePressed : _pageHover) : _pageNormal, rect, enabled ? Color.White : Color.Gray);
+                string text = enabled ? (_vaultPage == 0 ? "Extended >" : "< Main Vault") : "Locked";
+                const float scale = 0.32f;
+                var size = _font.MeasureString(text) * scale;
+                var pos = new Vector2(rect.Center.X - size.X / 2, rect.Center.Y - size.Y / 2);
+                sprite.DrawString(_font, text, pos + Vector2.One, Color.Black, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                sprite.DrawString(_font, text, pos, Theme.TextGold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                string page = enabled ? $"{_vaultPage + 1} / 2" : "1 / 1";
+                sprite.DrawString(_font, page, new Vector2(DisplayRectangle.X + _gridRect.X, rect.Y + 7), Theme.TextGold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
+        }
 
         private Rectangle Translate(Rectangle rect)
             => new(DisplayRectangle.X + rect.X, DisplayRectangle.Y + rect.Y, rect.Width, rect.Height);
@@ -1610,6 +1625,8 @@ namespace Client.Main.Controls.UI.Game
         private void HandleVisibilityLost()
         {
             CancelZenInput();
+            _vaultPage = 0;
+            InvalidateStaticSurface();
             SendCloseNpcRequest();
             _characterState?.ClearVaultItems();
             _items.Clear();
@@ -1647,15 +1664,15 @@ namespace Client.Main.Controls.UI.Game
             _characterState = MuGame.Network?.GetCharacterState();
             if (_characterState != null)
             {
-                _characterState.VaultItemsChanged += RefreshVaultContent;
+                _characterState.VaultItemsChanged += OnVaultItemsChanged;
             }
         }
+
+        private void OnVaultItemsChanged() => _vaultContentDirty = true;
 
         private void RefreshVaultContent()
         {
             if (_characterState == null) return;
-
-            bool wasVisible = Visible;
 
             _items.Clear();
             ClearGrid();
@@ -1664,10 +1681,17 @@ namespace Client.Main.Controls.UI.Game
             foreach (var kv in vaultItems)
             {
                 byte slot = kv.Key;
+                if (!VaultPageLayout.Contains(_vaultPage, slot)) continue;
+                if (_draggedItem != null && slot == _draggedSourceSlot)
+                {
+                    _items.Add(_draggedItem);
+                    continue;
+                }
                 byte[] data = kv.Value;
 
-                int gridX = slot % Columns;
-                int gridY = slot / Columns;
+                int localSlot = slot - _vaultPage * VaultPageLayout.PageSize;
+                int gridX = localSlot % Columns;
+                int gridY = localSlot / Columns;
 
                 var def = ItemDatabase.GetItemDefinition(data)
                     ?? new ItemDefinition(0, ItemDatabase.GetItemName(data) ?? "Unknown Item", 1, 1, "Interface/newui_item_box.tga");
@@ -1691,22 +1715,6 @@ namespace Client.Main.Controls.UI.Game
                 }
             }
 
-            if (_items.Count > 0 || _vaultZen > 0)
-            {
-                // Align left with padding before showing, then freeze position to avoid auto realignment
-                ForceAlignNow();
-                Align = ControlAlign.None;
-                // Use deferred show - warmup happens in Update(), window shows one frame later
-                // to avoid black screen flicker from render target switches during Draw().
-                // Only trigger pending show if not already visible (to avoid re-triggering sound on refresh)
-                if (!wasVisible)
-                {
-                    _pendingShow = true;
-                    _warmupComplete = false;
-                }
-                _closeRequestSent = false;
-                _isDragging = false;
-            }
         }
 
         private bool HandleZenControlsMouseInput(Point mousePos, bool leftJustPressed)

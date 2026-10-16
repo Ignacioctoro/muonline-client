@@ -1136,8 +1136,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 int offset = 0;
                 byte count = 0;
 
+                _characterState.IsVaultExtended = false;
+
                 // Determine header format by protocol version
-                const int MinHeaderS6 = 7;
+                const int MinHeaderS6 = 8;
                 const int MinHeaderLegacy = 5;
 
                 switch (_targetVersion)
@@ -1148,6 +1150,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             _logger.LogWarning("CharacterList (S6) packet too short for header.");
                             return Task.CompletedTask;
                         }
+                        _characterState.IsVaultExtended = new CharacterListRef(packet.Span).IsVaultExtended;
                         count = packet.Span[6];
                         offset = 8;
                         int remaining = Math.Max(0, packet.Length - offset);
@@ -1777,3 +1780,4 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         }
     }
 }
+

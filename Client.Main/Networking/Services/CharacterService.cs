@@ -2265,11 +2265,12 @@ namespace Client.Main.Networking.Services
             ItemStorageKind toStorage,
             byte toSlot,
             TargetProtocolVersion version,
-            byte[] itemData)
+            byte[] itemData, bool throwOnFailure = false)
         {
             if (!_connectionManager.IsConnected)
             {
                 _logger.LogError("Not connected - cannot send storage item move request.");
+                if (throwOnFailure) throw new InvalidOperationException("Not connected to the game server.");
                 return;
             }
 
@@ -2314,6 +2315,7 @@ namespace Client.Main.Networking.Services
             {
                 _logger.LogError(ex, "Error sending storage item move {FromStore}[{From}] -> {ToStore}[{To}]",
                     fromStorage, fromSlot, toStorage, toSlot);
+                if (throwOnFailure) throw;
             }
         }
 
