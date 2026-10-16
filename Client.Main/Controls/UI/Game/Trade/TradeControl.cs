@@ -233,46 +233,37 @@ namespace Client.Main.Controls.UI.Game.Trade
 
         public bool CanPlaceAt(Point gridSlot, InventoryItem item)
         {
-            return CanPlaceAt(_myGrid, gridSlot, item);
+            return _characterState?.HasPendingTradeMove != true && CanPlaceAt(_myGrid, gridSlot, item);
         }
 
-        public void AcceptItemFromInventory(InventoryItem item, Point dropSlot, byte inventorySlot)
+        public bool AcceptItemFromInventory(InventoryItem item, Point dropSlot, byte inventorySlot)
         {
-            if (item == null || !CanPlaceAt(dropSlot, item)) return;
+            if (item == null || !CanPlaceAt(dropSlot, item)) return false;
+            return RequestItemMove(ItemStorageKind.Inventory, inventorySlot, ItemStorageKind.Trade,
+                (byte)(dropSlot.Y * TRADE_COLUMNS + dropSlot.X), item);
+        }
 
-            UnacceptTradeIfNeeded();
-
-            // Calculate trade slot (0-31 for 8x4 grid)
-            byte tradeSlot = (byte)(dropSlot.Y * TRADE_COLUMNS + dropSlot.X);
-
-            // Add to my grid (visual feedback)
-            PlaceItemOnGrid(_myGrid, item, dropSlot);
-            _myItems.Add(item);
-
-            // Send to server using ItemMoveRequest (0x24) with ItemStorageKind.Trade
+        private bool RequestItemMove(ItemStorageKind from, byte fromSlot, ItemStorageKind to, byte toSlot, InventoryItem item)
+        {
             var svc = _networkManager?.GetCharacterService();
             var state = _networkManager?.GetCharacterState();
-            if (svc != null && state != null)
+            if (svc == null || state == null || !state.TryBeginTradeMove(from, fromSlot, to, toSlot))
+                return false;
+            UnacceptTradeIfNeeded();
+            var raw = item.RawData ?? Array.Empty<byte>();
+            EnqueueTradeSend(async () =>
             {
-                var raw = item.RawData ?? Array.Empty<byte>();
-                state.AddOrUpdateMyTradeItem(tradeSlot, raw);
-
-                // Mark inventory item as pending to prevent visual duplication
-                state.StashPendingInventoryMove(inventorySlot, inventorySlot);
-
-                EnqueueTradeSend(async () =>
+                try
                 {
-                    await svc.SendStorageItemMoveAsync(
-                        ItemStorageKind.Inventory,  // FromStorage = Inventory (0)
-                        inventorySlot,              // FromSlot = inventory slot
-                        ItemStorageKind.Trade,      // ToStorage = Trade (1)
-                        tradeSlot,                  // ToSlot = trade slot (0-31)
-                        _networkManager.TargetVersion,
-                        raw);
-                });
-
-                MuGame.ScheduleOnMainThread(() => state.RaiseInventoryChanged());
-            }
+                    await svc.SendStorageItemMoveAsync(from, fromSlot, to, toSlot, _networkManager.TargetVersion, raw);
+                }
+                catch
+                {
+                    state.CompleteTradeMove(default, 0, Array.Empty<byte>(), failed: true);
+                    throw;
+                }
+            });
+            return true;
         }
 
         public void DrawPickedPreview(SpriteBatch spriteBatch, GameTime gameTime)
@@ -1103,6 +1094,7 @@ namespace Client.Main.Controls.UI.Game.Trade
 
         private void BeginDrag(InventoryItem item)
         {
+            if (_characterState?.HasPendingTradeMove == true) return;
             UnacceptTradeIfNeeded();
             _draggedItem = item;
             _draggedOriginalSlot = item.GridPosition;
@@ -1125,11 +1117,12 @@ namespace Client.Main.Controls.UI.Game.Trade
                 var dropSlot = ItemGridRenderHelper.GetSlotAtScreenPosition(DisplayRectangle, _myGridRect, TRADE_COLUMNS, TRADE_ROWS, TRADE_SQUARE_WIDTH, TRADE_SQUARE_HEIGHT, mousePos);
                 if (dropSlot.X >= 0 && CanPlaceAt(_myGrid, dropSlot, _draggedItem))
                 {
-                    PlaceDraggedItem(dropSlot);
                     if (dropSlot != _draggedOriginalSlot)
-                    {
-                        // Item moved within trade grid - no network call needed
-                    }
+                        RequestItemMove(ItemStorageKind.Trade,
+                            (byte)(_draggedOriginalSlot.Y * TRADE_COLUMNS + _draggedOriginalSlot.X),
+                            ItemStorageKind.Trade, (byte)(dropSlot.Y * TRADE_COLUMNS + dropSlot.X), _draggedItem);
+                    // Keep the authoritative source position until the server replies.
+                    ReturnDraggedItem();
                     dropped = true;
                 }
             }
@@ -1144,26 +1137,8 @@ namespace Client.Main.Controls.UI.Game.Trade
                     // Calculate trade slot and target inventory slot
                     byte tradeSlot = (byte)(_draggedOriginalSlot.Y * TRADE_COLUMNS + _draggedOriginalSlot.X);
                     byte targetInventorySlot = (byte)(InventoryControl.InventorySlotOffsetConstant + (invSlot.Y * InventoryControl.Columns) + invSlot.X);
-                    var svc = _networkManager?.GetCharacterService();
-                    var state = _networkManager?.GetCharacterState();
-                    if (svc != null && state != null)
-                    {
-                        byte[] raw = _draggedItem.RawData ?? Array.Empty<byte>();
-
-                        state.RemoveMyTradeItem(tradeSlot);
-                        EnqueueTradeSend(async () =>
-                        {
-                            await svc.SendStorageItemMoveAsync(
-                                ItemStorageKind.Trade,
-                                tradeSlot,
-                                ItemStorageKind.Inventory,
-                                targetInventorySlot,
-                                _networkManager.TargetVersion,
-                                raw);
-                        });
-
-                        MuGame.ScheduleOnMainThread(() => state.RaiseInventoryChanged());
-                    }
+                    RequestItemMove(ItemStorageKind.Trade, tradeSlot, ItemStorageKind.Inventory, targetInventorySlot, _draggedItem);
+                    ReturnDraggedItem();
 
                     dropped = true;
                 }
@@ -1386,6 +1361,13 @@ namespace Client.Main.Controls.UI.Game.Trade
             var myItems = _characterState.GetMyTradeItems();
             foreach (var kv in myItems)
             {
+                // Partner updates rebuild both grids while a local item may still be picked.
+                // Retain that object's identity and keep its cells free until it is dropped.
+                if (_draggedItem != null && kv.Key == _draggedOriginalSlot.Y * TRADE_COLUMNS + _draggedOriginalSlot.X)
+                {
+                    _myItems.Add(_draggedItem);
+                    continue;
+                }
                 byte slot = kv.Key;
                 byte[] data = kv.Value;
 
@@ -1582,6 +1564,7 @@ namespace Client.Main.Controls.UI.Game.Trade
 
         private void ToggleTradeButton()
         {
+            if (_characterState?.HasPendingTradeMove == true) return;
             bool accept = _myButtonState != TradeButtonStateChanged.TradeButtonState.Checked;
 
             if (accept && IsMyButtonCoolingDown)

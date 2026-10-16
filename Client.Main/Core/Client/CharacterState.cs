@@ -740,6 +740,42 @@ namespace Client.Main.Core.Client
         public MUnique.OpenMU.Network.Packets.ServerToClient.TradeButtonStateChanged.TradeButtonState MyTradeButtonState => _myButtonState;
         public MUnique.OpenMU.Network.Packets.ServerToClient.TradeButtonStateChanged.TradeButtonState PartnerTradeButtonState => _partnerButtonState;
 
+        private readonly object _tradeMoveLock = new();
+        private (ItemStorageKind From, byte FromSlot, ItemStorageKind To, byte ToSlot)? _pendingTradeMove;
+        public bool HasPendingTradeMove { get { lock (_tradeMoveLock) return _pendingTradeMove.HasValue; } }
+
+        public bool TryBeginTradeMove(ItemStorageKind from, byte fromSlot, ItemStorageKind to, byte toSlot)
+        {
+            lock (_tradeMoveLock)
+            {
+                if (!_isTradeActive || _pendingTradeMove.HasValue || _pendingMoveFromSlot.HasValue)
+                    return false;
+                _pendingTradeMove = (from, fromSlot, to, toSlot);
+                return true;
+            }
+        }
+
+        public bool CompleteTradeMove(ItemStorageKind target, byte slot, byte[] data, bool failed = false)
+        {
+            lock (_tradeMoveLock)
+            {
+                if (_pendingTradeMove is not { } move) return false;
+                if (!failed && (move.To != target || move.ToSlot != slot)) return false;
+                if (!failed)
+                {
+                    if (move.From == ItemStorageKind.Trade) _myTradeItems.TryRemove(move.FromSlot, out _);
+                    else RemoveInventoryItem(move.FromSlot);
+                    if (target == ItemStorageKind.Trade) _myTradeItems[slot] = data;
+                    else AddOrUpdateInventoryItem(slot, data);
+                }
+                _pendingTradeMove = null;
+            }
+            // Rebuild both views from snapshots; rejected payloads are never item data.
+            RaiseInventoryChanged();
+            TradeItemsChanged?.Invoke();
+            return true;
+        }
+
         public void StartTrade(ushort partnerId, string partnerName, ushort partnerLevel, string partnerGuild = "")
         {
             _isTradeActive = true;
@@ -747,6 +783,7 @@ namespace Client.Main.Core.Client
             _tradePartnerName = partnerName ?? string.Empty;
             _tradePartnerLevel = partnerLevel;
             _tradePartnerGuild = partnerGuild ?? string.Empty;
+            lock (_tradeMoveLock) _pendingTradeMove = null;
             _tradePartnerItems.Clear();
             _myTradeItems.Clear();
             _tradePartnerMoney = 0;
@@ -764,6 +801,7 @@ namespace Client.Main.Core.Client
             _tradePartnerName = string.Empty;
             _tradePartnerLevel = 0;
             _tradePartnerGuild = string.Empty;
+            lock (_tradeMoveLock) _pendingTradeMove = null;
             _tradePartnerItems.Clear();
             _myTradeItems.Clear();
             _tradePartnerMoney = 0;

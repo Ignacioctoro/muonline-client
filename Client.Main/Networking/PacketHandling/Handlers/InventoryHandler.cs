@@ -404,6 +404,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 {
                     var failed = new ItemMoveRequestFailed(packet);
                     var itemData = failed.ItemData.ToArray();
+                    if (_characterState.CompleteTradeMove(default, 0, Array.Empty<byte>(), failed: true))
+                    {
+                        _logger.LogWarning("Trade item move rejected; retained original inventory and trade items.");
+                        return Task.CompletedTask;
+                    }
                     // First, try restore inventory<->inventory failed move
                     if (_characterState.TryConsumePendingInventoryMove(out var fromSlot, out _))
                     {
@@ -481,6 +486,14 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     byte toSlot = moved.TargetSlot;
                     var itemData = moved.ItemData.ToArray();
 
+                    if (_characterState.CompleteTradeMove(targetStore, toSlot, itemData))
+                        return Task.CompletedTask;
+                    if (targetStore == ItemStorageKind.Trade)
+                    {
+                        // Trade slots 0..31 must NEVER be decoded as equipment slots.
+                        _logger.LogWarning("Ignoring unmatched trade move reply for slot {Slot}.", toSlot);
+                        return Task.CompletedTask;
+                    }
                     if (targetStore == ItemStorageKind.PlayerShop)
                     {
                         // OpenMU moves items to absolute inventory-backed slots
@@ -540,7 +553,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         _characterState.RaiseChaosMachineItemsChanged();
                         _logger.LogInformation("Chaos machine item moved to slot {To}.", toSlot);
                     }
-                    else // Inventory or others -> inventory fallback
+                    else if (targetStore == ItemStorageKind.Inventory)
                     {
                         // A confirmed move from the personal store frees its old
                         // absolute shop slot; never remove it before this reply.

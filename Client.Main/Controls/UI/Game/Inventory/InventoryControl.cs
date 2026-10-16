@@ -2338,6 +2338,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private void HandleInventoryInteraction(Point mousePos, bool leftJustPressed, bool leftJustReleased)
         {
+            if (_networkManager?.GetCharacterState()?.HasPendingTradeMove == true) return;
             Point gridSlot = GetSlotAtScreenPosition(mousePos);
             _hoveredSlot = gridSlot;
 
@@ -2711,9 +2712,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
                      _network_manager_exists())
             {
                 var drop = trade.GetSlotAtScreenPosition(MuGame.Instance.UiMouseState.Position);
-                if (drop.X >= 0 && trade.CanPlaceAt(drop, item))
+                if (drop.X >= 0 && trade.CanPlaceAt(drop, item) &&
+                    trade.AcceptItemFromInventory(item, drop, slotIndex))
                 {
-                    trade.AcceptItemFromInventory(item, drop, slotIndex);
                     ReleasePickedItem();
                 }
                 else
