@@ -2207,11 +2207,12 @@ namespace Client.Main.Networking.Services
         /// <param name="toSlot">Destination slot index (including server offset).</param>
         /// <param name="version">Target protocol version.</param>
         /// <param name="itemData">Raw item data for Season6 (12 bytes expected). Optional for other versions.</param>
-        public async Task SendItemMoveRequestAsync(byte fromSlot, byte toSlot, TargetProtocolVersion version, byte[] itemData)
+        public async Task SendItemMoveRequestAsync(byte fromSlot, byte toSlot, TargetProtocolVersion version, byte[] itemData, bool throwOnFailure = false)
         {
             if (!_connectionManager.IsConnected)
             {
                 _logger.LogError("Not connected - cannot send item move request.");
+                if (throwOnFailure) throw new InvalidOperationException("Not connected to the game server.");
                 return;
             }
 
@@ -2251,6 +2252,7 @@ namespace Client.Main.Networking.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending item move request from {From} to {To}.", fromSlot, toSlot);
+                if (throwOnFailure) throw;
             }
         }
 

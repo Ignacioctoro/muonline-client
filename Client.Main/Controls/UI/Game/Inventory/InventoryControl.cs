@@ -813,13 +813,26 @@ namespace Client.Main.Controls.UI.Game.Inventory
         }
 
         public InventoryItem GetDraggedItem() => _pickedItemRenderer.Item;
+        public byte? GetPickedInventorySlot() => GetPickedItemSlotIndex();
+        public int GetEmptyEquipmentSlotAtScreenPosition(Point mouse)
+        {
+            int slot = GetEquipSlotAtScreenPosition(mouse);
+            return slot >= 0 && !_equippedItems.ContainsKey((byte)slot) ? slot : -1;
+        }
+        public void CompleteExtendedInventoryDrop()
+        {
+            ReleasePickedItem();
+            _networkManager?.GetCharacterState()?.RaiseInventoryChanged();
+        }
 
         public void Show()
         {
             // Force correct position BEFORE first draw to prevent flash on wrong side
             ForceAlignNow();
             Align = ControlAlign.None; // Prevent auto-realignment
-            _networkManager?.GetCharacterState()?.ClearPendingInventoryMove(); // ensure no stale hides
+            var state = _networkManager?.GetCharacterState();
+            // Reopening while an extension transfer is in flight must not lose its source slot.
+            if (state?.IsExtendedInventoryMovePending != true) state?.ClearPendingInventoryMove();
             UpdateZenFromNetwork();
             RefreshInventoryContent();
 
@@ -869,6 +882,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         public void Hide()
         {
+            ExtendedInventoryControl.Instance.Hide();
             if (_pickedItemRenderer.Item != null)
             {
                 InventoryItem itemToReturn = _pickedItemRenderer.Item;
@@ -949,6 +963,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             bool leftPressed = MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed;
             bool leftJustPressed = leftPressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released;
             bool leftJustReleased = !leftPressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Pressed;
+
+            if (leftJustPressed && ExtendedInventoryControl.Instance.TryHandleInventoryDrop(mousePos, this)) return;
 
             if (leftJustPressed && HandleChromeClick())
             {
@@ -2230,7 +2246,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             foreach (var entry in characterItems.Where(e => e.Key >= InventorySlotOffsetConstant &&
-                                                        e.Key < PersonalStoreControl.FirstStoreSlot))
+                                                        e.Key < ExtendedInventoryLayout.FirstSlot))
             {
                 byte slotIndex = entry.Key;
                 byte[] itemData = entry.Value;
@@ -2322,7 +2338,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             if (_extendedButtonHovered)
             {
-                // TODO: Open Extended Inventory.
+                ExtendedInventoryControl.Instance.Toggle();
                 return true;
             }
 
@@ -2338,7 +2354,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private void HandleInventoryInteraction(Point mousePos, bool leftJustPressed, bool leftJustReleased)
         {
-            if (_networkManager?.GetCharacterState()?.HasPendingTradeMove == true) return;
+            if (_networkManager?.GetCharacterState()?.HasPendingTradeMove == true ||
+                _networkManager?.GetCharacterState()?.IsExtendedInventoryMovePending == true ||
+                ExtendedInventoryControl.PickedItem != null) return;
             Point gridSlot = GetSlotAtScreenPosition(mousePos);
             _hoveredSlot = gridSlot;
 
@@ -2574,6 +2592,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private void HandleDropOutsideInventory()
         {
+            if (ExtendedInventoryControl.Instance.TryHandleInventoryDrop(MuGame.Instance.UiMouseState.Position, this)) return;
             var item = _pickedItemRenderer.Item;
             if (item == null)
             {
@@ -3412,7 +3431,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             Rectangle gridRect = Translate(_gridRect);
-            var dragged = _pickedItem_renderer_item() ??
+            var dragged = _pickedItem_renderer_item() ?? ExtendedInventoryControl.PickedItem ??
                           VaultControl.Instance?.GetDraggedItem() ??
                           (PersonalStoreControl.IsOpen ? PersonalStoreControl.Instance.GetPickedItem() : null);
 
@@ -3633,7 +3652,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private void DrawTooltip(SpriteBatch spriteBatch)
         {
-            if (_pickedItem_renderer_item() != null || _hoveredItem == null || _font == null)
+            if (_pickedItem_renderer_item() != null || ExtendedInventoryControl.PickedItem != null || _hoveredItem == null || _font == null)
                 return;
 
             Client.Main.Core.Client.PetInfoSnapshot? petInfo = null;

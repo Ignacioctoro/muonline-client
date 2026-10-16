@@ -1110,6 +1110,9 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(NpcShopControl.Instance))
                     return true;
 
+                if (IsWindowCovering(ExtendedInventoryControl.Instance))
+                    return true;
+
                 if (IsWindowCovering(VaultControl.Instance))
                     return true;
 
@@ -1262,6 +1265,7 @@ namespace Client.Main.Scenes
             //_guildEmblemPreview.BringToFront();
             Controls.Add(NpcShopControl.Instance);
             Controls.Add(VaultControl.Instance);
+            Controls.Add(ExtendedInventoryControl.Instance);
             Controls.Add(ChaosMixControl.Instance);
             Controls.Add(PersonalStoreControl.Instance);
             Controls.Add(PersonalStoreBuyerControl.Instance);
@@ -3054,6 +3058,7 @@ namespace Client.Main.Scenes
                 TradeControl.Instance.DrawTooltipOverlay(sprite);
                 PersonalStoreControl.Instance.DrawTooltipOverlay(sprite);
                 PersonalStoreBuyerControl.Instance.DrawTooltipOverlay(sprite);
+                ExtendedInventoryControl.Instance.DrawOverlay(sprite);
             }
         }
 

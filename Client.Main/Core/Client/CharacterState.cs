@@ -397,6 +397,9 @@ namespace Client.Main.Core.Client
         /// Used to hide items that are being moved to vault/trade.
         /// </summary>
         public byte? PendingMoveFromSlot => _pendingMoveFromSlot;
+        public bool IsExtendedInventoryMovePending =>
+            (_pendingMoveFromSlot >= 76 && _pendingMoveFromSlot < 204) ||
+            (_pendingMoveToSlot >= 76 && _pendingMoveToSlot < 204);
 
         /// <summary>
         /// Sets the raw ID of the item currently being picked up.
