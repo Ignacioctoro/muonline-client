@@ -3041,7 +3041,7 @@ namespace Client.Main.Scenes
             if (_mapController?.IsChangingWorld == true || World?.Status != GameControlStatus.Ready)
                 return;
 
-            // World and other controls have their own DrawAfter passes. Store tooltips
+            // World and other controls have their own DrawAfter passes. Item tooltips
             // must follow all of them and explicitly ignore world depth/scissor state.
             var sprite = GraphicsManager.Instance.Sprite;
             using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
@@ -3049,6 +3049,9 @@ namespace Client.Main.Scenes
                 DepthStencilState.None, RasterizerState.CullNone,
                 transform: UiScaler.SpriteTransform))
             {
+                NpcShopControl.Instance.DrawTooltipOverlay(sprite);
+                VaultControl.Instance.DrawTooltipOverlay(sprite);
+                TradeControl.Instance.DrawTooltipOverlay(sprite);
                 PersonalStoreControl.Instance.DrawTooltipOverlay(sprite);
                 PersonalStoreBuyerControl.Instance.DrawTooltipOverlay(sprite);
             }

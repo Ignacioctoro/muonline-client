@@ -1,4 +1,5 @@
 using System;
+using Client.Main.Core.Items.Tooltips;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Client.Main;
@@ -133,6 +134,15 @@ namespace Client.Main.Controls.UI.Game.Trade
         private Texture2D[] _skin;
         public override bool BlocksPointerInput => true;
 
+        // GFx uses straight alpha. Source-over alpha must use One, not SourceAlpha:
+        // squaring sprite alpha punches translucent holes into an opaque cached grid.
+        private readonly BlendState _skinCacheBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha,
+            ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One,
+            AlphaDestinationBlend = Blend.InverseSourceAlpha
+        };
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
 
@@ -358,6 +368,7 @@ namespace Client.Main.Controls.UI.Game.Trade
 
             _staticSurface?.Dispose();
             _staticSurface = null;
+            _skinCacheBlend.Dispose();
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -543,29 +554,7 @@ namespace Client.Main.Controls.UI.Game.Trade
             }
         }
 
-        public override void DrawAfter(GameTime gameTime)
-        {
-            if (!Visible || _hoveredItem == null) return;
 
-            var gm = GraphicsManager.Instance;
-            var spriteBatch = gm?.Sprite;
-            if (spriteBatch == null) return;
-
-            SpriteBatchScope? scope = null;
-            if (!SpriteBatchScope.BatchIsBegun)
-            {
-                scope = new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: UiScaler.SpriteTransform);
-            }
-
-            try
-            {
-                DrawTooltip(spriteBatch);
-            }
-            finally
-            {
-                scope?.Dispose();
-            }
-        }
 
         protected override void OnScreenSizeChanged()
         {
@@ -589,7 +578,7 @@ namespace Client.Main.Controls.UI.Game.Trade
 
             var previousTargets = gd.GetRenderTargets();
             var spriteBatch = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.NonPremultiplied))
+            using (new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, _skinCacheBlend))
             {
                 gd.SetRenderTarget(_staticSurface);
                 gd.Clear(Color.Transparent);
@@ -894,82 +883,26 @@ namespace Client.Main.Controls.UI.Game.Trade
             }
         }
 
-        private void DrawTooltip(SpriteBatch spriteBatch)
+        // Called by GameScene after the world and all window post-passes.
+        public void DrawTooltipOverlay(SpriteBatch spriteBatch)
         {
-            if (_hoveredItem == null || _font == null) return;
+            if (!Visible || Status != GameControlStatus.Ready || _hoveredItem == null || _font == null ||
+                _draggedItem != null ||
+                InventoryControl.Instance?.GetDraggedItem() != null ||
+                !PersonalStoreLayout.IsTopmostAtPointer(this, MuGame.Instance.UiMouseState.Position))
+                return;
 
-            var lines = ItemUiHelper.BuildTooltipLines(_hoveredItem);
-            const float scale = 0.44f;
-            const int lineSpacing = 4;
-            const int paddingX = 14;
-            const int paddingY = 12;
+            var grid = _hoverIsPartnerGrid ? _partnerGridRect : _myGridRect;
+            var itemRect = new Rectangle(
+                DisplayRectangle.X + grid.X + _hoveredItem.GridPosition.X * TRADE_SQUARE_WIDTH,
+                DisplayRectangle.Y + grid.Y + _hoveredItem.GridPosition.Y * TRADE_SQUARE_HEIGHT,
+                _hoveredItem.Definition.Width * TRADE_SQUARE_WIDTH,
+                _hoveredItem.Definition.Height * TRADE_SQUARE_HEIGHT);
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            if (!itemRect.Contains(mouse)) return;
 
-            int maxWidth = 0;
-            int totalHeight = 0;
-            foreach (var (text, _) in lines)
-            {
-                Vector2 sz = _font.MeasureString(text) * scale;
-                maxWidth = Math.Max(maxWidth, (int)MathF.Ceiling(sz.X));
-                totalHeight += (int)MathF.Ceiling(sz.Y) + lineSpacing;
-            }
-            totalHeight += 6;
-
-            int tooltipWidth = maxWidth + paddingX * 2;
-            int tooltipHeight = totalHeight + paddingY * 2;
-
-            Point mouse = MuGame.Instance.UiMouseState.Position;
-            Rectangle tooltipRect = new(mouse.X + 16, mouse.Y + 16, tooltipWidth, tooltipHeight);
-            Rectangle screenBounds = new(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y);
-
-            tooltipRect.X = Math.Clamp(tooltipRect.X, 10, screenBounds.Right - tooltipRect.Width - 10);
-            tooltipRect.Y = Math.Clamp(tooltipRect.Y, 10, screenBounds.Bottom - tooltipRect.Height - 10);
-
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var shadowRect = new Rectangle(tooltipRect.X + 4, tooltipRect.Y + 4, tooltipRect.Width, tooltipRect.Height);
-            spriteBatch.Draw(pixel, shadowRect, Color.Black * 0.5f);
-
-            UiDrawHelper.DrawVerticalGradient(spriteBatch, tooltipRect, new Color(20, 24, 32, 252), new Color(12, 14, 18, 254));
-
-            bool isExcellent = _hoveredItem.Details.IsExcellent;
-            bool isAncient = _hoveredItem.Details.IsAncient;
-            bool isHighLevel = _hoveredItem.Details.Level >= 7;
-
-            Color borderColor = isExcellent ? Theme.GlowExcellent :
-                                isAncient ? Theme.GlowAncient :
-                                isHighLevel ? Theme.Accent :
-                                Theme.TextWhite;
-
-            const int borderThickness = 2;
-            spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X, tooltipRect.Y, tooltipRect.Width, borderThickness), borderColor);
-            spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X, tooltipRect.Bottom - borderThickness, tooltipRect.Width, borderThickness), borderColor);
-            spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X, tooltipRect.Y, borderThickness, tooltipRect.Height), borderColor);
-            spriteBatch.Draw(pixel, new Rectangle(tooltipRect.Right - borderThickness, tooltipRect.Y, borderThickness, tooltipRect.Height), borderColor);
-
-            int textY = tooltipRect.Y + paddingY;
-            bool firstLine = true;
-            foreach (var (text, color) in lines)
-            {
-                Vector2 textSize = _font.MeasureString(text) * scale;
-                int textX = tooltipRect.X + (tooltipRect.Width - (int)textSize.X) / 2;
-
-                spriteBatch.DrawString(_font, text, new Vector2(textX + 1, textY + 1), Color.Black * 0.7f,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                Color lineColor = firstLine ? borderColor : color;
-                spriteBatch.DrawString(_font, text, new Vector2(textX, textY), lineColor,
-                                       0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-
-                textY += (int)textSize.Y + lineSpacing;
-
-                if (firstLine)
-                {
-                    textY += 2;
-                    spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X + 8, textY, tooltipRect.Width - 16, 1), borderColor * 0.3f);
-                    textY += 4;
-                    firstLine = false;
-                }
-            }
+            var lines = ClassicItemTooltipBuilder.Build(_hoveredItem);
+            ClassicItemTooltipRenderer.Draw(spriteBatch, _font, _hoveredItem, lines, itemRect, mouse);
         }
 
         private void DrawPendingDropOverlay(SpriteBatch spriteBatch, InventoryItem itemBeingDragged)
