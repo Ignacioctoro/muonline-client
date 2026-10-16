@@ -1157,6 +1157,7 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
+            EnsureUiTextureReferences();
             using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
                 BlendState.NonPremultiplied, SamplerState.PointClamp,
                 transform: UiScaler.SpriteTransform))
@@ -1186,6 +1187,32 @@ namespace Client.Main.Controls.UI.Game
             // scissored SpriteBatch with a different blend state, leaving digits
             // almost black on the NewUI panel. Values are rendered legibly in
             // the same NonPremultiplied batch as the surrounding NewUI text.
+        }
+
+        /// <summary>
+        /// Textures are managed by TextureLoader across scenes. Recover local
+        /// references when a graphics/device reset invalidated one of them.
+        /// This is a cheap no-op during normal gameplay.
+        /// </summary>
+        private void EnsureUiTextureReferences()
+        {
+            var loader = TextureLoader.Instance;
+            if (_frameAtlas == null || _frameAtlas.IsDisposed)
+                _frameAtlas = loader.GetTexture2D(FramePath);
+            if (_slotAtlas == null || _slotAtlas.IsDisposed)
+                _slotAtlas = loader.GetTexture2D(SlotPath);
+            if (_buttonNormal == null || _buttonNormal.IsDisposed)
+                _buttonNormal = loader.GetTexture2D(ButtonNormalPath);
+            if (_buttonHover == null || _buttonHover.IsDisposed)
+                _buttonHover = loader.GetTexture2D(ButtonHoverPath);
+            if (_buttonPressed == null || _buttonPressed.IsDisposed)
+                _buttonPressed = loader.GetTexture2D(ButtonPressedPath);
+            if (_closeNormal == null || _closeNormal.IsDisposed)
+                _closeNormal = loader.GetTexture2D(CloseNormalPath);
+            if (_closeHover == null || _closeHover.IsDisposed)
+                _closeHover = loader.GetTexture2D(CloseHoverPath);
+            if (_closePressed == null || _closePressed.IsDisposed)
+                _closePressed = loader.GetTexture2D(ClosePressedPath);
         }
 
         private void DrawStaticSurface(SpriteBatch sprite)
