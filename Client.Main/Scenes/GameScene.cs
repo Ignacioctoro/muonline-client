@@ -3035,6 +3035,25 @@ namespace Client.Main.Scenes
             }
         }
 
+        public override void DrawAfter(GameTime gameTime)
+        {
+            base.DrawAfter(gameTime);
+            if (_mapController?.IsChangingWorld == true || World?.Status != GameControlStatus.Ready)
+                return;
+
+            // World and other controls have their own DrawAfter passes. Store tooltips
+            // must follow all of them and explicitly ignore world depth/scissor state.
+            var sprite = GraphicsManager.Instance.Sprite;
+            using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.LinearClamp,
+                DepthStencilState.None, RasterizerState.CullNone,
+                transform: UiScaler.SpriteTransform))
+            {
+                PersonalStoreControl.Instance.DrawTooltipOverlay(sprite);
+                PersonalStoreBuyerControl.Instance.DrawTooltipOverlay(sprite);
+            }
+        }
+
         private new void DrawBackground()
         {
             if (_backgroundTexture == null) return;

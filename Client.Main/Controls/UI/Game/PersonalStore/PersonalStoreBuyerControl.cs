@@ -25,16 +25,16 @@ namespace Client.Main.Controls.UI.Game
     /// </summary>
     public sealed class PersonalStoreBuyerControl : UIControl, IUiTexturePreloadable
     {
-        private const int WidthPx = 348;
-        private const int HeightPx = 640;
+        private const int WidthPx = PersonalStoreLayout.Width;
+        private const int HeightPx = PersonalStoreLayout.Height;
         private const int Columns = 8;
         private const int Rows = 4;
         private const int Cell = GameWindowMetrics.InventoryCell;
         private const int FirstSlot = PersonalStoreControl.FirstStoreSlot;
-        private static readonly Rectangle Grid = new((WidthPx - Columns * Cell) / 2, 249, Columns * Cell, Rows * Cell);
-        private static readonly Rectangle Close = new(WidthPx - 44, 35, 25, 25);
-        private static readonly Rectangle Buy = new(25, 542, 142, 35);
-        private static readonly Rectangle Exit = new(181, 542, 142, 35);
+        private static readonly Rectangle Grid = PersonalStoreLayout.Grid;
+        private static readonly Rectangle Close = PersonalStoreLayout.Close;
+        private static readonly Rectangle Buy = new(84, PersonalStoreLayout.FooterY, 100, 32);
+        private static readonly Rectangle Exit = PersonalStoreLayout.Exit;
         private static readonly Rectangle ConfirmPanel = new(30, 226, 288, 174);
         private static readonly Rectangle ConfirmYes = new(44, 350, 122, 34);
         private static readonly Rectangle ConfirmNo = new(182, 350, 122, 34);
@@ -158,8 +158,11 @@ namespace Client.Main.Controls.UI.Game
 
             if (Parent != null)
             {
-                X = Math.Max(8, (Parent.DisplaySize.X - WidthPx) / 2);
-                Y = Math.Max(8, (Parent.DisplaySize.Y - HeightPx) / 2);
+                var inventory = InventoryControl.Instance;
+                X = inventory.Visible
+                    ? Math.Max(0, inventory.X - DisplaySize.X)
+                    : Math.Max(0, Parent.DisplaySize.X - DisplaySize.X);
+                Y = inventory.Visible ? inventory.Y : Math.Max(0, (Parent.DisplaySize.Y - DisplaySize.Y) / 2);
             }
             if (!Visible)
                 SoundController.Instance.PlayBuffer("Sound/iCreateWindow.wav");
@@ -381,21 +384,12 @@ namespace Client.Main.Controls.UI.Game
                 if (_atlas != null && !_atlas.IsDisposed)
                 {
                     NewUiFrameRenderer.DrawPersonalShopWindow(sprite, _atlas, DisplayRectangle);
-                    NewUiFrameRenderer.DrawPersonalShopInset(sprite, _atlas, ToScreen(new Rectangle(18, 103, 312, 86)));
-                    NewUiFrameRenderer.DrawPersonalShopInset(sprite, _atlas, ToScreen(new Rectangle(18, 199, 312, 191)));
-                    NewUiFrameRenderer.DrawPersonalShopInset(sprite, _atlas, ToScreen(new Rectangle(18, 402, 312, 129)));
                 }
-
-                // Same dark name field and subtle border as PersonalStoreControl.
-                var nameBox = ToScreen(new Rectangle(37, 143, 274, 31));
+                var nameBox = ToScreen(PersonalStoreLayout.Name);
                 sprite.Draw(pixel, nameBox, new Color(18, 17, 18, 238));
-                sprite.Draw(pixel, new Rectangle(nameBox.X, nameBox.Y, nameBox.Width, 1),
-                    new Color(103, 87, 72, 180));
-
-                Text(sprite, "VIEW PERSONAL STORE", ToScreen(new Rectangle(15, 46, 318, 28)), .53f * Scale, new Color(247, 218, 172));
-                Text(sprite, _shopName, ToScreen(new Rectangle(32, 126, 284, 29)), .48f * Scale, Color.Wheat);
-                Text(sprite, "Seller: " + _sellerName, ToScreen(new Rectangle(32, 157, 284, 24)), .40f * Scale, Color.LightGray);
-                Text(sprite, "SHOP ITEMS (8 x 4)", ToScreen(new Rectangle(20, 216, 308, 24)), .43f * Scale, Color.Wheat);
+                Text(sprite, "PERSONAL STORE", ToScreen(new Rectangle(15, 38, WidthPx - 30, 28)), .53f * Scale, Color.Wheat);
+                Text(sprite, _shopName, nameBox, .43f * Scale, Color.Wheat);
+                Text(sprite, "Seller: " + _sellerName, ToScreen(PersonalStoreLayout.State), .40f * Scale, Color.LightGray);
 
                 for (int y = 0; y < Rows; y++)
                 for (int x = 0; x < Columns; x++)
@@ -419,19 +413,17 @@ namespace Client.Main.Controls.UI.Game
                             item, new Color(39, 34, 32, 225), new Color(225, 213, 196));
                 }
 
-                Text(sprite, "ITEM INFORMATION", ToScreen(new Rectangle(20, 412, 308, 27)), .43f * Scale, Color.Wheat);
                 Listing current = _selectedSlot.HasValue &&
                     _listings.TryGetValue(_selectedSlot.Value, out var found) ? found : null;
-                Text(sprite, current?.DisplayName ?? "Select an item",
-                    ToScreen(new Rectangle(30, 445, 288, 30)), .42f * Scale,
-                    current?.NameColor ?? Color.Wheat);
-                Text(sprite, current != null ? "Price: " + current.Price.ToString("N0", CultureInfo.InvariantCulture) + " Zen" : "Price: --",
-                    ToScreen(new Rectangle(30, 477, 288, 27)), .43f * Scale, Color.Goldenrod);
-                Text(sprite, _feedback, ToScreen(new Rectangle(22, 506, 304, 23)), .32f * Scale, new Color(172, 208, 154));
+                Text(sprite, _feedback, ToScreen(PersonalStoreLayout.Feedback), .32f * Scale, new Color(172, 208, 154));
 
-                Button(sprite, Buy, "Buy Item");
-                Button(sprite, Exit, "Exit");
-                if (_close != null) sprite.Draw(_close, ToScreen(Close), Color.White);
+                Button(sprite, Buy, _buyPending ? "Waiting..." : "Buy Item");
+                Button(sprite, Exit, "");
+                if (_close != null)
+                {
+                    sprite.Draw(_close, ToScreen(Close), Color.White);
+                    sprite.Draw(_close, ToScreen(new Rectangle(Exit.X + 11, Exit.Y + 5, 22, 22)), Color.White);
+                }
 
                 if (_confirm)
                 {
@@ -447,30 +439,18 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
-        public override void DrawAfter(GameTime gameTime)
+        /// <summary>Called in the final scene overlay pass, never behind another window.</summary>
+        public void DrawTooltipOverlay(SpriteBatch sprite)
         {
-            if (!Visible || Status != GameControlStatus.Ready || _confirm)
+            if (!Visible || Status != GameControlStatus.Ready || _confirm || _font == null ||
+                InventoryControl.Instance.GetDraggedItem() != null || PersonalStoreControl.Instance.HasPickedItem ||
+                !PersonalStoreLayout.IsTopmostAtPointer(this, MuGame.Instance.UiMouseState.Position))
                 return;
-
-            byte? slot = _hoveredSlot ?? _selectedSlot;
-            if (!slot.HasValue || !_listings.TryGetValue(slot.Value, out var listing))
-                return;
-            var sprite = GraphicsManager.Instance?.Sprite;
-            if (sprite == null || _font == null)
-                return;
-
-            var itemRect = GetItemRect(listing.Item);
             var mouse = MuGame.Instance.UiMouseState.Position;
-            if (!_hoveredSlot.HasValue)
-                mouse = new Point(itemRect.Right + 8, itemRect.Top);
-
-            using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
-                BlendState.AlphaBlend, SamplerState.LinearClamp,
-                transform: UiScaler.SpriteTransform))
-            {
-                ClassicItemTooltipRenderer.Draw(sprite, _font, listing.Item,
-                    listing.TooltipLines, itemRect, mouse);
-            }
+            var listing = FindItemAt(mouse);
+            if (listing == null) return;
+            ClassicItemTooltipRenderer.Draw(sprite, _font, listing.Item,
+                listing.TooltipLines, GetItemRect(listing.Item), mouse);
         }
 
         private Texture2D ResolveTexture(InventoryItem item)

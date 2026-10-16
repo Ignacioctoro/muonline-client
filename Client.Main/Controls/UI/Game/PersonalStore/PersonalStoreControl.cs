@@ -13,6 +13,7 @@ using Client.Main.Core.Utilities;
 using Client.Main.Helpers;
 using Client.Main.Models;
 using Client.Main.Core.Client;
+using Client.Main.Core.Items.Tooltips;
 using MUnique.OpenMU.Network.Packets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -22,8 +23,7 @@ namespace Client.Main.Controls.UI.Game
 {
     /// <summary>
     /// Season 6 personal-store window, using the existing GFx NewUI frame.
-    /// Item placement uses the server's 0x24 move acknowledgements. Pricing,
-    /// shop publication and purchases are intentionally reserved for phase C/D.
+    /// Item placement, prices and publication follow authoritative server acknowledgements.
     /// </summary>
     public sealed class PersonalStoreControl : UIControl, IUiTexturePreloadable
     {
@@ -33,8 +33,8 @@ namespace Client.Main.Controls.UI.Game
         public const int CellSize = GameWindowMetrics.InventoryCell;
         public const int FirstStoreSlot = 204; // OpenMU InventoryConstants.FirstStoreItemSlotIndex
 
-        private const int WindowWidth = GameWindowMetrics.SecondaryWidth;
-        private const int WindowHeight = GameWindowMetrics.SecondaryHeight;
+        private const int WindowWidth = PersonalStoreLayout.Width;
+        private const int WindowHeight = PersonalStoreLayout.Height;
 
         private const string FramePath = NewUiFrameRenderer.PersonalShopAtlasPath;
         private const string SlotPath = "Interface/GFx/NpcShop_I3.ozd";
@@ -47,20 +47,15 @@ namespace Client.Main.Controls.UI.Game
 
         // Same verified cell crop used by Inventory and Resurrect Spirit.
         private static readonly Rectangle SlotSource = new(546, 220, 29, 29);
-        private static readonly Rectangle NameFrame = new(18, 103, 312, 86);
-        private static readonly Rectangle GridFrame = new(18, 199, 312, 191);
-        private static readonly Rectangle ItemGrid = new(
-            (WindowWidth - Columns * CellSize) / 2, 249,
-            Columns * CellSize, Rows * CellSize);
-        private static readonly Rectangle InfoFrame = new(18, 402, 312, 129);
-        private static readonly Rectangle OpenButton = new(25, 542, 142, 35);
-        private static readonly Rectangle CloseStoreButton = new(181, 542, 142, 35);
-        private static readonly Rectangle ExitButton = new(105, 584, 138, 33);
-        private static readonly Rectangle CloseButton = new(WindowWidth - 44, 35, 25, 25);
+        private static readonly Rectangle ItemGrid = PersonalStoreLayout.Grid;
+        private static readonly Rectangle OpenButton = PersonalStoreLayout.Open;
+        private static readonly Rectangle CloseStoreButton = PersonalStoreLayout.CloseStore;
+        private static readonly Rectangle ExitButton = PersonalStoreLayout.Exit;
+        private static readonly Rectangle CloseButton = PersonalStoreLayout.Close;
         private static readonly Rectangle PriceDialog = new(31, 226, 286, 181);
         private static readonly Rectangle PriceConfirmButton = new(48, 350, 119, 32);
         private static readonly Rectangle PriceCancelButton = new(180, 350, 119, 32);
-        private static readonly Rectangle StoreNameEditBox = new(37, 143, 274, 31);
+        private static readonly Rectangle StoreNameEditBox = PersonalStoreLayout.Name;
         private const double LongPressPriceMilliseconds = 620d;
         private const int LongPressMovementTolerance = 10;
         private const uint MaximumPriceZen = int.MaxValue; // OpenMU casts the protocol price to int
@@ -254,7 +249,7 @@ namespace Client.Main.Controls.UI.Game
             // Use the same parent-space positioning as Resurrect Spirit.
             // Inventory remains visible and retains its own controls.
             Align = ControlAlign.None;
-            X = Math.Max(12, inventory.X - WindowWidth - 12);
+            X = Math.Max(0, inventory.X - DisplaySize.X);
             Y = Math.Max(12, inventory.Y);
             if (Parent != null)
             {
@@ -912,6 +907,7 @@ namespace Client.Main.Controls.UI.Game
             var current = MuGame.Instance.UiMouseState;
             var previous = MuGame.Instance.PrevUiMouseState;
             bool inside = DisplayRectangle.Contains(current.Position);
+            _hoveredItem = !_priceEditorVisible && inside ? ItemAt(current.Position) : null;
             _closeHovered = inside && ToScreen(CloseButton).Contains(current.Position);
             _exitHovered = inside && ToScreen(ExitButton).Contains(current.Position);
 
@@ -1175,7 +1171,11 @@ namespace Client.Main.Controls.UI.Game
                         "Click to name your store", 0.43f);
                 if (!_priceEditorVisible)
                     DrawPlacementPreview(sprite);
-                DrawItemInformation(sprite);
+                DrawTextInRect(sprite, _priceFeedback,
+                    ToScreen(PersonalStoreLayout.Feedback), 0.32f * Scale,
+                    _priceFeedbackError ? new Color(247, 130, 105) : new Color(172, 205, 148));
+                DrawTextInRect(sprite, _storePublic ? "Store open" : "Store closed",
+                    ToScreen(PersonalStoreLayout.State), 0.40f * Scale, Color.Wheat);
                 DrawStoreActionButtons(sprite);
                 DrawExitButton(sprite);
                 DrawCloseButton(sprite);
@@ -1228,20 +1228,8 @@ namespace Client.Main.Controls.UI.Game
                 new Color(25, 23, 23, 255) * Alpha);
             NewUiFrameRenderer.DrawPersonalShopWindow(sprite, _frameAtlas,
                 ToScreen(new Rectangle(0, 0, WindowWidth, WindowHeight)));
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, ToScreen(NameFrame));
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, ToScreen(GridFrame));
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frameAtlas, ToScreen(InfoFrame));
-
             DrawCenteredText(sprite, "PERSONAL STORE", 52, 0.53f, new Color(233, 219, 195));
-            DrawCenteredText(sprite, "STORE NAME", 124, 0.42f, new Color(221, 206, 179));
-            var nameBox = new Rectangle(NameFrame.X + 19, 143, NameFrame.Width - 38, 31);
-            sprite.Draw(pixel, ToScreen(nameBox), new Color(18, 17, 18, 238) * Alpha);
-            sprite.Draw(pixel, ToScreen(new Rectangle(nameBox.X, nameBox.Y, nameBox.Width, 1)),
-                new Color(103, 87, 72, 180) * Alpha);
-            // Store name is drawn dynamically, using the editable field's value.
 
-            DrawCenteredText(sprite, "SHOP ITEMS (8 x 4)", 222, 0.43f,
-                new Color(221, 206, 179));
             for (int row = 0; row < Rows; row++)
             {
                 for (int column = 0; column < Columns; column++)
@@ -1258,11 +1246,6 @@ namespace Client.Main.Controls.UI.Game
                 }
             }
 
-            DrawCenteredText(sprite, "ITEM INFORMATION", 425, 0.43f,
-                new Color(221, 206, 179));
-            // Dynamic price feedback is drawn here, without overlapping static text.
-
-            // Action buttons are dynamic: their state changes on server ack.
         }
 
         private void DrawItems(SpriteBatch sprite)
@@ -1291,16 +1274,6 @@ namespace Client.Main.Controls.UI.Game
                     ItemGridRenderHelper.DrawItemStackCount(sprite, _font, rect, item.Durability,
                         new Color(240, 210, 140), Alpha);
 
-                byte itemSlot = (byte)(FirstStoreSlot +
-                    item.GridPosition.Y * Columns + item.GridPosition.X);
-                if (_confirmedPrices.TryGetValue(itemSlot, out var price) && price.Price > 0)
-                {
-                    var badge = new Rectangle(rect.X + 1, rect.Bottom - 14,
-                        Math.Max(1, rect.Width - 2), 13);
-                    sprite.Draw(pixel, badge, new Color(17, 18, 21, 205));
-                    DrawTextInRect(sprite, FormatZen(price.Price), badge,
-                        0.28f * Scale, new Color(245, 216, 132) * Alpha);
-                }
             }
         }
 
@@ -1383,27 +1356,30 @@ namespace Client.Main.Controls.UI.Game
             return texture;
         }
 
-        private void DrawItemInformation(SpriteBatch sprite)
+        /// <summary>Drawn by GameScene after the world and all window post-passes.</summary>
+        public void DrawTooltipOverlay(SpriteBatch sprite)
         {
-            var item = _hoveredItem ?? _pickedItem;
-            string name = item?.Definition.Name ?? "Selected item: none";
-            DrawTextInRect(sprite, name, ToScreen(new Rectangle(32, 443, 284, 31)),
-                0.41f * Scale, new Color(222, 208, 188) * Alpha);
-            byte slot = item == null ? (byte)0
-                : (byte)(FirstStoreSlot + item.GridPosition.Y * Columns +
-                          item.GridPosition.X);
-            string priceText = item != null && _confirmedPrices.TryGetValue(slot, out var entry)
-                ? (entry.Price == 0 ? "Price: not for sale" :
-                   $"Price: {FormatZen(entry.Price)} Zen")
-                : "Price: -- Zen (right-click to set)";
-            DrawTextInRect(sprite, priceText,
-                ToScreen(new Rectangle(32, 478, 284, 27)),
-                0.40f * Scale, new Color(210, 190, 145) * Alpha);
-            DrawTextInRect(sprite, _priceFeedback,
-                ToScreen(new Rectangle(32, 504, 284, 25)),
-                0.32f * Scale,
-                (_priceFeedbackError ? new Color(247, 130, 105) :
-                    new Color(172, 205, 148)) * Alpha);
+            if (!Visible || Status != GameControlStatus.Ready || _priceEditorVisible ||
+                _pickedItem != null || _requestInFlight || _font == null ||
+                InventoryControl.Instance.GetDraggedItem() != null ||
+                !PersonalStoreLayout.IsTopmostAtPointer(this, MuGame.Instance.UiMouseState.Position))
+                return;
+
+            // Resolve from the current pointer and occupied cells, including published stores.
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            var item = ItemAt(mouse);
+            if (item == null) return;
+            byte slot = (byte)(FirstStoreSlot + item.GridPosition.Y * Columns + item.GridPosition.X);
+            PetInfoSnapshot? petInfo = null;
+            if (_state != null && _state.TryGetPetInfo(slot, out var info)) petInfo = info;
+            var lines = ClassicItemTooltipBuilder.Build(item, petInfo);
+            if (_confirmedPrices.TryGetValue(slot, out var price))
+                lines.Add((price.Price > 0 ? "Store Price: " + FormatZen(price.Price) + " Zen"
+                    : "Not for sale", Color.Goldenrod));
+            var rect = ToScreen(new Rectangle(ItemGrid.X + item.GridPosition.X * CellSize,
+                ItemGrid.Y + item.GridPosition.Y * CellSize,
+                item.Definition.Width * CellSize, item.Definition.Height * CellSize));
+            ClassicItemTooltipRenderer.Draw(sprite, _font, item, lines, rect, mouse);
         }
 
         private void DrawPriceEditor(SpriteBatch sprite)
@@ -1496,9 +1472,9 @@ namespace Client.Main.Controls.UI.Game
             bool canOpen = !busy && !_storePublic;
             bool canClose = !busy && _storePublic;
             var mouse = MuGame.Instance.UiMouseState;
-            DrawStoreActionButton(sprite, OpenButton, "Open Store", canOpen,
+            DrawStoreActionButton(sprite, OpenButton, "Open", canOpen,
                 canOpen && ToScreen(OpenButton).Contains(mouse.Position));
-            DrawStoreActionButton(sprite, CloseStoreButton, "Close Store", canClose,
+            DrawStoreActionButton(sprite, CloseStoreButton, "Close", canClose,
                 canClose && ToScreen(CloseStoreButton).Contains(mouse.Position));
         }
 
@@ -1524,8 +1500,9 @@ namespace Client.Main.Controls.UI.Game
                     : _buttonHover ?? _buttonNormal)
                 : _buttonNormal;
             DrawThreeSlice(sprite, texture, ToScreen(ExitButton), Color.White * Alpha);
-            DrawTextInRect(sprite, "Exit", ToScreen(ExitButton), 0.45f * Scale,
-                new Color(237, 221, 196) * Alpha);
+            if (_closeNormal != null)
+                sprite.Draw(_closeNormal, ToScreen(new Rectangle(ExitButton.X + 11,
+                    ExitButton.Y + 5, 22, 22)), Color.White * Alpha);
         }
 
         private void DrawCloseButton(SpriteBatch sprite)
