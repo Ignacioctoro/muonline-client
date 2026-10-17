@@ -131,6 +131,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             string key = $"{definition.TexturePath}:{width}x{height}";
+            if (definition.PackedJewelPreviewSource != null) key += ":packed";
             if (rotationAngle != 0f)
             {
                 key = $"{key}:{rotationAngle:F0}";
@@ -585,7 +586,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 if (bmd == null)
                     return target;
 
-                var bones = BuildBoneMatrices(bmd, def);
+                var modelDefinition = def.PackedJewelPreviewSource ?? def;
+                var bones = BuildBoneMatrices(bmd, modelDefinition);
                 var originalBounds = ComputeBounds(bmd, bones);
 
                 if (rt == null || rt.IsDisposed || rt.Width != width || rt.Height != height)
@@ -613,7 +615,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Matrix view = Matrix.CreateLookAt(new Vector3(0, 0, 40f), Vector3.Zero, Vector3.Up);
                 Matrix projection = Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(30f), (float)width / height, 1f, 100f);
 
-                Matrix baseRotation = ItemOrientationHelper.GetInventoryBaseRotation(def);
+                Matrix baseRotation = ItemOrientationHelper.GetInventoryBaseRotation(modelDefinition);
 
                 Matrix mouseRotation = Matrix.CreateRotationY(MathHelper.ToRadians(rotationAngle));
 
@@ -667,7 +669,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Matrix worldViewProjection = world * view * projection;
                 Vector3 eyePosition = new Vector3(0f, 0f, 40f);
 
-                bool useItemMaterial = props.ShouldUseItemMaterial &&
+                bool useItemMaterial = def.PackedJewelPreviewSource == null && props.ShouldUseItemMaterial &&
                                        Constants.ENABLE_ITEM_MATERIAL_SHADER &&
                                        GraphicsManager.Instance.ItemMaterialEffect != null;
 
@@ -682,11 +684,15 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                     effect.View = view;
                     effect.Projection = projection;
-                    effect.World = world;
-
-                    foreach (int meshIdx in meshOrder)
+                    int copies = def.PackedJewelPreviewSource == null ? 1 : 3;
+                    for (int copy = 0; copy < copies; copy++)
                     {
-                        RenderMeshWithBlendState(gd, effect, bmd, meshIdx, bones);
+                        // Render a recognizable bundle using the actual jewel BMD,
+                        // without borrowing weapon IDs or replacing existing pack models.
+                        effect.World = copies == 1 ? world : world * Matrix.CreateScale(0.55f) *
+                            Matrix.CreateTranslation(copy == 0 ? -3.4f : copy == 1 ? 3.4f : 0f, copy == 2 ? 3.4f : -2.5f, 0f);
+                        foreach (int meshIdx in meshOrder)
+                            RenderMeshWithBlendState(gd, effect, bmd, meshIdx, bones);
                     }
 
                     effect.View = oldV;

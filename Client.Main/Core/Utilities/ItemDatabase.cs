@@ -144,7 +144,27 @@ namespace Client.Main.Core.Utilities
                 Console.WriteLine($"Error while loading 'items.bmd': {ex}");
             }
 
+            AddMissingPackedJewels(data);
             return data;
+        }
+
+        private static void AddMissingPackedJewels(Dictionary<(byte, short), ItemDefinition> definitions)
+        {
+            // OpenMU Season 6 PackedJewels.cs. Modern Data sets can omit these
+            // legacy IDs; never reinterpret their extended bytes as an unrelated item.
+            foreach (var (pack, group, single) in new (short, byte, short)[]
+            {
+                (30,14,13), (31,14,14), (136,14,16), (137,14,22), (138,14,31),
+                (139,14,41), (140,14,42), (141,12,15), (142,14,43), (143,14,44)
+            })
+            {
+                if (definitions.ContainsKey((12, pack)) || !definitions.TryGetValue((group, single), out var source)) continue;
+                definitions.Add((12, pack), new ItemDefinition(pack, $"Packed {source.Name}", 1, 1, source.TexturePath)
+                {
+                    Group = 12, EquipmentSlot = -1, BaseDurability = 1,
+                    PackedJewelPreviewSource = source
+                });
+            }
         }
 
         #region Public API ------------------------------------------------------

@@ -11,6 +11,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public int Width { get; set; }  // Width in slots
         public int Height { get; set; } // Height in slots
         public string TexturePath { get; set; } // Path to the item's texture/model
+        // Compatibility packs use a cluster of this single-jewel model when item.bmd omits the pack.
+        public ItemDefinition PackedJewelPreviewSource { get; set; }
 
         // Additional stats loaded from items.json for richer tooltips
         public int DamageMin { get; set; }

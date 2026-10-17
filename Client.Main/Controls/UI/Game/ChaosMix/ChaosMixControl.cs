@@ -32,6 +32,7 @@ namespace Client.Main.Controls.UI.Game
         // ═══════════════════════════════════════════════════════════════
         // WINDOW DIMENSIONS
         // ═══════════════════════════════════════════════════════════════
+        public override bool BlocksPointerInput => true;
         public const int Columns = 8;
         public const int Rows = 4;
 
@@ -52,8 +53,8 @@ namespace Client.Main.Controls.UI.Game
         private const int TrainerWindowWidth = GameWindowMetrics.SecondaryWidth;
         private const int TrainerWindowHeight = GameWindowMetrics.SecondaryHeight;
 
-        private const int SLOT_WIDTH = GameWindowMetrics.SecondaryCell;
-        private const int SLOT_HEIGHT = GameWindowMetrics.SecondaryCell;
+        private int SLOT_WIDTH => IsTrainerMix ? GameWindowMetrics.SecondaryCell : GameWindowMetrics.InventoryCell;
+        private int SLOT_HEIGHT => SLOT_WIDTH;
 
         private const int HEADER_HEIGHT = 52;
         private const int SECTION_HEADER_HEIGHT = 22;
@@ -63,9 +64,9 @@ namespace Client.Main.Controls.UI.Game
         private const int WINDOW_MARGIN = 12;
         private const int SECTION_SPACING = 10;
 
-        private static readonly int GRID_WIDTH = Columns * SLOT_WIDTH;
-        private static readonly int GRID_HEIGHT = Rows * SLOT_HEIGHT;
-        private const int WINDOW_WIDTH = GameWindowMetrics.SecondaryWidth;
+        private int GRID_WIDTH => Columns * SLOT_WIDTH;
+        private int GRID_HEIGHT => Rows * SLOT_HEIGHT;
+        private const int WINDOW_WIDTH = GameWindowMetrics.FullHeightWindowWidth;
 
         // ═══════════════════════════════════════════════════════════════
         // MODERN DARK THEME (muonline-ui-design skill)
@@ -264,9 +265,8 @@ namespace Client.Main.Controls.UI.Game
         {
             _mixInventoryType = mode;
             BuildLayoutMetrics();
-            ControlSize = IsTrainerMix
-                ? new Point(TrainerWindowWidth, TrainerWindowHeight)
-                : new Point(WINDOW_WIDTH, _mixButtonRect.Bottom + WINDOW_MARGIN);
+            ControlSize = IsTrainerMix ? new Point(TrainerWindowWidth, TrainerWindowHeight)
+                : new Point(WINDOW_WIDTH, GameWindowMetrics.FullHeightWindowHeight);
             ViewSize = ControlSize;
             Align = ControlAlign.VerticalCenter | ControlAlign.Left;
             ForceAlignNow();
@@ -275,7 +275,7 @@ namespace Client.Main.Controls.UI.Game
             // Keep the two 420x690 NewUI windows adjacent (rather than
             // overlapping the item grid) in the same logical parent space.
             var inventory = InventoryControl.Instance;
-            if (IsTrainerMix && inventory?.Visible == true)
+            if (inventory?.Visible == true)
             {
                 X = Math.Max(12, inventory.X - ControlSize.X - 12);
                 Y = Math.Max(12, inventory.Y);
@@ -381,8 +381,8 @@ namespace Client.Main.Controls.UI.Game
             }
 
             using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred,
-                IsTrainerMix ? BlendState.NonPremultiplied : BlendState.AlphaBlend,
-                IsTrainerMix ? SamplerState.PointClamp : GraphicsManager.GetQualityLinearSamplerState(),
+                BlendState.NonPremultiplied,
+                SamplerState.PointClamp,
                 transform: UiScaler.SpriteTransform);
 
             DrawDynamicContent(sb);
@@ -445,26 +445,13 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            int currentHeaderHeight = HEADER_HEIGHT;
-            _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, currentHeaderHeight);
-
-            int frameX = WINDOW_MARGIN;
-            int frameY = currentHeaderHeight;
-            int frameW = WINDOW_WIDTH - WINDOW_MARGIN * 2;
-            int frameH = SECTION_HEADER_HEIGHT + GRID_PADDING * 2 + GRID_HEIGHT;
-            _gridFrameRect = new Rectangle(frameX, frameY, frameW, frameH);
-
-            _gridRect = new Rectangle(
-                (WINDOW_WIDTH - GRID_WIDTH) / 2,
-                frameY + SECTION_HEADER_HEIGHT + GRID_PADDING,
-                GRID_WIDTH,
-                GRID_HEIGHT);
-
-            _infoRect = new Rectangle(frameX, _gridFrameRect.Bottom + SECTION_SPACING, frameW, INFO_PANEL_HEIGHT);
-            _mixButtonRect = new Rectangle(frameX, _infoRect.Bottom + SECTION_SPACING, frameW, BUTTON_AREA_HEIGHT);
-            _closeButtonRect = IsTrainerMix
-                ? new Rectangle(WINDOW_WIDTH - 42, 35, 25, 25)
-                : new Rectangle(WINDOW_WIDTH - 30, 14, 20, 20);
+            _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, TrainerTopSourceHeight);
+            _gridRect = new Rectangle((WINDOW_WIDTH - GRID_WIDTH) / 2, 186, GRID_WIDTH, GRID_HEIGHT);
+            _gridFrameRect = new Rectangle(_gridRect.X - 8, _gridRect.Y - 8, GRID_WIDTH + 16, GRID_HEIGHT + 16);
+            _mixButtonRect = new Rectangle((WINDOW_WIDTH - 130) / 2, GameWindowMetrics.FullHeightWindowHeight - 68, 130, 38);
+            _infoRect = new Rectangle(20, _gridFrameRect.Bottom + 8, WINDOW_WIDTH - 40,
+                _mixButtonRect.Top - _gridFrameRect.Bottom - 14);
+            _closeButtonRect = new Rectangle(WINDOW_WIDTH - 44, 35, 25, 25);
         }
 
         private void ForceAlignNow()
@@ -515,8 +502,8 @@ namespace Client.Main.Controls.UI.Game
 
             var sb = GraphicsManager.Instance.Sprite;
             using (new SpriteBatchScope(sb, SpriteSortMode.Deferred,
-                IsTrainerMix ? _trainerSurfaceBlend : BlendState.AlphaBlend,
-                IsTrainerMix ? SamplerState.PointClamp : SamplerState.LinearClamp))
+                _trainerSurfaceBlend,
+                SamplerState.PointClamp))
             {
                 DrawStaticElements(sb);
             }
@@ -535,7 +522,7 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
-            if (IsTrainerMix && _trainerFrame != null && !_trainerFrame.IsDisposed)
+            if (_trainerFrame != null && !_trainerFrame.IsDisposed)
             {
                 DrawTrainerFrame(sb);
             }
@@ -634,11 +621,11 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawHeader(SpriteBatch sb)
         {
-            if (IsTrainerMix && _trainerFrame != null)
+            if (_trainerFrame != null)
             {
                 if (_font != null)
                 {
-                    const string title = "Resurrect Spirit";
+                    string title = IsTrainerMix ? "Resurrect Spirit" : "Regular Combination";
                     float scale = 0.53f;
                     Vector2 size = _font.MeasureString(title) * scale;
                     Vector2 pos = new((ControlSize.X - size.X) / 2, 52 - size.Y / 2);
@@ -679,7 +666,8 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawInfoPanel(SpriteBatch sb)
         {
-            if (IsTrainerMix && _trainerFrame != null)
+            if (!IsTrainerMix) return;
+            if (_trainerFrame != null)
             {
                 NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _infoRect);
             }
@@ -694,10 +682,10 @@ namespace Client.Main.Controls.UI.Game
             var pixel = GraphicsManager.Instance.Pixel;
             if (pixel == null) return;
 
-            if (IsTrainerMix && _trainerFrame != null)
+            if (_trainerFrame != null)
             {
                 NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _gridFrameRect);
-                DrawSectionHeader(sb, "SPIRIT COMBINATION", _gridFrameRect.X,
+                if (IsTrainerMix) DrawSectionHeader(sb, "SPIRIT COMBINATION", _gridFrameRect.X,
                     _gridFrameRect.Y + 12, _gridFrameRect.Width);
 
                 if (_trainerSlots != null && !_trainerSlots.IsDisposed)
@@ -759,7 +747,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawCloseButton(SpriteBatch sb)
         {
-            if (IsTrainerMix)
+            if (_trainerCloseNormal != null)
             {
                 var texture = _closeHovered
                     ? _trainerCloseHover ?? _trainerCloseNormal
@@ -807,11 +795,37 @@ namespace Client.Main.Controls.UI.Game
                 ClassicItemTooltipRenderer.Draw(spriteBatch, _font, item, ClassicItemTooltipBuilder.Build(item), rect, mouse);
         }
 
+        private void DrawChaosRecipeText(SpriteBatch sb)
+        {
+            var recipe = _evaluation?.CurrentRecipe ?? _evaluation?.MostSimilarRecipe;
+            int x = DisplayRectangle.X + 26;
+            void Line(string text, int y, Color color, float maxScale = 0.37f)
+            {
+                float width = _font.MeasureString(text).X;
+                float scale = width > 0 ? Math.Min(maxScale, (ControlSize.X - 52) / width) : maxScale;
+                var pos = new Vector2(x, DisplayRectangle.Y + y);
+                sb.DrawString(_font, text, pos + Vector2.One, Color.Black, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                sb.DrawString(_font, text, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
+            Line(recipe == null ? "Place the combination materials." : FormatMixType(recipe.MixId), 104, Theme.TextGold);
+            bool complete = _evaluation?.CurrentRecipe != null;
+            Line(complete ? $"Combining success rate: {_evaluation.SuccessRate}%" : "Combining success rate: --", 131, Theme.TextWhite);
+            Line(complete ? $"Required Zen: {FormatZen(_evaluation.RequiredZen)}" : "Required Zen: --", 158, Theme.TextWhite);
+            int first = _infoLines.IndexOf("Requirements:") + 1;
+            int y = _infoRect.Top + 6;
+            if (first > 0)
+                for (int i = first; i < _infoLines.Count && y < _mixButtonRect.Top - 66; i++, y += 19)
+                    Line(_infoLines[i], y, Theme.TextGold, 0.35f);
+            Line("Failure can destroy the combination items.", _mixButtonRect.Top - 48, Theme.Danger, 0.33f);
+            Line("Final cost may include Castle Siege tax.", _mixButtonRect.Top - 27, Theme.TextGray, 0.30f);
+        }
+
         private void DrawInfoText(SpriteBatch sb)
         {
             if (_font == null) return;
 
-            float scale = IsTrainerMix ? 0.42f : 0.32f;
+            if (!IsTrainerMix) { DrawChaosRecipeText(sb); return; }
+            float scale = 0.42f;
             int x = DisplayRectangle.X + _infoRect.X + 14;
             int y = DisplayRectangle.Y + _infoRect.Y + 10;
 
@@ -853,7 +867,7 @@ namespace Client.Main.Controls.UI.Game
             if (pixel == null) return;
 
             var rect = Translate(_mixButtonRect);
-            if (IsTrainerMix)
+            if (_trainerButtonNormal != null)
             {
                 var texture = _mixInProgress ? _trainerButtonPressed ?? _trainerButtonNormal
                     : _mixHovered ? _trainerButtonHover ?? _trainerButtonNormal
@@ -873,12 +887,12 @@ namespace Client.Main.Controls.UI.Game
 
             if (_font == null) return;
 
-            string text = _mixInProgress ? "MIXING..." : IsTrainerMix ? "RESURRECT" : "MIX";
+            string text = _mixInProgress ? "MIXING..." : IsTrainerMix ? "RESURRECT" : "COMBINE";
             float scale = IsTrainerMix ? 0.54f : 0.45f;
             Vector2 size = _font.MeasureString(text) * scale;
             Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
 
-            if (!IsTrainerMix)
+            if (_trainerButtonNormal == null)
                 sb.Draw(pixel, new Rectangle((int)pos.X - 18, (int)pos.Y - 4,
                     (int)size.X + 36, (int)size.Y + 8),
                     Theme.AccentGlow * (_mixHovered ? 0.35f : 0.22f));
