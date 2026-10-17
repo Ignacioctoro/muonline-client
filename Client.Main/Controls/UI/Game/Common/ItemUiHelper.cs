@@ -177,6 +177,8 @@ namespace Client.Main.Controls.UI.Game.Common
             if (item?.Definition == null || item?.Details is null)
                 return lines;
 
+            if (Client.Main.Core.Items.Tooltips.SpiritItemInfo.IsSpirit(item.Definition))
+                return Client.Main.Core.Items.Tooltips.SpiritItemInfo.BuildTooltip(item);
             var details = item.Details;
 
             var characterState = MuGame.Network?.GetCharacterState();

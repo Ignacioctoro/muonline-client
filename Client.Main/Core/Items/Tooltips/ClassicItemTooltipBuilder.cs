@@ -159,6 +159,7 @@ namespace Client.Main.Core.Items.Tooltips
 
             var def = item.Definition;
             var details = item.Details;
+            if (SpiritItemInfo.IsSpirit(def)) return SpiritItemInfo.BuildTooltip(item);
 
             // Trainable pets use OpenMU A9, not the serialized item +level.
             if (def.Group == 13 && (def.Id == 4 || def.Id == 5))

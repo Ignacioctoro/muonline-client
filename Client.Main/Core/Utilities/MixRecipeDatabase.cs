@@ -187,15 +187,15 @@ namespace Client.Main.Core.Utilities
             uint zen, bool raven)
         {
             // Item IDs are encoded group*512 + number by the original mix engine.
-            // A raven requires Spirit (13,31) +1, whereas OpenMU's horse
-            // recipe currently accepts any item level of Spirit.
+            // OpenMU's required-item level bounds default to zero: horse and
+            // jewels require +0; only the raven spirit explicitly requires +1.
             static MixRecipeItem Req(int group, int number, int amount,
-                int minLevel = 0, int maxLevel = 255)
+                int minLevel = 0, int maxLevel = 0)
                 => new((short)(group * 512 + number), (short)(group * 512 + number),
                     minLevel, maxLevel, 0, 255, 0, 255, amount, amount, MixSpecialItem.None);
 
             var ingredients = new MixRecipeItem[8];
-            ingredients[0] = Req(13, 31, 1, raven ? 1 : 0, raven ? 1 : 255);
+            ingredients[0] = Req(13, 31, 1, raven ? 1 : 0, raven ? 1 : 0);
             ingredients[1] = Req(14, 13, bless); // Jewel of Bless
             ingredients[2] = Req(14, 14, soul);  // Jewel of Soul
             ingredients[3] = Req(12, 15, 1);    // Jewel of Chaos

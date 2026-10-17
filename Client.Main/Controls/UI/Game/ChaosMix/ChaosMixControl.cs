@@ -1366,6 +1366,9 @@ namespace Client.Main.Controls.UI.Game
 
         private static string FormatSource(MixRecipeItem src, bool includeCount = true)
         {
+            if (src.TypeMin == 13 * 512 + 31 && src.TypeMax == src.TypeMin && src.LevelMin == src.LevelMax)
+                return SpiritItemInfo.Name(src.LevelMin) + (includeCount ? $" x{src.CountMin}" : "");
+
             static short ItemType(byte group, short id) => (short)((group * 512) + id);
 
             static bool IsWildcard(int min, int max) => min == 0 && max == 255;

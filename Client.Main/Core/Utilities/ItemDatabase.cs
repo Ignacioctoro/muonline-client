@@ -328,8 +328,12 @@ namespace Client.Main.Core.Utilities
         public static string GetItemName(byte group, short id) =>
             GetItemDefinition(group, id)?.Name;
 
-        public static string GetItemName(ReadOnlySpan<byte> itemData) =>
-            GetItemDefinition(itemData)?.Name;
+        public static string GetItemName(ReadOnlySpan<byte> itemData)
+        {
+            var definition = GetItemDefinition(itemData);
+            return SpiritItemInfo.IsSpirit(definition)
+                ? SpiritItemInfo.Name(ParseItemDetails(itemData).Level) : definition?.Name;
+        }
 
         public struct ItemDetails
         {
