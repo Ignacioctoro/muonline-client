@@ -1,4 +1,8 @@
 using Client.Main.Graphics;
+using Client.Main.Content;
+using Client.Main.Controls.UI.Game.Common;
+using System.Threading.Tasks;
+using Microsoft.Xna.Framework.Input;
 using Client.Main.Helpers;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
@@ -60,16 +64,25 @@ namespace Client.Main.Controls.UI
             public static readonly Color Danger = new(220, 80, 80);
         }
 
-        private const int BASE_BG_WIDTH = 352;
+        private const int BASE_BG_WIDTH = 420;
         private const int BASE_BG_HEIGHT = 113;
-        private const int SIDE_PAD = 20;
-        private const int TOP_PAD = 25;
+        private const int SIDE_PAD = 28;
+        private const int TOP_PAD = 30;
         private const int BTN_GAP = 10;
 
         private readonly LabelControl _label;
         private readonly ButtonControl _acceptButton;
         private readonly ButtonControl _rejectButton;
 
+        public override bool BlocksPointerInput => true;
+        private Texture2D _newUiFrame;
+        private bool _choice;
+        private Action _cancelChoice;
+        private readonly BlendState _surfaceBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.InverseSourceAlpha
+        };
         private bool _infoOnly = false; // single OK button mode
 
         private RenderTarget2D _staticSurface;
@@ -233,47 +246,94 @@ namespace Client.Main.Controls.UI
 
             float scale = _label.FontSize / Constants.BASE_FONT_SIZE;
             float maxWidth = BASE_BG_WIDTH - SIDE_PAD * 2;
-            var words = _rawText.Split(' ');
-            var sb = new StringBuilder();
-            var current = new StringBuilder();
+            _label.Text = WrapMessage(_rawText, maxWidth, text => font.MeasureString(text).X * scale);
+        }
 
-            foreach (var w in words)
+        public static string WrapMessage(string text, float maxWidth, Func<string, float> measure)
+        {
+            var output = new StringBuilder();
+            foreach (var paragraph in (text ?? "").Replace("\r\n", "\n").Split('\n'))
             {
-                string test = (current.Length == 0) ? w : current + " " + w;
-                float tw = font.MeasureString(test).X * scale;
-
-                if (tw <= maxWidth)
+                if (output.Length > 0) output.Append('\n');
+                var line = new StringBuilder();
+                foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    current.Clear();
-                    current.Append(test);
+                    string next = line.Length == 0 ? word : line + " " + word;
+                    if (line.Length > 0 && measure(next) > maxWidth)
+                    {
+                        output.Append(line).Append('\n');
+                        line.Clear();
+                    }
+                    if (line.Length > 0) line.Append(' ');
+                    line.Append(word);
                 }
-                else
-                {
-                    if (sb.Length > 0) sb.Append('\n');
-                    sb.Append(current);
-                    current.Clear();
-                    current.Append(w);
-                }
+                output.Append(line);
             }
-            if (current.Length > 0)
+            return output.ToString();
+        }
+
+        public override async Task Load()
+        {
+            _newUiFrame = await TextureLoader.Instance.PrepareAndGetTexture(NewUiFrameRenderer.PersonalShopAtlasPath);
+            await base.Load();
+            UpdateWrappedText();
+            AdjustSizeAndLayout();
+        }
+
+        public override void Update(GameTime gameTime)
+        {
+            base.Update(gameTime);
+            if (Visible && MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) && MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape))
             {
-                if (sb.Length > 0) sb.Append('\n');
-                sb.Append(current);
+                Scene?.ConsumeKeyboardEscape();
+                if (_choice) _cancelChoice?.Invoke();
+                else Rejected?.Invoke(this, EventArgs.Empty);
+                Close();
             }
+        }
 
-            _label.Text = sb.ToString();
+        public static RequestDialog ShowChoice(string text, Action first, Action second, Action cancel, string firstText, string secondText)
+        {
+            var dialog = Show(text, first, second, firstText, secondText);
+            if (dialog != null) { dialog._choice = true; dialog._cancelChoice = cancel; }
+            return dialog;
+        }
+
+        private sealed class NewUiButton : ButtonControl
+        {
+            private Texture2D _normal, _hover, _pressed;
+            public override async Task Load()
+            {
+                var loader = TextureLoader.Instance;
+                _normal = await loader.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
+                _hover = await loader.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
+                _pressed = await loader.PrepareAndGetTexture("Interface/GFx/btn_l03.ozd");
+                BackgroundColor = HoverBackgroundColor = PressedBackgroundColor = Color.Transparent;
+                BorderThickness = 0;
+                await base.Load();
+            }
+            public override void Draw(GameTime gameTime)
+            {
+                if (!Visible) return;
+                var sprite = GraphicsManager.Instance.Sprite;
+                if (_normal != null)
+                using (new SpriteBatchScope(sprite, SpriteSortMode.Deferred, BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform))
+                    sprite.Draw(IsMousePressed ? _pressed ?? _normal : IsMouseOver ? _hover ?? _normal : _normal,
+                        DisplayRectangle, Enabled ? Color.White : Color.Gray);
+                base.Draw(gameTime);
+            }
         }
 
         private static ButtonControl MakeButton(string text,
                                                 Color bg, Color bgH, Color bgP,
                                                 Color border,
                                                 Color textColor, Color hoverTextColor, Color disabledTextColor)
-            => new ButtonControl
+            => new NewUiButton
             {
                 Text = text,
                 FontSize = 12f,
-                ViewSize = new Point(70, 30),
-                ControlSize = new Point(70, 30),
+                ViewSize = new Point(94, 38),
+                ControlSize = new Point(94, 38),
                 BackgroundColor = bg,
                 HoverBackgroundColor = bgH,
                 PressedBackgroundColor = bgP,
@@ -355,6 +415,7 @@ namespace Client.Main.Controls.UI
             base.Dispose();
             _staticSurface?.Dispose();
             _staticSurface = null;
+            _surfaceBlend.Dispose();
         }
 
         // Consume clicks anywhere on the dialog (background or label), so they don't reach the world.
@@ -384,7 +445,7 @@ namespace Client.Main.Controls.UI
             gd.Clear(Color.Transparent);
 
             var sb = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend))
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, _surfaceBlend))
             {
                 DrawStaticElements(sb);
             }
@@ -404,33 +465,9 @@ namespace Client.Main.Controls.UI
             }
 
             var windowRect = new Rectangle(0, 0, ControlSize.X, ControlSize.Y);
-            DrawWindowBackground(sb, windowRect);
-
-            // Top accent lines (simple chrome, no external textures)
-            sb.Draw(pixel, new Rectangle(20, 10, ControlSize.X - 40, 2), Theme.Accent * 0.85f);
-            sb.Draw(pixel, new Rectangle(30, 12, ControlSize.X - 60, 1), Theme.Accent * 0.25f);
-
-            int footerTop = Math.Clamp(_acceptButton.Y - 12, 12, ControlSize.Y - 12);
-            var contentRect = new Rectangle(12, 16, ControlSize.X - 24, Math.Max(0, footerTop - 26));
-            var footerRect = new Rectangle(12, footerTop, ControlSize.X - 24, Math.Max(0, ControlSize.Y - footerTop - 12));
-
-            if (contentRect.Height > 0)
-            {
-                DrawPanel(sb, contentRect, Theme.BgMid);
-            }
-
-            if (footerRect.Height > 0)
-            {
-                DrawPanel(sb, footerRect, Theme.BgMid);
-            }
-
-            int sepY = footerTop - 2;
-            if (sepY > 0)
-            {
-                int half = (ControlSize.X - 40) / 2;
-                UiDrawHelper.DrawHorizontalGradient(sb, new Rectangle(20, sepY, half, 1), Color.Transparent, Theme.BorderInner);
-                UiDrawHelper.DrawHorizontalGradient(sb, new Rectangle(20 + half, sepY, half, 1), Theme.BorderInner, Color.Transparent);
-            }
+            sb.Draw(pixel, windowRect, new Color(20, 18, 16));
+            if (_newUiFrame != null)
+                NewUiFrameRenderer.DrawPersonalShopInset(sb, _newUiFrame, windowRect);
         }
 
         private void DrawWindowBackground(SpriteBatch sb, Rectangle rect)

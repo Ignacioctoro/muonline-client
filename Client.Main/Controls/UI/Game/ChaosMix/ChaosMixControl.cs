@@ -258,6 +258,19 @@ namespace Client.Main.Controls.UI.Game
 
         // The existing Chaos Goblin entry point continues using its own recipes/skin.
         public void Show() => ShowFor(MixInventoryType.GoblinNormal);
+        public void ShowSelection()
+        {
+            RequestDialog.ShowChoice("Select a Chaos Goblin operation.\nEscape cancels.",
+                () => OpenMode(MixInventoryType.GoblinNormal),
+                () => OpenMode(MixInventoryType.GoblinAdd380),
+                () => { _ = MuGame.Network?.GetCharacterService()?.SendCloseNpcRequestAsync(); },
+                "Regular Combination", "Item 380 Option");
+        }
+        private void OpenMode(MixInventoryType mode)
+        {
+            InventoryControl.Instance.Show();
+            ShowFor(mode);
+        }
 
         public void ShowTrainer() => ShowFor(MixInventoryType.Trainer);
 
@@ -625,7 +638,7 @@ namespace Client.Main.Controls.UI.Game
             {
                 if (_font != null)
                 {
-                    string title = IsTrainerMix ? "Resurrect Spirit" : "Regular Combination";
+                    string title = IsTrainerMix ? "Resurrect Spirit" : _mixInventoryType == MixInventoryType.GoblinAdd380 ? "Item 380 Option" : "Regular Combination";
                     float scale = 0.53f;
                     Vector2 size = _font.MeasureString(title) * scale;
                     Vector2 pos = new((ControlSize.X - size.X) / 2, 52 - size.Y / 2);
@@ -816,7 +829,7 @@ namespace Client.Main.Controls.UI.Game
             if (first > 0)
                 for (int i = first; i < _infoLines.Count && y < _mixButtonRect.Top - 66; i++, y += 19)
                     Line(_infoLines[i], y, Theme.TextGold, 0.35f);
-            Line("Failure can destroy the combination items.", _mixButtonRect.Top - 48, Theme.Danger, 0.33f);
+            Line(_mixInventoryType == MixInventoryType.GoblinAdd380 ? "Failure consumes jewels; equipment remains." : "Failure can destroy the combination items.", _mixButtonRect.Top - 48, Theme.Danger, 0.33f);
             Line("Final cost may include Castle Siege tax.", _mixButtonRect.Top - 27, Theme.TextGray, 0.30f);
         }
 
@@ -1116,11 +1129,13 @@ namespace Client.Main.Controls.UI.Game
             int chance = _evaluation.SuccessRate;
             uint cost = _evaluation.RequiredZen;
 
-            string message = IsTrainerMix
+            string message = _mixInventoryType == MixInventoryType.GoblinAdd380
+                ? $"Add the 380 option?\nChance: {chance}%\nBase cost: {FormatZen(cost)} Zen\nFailure consumes jewels; the equipment remains."
+                : IsTrainerMix
                 ? $"Resurrect {(mixId == 13 ? "Dark Horse" : "Dark Raven")}?\n" +
                   $"Base chance: {chance}%\nBase cost: {FormatZen(cost)} Zen\n" +
                   "Server taxes may apply. Failure can consume materials."
-                : $"Proceed with mix?\\nChance: {chance}%\\nCost: {FormatZen(cost)} Zen\\n\\nFailure may destroy items.";
+                : $"Proceed with mix?\nChance: {chance}%\nCost: {FormatZen(cost)} Zen\n\nFailure may destroy items.";
 
             RequestDialog.Show(
                 message,
@@ -1239,7 +1254,8 @@ namespace Client.Main.Controls.UI.Game
         {
             _evaluation = IsTrainerMix
                 ? MixRecipeDatabase.EvaluateTrainer(_items)
-                : MixRecipeDatabase.EvaluateChaosMachine(_items);
+                : _mixInventoryType == MixInventoryType.GoblinAdd380
+                    ? MixRecipeDatabase.EvaluateGuardianOption(_items) : MixRecipeDatabase.EvaluateChaosMachine(_items);
             _infoLines.Clear();
             _requirementColors.Clear();
 

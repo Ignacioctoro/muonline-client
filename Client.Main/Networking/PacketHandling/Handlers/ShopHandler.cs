@@ -415,10 +415,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     MuGame.ScheduleOnMainThread(() =>
                     {
                         var chaos = ChaosMixControl.Instance;
-                        chaos.Show();
-
-                        var scene = MuGame.Instance?.ActiveScene as GameScene;
-                        scene?.InventoryControl?.Show();
+                        chaos.ShowSelection();
                     });
                 }
                 else if (resp.Window == NpcWindowResponse.NpcWindow.DevilSquare)

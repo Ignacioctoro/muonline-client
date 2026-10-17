@@ -129,10 +129,9 @@ namespace Client.Main.Core.Utilities
 
         public static IReadOnlyList<MixRecipe> GetChaosMachineRecipes()
         {
-            // Chaos Goblin uses the first three mix groups.
+            // Regular combination includes normal and Chaos weapon recipes; 380 is a separate mode.
             return GetRecipes(MixInventoryType.GoblinNormal)
                 .Concat(GetRecipes(MixInventoryType.GoblinChaosItem))
-                .Concat(GetRecipes(MixInventoryType.GoblinAdd380))
                 .ToList();
         }
 
@@ -142,6 +141,23 @@ namespace Client.Main.Core.Utilities
         /// </summary>
         public static ChaosMixEvaluation EvaluateChaosMachine(IReadOnlyList<InventoryItem> items)
             => EvaluateRecipes(items, GetChaosMachineRecipes());
+
+        public static ChaosMixEvaluation EvaluateGuardianOption(IReadOnlyList<InventoryItem> items)
+        {
+            var recipes = GetRecipes(MixInventoryType.GoblinAdd380).Where(r => r.MixId == 36).ToList();
+            var result = EvaluateRecipes(items, recipes);
+            var equipment = items.FirstOrDefault(i => i.Definition.Group <= 11);
+            bool invalid = equipment?.Details.HasGuardian == true || equipment?.Details.Level > 15 ||
+                items.Any(i => i.Definition.Group == 14 && i.Details.Level != 0);
+            if (invalid) return new ChaosMixEvaluation { MostSimilarRecipe = result.CurrentRecipe ?? result.MostSimilarRecipe };
+            if (result.CurrentRecipe == null) return result;
+            int level = equipment?.Details.Level ?? 0;
+            return new ChaosMixEvaluation
+            {
+                CurrentRecipe = result.CurrentRecipe, MostSimilarRecipe = result.MostSimilarRecipe,
+                SuccessRate = level <= 6 ? 50 : level <= 9 ? 60 : 70, RequiredZen = 10_000_000
+            };
+        }
 
         public static ChaosMixEvaluation EvaluateTrainer(IReadOnlyList<InventoryItem> items)
         {
@@ -839,3 +855,4 @@ namespace Client.Main.Core.Utilities
         }
     }
 }
+
