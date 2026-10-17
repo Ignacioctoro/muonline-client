@@ -1,0 +1,41 @@
+using Client.Main;
+using Client.Main.Controls.UI.Game;
+using Client.Main.Controls.UI.Game.Inventory;
+using Client.Main.Core.Utilities;
+using Microsoft.Xna.Framework;
+using System.Reflection;
+
+if (args.Length > 0) Constants.DataPath=args[0];
+void Check(bool value,string message) { if(!value) throw new Exception(message); }
+InventoryItem Item(int group,int id,int level=0) => new(new ItemDefinition(id,"Test",1,1){Group=group},Point.Zero,new byte[]{(byte)id,(byte)(level<<3),1},1);
+var items=new List<InventoryItem>();
+var empty=MixRecipeDatabase.EvaluateTrainer(items);
+Check(empty.CurrentRecipe==null,"Empty recipe must not be ready");
+items.Add(Item(13,31,1));
+var partial=MixRecipeDatabase.EvaluateTrainer(items);
+Check(partial.MostSimilarRecipe.MixId==14,"Raven spirit selects raven requirements before completion");
+var recipe=partial.MostSimilarRecipe;
+Check(MixRecipeDatabase.GetRequirementCounts(recipe,items).SequenceEqual(new[]{1,0,0,0,0}),"Spirit only");
+items.Add(Item(14,13));
+Check(MixRecipeDatabase.GetRequirementCounts(recipe,items)[1]==1,"Partial bless count");
+items.Add(Item(14,13));
+items.Add(Item(14,14)); items.Add(Item(14,14)); items.Add(Item(12,15)); items.Add(Item(14,22));
+Check(MixRecipeDatabase.EvaluateTrainer(items).CurrentRecipe?.MixId==14,"Complete raven recipe");
+Check(MixRecipeDatabase.GetRequirementCounts(recipe,items).SequenceEqual(new[]{1,2,2,1,1}),"Complete counts");
+var control=ChaosMixControl.Instance;
+var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+control.GetType().GetField("_mixInventoryType",flags)!.SetValue(control,MixInventoryType.Trainer);
+var uiItems=(List<InventoryItem>)control.GetType().GetField("_items",flags)!.GetValue(control)!;
+var colors=(Dictionary<int,Color>)control.GetType().GetField("_requirementColors",flags)!.GetValue(control)!;
+void Refresh() {uiItems.Clear();uiItems.AddRange(items);control.GetType().GetMethod("UpdateRecipeInfo",flags)!.Invoke(control,null);}
+Refresh();
+Check(colors.Count==5 && colors.Values.All(c=>c==Color.LimeGreen),"All complete requirement lines turn green");
+items.RemoveAt(1);Refresh();
+Check(colors.Values.Count(c=>c==Color.LimeGreen)==4,"Removing a bless clears its green state");
+items.Add(Item(14,13));items.Add(Item(14,13));Refresh();
+Check(colors.Values.Count(c=>c==Color.LimeGreen)==4,"Too many jewels must not show all green");
+items.Clear();items.Add(Item(13,31));Refresh();
+Check(MixRecipeDatabase.EvaluateTrainer(items).MostSimilarRecipe.MixId==13,"Horse spirit selects horse recipe");
+items.Clear();Refresh();
+Check(colors.Values.All(c=>c!=Color.LimeGreen),"Empty box resets all requirement colors");
+Console.WriteLine("PASS: spirit selection, partial/complete/excess counts, green requirement lines, removal and empty reset.");

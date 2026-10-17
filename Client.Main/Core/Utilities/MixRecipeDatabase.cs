@@ -144,7 +144,27 @@ namespace Client.Main.Core.Utilities
             => EvaluateRecipes(items, GetChaosMachineRecipes());
 
         public static ChaosMixEvaluation EvaluateTrainer(IReadOnlyList<InventoryItem> items)
-            => EvaluateRecipes(items, GetOpenMuTrainerRecipes());
+        {
+            var result = EvaluateRecipes(items, GetOpenMuTrainerRecipes());
+            if (result.CurrentRecipe != null) return result;
+            // Shared jewels cannot identify the intended pet. Prefer the spirit
+            // when displaying an incomplete recipe; keep server validation unchanged.
+            var spirit = items?.FirstOrDefault(item => item.Definition.Group == 13 && item.Definition.Id == 31);
+            var suggested = spirit == null ? result.MostSimilarRecipe : s_openMuTrainerRecipes[spirit.Details.Level == 1 ? 1 : 0];
+            return new ChaosMixEvaluation { MostSimilarRecipe = suggested };
+        }
+
+        /// <summary>Uses the same item/level/option matcher and quantities as mix validation.</summary>
+        public static int[] GetRequirementCounts(MixRecipe recipe, IReadOnlyList<InventoryItem> items)
+        {
+            int length = Math.Clamp(recipe.NumSources, 0, recipe.Sources.Length);
+            var counts = new int[length];
+            var sources = BuildMixItems(items);
+            for (int i = 0; i < length; i++)
+                foreach (var item in sources)
+                    if (CheckItem(recipe.Sources[i], item)) counts[i] += item.Count;
+            return counts;
+        }
 
         private static IReadOnlyList<MixRecipe> GetOpenMuTrainerRecipes()
         {

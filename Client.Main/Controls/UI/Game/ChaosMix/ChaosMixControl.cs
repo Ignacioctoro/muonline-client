@@ -8,6 +8,7 @@ using Client.Main;
 using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Core.Client;
+using Client.Main.Core.Items.Tooltips;
 using Client.Main.Core.Utilities;
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Common;
@@ -181,6 +182,7 @@ namespace Client.Main.Controls.UI.Game
 
         private ChaosMixEvaluation _evaluation;
         private readonly List<string> _infoLines = new();
+        private readonly Dictionary<int, Color> _requirementColors = new();
         private string _warningLine = "Failure may destroy items.";
 
         private static readonly Dictionary<int, string> s_mixTypeNames = new();
@@ -790,6 +792,21 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
+        public void DrawTooltipOverlay(SpriteBatch spriteBatch)
+        {
+            if (!Visible || Status != GameControlStatus.Ready || _hoveredItem == null || _font == null ||
+                _draggedItem != null || InventoryControl.Instance.GetDraggedItem() != null ||
+                ExtendedInventoryControl.PickedItem != null ||
+                !PersonalStoreLayout.IsTopmostAtPointer(this, MuGame.Instance.UiMouseState.Position)) return;
+            var item = _hoveredItem;
+            var rect = new Rectangle(DisplayRectangle.X + _gridRect.X + item.GridPosition.X * SLOT_WIDTH,
+                DisplayRectangle.Y + _gridRect.Y + item.GridPosition.Y * SLOT_HEIGHT,
+                item.Definition.Width * SLOT_WIDTH, item.Definition.Height * SLOT_HEIGHT);
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            if (rect.Contains(mouse))
+                ClassicItemTooltipRenderer.Draw(spriteBatch, _font, item, ClassicItemTooltipBuilder.Build(item), rect, mouse);
+        }
+
         private void DrawInfoText(SpriteBatch sb)
         {
             if (_font == null) return;
@@ -798,13 +815,15 @@ namespace Client.Main.Controls.UI.Game
             int x = DisplayRectangle.X + _infoRect.X + 14;
             int y = DisplayRectangle.Y + _infoRect.Y + 10;
 
-            foreach (string line in _infoLines)
+            for (int lineIndex = 0; lineIndex < _infoLines.Count; lineIndex++)
             {
+                string line = _infoLines[lineIndex];
                 float lineScale = scale;
                 float textWidth = _font.MeasureString(line).X;
                 if (textWidth > 0)
                     lineScale = Math.Min(lineScale, (_infoRect.Width - 28) / textWidth);
-                Color color = line == "Requirements:" ? Theme.TextGold : Theme.TextGray;
+                Color color = _requirementColors.TryGetValue(lineIndex, out var requirementColor)
+                    ? requirementColor : line == "Requirements:" ? Theme.TextGold : Theme.TextGray;
                 sb.DrawString(_font, line, new Vector2(x + 1, y + 1), Color.Black * 0.6f, 0f, Vector2.Zero, lineScale, SpriteEffects.None, 0f);
                 sb.DrawString(_font, line, new Vector2(x, y), color, 0f, Vector2.Zero, lineScale, SpriteEffects.None, 0f);
                 y += (int)(_font.LineSpacing * scale) + (IsTrainerMix ? 4 : 2);
@@ -1208,6 +1227,7 @@ namespace Client.Main.Controls.UI.Game
                 ? MixRecipeDatabase.EvaluateTrainer(_items)
                 : MixRecipeDatabase.EvaluateChaosMachine(_items);
             _infoLines.Clear();
+            _requirementColors.Clear();
 
             var recipe = _evaluation?.CurrentRecipe;
             var similar = _evaluation?.MostSimilarRecipe;
@@ -1236,6 +1256,7 @@ namespace Client.Main.Controls.UI.Game
             {
                 _infoLines.Add("Requirements:");
                 int count = Math.Clamp(showRecipe.NumSources, 0, showRecipe.Sources.Length);
+                var quantities = IsTrainerMix ? MixRecipeDatabase.GetRequirementCounts(showRecipe, _items) : null;
                 for (int i = 0; i < count; i++)
                 {
                     var src = showRecipe.Sources[i];
@@ -1244,7 +1265,14 @@ namespace Client.Main.Controls.UI.Game
                         continue;
                     }
 
-                    _infoLines.Add($"- {FormatSource(src)}");
+                    if (quantities != null)
+                    {
+                        int actual = quantities[i];
+                        _requirementColors[_infoLines.Count] = actual > src.CountMax ? Theme.Danger
+                            : actual >= src.CountMin ? Color.LimeGreen : Theme.TextGray;
+                        _infoLines.Add($"- {FormatSource(src, includeCount: false)} [{actual}/{src.CountMin}]");
+                    }
+                    else _infoLines.Add($"- {FormatSource(src)}");
                 }
             }
 
@@ -1322,7 +1350,7 @@ namespace Client.Main.Controls.UI.Game
             return sb.ToString();
         }
 
-        private static string FormatSource(MixRecipeItem src)
+        private static string FormatSource(MixRecipeItem src, bool includeCount = true)
         {
             static short ItemType(byte group, short id) => (short)((group * 512) + id);
 
@@ -1483,7 +1511,7 @@ namespace Client.Main.Controls.UI.Game
                             ? $"x{src.CountMin}+"
                             : $"x{src.CountMin}-{src.CountMax}";
 
-            return $"{baseName} {countPart}";
+            return includeCount ? $"{baseName} {countPart}" : baseName;
         }
 
         private void ClearGrid()
@@ -1842,3 +1870,5 @@ namespace Client.Main.Controls.UI.Game
 
     }
 }
+
+

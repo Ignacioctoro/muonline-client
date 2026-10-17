@@ -3055,6 +3055,7 @@ namespace Client.Main.Scenes
             {
                 NpcShopControl.Instance.DrawTooltipOverlay(sprite);
                 VaultControl.Instance.DrawTooltipOverlay(sprite);
+                ChaosMixControl.Instance.DrawTooltipOverlay(sprite);
                 TradeControl.Instance.DrawTooltipOverlay(sprite);
                 PersonalStoreControl.Instance.DrawTooltipOverlay(sprite);
                 PersonalStoreBuyerControl.Instance.DrawTooltipOverlay(sprite);
