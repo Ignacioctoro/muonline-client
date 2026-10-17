@@ -1604,7 +1604,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-        [PacketHandler(0xF6, 0x1A)]             // QuestStateList
+        // QuestStateList is handled by QuestJournalHandler.
         public Task HandleQuestStateListAsync(Memory<byte> packet)
         {
             try

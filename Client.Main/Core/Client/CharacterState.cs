@@ -85,6 +85,7 @@ namespace Client.Main.Core.Client
         }
 
         // Basic Character Information
+        public QuestJournal Quests { get; } = new();
         public string Name { get; set; } = "???";
         public ushort Id { get; set; } = 0xFFFF;
         public bool IsInGame { get; set; } = false;

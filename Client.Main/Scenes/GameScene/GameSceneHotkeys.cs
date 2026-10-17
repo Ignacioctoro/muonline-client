@@ -167,6 +167,7 @@ namespace Client.Main.Scenes
                     when: WhenMoveCommandFocused);
             }
 
+            hotkeys.OnKeyPressed(Keys.T, _ => Client.Main.Controls.UI.Game.Quest.MyQuestsControl.Instance.Toggle(), when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.I, ToggleInventory, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.V, ToggleInventory, when: WhenNotUiInput);
             // S is only a shop shortcut while Inventory is open; otherwise it

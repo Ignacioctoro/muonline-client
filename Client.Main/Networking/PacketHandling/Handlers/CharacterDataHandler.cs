@@ -328,6 +328,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     _characterState.PositionX,
                     _characterState.PositionY);
 
+                MuGame.ScheduleOnMainThread(() => Client.Main.Controls.UI.Game.Quest.MyQuestsControl.Instance.ResetForCharacter());
+
                 // Notify NetworkManager that character info is ready
                 _networkManager.ProcessCharacterInformation();
             }

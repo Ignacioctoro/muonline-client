@@ -208,7 +208,7 @@ namespace Client.Main.Controls.UI
             int width = BASE_BG_WIDTH;
 
             int textHeight = _label.ControlSize.Y;
-            int buttonsBlock = _acceptButton.ViewSize.Y + 20;
+            int buttonsBlock = _acceptButton.ViewSize.Y + 20 + (_choice ? _rejectButton.ViewSize.Y + BTN_GAP : 0);
             int wantedH = TOP_PAD + textHeight + 20 + buttonsBlock;
             int height = Math.Max(BASE_BG_HEIGHT, wantedH);
 
@@ -225,6 +225,13 @@ namespace Client.Main.Controls.UI
                 int startX = (width - _acceptButton.ViewSize.X) / 2;
                 _acceptButton.X = startX;
                 _acceptButton.Y = btnY;
+            }
+            else if (_choice)
+            {
+                _acceptButton.X = (width - _acceptButton.ViewSize.X) / 2;
+                _rejectButton.X = (width - _rejectButton.ViewSize.X) / 2;
+                _rejectButton.Y = btnY;
+                _acceptButton.Y = btnY - _acceptButton.ViewSize.Y - BTN_GAP;
             }
             else
             {
@@ -295,7 +302,7 @@ namespace Client.Main.Controls.UI
         public static RequestDialog ShowChoice(string text, Action first, Action second, Action cancel, string firstText, string secondText)
         {
             var dialog = Show(text, first, second, firstText, secondText);
-            if (dialog != null) { dialog._choice = true; dialog._cancelChoice = cancel; }
+            if (dialog != null) { dialog._choice = true; dialog._cancelChoice = cancel; dialog.AdjustSizeAndLayout(); }
             return dialog;
         }
 

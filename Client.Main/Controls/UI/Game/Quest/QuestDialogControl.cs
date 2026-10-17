@@ -15,6 +15,9 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MUnique.OpenMU.Network.Packets;
 
+using Client.Main.Content;
+using Client.Main.Controls.UI.Game.Common;
+
 namespace Client.Main.Controls.UI.Game.Quest
 {
     /// <summary>
@@ -134,6 +137,13 @@ namespace Client.Main.Controls.UI.Game.Quest
         private RenderTarget2D _staticSurface;
         private bool _staticSurfaceDirty = true;
         private SpriteFont _font;
+        private Texture2D _questAtlas, _buttonNormal, _buttonHover;
+        private readonly BlendState _newUiBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.InverseSourceAlpha
+        };
+        public override bool BlocksPointerInput => true;
 
         private Rectangle _headerRect;
         private Rectangle _contentRect;
@@ -187,6 +197,9 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         public override async Task Load()
         {
+            _questAtlas = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/NpcJobChangeQuest_I3.ozd");
+            _buttonNormal = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
+            _buttonHover = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
             await base.Load();
             _font = GraphicsManager.Instance.Font;
             InvalidateStaticSurface();
@@ -205,6 +218,7 @@ namespace Client.Main.Controls.UI.Game.Quest
             }
 
             Point mousePos = MuGame.Instance.UiMouseState.Position;
+            if (!_mouseCaptured && !PersonalStoreLayout.IsTopmostAtPointer(this, mousePos)) return;
             UpdateHoverStates(mousePos);
             HandleWindowDrag(mousePos);
             HandleButtonClicks(mousePos);
@@ -420,7 +434,7 @@ namespace Client.Main.Controls.UI.Game.Quest
             gd.Clear(Color.Transparent);
 
             var sb = GraphicsManager.Instance.Sprite;
-            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend))
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, _newUiBlend))
             {
                 DrawStaticElements(sb);
             }
@@ -452,23 +466,15 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         private void DrawWindowBackground(SpriteBatch sb, Rectangle rect)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            sb.Draw(pixel, rect, Theme.BorderOuter);
-
-            var inner = new Rectangle(rect.X + 2, rect.Y + 2, rect.Width - 4, rect.Height - 4);
-            UiDrawHelper.DrawVerticalGradient(sb, inner, Theme.BgDark, Theme.BgDarkest);
-
-            sb.Draw(pixel, new Rectangle(inner.X, inner.Y, inner.Width, 1), Theme.BorderInner * 0.5f);
-            UiDrawHelper.DrawCornerAccents(sb, rect, Theme.Accent * 0.4f);
+            sb.Draw(GraphicsManager.Instance.Pixel, rect, new Color(20, 18, 15));
+            if (_questAtlas != null)
+                NewUiFrameRenderer.DrawNineSlice(sb, _questAtlas, new Rectangle(0, 0, 320, 380), rect, 12, 12, 12, 14);
         }
 
         private void DrawPanel(SpriteBatch sb, Rectangle rect, Color bg, bool withGlow = false)
         {
-            UiDrawHelper.DrawPanel(sb, rect, bg,
-                Theme.BorderInner, Theme.BorderOuter, Theme.BorderHighlight * 0.3f,
-                withGlow, withGlow ? Theme.Accent * 0.15f : null);
+            if (_questAtlas != null)
+                NewUiFrameRenderer.DrawNineSlice(sb, _questAtlas, new Rectangle(332, 2, 307, 180), rect, 10, 10, 10, 10);
         }
 
         private void DrawSectionHeader(SpriteBatch sb, string title, int x, int y, int width)
@@ -492,30 +498,14 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         private void DrawHeader(SpriteBatch sb)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            var headerBg = new Rectangle(8, 6, ControlSize.X - 16, HEADER_HEIGHT - 10);
-            DrawPanel(sb, headerBg, Theme.BgMid);
-
-            sb.Draw(pixel, new Rectangle(20, 10, ControlSize.X - 40, 2), Theme.Accent * 0.85f);
-            sb.Draw(pixel, new Rectangle(30, 12, ControlSize.X - 60, 1), Theme.Accent * 0.25f);
-
-            if (_font != null && _questData != null)
-            {
-                string title = _questData.Title ?? "QUEST";
-                float scale = FONT_SCALE_TITLE;
-                Vector2 size = _font.MeasureString(title) * scale;
-                Vector2 pos = new((ControlSize.X - size.X) / 2, (HEADER_HEIGHT - size.Y) / 2 + 3);
-
-                sb.Draw(pixel, new Rectangle((int)pos.X - 18, (int)pos.Y - 4, (int)size.X + 36, (int)size.Y + 8), Theme.AccentGlow * 0.28f);
-                sb.DrawString(_font, title, pos + new Vector2(2, 2), Color.Black * 0.55f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-                sb.DrawString(_font, title, pos, Theme.TextWhite, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            }
-
-            int sepY = HEADER_HEIGHT - 2;
-            UiDrawHelper.DrawHorizontalGradient(sb, new Rectangle(20, sepY, (ControlSize.X - 40) / 2, 1), Color.Transparent, Theme.BorderInner);
-            UiDrawHelper.DrawHorizontalGradient(sb, new Rectangle(ControlSize.X / 2, sepY, (ControlSize.X - 40) / 2, 1), Theme.BorderInner, Color.Transparent);
+            if (_questAtlas != null)
+                NewUiFrameRenderer.DrawNineSlice(sb, _questAtlas, new Rectangle(651, 0, 327, 75), new Rectangle(3, 0, ControlSize.X - 6, HEADER_HEIGHT), 16, 16, 16, 12);
+            if (_font == null || _questData == null) return;
+            string title = _questData.Title ?? "Quest";
+            float scale = Math.Min(FONT_SCALE_TITLE, (ControlSize.X - 65) / Math.Max(1f, _font.MeasureString(title).X));
+            var size = _font.MeasureString(title) * scale;
+            var pos = new Vector2((ControlSize.X - size.X) / 2, (HEADER_HEIGHT - size.Y) / 2 + 6);
+            sb.DrawString(_font, title, pos, Theme.TextGold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
         private void DrawContentSection(SpriteBatch sb)
@@ -668,25 +658,15 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         private void DrawButton(SpriteBatch sb, Rectangle rect, string text, bool hovered, Color accentColor)
         {
-            var pixel = GraphicsManager.Instance.Pixel;
-            if (pixel == null) return;
-
-            Color bg = hovered ? Color.Lerp(Theme.BgLight, accentColor, 0.35f) : Theme.BgDarkest;
-            UiDrawHelper.DrawPanel(sb, rect, bg, Theme.BorderInner, Theme.BorderOuter, Theme.BorderHighlight * 0.3f, hovered, Theme.Accent * 0.15f);
-
-            if (_font == null) return;
-
-            float scale = FONT_SCALE_BUTTON;
-            Vector2 size = _font.MeasureString(text) * scale;
-            Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
-
-            if (hovered)
+            if (_buttonNormal != null)
             {
-                sb.Draw(pixel, new Rectangle((int)pos.X - 12, (int)pos.Y - 4, (int)size.X + 24, (int)size.Y + 8), Theme.AccentGlow * 0.3f);
+                using var scope = new SpriteBatchScope(sb, blend: BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform);
+                sb.Draw(hovered ? _buttonHover : _buttonNormal, rect, Color.White);
             }
-
-            sb.DrawString(_font, text, pos + new Vector2(1, 1), Color.Black * 0.6f, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
-            sb.DrawString(_font, text, pos, hovered ? Theme.TextGold : Theme.TextWhite, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            if (_font == null) return;
+            float scale = FONT_SCALE_BODY;
+            var size = _font.MeasureString(text) * scale;
+            sb.DrawString(_font, text, new Vector2(rect.Center.X - size.X / 2, rect.Center.Y - size.Y / 2), Theme.TextGold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
         private Rectangle Translate(Rectangle rect)

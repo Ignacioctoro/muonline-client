@@ -1122,6 +1122,9 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(TradeControl.Instance))
                     return true;
 
+                if (IsWindowCovering(MyQuestsControl.Instance))
+                    return true;
+
                 if (IsWindowCovering(QuestDialogControl.Instance))
                     return true;
 
@@ -1272,6 +1275,7 @@ namespace Client.Main.Scenes
             Controls.Add(PetTrainerControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
+            Controls.Add(MyQuestsControl.Instance);
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);
@@ -3053,6 +3057,7 @@ namespace Client.Main.Scenes
                 DepthStencilState.None, RasterizerState.CullNone,
                 transform: UiScaler.SpriteTransform))
             {
+                MyQuestsControl.Instance.DrawTooltipOverlay(sprite);
                 NpcShopControl.Instance.DrawTooltipOverlay(sprite);
                 VaultControl.Instance.DrawTooltipOverlay(sprite);
                 ChaosMixControl.Instance.DrawTooltipOverlay(sprite);

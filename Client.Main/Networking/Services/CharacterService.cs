@@ -1949,6 +1949,17 @@ namespace Client.Main.Networking.Services
         /// <summary>
         /// Sends a legacy quest progress request (C1 A2). SourceMain5.2 sends NewState=1 for progression.
         /// </summary>
+        public async Task SendQuestRequestAsync(byte sub, ushort group = 0, ushort number = 0)
+        {
+            if (!_connectionManager.IsConnected) throw new InvalidOperationException("Not connected.");
+            byte[] data = Client.Main.Core.Client.QuestJournal.Request(sub, group, number);
+            await _connectionManager.Connection.SendAsync(() =>
+            {
+                data.AsSpan().CopyTo(_connectionManager.Connection.Output.GetSpan(data.Length));
+                return data.Length;
+            });
+        }
+
         public async Task SendLegacyQuestProceedRequestAsync(byte questNumber)
         {
             if (!_connectionManager.IsConnected)

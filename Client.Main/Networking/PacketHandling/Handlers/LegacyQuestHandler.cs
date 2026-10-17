@@ -158,7 +158,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             QuestIndex = res.QuestIndex,
                             Title = GetQuestTitle(res.QuestIndex),
                             NpcName = GetNpcName(res.QuestIndex),
-                            Description = $"Quest action failed (code {res.Result}).\\nPlease check requirements (Zen/items/level).",
+                            Description = $"Quest action failed (code {res.Result}).\nPlease check requirements (Zen/items/level).",
                             StateText = "Failed",
                             State = LegacyQuestState.Undefined,
                             CanProceed = false
@@ -230,7 +230,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-        private static QuestDialogControl.QuestData BuildQuestData(byte questIndex, LegacyQuestState state, CharacterState characterState, string blockReason)
+        internal static QuestDialogControl.QuestData BuildQuestData(byte questIndex, LegacyQuestState state, CharacterState characterState, string blockReason)
         {
             var requirements = new List<QuestDialogControl.QuestRequirement>();
             var requiredItems = new List<QuestDialogControl.QuestItem>();
@@ -313,25 +313,25 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         private static string GetQuestDescription(byte questIndex) => questIndex switch
         {
             0 =>
-                "Pay Zen to hear the story, then hunt and find the Scroll of Emperor.\\n" +
+                "Pay Zen to hear the story, then hunt and find the Scroll of Emperor.\n" +
                 "Bring it back to Sebina to proceed.",
             1 =>
-                "Pay Zen to receive the task.\\n" +
-                "Find the appropriate treasure for your class and return to Sebina.\\n" +
+                "Pay Zen to receive the task.\n" +
+                "Find the appropriate treasure for your class and return to Sebina.\n" +
                 "Reward: class change (1st -> 2nd).",
             2 =>
-                "Pay Zen to accept the quest.\\n" +
+                "Pay Zen to accept the quest.\n" +
                 "Find the Ring of Glory and return to Marlon.",
             3 =>
-                "After completing the Ring of Glory quest, find the Dark Stone and return to Marlon.\\n" +
+                "After completing the Ring of Glory quest, find the Dark Stone and return to Marlon.\n" +
                 "Reward: combo skill (for eligible classes).",
             4 =>
                 "Bring the required items to Priest Devin and pay Zen to proceed.",
             5 =>
-                "Enter the Barracks of Balgass and defeat the required monsters.\\n" +
+                "Enter the Barracks of Balgass and defeat the required monsters.\n" +
                 "Reward: additional stat points.",
             6 =>
-                "Enter the Refuge of Balgass and defeat the Dark Elf (Hero).\\n" +
+                "Enter the Refuge of Balgass and defeat the Dark Elf (Hero).\n" +
                 "Reward: class change (2nd -> 3rd) + additional stat points.",
             _ => "No description for this quest in this client."
         };
