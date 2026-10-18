@@ -32,7 +32,7 @@ public sealed class MyQuestsControl : UIControl
         public static readonly Color Complete = new(110, 220, 90);
         public static readonly Color Reward = new(120, 155, 255);
     }
-    private Texture2D _atlas, _button, _hover;
+    private Texture2D _atlas, _frame, _button, _hover;
     private RenderTarget2D _surface;
     private SpriteFont _font;
     private readonly BlendState _surfaceBlend = new()
@@ -57,7 +57,7 @@ public sealed class MyQuestsControl : UIControl
     private static readonly Rectangle RewardRect = new(215, 444, 291, 102);
     private static readonly Rectangle ActionRect = new(376, 558, 130, 36);
     private static readonly Rectangle CancelRect = new(234, 558, 132, 36);
-    private static readonly Rectangle CloseRect = new(488, 28, 24, 24);
+    private static readonly Rectangle CloseRect = new(488, 40, 24, 24);
 
     private MyQuestsControl()
     {
@@ -70,6 +70,7 @@ public sealed class MyQuestsControl : UIControl
 
     public override async Task Load()
     {
+        _frame = await TextureLoader.Instance.PrepareAndGetTexture(NewUiFrameRenderer.PersonalShopAtlasPath);
         _atlas = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/MyQuestInfo_I1.ozd");
         _button = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
         _hover = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
@@ -300,7 +301,7 @@ public sealed class MyQuestsControl : UIControl
         Scene?.SetMouseInputConsumed();
         if (CloseRect.Contains(local)) { CloseWindow(); return; }
         for (int i = 0; i < Categories.Length; i++)
-            if (new Rectangle(25, 105 + i * 28, 180, 28).Contains(local))
+            if (new Rectangle(25, 115 + i * 28, 180, 28).Contains(local))
             { _category = i; _selected = _listScroll = _detailScroll = 0; Rebuild(); return; }
         if (ListRect.Contains(local))
         {
@@ -318,7 +319,15 @@ public sealed class MyQuestsControl : UIControl
         if (ActionRect.Contains(local) && ActionEnabled)
         {
             if (Selected == null) { _ = Send(0x1A); return; }
-            if (Selected.Group == 0) { _message = "Talk to " + LegacyQuestHandler.BuildQuestData((byte)Selected.Number, State.GetLegacyQuestState((byte)Selected.Number), State, null).NpcName + "."; return; }
+            if (Selected.Group == 0)
+            {
+                string npc = LegacyQuestHandler.BuildQuestData((byte)Selected.Number, State.GetLegacyQuestState((byte)Selected.Number), State, null).NpcName;
+                string location = Selected.Number <= 1
+                    ? "Priestess Sevina (Sabina)\n\nDevias - Coordinates: 183, 31\n\nTalk to her to accept or complete this quest."
+                    : "Talk to " + npc + " to accept or complete this quest.";
+                RequestDialog.ShowInfo(location);
+                return;
+            }
             byte sub = ActionLabel switch { "Accept Quest" => 0x0B, "View Quest" => 0x0A, "Complete" => 0x0D, _ => 0x1B };
             _busy = true; _pendingSince = now;
             _ = Send(sub, Selected);
@@ -331,16 +340,17 @@ public sealed class MyQuestsControl : UIControl
         var device = GraphicsManager.Instance.GraphicsDevice;
         _surface = new RenderTarget2D(device, Width, Height);
         var targets = device.GetRenderTargets();
-        device.SetRenderTarget(_surface); device.Clear(Theme.Background);
+        device.SetRenderTarget(_surface); device.Clear(Color.Transparent);
         var sb = GraphicsManager.Instance.Sprite;
         using (new SpriteBatchScope(sb, blend: _surfaceBlend))
         {
-            // Atlas sprites inspected in OZD_Preview_GFx/MyQuestInfo_I1.png.
-            NewUiFrameRenderer.DrawNineSlice(sb, _atlas, new Rectangle(45, 0, 310, 376), new Rectangle(10, 68, 195, 540), 12, 12, 12, 14);
-            NewUiFrameRenderer.DrawNineSlice(sb, _atlas, new Rectangle(385, 2, 500, 338), new Rectangle(209, 72, 307, 202), 10, 10, 10, 10);
-            NewUiFrameRenderer.DrawNineSlice(sb, _atlas, new Rectangle(385, 2, 500, 338), new Rectangle(209, 278, 307, 164), 10, 10, 10, 10);
-            NewUiFrameRenderer.DrawNineSlice(sb, _atlas, new Rectangle(385, 2, 500, 338), new Rectangle(209, 443, 307, 106), 10, 10, 10, 10);
-            NewUiFrameRenderer.DrawNineSlice(sb, _atlas, new Rectangle(43, 391, 520, 73), new Rectangle(5, 0, 520, 73), 18, 18, 18, 12);
+            // Keep the ornament silhouette transparent; fill only the interior.
+            sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle(16, 78, Width - 32, Height - 94), Theme.Background);
+            NewUiFrameRenderer.DrawPersonalShopWindow(sb, _frame, new Rectangle(0, 0, Width, Height));
+            NewUiFrameRenderer.DrawPersonalShopInset(sb, _frame, new Rectangle(18, 80, 187, 522));
+            NewUiFrameRenderer.DrawPersonalShopInset(sb, _frame, new Rectangle(209, 80, 307, 194));
+            NewUiFrameRenderer.DrawPersonalShopInset(sb, _frame, new Rectangle(209, 278, 307, 164));
+            NewUiFrameRenderer.DrawPersonalShopInset(sb, _frame, new Rectangle(209, 443, 307, 106));
         }
         device.SetRenderTargets(targets);
     }
@@ -360,12 +370,13 @@ public sealed class MyQuestsControl : UIControl
         var sb = GraphicsManager.Instance.Sprite;
         using var scope = new SpriteBatchScope(sb, blend: BlendState.AlphaBlend, transform: UiScaler.SpriteTransform);
         sb.Draw(_surface, DisplayRectangle, Color.White);
-        Text(sb, "My Quests", 215, 33, Theme.Gold);
+        var titleSize = _font.MeasureString("My Quests") * 0.48f;
+        Text(sb, "My Quests", (Width - (int)titleSize.X) / 2, 52 - (int)titleSize.Y / 2, Theme.Gold, 400, 0.48f);
         // The same atlas provides the NewUI close states.
         using (new SpriteBatchScope(sb, blend: BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform))
             sb.Draw(_atlas, Screen(CloseRect), new Rectangle(40, 532, 20, 20), Color.White);
-        Text(sb, "Quest Group", 38, 80, Theme.Text, 165);
-        for (int i = 0; i < Categories.Length; i++) Text(sb, Categories[i], 28, 110 + i * 28, _category == i ? Theme.Gold : Theme.Text, 174);
+        Text(sb, "Quest Group", 38, 94, Theme.Text, 165);
+        for (int i = 0; i < Categories.Length; i++) Text(sb, Categories[i], 28, 120 + i * 28, _category == i ? Theme.Gold : Theme.Text, 174);
         for (int i = 0; i < 7 && _listScroll + i < _rows.Count; i++)
         {
             int index = _listScroll + i;

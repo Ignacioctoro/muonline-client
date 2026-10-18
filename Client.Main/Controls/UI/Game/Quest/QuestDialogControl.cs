@@ -32,9 +32,9 @@ namespace Client.Main.Controls.UI.Game.Quest
         private const int WINDOW_WIDTH = 480;
         private const int MIN_WINDOW_HEIGHT = 440;
         private const int MAX_WINDOW_HEIGHT = 680;
-        private const int HEADER_HEIGHT = 58;
+        private const int HEADER_HEIGHT = 86;
         private const int SECTION_SPACING = 12;
-        private const int PANEL_PADDING = 14;
+        private const int PANEL_PADDING = 22;
         private const int BUTTON_HEIGHT = 42;
         private const int BUTTON_WIDTH = 110;
         private const int BUTTON_GAP = 18;
@@ -197,11 +197,12 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         public override async Task Load()
         {
-            _questAtlas = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/NpcJobChangeQuest_I3.ozd");
+            _questAtlas = await TextureLoader.Instance.PrepareAndGetTexture(NewUiFrameRenderer.PersonalShopAtlasPath);
             _buttonNormal = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
             _buttonHover = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
             await base.Load();
             _font = GraphicsManager.Instance.Font;
+            RecalculateLayout();
             InvalidateStaticSurface();
         }
 
@@ -303,80 +304,30 @@ namespace Client.Main.Controls.UI.Game.Quest
             if (_font == null) _font = GraphicsManager.Instance.Font;
             if (_font == null) return;
 
-            int y = HEADER_HEIGHT + SECTION_SPACING;
-            int lineHeight = (int)(_font.LineSpacing * FONT_SCALE_BODY) + 6;
-
-            // Content section (description + state)
-            int descLines = WrapText(_questData?.Description ?? "", WINDOW_WIDTH - PANEL_PADDING * 4, FONT_SCALE_BODY).Count;
-            int contentHeight = Math.Max(80, descLines * lineHeight + 50);
-
-            // Requirements section
-            int reqCount = _questData?.Requirements?.Count ?? 0;
-            int requirementsHeight = reqCount > 0 ? 44 + reqCount * (lineHeight + 12) : 0;
-
-            // Items section (only show for Active or Complete quests, not Inactive)
-            bool showItems = _questData?.State == LegacyQuestState.Active || _questData?.State == LegacyQuestState.Complete;
-            int itemCount = showItems ? (_questData?.RequiredItems?.Count ?? 0) : 0;
-            int itemsHeight = itemCount > 0 ? 44 + itemCount * (lineHeight + 12) : 0;
-
-            // Footer (buttons)
-            int footerHeight = BUTTON_HEIGHT + 20;
-
-            // Total height
-            _calculatedHeight = y + contentHeight + SECTION_SPACING;
-            if (requirementsHeight > 0) _calculatedHeight += requirementsHeight + SECTION_SPACING;
-            if (itemsHeight > 0) _calculatedHeight += itemsHeight + SECTION_SPACING;
-            _calculatedHeight += footerHeight + PANEL_PADDING;
-
-            _calculatedHeight = Math.Clamp(_calculatedHeight, MIN_WINDOW_HEIGHT, MAX_WINDOW_HEIGHT);
-
-            ControlSize = new Point(WINDOW_WIDTH, _calculatedHeight);
-            ViewSize = ControlSize;
-
             BuildLayoutMetrics();
         }
 
         private void BuildLayoutMetrics()
         {
             _headerRect = new Rectangle(0, 0, WINDOW_WIDTH, HEADER_HEIGHT);
-
-            int y = HEADER_HEIGHT + SECTION_SPACING;
-
-            // Content (description) section
-            int contentHeight = 100;
-            _contentRect = new Rectangle(PANEL_PADDING, y, WINDOW_WIDTH - PANEL_PADDING * 2, contentHeight);
-            y += contentHeight + SECTION_SPACING;
-
-            // Requirements section (dynamic height based on content)
+            int y = HEADER_HEIGHT;
+            int lineHeight = (int)((_font?.LineSpacing ?? 32) * FONT_SCALE_BODY) + 4;
+            int contentWidth = WINDOW_WIDTH - PANEL_PADDING * 2;
+            int descLines = WrapText(_questData?.Description ?? "", contentWidth - 32, FONT_SCALE_BODY).Count;
+            int contentHeight = 28 + (descLines + 2) * lineHeight + 4;
+            _contentRect = new Rectangle(PANEL_PADDING, y, contentWidth, contentHeight);
+            y = _contentRect.Bottom + SECTION_SPACING;
             int reqCount = _questData?.Requirements?.Count ?? 0;
-            int reqHeight = reqCount > 0 ? 44 + reqCount * 36 : 0;
-            if (reqHeight > 0)
-            {
-                _requirementsRect = new Rectangle(PANEL_PADDING, y, WINDOW_WIDTH - PANEL_PADDING * 2, reqHeight);
-                y += reqHeight + SECTION_SPACING;
-            }
-            else
-            {
-                _requirementsRect = Rectangle.Empty;
-            }
-
-            // Items section (only show for Active or Complete quests, not Inactive)
+            _requirementsRect = reqCount == 0 ? Rectangle.Empty : new Rectangle(PANEL_PADDING, y, contentWidth, 48 + reqCount * 32);
+            if (reqCount > 0) y = _requirementsRect.Bottom + SECTION_SPACING;
             bool showItems = _questData?.State == LegacyQuestState.Active || _questData?.State == LegacyQuestState.Complete;
-            int itemCount = showItems ? (_questData?.RequiredItems?.Count ?? 0) : 0;
-            int itemsHeight = itemCount > 0 ? 44 + itemCount * 36 : 0;
-            if (itemsHeight > 0)
-            {
-                _itemsRect = new Rectangle(PANEL_PADDING, y, WINDOW_WIDTH - PANEL_PADDING * 2, itemsHeight);
-                y += itemsHeight + SECTION_SPACING;
-            }
-            else
-            {
-                _itemsRect = Rectangle.Empty;
-            }
-
-            // Footer with buttons
-            int footerY = _calculatedHeight - BUTTON_HEIGHT - 24 - PANEL_PADDING;
-            _footerRect = new Rectangle(PANEL_PADDING, footerY, WINDOW_WIDTH - PANEL_PADDING * 2, BUTTON_HEIGHT + 24);
+            int itemCount = showItems ? _questData?.RequiredItems?.Count ?? 0 : 0;
+            _itemsRect = itemCount == 0 ? Rectangle.Empty : new Rectangle(PANEL_PADDING, y, contentWidth, 48 + itemCount * 32);
+            if (itemCount > 0) y = _itemsRect.Bottom + SECTION_SPACING;
+            int footerY = y;
+            _footerRect = new Rectangle(PANEL_PADDING, footerY, contentWidth, BUTTON_HEIGHT + 20);
+            _calculatedHeight = _footerRect.Bottom + PANEL_PADDING;
+            ControlSize = ViewSize = new Point(WINDOW_WIDTH, _calculatedHeight);
 
             if (_infoOnly)
             {
@@ -466,15 +417,15 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         private void DrawWindowBackground(SpriteBatch sb, Rectangle rect)
         {
-            sb.Draw(GraphicsManager.Instance.Pixel, rect, new Color(20, 18, 15));
+            sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle(16, 78, rect.Width - 32, rect.Height - 94), new Color(20, 18, 15));
             if (_questAtlas != null)
-                NewUiFrameRenderer.DrawNineSlice(sb, _questAtlas, new Rectangle(0, 0, 320, 380), rect, 12, 12, 12, 14);
+                NewUiFrameRenderer.DrawPersonalShopWindow(sb, _questAtlas, rect);
         }
 
         private void DrawPanel(SpriteBatch sb, Rectangle rect, Color bg, bool withGlow = false)
         {
             if (_questAtlas != null)
-                NewUiFrameRenderer.DrawNineSlice(sb, _questAtlas, new Rectangle(332, 2, 307, 180), rect, 10, 10, 10, 10);
+                NewUiFrameRenderer.DrawPersonalShopInset(sb, _questAtlas, rect);
         }
 
         private void DrawSectionHeader(SpriteBatch sb, string title, int x, int y, int width)
@@ -498,13 +449,11 @@ namespace Client.Main.Controls.UI.Game.Quest
 
         private void DrawHeader(SpriteBatch sb)
         {
-            if (_questAtlas != null)
-                NewUiFrameRenderer.DrawNineSlice(sb, _questAtlas, new Rectangle(651, 0, 327, 75), new Rectangle(3, 0, ControlSize.X - 6, HEADER_HEIGHT), 16, 16, 16, 12);
             if (_font == null || _questData == null) return;
             string title = _questData.Title ?? "Quest";
             float scale = Math.Min(FONT_SCALE_TITLE, (ControlSize.X - 65) / Math.Max(1f, _font.MeasureString(title).X));
             var size = _font.MeasureString(title) * scale;
-            var pos = new Vector2((ControlSize.X - size.X) / 2, (HEADER_HEIGHT - size.Y) / 2 + 6);
+            var pos = new Vector2((ControlSize.X - size.X) / 2, 52 - size.Y / 2);
             sb.DrawString(_font, title, pos, Theme.TextGold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
         }
 
@@ -516,8 +465,8 @@ namespace Client.Main.Controls.UI.Game.Quest
 
             float scale = FONT_SCALE_BODY;
             int lineHeight = (int)(_font.LineSpacing * scale) + 4;
-            int x = _contentRect.X + 12;
-            int y = _contentRect.Y + 10;
+            int x = _contentRect.X + 16;
+            int y = _contentRect.Y + 16;
 
             // NPC and state
             if (!string.IsNullOrEmpty(_questData.NpcName))
@@ -540,7 +489,7 @@ namespace Client.Main.Controls.UI.Game.Quest
             }
 
             // Description (wrapped)
-            var lines = WrapText(_questData.Description ?? "", _contentRect.Width - 24, scale);
+            var lines = WrapText(_questData.Description ?? "", _contentRect.Width - 32, scale);
             foreach (var line in lines)
             {
                 if (y + lineHeight > _contentRect.Bottom - 8) break;
@@ -552,14 +501,14 @@ namespace Client.Main.Controls.UI.Game.Quest
         private void DrawRequirementsSection(SpriteBatch sb)
         {
             DrawPanel(sb, _requirementsRect, Theme.BgMid);
-            DrawSectionHeader(sb, "REQUIREMENTS", _requirementsRect.X, _requirementsRect.Y + 2, _requirementsRect.Width);
+            DrawSectionHeader(sb, "REQUIREMENTS", _requirementsRect.X, _requirementsRect.Y + 10, _requirementsRect.Width);
 
             if (_font == null || _questData?.Requirements == null) return;
 
             float scale = FONT_SCALE_BODY;
             int lineHeight = 32;
             int x = _requirementsRect.X + 12;
-            int y = _requirementsRect.Y + 32;
+            int y = _requirementsRect.Y + 40;
 
             foreach (var req in _questData.Requirements)
             {
@@ -581,25 +530,26 @@ namespace Client.Main.Controls.UI.Game.Quest
 
             // Label
             int labelX = x + 40;
-            DrawTextWithShadow(sb, req.Label, labelX, y, scale, Theme.TextGray);
+            
 
             // Value comparison
-            int valueX = _requirementsRect.Right - 120;
             string valueText = $"{req.CurrentValue} / {req.RequiredValue}";
+            int valueX = _requirementsRect.Right - 16 - (int)Math.Ceiling(_font.MeasureString(valueText).X * scale);
+            DrawTextWithShadow(sb, FitLabel(req.Label, valueX - labelX - 12, scale), labelX, y, scale, Theme.TextGray);
             DrawTextWithShadow(sb, valueText, valueX, y, scale, req.IsMet ? Theme.Success : Theme.Danger);
         }
 
         private void DrawItemsSection(SpriteBatch sb)
         {
             DrawPanel(sb, _itemsRect, Theme.BgMid);
-            DrawSectionHeader(sb, "REQUIRED ITEMS", _itemsRect.X, _itemsRect.Y + 2, _itemsRect.Width);
+            DrawSectionHeader(sb, "REQUIRED ITEMS", _itemsRect.X, _itemsRect.Y + 10, _itemsRect.Width);
 
             if (_font == null || _questData?.RequiredItems == null) return;
 
             float scale = FONT_SCALE_BODY;
             int lineHeight = 32;
             int x = _itemsRect.X + 12;
-            int y = _itemsRect.Y + 32;
+            int y = _itemsRect.Y + 40;
 
             foreach (var item in _questData.RequiredItems)
             {
@@ -621,14 +571,23 @@ namespace Client.Main.Controls.UI.Game.Quest
 
             // Item name
             int labelX = x + 40;
-            DrawTextWithShadow(sb, item.Name, labelX, y, scale, Theme.TextGray);
+            
 
             // Count
-            int valueX = _itemsRect.Right - 80;
             string countText = item.RequiredCount > 1
                 ? $"{item.CurrentCount} / {item.RequiredCount}"
                 : (item.IsMet ? "In Inventory" : "Missing");
+            int valueX = _itemsRect.Right - 16 - (int)Math.Ceiling(_font.MeasureString(countText).X * scale);
+            DrawTextWithShadow(sb, FitLabel(item.Name, valueX - labelX - 12, scale), labelX, y, scale, Theme.TextGray);
             DrawTextWithShadow(sb, countText, valueX, y, scale, item.IsMet ? Theme.Success : Theme.Danger);
+        }
+
+        private string FitLabel(string text, int width, float scale)
+        {
+            text ??= "";
+            if (_font.MeasureString(text).X * scale <= width) return text;
+            while (text.Length > 0 && _font.MeasureString(text + "...").X * scale > width) text = text[..^1];
+            return text + "...";
         }
 
         private void DrawFooterSection(SpriteBatch sb)
