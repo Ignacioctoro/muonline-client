@@ -67,17 +67,17 @@
     "Name": "Bar1",
     "ScreenX": 410,
     "ScreenY": 633,
-    "Width": 10,
+    "Width": 106,
     "Height": 18,
-    "Z": 0
+    "Z": 2
   },
   {
     "Name": "Bar2",
-    "ScreenX": 852,
+    "ScreenX": 756,
     "ScreenY": 630,
-    "Width": 10,
+    "Width": 106,
     "Height": 18,
-    "Z": 0
+    "Z": 2
   },
   {
     "Name": "1",

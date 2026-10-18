@@ -1,4 +1,4 @@
-﻿using Client.Main.Controllers;
+using Client.Main.Controllers;
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Game.Hud;
 using Client.Main.Controls.UI.Game.Inventory;
@@ -42,6 +42,8 @@ namespace Client.Main.Controls.UI.Game
         private readonly MapPositionHudControl _mapPositionHud;
         private readonly PetStatusHudControl _petStatusHud;
         private ExperienceBarControl _experienceBar;
+        private ResourceBarControl _shieldBar;
+        private ResourceBarControl _abilityBar;
         private TextureControl _experienceDigit;
         private int _lastExperienceDigit = -1;
 
@@ -259,6 +261,11 @@ namespace Client.Main.Controls.UI.Game
             ControlFactories["InventoryButton"] =
                 CreateHudButton;
 
+            ControlFactories["button2"] = CreateHudButton;
+            ControlFactories["button4"] = CreateHudButton;
+            ControlFactories["Bar1"] = _ => _shieldBar = new ResourceBarControl(state, true);
+            ControlFactories["Bar2"] = _ => _abilityBar = new ResourceBarControl(state, false);
+
             ControlFactories["SettingsButton"] =
                 CreateHudButton;
 
@@ -373,6 +380,27 @@ namespace Client.Main.Controls.UI.Game
             // =========================================================
             // SETTINGS BUTTON
             // =========================================================
+
+            if (Controls.FirstOrDefault(c => c.Name == "button2") is TextureControl characterButton)
+            {
+                characterButton.BringToFront();
+                characterButton.Click += (_, _) =>
+                {
+                    Scene?.SetMouseInputConsumed();
+                    (Scene as GameScene)?.ToggleCharacterInfoWindow();
+                };
+            }
+
+            if (Controls.FirstOrDefault(c => c.Name == "button4") is TextureControl questButton)
+            {
+                questButton.BringToFront();
+                questButton.Click += (_, _) =>
+                {
+                    Scene?.SetMouseInputConsumed();
+                    Quest.MyQuestsControl.Instance.Toggle();
+                    SoundController.Instance?.PlayBuffer("Sound/iButtonClick.wav");
+                };
+            }
 
             if (Controls.FirstOrDefault(
                     c => c.Name == "SettingsButton")
@@ -898,14 +926,16 @@ namespace Client.Main.Controls.UI.Game
         public bool HasExperienceTooltip =>
             Status == GameControlStatus.Ready &&
             Visible &&
-            _experienceBar != null &&
-            _experienceBar.Visible &&
-            _experienceBar.IsMouseOver;
+            ((_experienceBar?.IsMouseOver == true && _experienceBar.Visible) ||
+             (_shieldBar?.IsMouseOver == true && _shieldBar.Visible) ||
+             (_abilityBar?.IsMouseOver == true && _abilityBar.Visible));
 
         public void DrawExperienceTooltip(GameTime gameTime)
         {
-            if (HasExperienceTooltip)
-                _experienceBar.DrawTooltip(gameTime);
+            if (!HasExperienceTooltip) return;
+            _experienceBar?.DrawTooltip(gameTime);
+            _shieldBar?.DrawTooltip(gameTime);
+            _abilityBar?.DrawTooltip(gameTime);
         }
 
         // =============================================================

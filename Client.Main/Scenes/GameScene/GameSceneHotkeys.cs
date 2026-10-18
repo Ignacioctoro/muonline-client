@@ -471,7 +471,9 @@ namespace Client.Main.Scenes
             }
         }
 
-        private void ToggleCharacterInfo(HotkeyContext context)
+        private void ToggleCharacterInfo(HotkeyContext context) => ToggleCharacterInfoWindow();
+
+        public void ToggleCharacterInfoWindow()
         {
             if (_characterInfoWindow == null)
             {

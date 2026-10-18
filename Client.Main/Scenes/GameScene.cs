@@ -73,6 +73,7 @@ namespace Client.Main.Scenes
         private GameSceneNotificationController _notificationController;
         private GameScenePlayerMenuController _playerMenuController;
         private GameSceneHotkeys _hotkeys;
+        public void ToggleCharacterInfoWindow() => _hotkeys?.ToggleCharacterInfoWindow();
         private GameSceneScopeImportController _scopeImportController;
         private GameSceneObjectEditorController _objectEditorController;
         private GameSceneDuelController _duelController;

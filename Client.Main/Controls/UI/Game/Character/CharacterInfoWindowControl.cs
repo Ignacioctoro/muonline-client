@@ -296,14 +296,19 @@ namespace Client.Main.Controls.UI.Game.Character
                     _statIncreaseButtonTexture == null ? "+" : null);
             }
 
-            // Season 6 compatibility buttons: visual feedback only, no nonexistent windows.
+            // Keep the Season 6 Quest shortcut connected to the shared journal.
             Rectangle buttonNormal = s_attributeBandSource;
             _petButton = CreateButton(new Rectangle(23, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
                 () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "PETS");
             _skillsButton = CreateButton(new Rectangle(127, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
-                () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "SKILLS");
+                () =>
+                {
+                    Scene?.SetMouseInputConsumed();
+                    Client.Main.Controls.UI.Game.Quest.MyQuestsControl.Instance.Toggle();
+                    SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+                }, "QUEST");
             _masterButton = CreateButton(new Rectangle(231, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
                 () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "MASTER");
