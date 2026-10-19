@@ -16,6 +16,10 @@ namespace Client.Main.Core.Client
         public byte PositionY { get; set; }
         public uint CurrentHealth { get; set; }
         public uint MaximumHealth { get; set; }
+        public uint? CurrentMana { get; set; }
+        public uint MaximumMana { get; set; }
+        public float? ManaPercentage => CurrentMana.HasValue && MaximumMana > 0
+            ? Math.Clamp((float)CurrentMana.Value / MaximumMana, 0f, 1f) : null;
         public float HealthPercentage => MaximumHealth > 0 ? (float)CurrentHealth / MaximumHealth : 0;
     }
 
@@ -39,6 +43,10 @@ namespace Client.Main.Core.Client
         public void UpdatePartyList(List<PartyMemberInfo> members)
         {
             _logger.LogDebug("Updating party list with {Count} members.", members.Count);
+            // Preserve received mana only while the party index still identifies the same player.
+            foreach (var member in members)
+                if (_partyMembers.TryGetValue(member.Index, out var previous) && previous.Name == member.Name)
+                { member.CurrentMana = previous.CurrentMana; member.MaximumMana = previous.MaximumMana; }
             _partyMembers.Clear();
             foreach (var member in members)
             {
@@ -74,6 +82,16 @@ namespace Client.Main.Core.Client
                     OnPartyUpdated();
                 }
             }
+        }
+
+        public void UpdateMemberVitals(byte index, uint health, uint maximumHealth, uint mana, uint maximumMana)
+        {
+            if (!_partyMembers.TryGetValue(index, out var member)) return;
+            member.CurrentHealth = Math.Min(health, maximumHealth);
+            member.MaximumHealth = maximumHealth;
+            member.CurrentMana = Math.Min(mana, maximumMana);
+            member.MaximumMana = maximumMana;
+            OnPartyUpdated();
         }
 
         public void UpdateMemberPosition(ushort id, byte x, byte y)
