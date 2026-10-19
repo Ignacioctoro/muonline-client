@@ -203,8 +203,10 @@ namespace Client.Main.ClassicFX.Core
 
             if (e.SubType == 2)
             {
-                if (e.ModelView != null)
-                    e.ModelView.HiddenMesh = 0;
+                // Data_Broyal's Magic02.bmd has a single visible wave mesh.
+                // The original HiddenMesh=0 removes that entire mesh in the
+                // MonoGame renderer. Keep the subtype's particles and lights
+                // while preserving the BMD visibility set at creation.
                 CreateParticle(ClassicTextureIds.BitmapSmoke,
                     e.Position, e.Angle, new Vector3(0.3f, 0.6f, 1f),
                     subType: 11,
