@@ -1613,6 +1613,30 @@ namespace Client.Main.Scenes
                     extraTargetId: extraTargetId,
                     animationCounter: animationCounter);
 
+            // Power Slash's 0.30s moving projectiles must begin immediately
+            // when the accepted local cast starts. Depending on the OpenMU
+            // server/version, a 0x1E animation echo may arrive too late or
+            // not produce a visible local client effect. The ClassicFX
+            // emitter deduplicates its own immediate/0x1E/0x19 emissions,
+            // so server-confirmed visuals are not drawn twice.
+            if (skill.SkillId == 56 &&
+                _scene.World is WalkableWorldControl slashWorld)
+            {
+                var slashContext = new Client.Main.Objects.Effects.Skills.SkillEffectContext
+                {
+                    Caster = hero,
+                    TargetId = extraTargetId,
+                    SkillId = skill.SkillId,
+                    World = slashWorld
+                };
+                bool spawned = Client.Main.Objects.Effects.Skills
+                    .SkillVisualEffectRegistry.TrySpawn(
+                        skill.SkillId, slashContext, out _);
+                _logger?.LogInformation(
+                    "[ClassicFX][PowerSlash] Local cast visual dispatch: {Spawned}",
+                    spawned);
+            }
+
             return true;
         }
 
