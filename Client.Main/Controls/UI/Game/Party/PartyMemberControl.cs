@@ -1,204 +1,142 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Client.Main.Content;
+using Client.Main.Controllers;
 using Client.Main.Controls.UI.Common;
+using Client.Main.Controls.UI.Game.Buffs;
 using Client.Main.Core.Client;
+using Client.Main.Core.Models;
 using Client.Main.Core.Utilities;
+using Client.Main.Helpers;
+using Client.Main.Models;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.Controls.UI.Game.Party
 {
     public class PartyMemberControl : UIControl
     {
-        private readonly LabelControl _nameLabel;
-        private readonly LabelControl _infoLabel;
-        
-        private readonly LabelControl _healthPercentLabel;
+        public const int RowWidth = 230;
+        public const int RowHeight = 92;
+        private Texture2D _background, _selected, _hp, _mp, _crown;
         private readonly ButtonControl _leaveButton;
-
-        private readonly ColorBarControl[] _healthSegments;
-
+        private readonly BuffSlotControl[] _buffs = new BuffSlotControl[10];
+        private string _location = "", _healthText = "";
+        private double _refreshTime;
+        private bool _inScope;
         public PartyMemberInfo MemberInfo { get; private set; }
         public bool IsCurrentPlayer { get; private set; }
 
         public PartyMemberControl()
         {
             AutoViewSize = false;
-            ViewSize = new Point(160, 48);
-            BackgroundColor = new Color(15, 15, 25) * 0.9f;
-            BorderColor = new Color(100, 150, 200) * 0.8f;
-            BorderThickness = 1;
-
-            _nameLabel = new LabelControl
-            {
-                X = 6,
-                Y = 4,
-                FontSize = 11f,
-                TextColor = Color.White,
-                IsBold = true,
-                HasShadow = true,
-                ShadowColor = Color.Black,
-                ShadowOffset = new Vector2(1, 1),
-                ShadowOpacity = 0.8f
-            };
-
-            _healthSegments = new ColorBarControl[4];
-            int segmentWidth = 30;
-            int segmentSpacing = 2;
-
-            for (int i = 0; i < 4; i++)
-            {
-                _healthSegments[i] = new ColorBarControl
-                {
-                    X = 6 + i * (segmentWidth + segmentSpacing),
-                    Y = 20,
-                    ViewSize = new Point(segmentWidth, 7),
-                    BackgroundColor = new Color(60, 20, 20) * 0.8f,
-                    FillColor = GetHealthSegmentColor(i),
-                    BorderColor = Color.Black * 0.8f,
-                    BorderThickness = 1
-                };
-                Controls.Add(_healthSegments[i]);
-            }
-
-            _healthPercentLabel = new LabelControl
-            {
-                X = 4 * (segmentWidth + segmentSpacing) + 5,
-                Y = 18,
-                FontSize = 8f,
-                TextColor = Color.Yellow,
-                IsBold = true,
-                HasShadow = true,
-                ShadowColor = Color.Black,
-                ShadowOffset = new Vector2(1, 1),
-                ShadowOpacity = 0.8f
-            };
-
-            _infoLabel = new LabelControl
-            {
-                X = 6,
-                Y = 28,
-                FontSize = 9f,
-                TextColor = Color.LightBlue,
-                HasShadow = true,
-                ShadowColor = Color.Black,
-                ShadowOffset = new Vector2(1, 1),
-                ShadowOpacity = 0.7f
-            };
-
+            ViewSize = ControlSize = new Point(RowWidth, RowHeight);
+            BackgroundColor = Color.Transparent;
+            BorderThickness = 0;
             _leaveButton = new ButtonControl
             {
-                X = ViewSize.X - 18,
-                Y = 3,
-                ViewSize = new Point(15, 15),
-                Text = "×",
-                FontSize = 12f,
-                TextColor = Color.White,
-                BackgroundColor = new Color(150, 50, 50) * 0.8f,
-                BorderColor = new Color(200, 100, 100),
-                BorderThickness = 1,
-                Visible = false,
+                X = 207, Y = 5, AutoViewSize = false, ViewSize = new Point(18, 18),
+                TexturePath = "Interface/GFx/party_xbtn01_1.ozd", Visible = false,
+                BackgroundColor = Color.Transparent, BorderThickness = 0
             };
-            _leaveButton.Click += OnLeaveButtonClick;
-
-            Controls.Add(_nameLabel);
-            Controls.Add(_infoLabel);
-            Controls.Add(_healthPercentLabel);
+            _leaveButton.Click += (_, _) =>
+            {
+                if (!IsCurrentPlayer || MemberInfo == null) return;
+                Scene?.SetMouseInputConsumed();
+                _ = MuGame.Network?.GetCharacterService()?.SendPartyKickRequestAsync(MemberInfo.Index);
+            };
             Controls.Add(_leaveButton);
+            for (int i = 0; i < _buffs.Length; i++)
+            {
+                _buffs[i] = new BuffSlotControl { X = 5 + i * 22, Y = 62, Visible = false };
+                Controls.Add(_buffs[i]);
+            }
         }
 
-        private Color GetHealthSegmentColor(int segmentIndex)
+        public override async Task Load()
         {
-            switch (segmentIndex)
-            {
-                case 0: return new Color(220, 20, 20);
-                case 1: return new Color(220, 20, 20);
-                case 2: return new Color(220, 20, 20);
-                case 3: return new Color(220, 20, 20);
-                default: return Color.Red;
-            }
+            var loader = TextureLoader.Instance;
+            _background = await loader.PrepareAndGetTexture("Interface/GFx/party_bg.ozd");
+            _selected = await loader.PrepareAndGetTexture("Interface/GFx/party_bg01.ozd");
+            _hp = await loader.PrepareAndGetTexture("Interface/GFx/party_hpbar.ozd");
+            _mp = await loader.PrepareAndGetTexture("Interface/GFx/party_mpbar.ozd");
+            _crown = await loader.PrepareAndGetTexture("Interface/GFx/party_crown.ozd");
+            await base.Load();
         }
 
         public void UpdateData(PartyMemberInfo memberInfo, bool isCurrentPlayer = false)
         {
             MemberInfo = memberInfo;
             IsCurrentPlayer = isCurrentPlayer;
-
-            _nameLabel.Text = memberInfo.Name;
-
-            _healthPercentLabel.Text = $"{(int)(memberInfo.HealthPercentage * 100)}%";
-
-            if (memberInfo.HealthPercentage <= 0.25f)
-                _healthPercentLabel.TextColor = Color.Red;
-            else if (memberInfo.HealthPercentage <= 0.5f)
-                _healthPercentLabel.TextColor = Color.Orange;
-            else
-                _healthPercentLabel.TextColor = Color.LimeGreen;
-
-            if (memberInfo.HealthPercentage <= 0.25f)
-                _nameLabel.TextColor = Color.Red;
-            else if (memberInfo.HealthPercentage <= 0.5f)
-                _nameLabel.TextColor = Color.Orange;
-            else
-                _nameLabel.TextColor = Color.White;
-
-            UpdateHealthSegments(memberInfo.HealthPercentage);
-
-            string mapName = MapDatabase.GetMapName(memberInfo.MapId);
-            _infoLabel.Text = $"{mapName} ({memberInfo.PositionX}, {memberInfo.PositionY})";
-
+            _healthText = $"{Math.Clamp((int)(memberInfo.HealthPercentage * 100), 0, 100)}%";
+            _location = $"{MapDatabase.GetMapName(memberInfo.MapId)} ({memberInfo.PositionX}, {memberInfo.PositionY})";
             _leaveButton.Visible = isCurrentPlayer;
+        }
 
-            if (isCurrentPlayer)
+        public override void Update(GameTime gameTime)
+        {
+            base.Update(gameTime);
+            if (MemberInfo == null) return;
+            _refreshTime -= gameTime.ElapsedGameTime.TotalSeconds;
+            if (_refreshTime > 0) return;
+            _refreshTime = 0.5;
+            var state = MuGame.Network?.GetCharacterState();
+            var scope = MuGame.Network?.GetScopeManager();
+            ushort? id = IsCurrentPlayer ? state?.Id : null;
+            if (!IsCurrentPlayer && scope != null)
             {
-                BorderColor = new Color(150, 200, 100) * 0.9f; // Zielona ramka
-                BackgroundColor = new Color(15, 25, 15) * 0.9f; // Lekko zielone tło
+                // PartyList identifies members by name, not by a reliable remote object ID.
+                foreach (var entry in scope.GetScopeItems(ScopeObjectType.Player))
+                    if (entry is PlayerScopeObject player && string.Equals(player.Name, MemberInfo.Name, StringComparison.OrdinalIgnoreCase))
+                    { id = player.Id; break; }
             }
-            else
+            _inScope = id.HasValue;
+            var active = id.HasValue && state != null
+                ? state.GetActiveBuffsForPlayer(id.Value).Where(b => BuffIconAtlas.ShouldRender(b.EffectId))
+                    .OrderBy(b => BuffIconAtlas.IsDebuff(b.EffectId)).ThenBy(b => b.EffectId).Take(_buffs.Length).ToArray()
+                : Array.Empty<ActiveBuffState>();
+            for (int i = 0; i < _buffs.Length; i++)
             {
-                BorderColor = new Color(100, 150, 200) * 0.8f; // Standardowa ramka
-                BackgroundColor = new Color(15, 15, 25) * 0.9f; // Standardowe tło
+                _buffs[i].Buff = i < active.Length ? active[i] : null;
+                _buffs[i].Visible = i < active.Length;
             }
         }
 
-        private void UpdateHealthSegments(float healthPercentage)
+        public override void Draw(GameTime gameTime)
         {
-            float segmentSize = 0.25f;
-
-            for (int i = 0; i < 4; i++)
+            if (!Visible || Status != GameControlStatus.Ready || MemberInfo == null) return;
+            var sb = GraphicsManager.Instance.Sprite;
+            using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
+                transform: UiScaler.SpriteTransform);
+            var rect = DisplayRectangle;
+            var background = IsCurrentPlayer ? _selected ?? _background : _background;
+            // These are complete standalone GFx sprites; no atlas gutters or generated frame.
+            if (background != null) sb.Draw(background, new Rectangle(rect.X, rect.Y, RowWidth, 52), Color.White);
+            if (MemberInfo.Index == 0 && _crown != null)
+                sb.Draw(_crown, new Rectangle(rect.X + 7, rect.Y + 25, 24, 12), Color.White);
+            float health = Math.Clamp(MemberInfo.HealthPercentage, 0f, 1f);
+            if (_hp != null && health > 0)
+                sb.Draw(_hp, new Rectangle(rect.X + 34, rect.Y + 28, (int)(190 * health), 6), Color.White);
+            var state = MuGame.Network?.GetCharacterState();
+            if (IsCurrentPlayer && state != null && _mp != null && state.MaximumMana > 0)
             {
-                float segmentStart = i * segmentSize;
-                float segmentEnd = (i + 1) * segmentSize;
-
-                if (healthPercentage <= segmentStart)
-                {
-                    _healthSegments[i].Percentage = 0f;
-                }
-                else if (healthPercentage >= segmentEnd)
-                {
-                    _healthSegments[i].Percentage = 1f;
-                }
-                else
-                {
-                    float segmentFill = (healthPercentage - segmentStart) / segmentSize;
-                    _healthSegments[i].Percentage = segmentFill;
-                }
-
-                if (healthPercentage <= 0.25f && i == 0)
-                {
-                    _healthSegments[i].Alpha = 0.5f + (float)(System.Math.Sin(System.DateTime.Now.Millisecond * 0.01) * 0.3);
-                }
-                else
-                {
-                    _healthSegments[i].Alpha = 1f;
-                }
+                float mana = Math.Clamp((float)state.CurrentMana / state.MaximumMana, 0f, 1f);
+                if (mana > 0) sb.Draw(_mp, new Rectangle(rect.X + 34, rect.Y + 38, (int)(190 * mana), 4), Color.White);
             }
+            if (!IsCurrentPlayer) Text(sb, "MP --", rect.X + 35, rect.Y + 35, 7, Color.Gray);
+            Text(sb, MemberInfo.Name, rect.X + 35, rect.Y + 8, 11, _inScope ? Color.White : Color.Gray);
+            Text(sb, _healthText, rect.X + 5, rect.Y + 9, 8, Color.Gold);
+            Text(sb, _location, rect.X + 5, rect.Y + 49, 9, new Color(190, 190, 180));
+            // Remote mana is not part of the Season 6 party packets. Never invent it.
+            for (int i = 0; i < Controls.Count; i++) Controls[i].Draw(gameTime);
         }
 
-        private void OnLeaveButtonClick(object sender, System.EventArgs e)
+        private static void Text(SpriteBatch sb, string text, int x, int y, float size, Color color)
         {
-            if (IsCurrentPlayer && MemberInfo != null)
-            {
-                var characterService = MuGame.Network?.GetCharacterService();
-                _ = characterService?.SendPartyKickRequestAsync(MemberInfo.Index);
-            }
+            var font = GraphicsManager.Instance.Font;
+            if (font != null) sb.DrawString(font, text, new Vector2(x, y), color, 0,
+                Vector2.Zero, size / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0);
         }
     }
 }

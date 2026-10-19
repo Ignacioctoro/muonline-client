@@ -1804,6 +1804,21 @@ namespace Client.Main.Core.Client
                 .OrderBy(b => b.ActivatedAt);
         }
 
+        public IEnumerable<ActiveBuffState> GetActiveBuffsForPlayer(ushort playerId)
+        {
+            ushort masked = (ushort)(playerId & 0x7FFF);
+            return _activeBuffs.Values.Where(b => b.PlayerIdMasked == masked);
+        }
+
+        public void ClearPlayerBuffs(ushort playerId)
+        {
+            ushort masked = (ushort)(playerId & 0x7FFF);
+            bool changed = false;
+            foreach (var key in _activeBuffs.Keys)
+                if (key.PlayerIdMasked == masked) changed |= _activeBuffs.TryRemove(key, out _);
+            if (changed) ActiveBuffsChanged?.Invoke();
+        }
+
         public bool HasActiveBuff(byte effectId, ushort playerId)
         {
             ushort maskedId = (ushort)(playerId & 0x7FFF);

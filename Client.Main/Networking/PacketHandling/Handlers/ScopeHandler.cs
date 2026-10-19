@@ -264,6 +264,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         effectCount,
                         appearanceAndEffects.Length - 28);
 
+                    _characterState.ClearPlayerBuffs(raw);
                     for (int e = 0; e < availableEffects; e++)
                     {
                         byte effectId = appearanceAndEffects[28 + e];
@@ -338,6 +339,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     ushort masked = (ushort)(raw & 0x7FFF);
                     var cls = ClassFromAppearance(c.Appearance);
 
+                    _characterState.ClearPlayerBuffs(raw);
                     if (c.EffectCount > 0)
                     {
                         for (int e = 0; e < c.EffectCount; e++)
@@ -1689,6 +1691,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     ushort raw = outPkt[i].Id;
                     ushort masked = (ushort)(raw & 0x7FFF);
                     objectsToRemove.Add(masked);
+                    _characterState.ClearPlayerBuffs(masked);
                     _scopeManager.RemoveObjectFromScope(masked);
                 }
 

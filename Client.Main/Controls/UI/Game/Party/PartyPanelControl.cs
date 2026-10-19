@@ -21,8 +21,16 @@ namespace Client.Main.Controls.UI.Game.Party
         public PartyPanelControl()
         {
             _logger = MuGame.AppLoggerFactory.CreateLogger<PartyPanelControl>();
-            Align = ControlAlign.Top | ControlAlign.Left;
-            Margin = new Margin { Top = 10, Left = 10 };
+            Align = ControlAlign.Top | ControlAlign.Right;
+            AutoViewSize = false;
+            ViewSize = new Point(PartyMemberControl.RowWidth, 28);
+            Margin = new Margin { Top = 12, Right = 10 };
+            Controls.Add(new TextureControl
+            {
+                Name = "PartyHeader", AutoViewSize = false, ViewSize = new Point(PartyMemberControl.RowWidth, 24),
+                TexturePath = "Interface/GFx/party_gragbar.ozd"
+            });
+            Controls.Add(new LabelControl { Text = "Party", X = 96, Y = 4, FontSize = 12, TextColor = Color.Gold });
             Visible = false;
         }
 
@@ -36,46 +44,35 @@ namespace Client.Main.Controls.UI.Game.Party
                 _partyManager.PartyUpdated += OnPartyUpdated;
             }
             await base.Load();
+            if (_partyManager != null) MuGame.ScheduleOnMainThread(OnPartyUpdated);
         }
 
         private void OnPartyUpdated()
         {
             _logger.LogDebug("PartyPanelControl.OnPartyUpdated fired.");
-            // Clear previous controls to rebuild the list
-            foreach (var control in Controls)
-            {
-                control.Dispose();
-            }
-            Controls.Clear();
-
             var members = _partyManager.GetPartyMembers();
-            _logger.LogDebug("Party contains {Count} members.", members.Count);
-
-            if (members.Count <= 1)
+            for (int i = Controls.Count - 1; i >= 0; i--)
             {
-                Visible = false;
-                _logger.LogDebug("Party empty, hiding panel.");
-                return;
+                if (Controls[i] is PartyMemberControl row &&
+                    !members.Any(m => m.Index == row.MemberInfo.Index && m.Name == row.MemberInfo.Name))
+                { row.Dispose(); Controls.Remove(row); }
             }
-
-            Visible = true;
-            _logger.LogDebug("Party not empty, showing panel.");
-            int currentY = 0;
+            Visible = members.Count > 1;
+            int currentY = 28;
             foreach (var member in members)
             {
-                var memberControl = new PartyMemberControl
+                var row = Controls.OfType<PartyMemberControl>().FirstOrDefault(c => c.MemberInfo.Index == member.Index);
+                if (row == null)
                 {
-                    Y = currentY
-                };
-
-                bool isCurrentPlayer = IsCurrentPlayer(member);
-
-                memberControl.UpdateData(member, isCurrentPlayer);
-                Controls.Add(memberControl);
-                // Initialize is needed so child controls (labels, etc.) can load their resources.
-                _ = memberControl.Initialize();
-                currentY += memberControl.ViewSize.Y + VerticalSpacing;
+                    row = new PartyMemberControl();
+                    row.UpdateData(member, IsCurrentPlayer(member));
+                    Controls.Add(row);
+                }
+                else row.UpdateData(member, IsCurrentPlayer(member));
+                row.Y = currentY;
+                currentY += PartyMemberControl.RowHeight + VerticalSpacing;
             }
+            ViewSize = new Point(PartyMemberControl.RowWidth, currentY);
         }
 
         private bool IsCurrentPlayer(PartyMemberInfo member)
