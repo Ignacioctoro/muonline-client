@@ -3,6 +3,7 @@ using Client.Main.ClassicFX.Data;
 using Client.Main.Controllers;
 using Client.Main.Graphics;
 using Microsoft.Xna.Framework;
+using Microsoft.Extensions.Logging;
 
 namespace Client.Main.ClassicFX.Core
 {
@@ -27,15 +28,35 @@ namespace Client.Main.ClassicFX.Core
         // Up to 12 overlapping casts, no transient WorldObjects or SpriteBatch.
         private readonly MgSlashArc[] _mgSlashArcs = new MgSlashArc[60];
         private bool _mgSlashReported;
+        private object _mgSlashLastCaster;
+        private double _mgSlashLastCastMs = -1d;
+        private ILogger _mgSlashLogger;
 
-        public bool EmitMgPowerSlash(Vector3 origin, Vector3 casterAngle)
+        public bool EmitMgPowerSlash(Vector3 origin, Vector3 casterAngle, object caster)
         {
             if (_disposed || !Enabled) return false;
-            if (!Textures.TryGet(ClassicTextureIds.BitmapShiny + 1, out _) ||
-                !Textures.TryGet(ClassicTextureIds.BitmapLight, out _))
+
+            // Local prediction and server 0x1E/0x19 echoes can all visit the
+            // visual registry. Suppress only the *same caster* in the short
+            // echo window; do not double the five-projectile sequence.
+            double now = Clock.WorldTimeMilliseconds;
+            if (caster != null && ReferenceEquals(_mgSlashLastCaster, caster) &&
+                _mgSlashLastCastMs >= 0d &&
+                now >= _mgSlashLastCastMs && now - _mgSlashLastCastMs < 100d)
+                return true;
+
+            _mgSlashLogger ??= MuGame.AppLoggerFactory?
+                .CreateLogger("ClassicFX.PowerSlash");
+            bool shinyReady = Textures.TryGet(
+                ClassicTextureIds.BitmapShiny + 1, out _);
+            bool flareReady = Textures.TryGet(
+                ClassicTextureIds.BitmapLight, out _);
+            if (!shinyReady || !flareReady)
             {
                 if (!_mgSlashReported)
-                    Console.WriteLine("[ClassicFX][PowerSlash] Shiny02/flare01 not loaded.");
+                    _mgSlashLogger?.LogWarning(
+                        "[ClassicFX][PowerSlash] Missing texture: Shiny02={ShinyReady}, flare01={FlareReady}.",
+                        shinyReady, flareReady);
                 _mgSlashReported = true;
                 return false;
             }
@@ -56,8 +77,20 @@ namespace Client.Main.ClassicFX.Core
                 };
                 ++count;
             }
-            if (!_mgSlashReported)
-                Console.WriteLine($"[ClassicFX][PowerSlash] emitted {count} arcs from ClassicFX.");
+            if (count > 0)
+            {
+                _mgSlashLastCaster = caster;
+                _mgSlashLastCastMs = now;
+                if (!_mgSlashReported)
+                    _mgSlashLogger?.LogInformation(
+                        "[ClassicFX][PowerSlash] Emitted {ArcCount} moving ClassicFX arcs.",
+                        count);
+            }
+            else if (!_mgSlashReported)
+            {
+                _mgSlashLogger?.LogWarning(
+                    "[ClassicFX][PowerSlash] Arc pool exhausted; no projectiles emitted.");
+            }
             _mgSlashReported = true;
             return count > 0;
         }
@@ -114,6 +147,8 @@ namespace Client.Main.ClassicFX.Core
         {
             Array.Clear(_mgSlashArcs);
             _mgSlashReported = false;
+            _mgSlashLastCaster = null;
+            _mgSlashLastCastMs = -1d;
         }
     }
 }
