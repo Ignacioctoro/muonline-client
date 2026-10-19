@@ -1563,9 +1563,27 @@ namespace Client.Main.ClassicFX.Core
             return true;
         }
 
+        // Diagnostic branch only: prints the first Power Slash cast's five
+        // model states at native expiry (roughly 0.8 seconds after cast).
+        // This distinguishes missing files, unfinished async loading,
+        // invisible mesh configuration and missing texture/vertex buffers.
+        private int _powerSlashDiagnosticsPrinted;
+
         private void ReleaseEffectAt(int index)
         {
             var view = _effects[index].ModelView;
+            if (_effects[index].Type == ClassicFxEffectType.Magic2 &&
+                _effects[index].SubType == 2 &&
+                _powerSlashDiagnosticsPrinted < 5)
+            {
+                _powerSlashDiagnosticsPrinted++;
+                Console.WriteLine(
+                    $"[ClassicFX][PowerSlash] expiration #{_powerSlashDiagnosticsPrinted}: " +
+                    $"status={view?.Status}, meshes={view?.Model?.Meshes?.Length ?? 0}, " +
+                    $"mesh0Ready={view?.DebugHasRenderableMesh0}, " +
+                    $"hidden={view?.HiddenMesh}, blend={view?.BlendMesh}, " +
+                    $"scale={view?.Scale}, alpha={view?.Alpha}");
+            }
             _effects[index] = default;
             ClassicFxHandle handle = Pools.Effects.GetHandle(index);
             if (handle.IsValid)
@@ -2593,12 +2611,20 @@ namespace Client.Main.ClassicFX.Core
             }
         }
 
+        // Only used by this separate diagnostic branch. Returns false if
+        // mesh 0 lacks a loaded texture or GPU buffers, or remains hidden.
+        internal bool DebugHasRenderableMesh0 =>
+            TryGetDerivedMeshRenderData(0, out _, out _, out _);
+
         public override async Task Load()
         {
             try
             {
                 if (Model == null)
                     Model = await BMDLoader.Instance.Prepare(_bmdPath);
+                if (_nativeMagic2BmdLighting && Model == null)
+                    Console.WriteLine(
+                        $"[ClassicFX][PowerSlash] BMD missing or unreadable: {_bmdPath}");
             }
             catch (Exception ex)
             {
