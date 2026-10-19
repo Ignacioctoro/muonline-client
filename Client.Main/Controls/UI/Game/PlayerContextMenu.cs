@@ -41,8 +41,7 @@ namespace Client.Main.Controls.UI.Game
             public static readonly Color BgLighter = new(64, 53, 36);
             public static readonly Color Gold = new(212, 175, 85);
         }
-        private readonly LabelControl _title;
-        private Texture2D _frame;
+        private Texture2D _frame, _panel;
         private RenderTarget2D _surface;
         private readonly BlendState _surfaceBlend = new()
         {
@@ -71,13 +70,6 @@ namespace Client.Main.Controls.UI.Game
 
             BackgroundColor = Color.Transparent;
             BorderThickness = 0;
-            _title = new LabelControl
-            {
-                X = 16, Y = 17, ViewSize = new Point(188, 24), AutoViewSize = false,
-                FontSize = 13f, TextColor = Theme.Gold, TextAlign = HorizontalAlign.Center,
-                Interactive = false
-            };
-            Controls.Add(_title);
             Interactive = true;
             Visible = false;
 
@@ -180,7 +172,6 @@ namespace Client.Main.Controls.UI.Game
             _targetPlayerName =
                 playerName ??
                 string.Empty;
-            _title.Text = _targetPlayerName;
         }
 
         public ushort TargetPlayerId =>
@@ -523,6 +514,7 @@ namespace Client.Main.Controls.UI.Game
         public override async Task Load()
         {
             _frame = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/FriendMenu_I1.ozd");
+            _panel = await TextureLoader.Instance.PrepareAndGetTexture(NewUiFrameRenderer.PersonalShopAtlasPath);
             await base.Load();
         }
 
@@ -545,14 +537,13 @@ namespace Client.Main.Controls.UI.Game
                 _surface = new RenderTarget2D(gd, ViewSize.X, ViewSize.Y);
                 var previous = gd.GetRenderTargets();
                 gd.SetRenderTarget(_surface);
-                gd.Clear(Theme.BgDarkest);
+                gd.Clear(Color.Transparent);
                 using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, _surfaceBlend))
                 {
-                    NewUiFrameRenderer.DrawNineSlice(sb, _frame, new Rectangle(0, 0, 529, 297),
-                        new Rectangle(0, 0, ViewSize.X, ViewSize.Y), 18, 18, 18, 18);
-                    if (_frame != null)
-                        sb.Draw(_frame, new Rectangle(12, 12, ViewSize.X - 24, 29),
-                            new Rectangle(18, 340, 490, 31), Color.White);
+                    NewUiFrameRenderer.DrawPersonalShopInset(sb, _panel,
+                        new Rectangle(0, 0, ViewSize.X, ViewSize.Y));
+                    NewUiFrameRenderer.DrawNineSlice(sb, _frame, new Rectangle(18, 340, 490, 31),
+                        new Rectangle(14, 14, ViewSize.X - 28, 31), 18, 8, 18, 8);
                 }
                 gd.SetRenderTargets(previous);
             }
@@ -565,6 +556,16 @@ namespace Client.Main.Controls.UI.Game
             using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: UiScaler.SpriteTransform))
             {
                 sb.Draw(_surface, DisplayRectangle, Color.White);
+                var font = GraphicsManager.Instance.Font;
+                if (font != null && !string.IsNullOrEmpty(_targetPlayerName))
+                {
+                    float scale = 13f / Constants.BASE_FONT_SIZE;
+                    var size = font.MeasureString(_targetPlayerName) * scale;
+                    var bounds = DisplayRectangle;
+                    sb.DrawString(font, _targetPlayerName,
+                        new Vector2(bounds.Center.X - size.X / 2, bounds.Y + 29 - size.Y / 2),
+                        Theme.Gold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                }
                 for (int i = 0; i < Controls.Count; i++) Controls[i].Draw(gameTime);
             }
         }

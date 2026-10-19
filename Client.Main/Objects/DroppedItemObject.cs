@@ -128,6 +128,7 @@ namespace Client.Main.Objects
             _coinModels.Clear();
             _shineEffect = null;
             _renderVisualsThisFrame = true;
+            BoundingBoxLocal = new BoundingBox(new Vector3(-20, -20, 0), new Vector3(20, 20, 40));
 
             // Initialize position at ground level (will be adjusted in Load() after terrain height is known)
             Position = new(
@@ -429,7 +430,11 @@ namespace Client.Main.Objects
 
             _renderVisualsThisFrame = ShouldRenderVisualsThisFrame();
             if (!_renderVisualsThisFrame)
+            {
+                // The drop budget may reduce a pile, but must never erase Zen.
+                if (_isMoney && _coinModels.Count > 0) _coinModels[0].Draw(gameTime);
                 return;
+            }
 
             var objects = Children;
             for (int i = 0; i < objects.Count; i++)
@@ -448,7 +453,10 @@ namespace Client.Main.Objects
             if (!Visible) return;
 
             if (!_renderVisualsThisFrame)
+            {
+                if (_isMoney && _coinModels.Count > 0) _coinModels[0].DrawAfter(gameTime);
                 return;
+            }
 
             var objects = Children;
             for (int i = 0; i < objects.Count; i++)
@@ -557,7 +565,8 @@ namespace Client.Main.Objects
 
         public override void DrawHoverName()
         {
-            if (_pickedUp || Hidden)
+            // A pickup request is not confirmation: keep the label until despawn.
+            if (Hidden || World?.Scene?.ShowDroppedItemNames == false)
                 return;
 
             if (_font == null)
@@ -636,7 +645,7 @@ namespace Client.Main.Objects
 
         internal void DrawShineEffect(GameTime gameTime)
         {
-            if (!Visible || _pickedUp)
+            if (!Visible)
                 return;
 
             if (Camera.Instance?.Frustum != null && !Camera.Instance.Frustum.Intersects(BoundingBoxWorld))

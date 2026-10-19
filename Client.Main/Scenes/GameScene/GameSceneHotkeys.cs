@@ -16,6 +16,7 @@ namespace Client.Main.Scenes
 {
     internal sealed class GameSceneHotkeys
     {
+        private bool _altUsedWithMouse;
         private static readonly Keys[] MoveCommandKeys = { Keys.Up, Keys.Down, Keys.Left, Keys.Right, Keys.Enter, Keys.Escape };
 
         private readonly GameScene _scene;
@@ -84,6 +85,14 @@ namespace Client.Main.Scenes
         public void HandleGlobal(KeyboardState keyboard, KeyboardState prevKeyboard)
         {
             var context = CreateContext(keyboard, prevKeyboard);
+            bool alt = keyboard.IsKeyDown(Keys.LeftAlt) || keyboard.IsKeyDown(Keys.RightAlt);
+            bool wasAlt = prevKeyboard.IsKeyDown(Keys.LeftAlt) || prevKeyboard.IsKeyDown(Keys.RightAlt);
+            if (alt && !wasAlt) _altUsedWithMouse = false;
+            if (alt && (MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed ||
+                        MuGame.Instance.UiMouseState.RightButton == ButtonState.Pressed))
+                _altUsedWithMouse = true;
+            if (!alt && wasAlt && !_altUsedWithMouse && WhenNotUiInput(context))
+                _scene.ShowDroppedItemNames = !_scene.ShowDroppedItemNames;
             _global.Execute(context);
         }
 
@@ -181,7 +190,8 @@ namespace Client.Main.Scenes
                 when: context => WhenNotUiInput(context) && _inventoryControl.Visible,
                 exactModifiers: true);
             hotkeys.OnKeyPressed(Keys.C, ToggleCharacterInfo, when: WhenNotUiInput);
-            hotkeys.OnKeyPressed(Keys.M, ToggleMoveCommand, when: WhenNotUiInput);
+            hotkeys.OnKeyPressed(Keys.M, ToggleMoveCommand,
+                when: context => WhenNotUiInput(context) || WhenMoveCommandFocused(context));
             hotkeys.OnKeyPressed(Keys.Enter, OpenChatInput, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(
                 Keys.G,
@@ -498,11 +508,7 @@ namespace Client.Main.Scenes
 
         private void ToggleMoveCommand(HotkeyContext context)
         {
-            if (NpcShopControl.Instance.Visible)
-            {
-                return;
-            }
-
+            if (NpcShopControl.Instance.Visible && !_moveCommandWindow.Visible) return;
             _moveCommandWindow.ToggleVisibility();
         }
 

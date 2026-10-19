@@ -23,6 +23,7 @@ namespace Client.Main.Scenes
         public new WorldControl World { get; protected set; }
 
         public CursorControl Cursor { get; }
+        public bool ShowDroppedItemNames { get; set; } = true;
         public GameControl MouseControl { get; set; }
         public GameControl MouseHoverControl { get; set; }
         public GameControl FocusControl { get; set; }
