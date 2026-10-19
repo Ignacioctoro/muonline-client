@@ -69,7 +69,10 @@ namespace Client.Main.Objects.NPCS
             var characterService = MuGame.Network?.GetCharacterService();
             if (characterService != null)
             {
-                _ = characterService.SendElfSoldierBuffSequenceAsync(NetworkId);
+                Client.Main.Controls.UI.RequestDialog.ShowChoice("Elf Soldier", 
+                    () => { _ = characterService.SendElfSoldierBuffSequenceAsync(NetworkId); },
+                    () => { _ = Client.Main.Controls.UI.Game.Quest.MyQuestsControl.Instance.OpenNpcAsync(NetworkId); },
+                    () => { }, "Receive Buff", "Quests");
             }
             else
             {
