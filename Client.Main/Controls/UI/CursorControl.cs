@@ -1,4 +1,4 @@
-﻿using Client.Main.Controls.UI;
+using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Game;
 using Client.Main.Controls.UI.Game.Inventory;
 using Client.Main.Graphics;
@@ -8,8 +8,11 @@ using Client.Main.Objects.Player;
 using Client.Main;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
-using Microsoft.Xna.Framework.Input.Touch;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Client.Main.Content;
+using Microsoft.Xna.Framework.Graphics;
 using System.Linq;
 using Client.Main.Objects;
 
@@ -24,6 +27,22 @@ public class CursorControl : SpriteControl
     private Type[] restPlaceTypes;
     private string currentTexturePath = "";
     private Vector2[] currentAnimationState;
+    private readonly Dictionary<string, Texture2D> _cursorTextures = new();
+
+    public override async Task Load()
+    {
+        foreach (string name in new[] { "Cursor", "CursorPush", "CursorAttack", "CursorGet", "CursorTalk", "CursorRepair", "CursorLeanAgainst", "CursorSitDown" })
+        {
+            string path = $"Interface/{name}.ozt";
+            var texture = await TextureLoader.Instance.PrepareAndGetTexture(path);
+            if (texture != null) _cursorTextures[path] = texture;
+        }
+        await base.Load();
+    }
+
+    // Scene children update front-to-back, before world picking. Only update
+    // the lifecycle here; choose the cursor once picking has finished.
+    public override void Update(GameTime gameTime) => base.Update(gameTime);
 
     // BringToFront throttling - no need to call every frame
     private double _bringToFrontTimer = 0;
@@ -75,7 +94,8 @@ public class CursorControl : SpriteControl
         {
             currentTexturePath = texturePath;
             currentAnimationState = animation;
-            TexturePath = texturePath;
+            if (_cursorTextures.TryGetValue(texturePath, out var cursorTexture))
+                SetTexture(cursorTexture);
             CurrentAnimation = animation;
 
             // Reset animation only when texture/animation actually changes
@@ -123,13 +143,9 @@ public class CursorControl : SpriteControl
         return ctrlPressed || isDuelTarget;
     }
 
-    public override void Update(GameTime gameTime)
+    public void UpdateAfterWorld(GameTime gameTime)
     {
-        if (Scene == null)
-        {
-            base.Update(gameTime);
-            return;
-        }
+        if (Scene == null || Status != Client.Main.Models.GameControlStatus.Ready) return;
 
         var hoveredObject = Scene.MouseHoverObject;
 
@@ -140,6 +156,10 @@ public class CursorControl : SpriteControl
             hoveredObject = dropItem;
         }
 
+        bool overUi = Scene.IsInteractiveUIUnderMouse();
+        if (overUi && Scene.MouseHoverControl is not LabelControl { Tag: DroppedItemObject }) hoveredObject = null;
+        bool inventoryItem = InventoryControl.Instance is { Visible: true, HasHoveredItem: true } inventory &&
+            !Scene.IsPointerInputBlockedFor(inventory);
         bool sitPlace = IsSitPlace(hoveredObject);
 
         // Check if in repair mode (NPC shop visible and repair mode active)
@@ -152,66 +172,10 @@ public class CursorControl : SpriteControl
                                 InventoryControl.Instance.Visible &&
                                 InventoryControl.Instance.IsSelfRepairMode;
 
-        // If touches are available, we use them - standard input on Android
-        if (MuGame.Instance.Touch.Count > 0)
+        var uiMouse = MuGame.Instance.UiMouseState;
+        X = uiMouse.X;
+        Y = uiMouse.Y;
         {
-            var touch = MuGame.Instance.Touch[0];
-
-            // Use converted UI touch position instead of raw coordinates
-            var uiTouchPos = MuGame.Instance.UiTouchPosition;
-            X = uiTouchPos.X;
-            Y = uiTouchPos.Y;
-
-            // Repair mode cursor has priority when active
-            if (isRepairMode || isSelfRepairMode)
-            {
-                if (touch.State == TouchLocationState.Pressed || touch.State == TouchLocationState.Moved)
-                {
-                    // Hammer hitting animation - could rotate if we had rotation support
-                    SetCursorState("Interface/CursorRepair.ozt", DefaultAnimation);
-                }
-                else
-                {
-                    SetCursorState("Interface/CursorRepair.ozt", DefaultAnimation);
-                }
-            }
-            // If the touch is pressed or moved, simulate a click
-            else if (touch.State == TouchLocationState.Pressed || touch.State == TouchLocationState.Moved)
-            {
-                SetCursorState("Interface/CursorPush.ozt", DefaultAnimation);
-            }
-            else if ((hoveredObject is MonsterObject monster && !monster.IsDead) || IsPlayerAttackTarget(hoveredObject))
-            {
-                SetCursorState("Interface/CursorAttack.ozt", DefaultAnimation);
-            }
-            else if (hoveredObject is DroppedItemObject)
-            {
-                SetCursorState("Interface/CursorGet.ozt", DefaultAnimation);
-            }
-            else if (hoveredObject is NPCObject)
-            {
-                SetCursorState("Interface/CursorTalk.ozt", TalkAnimation);
-            }
-            else if (hoveredObject != null && restPlaceTypes.Contains(hoveredObject.GetType()))
-            {
-                SetCursorState("Interface/CursorLeanAgainst.ozt", DefaultAnimation);
-            }
-            else if (sitPlace)
-            {
-                SetCursorState("Interface/CursorSitDown.ozt", DefaultAnimation);
-            }
-            else
-            {
-                SetCursorState("Interface/Cursor.ozt", DefaultAnimation);
-            }
-        }
-        else
-        {
-            // If there are no touches, handle mouse input (e.g. on PC)
-            var uiMouse = MuGame.Instance.UiMouseState;
-            X = uiMouse.X;
-            Y = uiMouse.Y;
-
             // Repair mode cursor has priority when active
             if (isRepairMode || isSelfRepairMode)
             {
@@ -226,7 +190,7 @@ public class CursorControl : SpriteControl
                 }
 
                 // Still handle NPC clicks even in repair mode
-                if (uiMouse.LeftButton == ButtonState.Pressed && hoveredObject is NPCObject npc)
+                if (uiMouse.LeftButton == ButtonState.Pressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released && hoveredObject is NPCObject npc)
                 {
                     npc.OnClick();
                 }
@@ -235,7 +199,7 @@ public class CursorControl : SpriteControl
             {
                 SetCursorState("Interface/CursorPush.ozt", DefaultAnimation);
 
-                if (hoveredObject is NPCObject npc)
+                if (MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released && hoveredObject is NPCObject npc)
                 {
                     npc.OnClick();
                 }
@@ -244,7 +208,7 @@ public class CursorControl : SpriteControl
             {
                 SetCursorState("Interface/CursorAttack.ozt", DefaultAnimation);
             }
-            else if (hoveredObject is DroppedItemObject)
+            else if (hoveredObject is DroppedItemObject || inventoryItem)
             {
                 SetCursorState("Interface/CursorGet.ozt", DefaultAnimation);
             }
@@ -284,6 +248,6 @@ public class CursorControl : SpriteControl
             BringToFront();
         }
 
-        base.Update(gameTime);
+        TextureRectangle = new Rectangle(TileX * TileWidth, TileY * TileHeight, TileWidth, TileHeight);
     }
 }

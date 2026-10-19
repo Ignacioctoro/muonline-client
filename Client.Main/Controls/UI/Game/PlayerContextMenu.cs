@@ -1,4 +1,10 @@
 using System;
+using System.Threading.Tasks;
+using Client.Main.Content;
+using Client.Main.Helpers;
+using Client.Main.Models;
+using Client.Main.Controls.UI.Game.Common;
+using Microsoft.Xna.Framework.Graphics;
 using Client.Main;
 using Client.Main.Controls.UI.Common;
 using Client.Main.Controllers;
@@ -9,7 +15,7 @@ namespace Client.Main.Controls.UI.Game
 {
     /// <summary>
     /// Context menu for remote player interactions.
-    /// Triggered by ALT + Right Click on a remote player.
+    /// Triggered by ALT + Right Click or a touch hold on a remote player.
     /// </summary>
     public class PlayerContextMenu : UIControl
     {
@@ -25,6 +31,25 @@ namespace Client.Main.Controls.UI.Game
         private readonly ButtonControl _hostilityRequestButton;
         private readonly ButtonControl _storeButton;
         private readonly ButtonControl _whisperButton;
+
+        private static class Theme
+        {
+            public static readonly Color BgDarkest = new(10, 9, 8);
+            public static readonly Color BgDark = new(20, 18, 16);
+            public static readonly Color BgMid = new(31, 27, 22);
+            public static readonly Color BgLight = new(48, 40, 30);
+            public static readonly Color BgLighter = new(64, 53, 36);
+            public static readonly Color Gold = new(212, 175, 85);
+        }
+        private readonly LabelControl _title;
+        private Texture2D _frame;
+        private RenderTarget2D _surface;
+        private readonly BlendState _surfaceBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.InverseSourceAlpha
+        };
+        public override bool BlocksPointerInput => true;
 
         private ushort _targetPlayerId;
         private string _targetPlayerName;
@@ -44,21 +69,15 @@ namespace Client.Main.Controls.UI.Game
             ViewSize =
                 ControlSize;
 
-            BackgroundColor =
-                new Color(
-                    30,
-                    30,
-                    50,
-                    240);
-
-            BorderColor =
-                new Color(
-                    100,
-                    100,
-                    150,
-                    255);
-
-            BorderThickness = 1;
+            BackgroundColor = Color.Transparent;
+            BorderThickness = 0;
+            _title = new LabelControl
+            {
+                X = 16, Y = 17, ViewSize = new Point(188, 24), AutoViewSize = false,
+                FontSize = 13f, TextColor = Theme.Gold, TextAlign = HorizontalAlign.Center,
+                Interactive = false
+            };
+            Controls.Add(_title);
             Interactive = true;
             Visible = false;
 
@@ -161,6 +180,7 @@ namespace Client.Main.Controls.UI.Game
             _targetPlayerName =
                 playerName ??
                 string.Empty;
+            _title.Text = _targetPlayerName;
         }
 
         public ushort TargetPlayerId =>
@@ -225,13 +245,13 @@ namespace Client.Main.Controls.UI.Game
                 Math.Clamp(
                     X,
                     0,
-                    maxX);
+                    Math.Max(0, maxX));
 
             Y =
                 Math.Clamp(
                     Y,
                     0,
-                    maxY);
+                    Math.Max(0, maxY));
 
             Visible =
                 true;
@@ -427,16 +447,15 @@ namespace Client.Main.Controls.UI.Game
         private void RefreshButtonLayout()
         {
             const int x =
-                5;
+                16;
 
             const int firstY =
-                5;
+                48;
 
             const int width =
-                160;
+                188;
 
-            const int height =
-                28;
+            int height = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 34;
 
             int y =
                 firstY;
@@ -462,7 +481,7 @@ namespace Client.Main.Controls.UI.Game
                     button.ControlSize;
 
                 y +=
-                    height;
+                    height + 5;
             }
 
             PositionButton(
@@ -490,15 +509,93 @@ namespace Client.Main.Controls.UI.Game
                 _whisperButton);
 
             int totalHeight =
-                y + 5;
+                y + 10;
 
             ControlSize =
                 new Point(
-                    170,
+                    220,
                     totalHeight);
 
             ViewSize =
                 ControlSize;
+        }
+
+        public override async Task Load()
+        {
+            _frame = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/FriendMenu_I1.ozd");
+            await base.Load();
+        }
+
+        public override void Update(GameTime gameTime)
+        {
+            base.Update(gameTime);
+            if (!Visible || Status != GameControlStatus.Ready) return;
+            // Cache outside Draw so an enclosing UI batch cannot flush into this target.
+            EnsureSurface();
+        }
+
+        private void EnsureSurface()
+        {
+            var graphics = GraphicsManager.Instance;
+            var sb = graphics.Sprite;
+            if (_surface == null || _surface.IsDisposed || _surface.Width != ViewSize.X || _surface.Height != ViewSize.Y)
+            {
+                _surface?.Dispose();
+                var gd = graphics.GraphicsDevice;
+                _surface = new RenderTarget2D(gd, ViewSize.X, ViewSize.Y);
+                var previous = gd.GetRenderTargets();
+                gd.SetRenderTarget(_surface);
+                gd.Clear(Theme.BgDarkest);
+                using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, _surfaceBlend))
+                {
+                    NewUiFrameRenderer.DrawNineSlice(sb, _frame, new Rectangle(0, 0, 529, 297),
+                        new Rectangle(0, 0, ViewSize.X, ViewSize.Y), 18, 18, 18, 18);
+                    if (_frame != null)
+                        sb.Draw(_frame, new Rectangle(12, 12, ViewSize.X - 24, 29),
+                            new Rectangle(18, 340, 490, 31), Color.White);
+                }
+                gd.SetRenderTargets(previous);
+            }
+        }
+
+        public override void Draw(GameTime gameTime)
+        {
+            if (!Visible || Status != GameControlStatus.Ready || _surface == null) return;
+            var sb = GraphicsManager.Instance.Sprite;
+            using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: UiScaler.SpriteTransform))
+            {
+                sb.Draw(_surface, DisplayRectangle, Color.White);
+                for (int i = 0; i < Controls.Count; i++) Controls[i].Draw(gameTime);
+            }
+        }
+
+        public override void Dispose()
+        {
+            _surface?.Dispose();
+            _surfaceBlend.Dispose();
+            base.Dispose();
+        }
+
+        private sealed class NewUiMenuButton : ButtonControl
+        {
+            private Texture2D _normal, _hover, _pressed;
+            public override async Task Load()
+            {
+                var loader = TextureLoader.Instance;
+                _normal = await loader.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
+                _hover = await loader.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
+                _pressed = await loader.PrepareAndGetTexture("Interface/GFx/btn_l03.ozd");
+                await base.Load();
+                SetTexture(_normal);
+            }
+            public override void Draw(GameTime gameTime)
+            {
+                if (!Visible) return;
+                SetTexture(!Enabled ? _normal : IsMousePressed ? _pressed ?? _normal : IsMouseOver ? _hover ?? _normal : _normal);
+                using var scope = new SpriteBatchScope(GraphicsManager.Instance.Sprite,
+                    SpriteSortMode.Deferred, BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform);
+                base.Draw(gameTime);
+            }
         }
 
         private (
@@ -513,15 +610,14 @@ namespace Client.Main.Controls.UI.Game
             CreateButtons()
         {
             const int width =
-                160;
+                188;
 
-            const int height =
-                28;
+            int height = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 34;
 
             ButtonControl Make(
                 string text)
             {
-                return new ButtonControl
+                return new NewUiMenuButton
                 {
                     Text =
                         text,
@@ -539,32 +635,12 @@ namespace Client.Main.Controls.UI.Game
                     AutoViewSize =
                         false,
 
-                    BackgroundColor =
-                        new Color(
-                            50,
-                            50,
-                            80,
-                            200),
-
-                    HoverBackgroundColor =
-                        new Color(
-                            80,
-                            80,
-                            120,
-                            220),
-
-                    PressedBackgroundColor =
-                        new Color(
-                            40,
-                            40,
-                            70,
-                            220),
-
-                    FontSize =
-                        12f,
-
-                    TextColor =
-                        Color.White
+                    BackgroundColor = Theme.BgDark,
+                    HoverBackgroundColor = Theme.BgLight,
+                    PressedBackgroundColor = Theme.BgDarkest,
+                    FontSize = 13f,
+                    TextColor = Theme.Gold,
+                    HoverTextColor = new Color(255, 225, 155)
                 };
             }
 

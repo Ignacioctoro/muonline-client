@@ -251,7 +251,11 @@ namespace Client.Main.Scenes
             if (Status != GameControlStatus.Ready)
                 return;
 
-            if (World == null) return;
+            if (World == null)
+            {
+                Cursor.UpdateAfterWorld(gameTime);
+                return;
+            }
 
             // Clear MouseHoverObject if no object is currently being hovered
             if (MouseHoverObject != null && !MouseHoverObject.IsMouseHover)
@@ -260,7 +264,7 @@ namespace Client.Main.Scenes
             }
 
             // Update cursor after world objects have been updated
-            //Cursor.Update(gameTime);
+            Cursor.UpdateAfterWorld(gameTime);
 
             // focus management (driven by GameControl.OnClick via FocusControlIfInteractive)
             if (FocusControl != currentFocusControl)

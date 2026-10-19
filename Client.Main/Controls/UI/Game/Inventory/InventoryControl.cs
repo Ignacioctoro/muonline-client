@@ -305,6 +305,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             InventoryItem RepresentativeItem);
 
         private InventoryItem _hoveredItem;
+        public bool HasHoveredItem => Visible && _hoveredItem != null;
         private Point _hoveredSlot = new(-1, -1);
         private int _hoveredEquipSlot = -1;
         private int _lastPetInfoRequestSlot = -1;

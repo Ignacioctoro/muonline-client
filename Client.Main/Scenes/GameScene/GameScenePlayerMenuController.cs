@@ -1,4 +1,6 @@
 using System;
+using Client.Main.Core.Input;
+using Microsoft.Xna.Framework.Input.Touch;
 using Client.Main.Controllers;
 using Client.Main.Controls;
 using Client.Main.Controls.UI;
@@ -28,6 +30,8 @@ namespace Client.Main.Scenes
         private ushort? _storeHoldPlayerId;
         private double _storeHoldSeconds;
         private bool _storeHoldTriggered;
+        private readonly PlayerMenuHoldGesture _touchHold = new();
+        private bool _ignoreOpeningRelease;
 
         public GameScenePlayerMenuController(GameScene scene, Action<string> whisperRequested, Action<ushort, string> duelRequested)
         {
@@ -43,7 +47,8 @@ namespace Client.Main.Scenes
 
             _playerMenuHint = new LabelControl
             {
-                Text = "ALT + RMB: player menu",
+                Text = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS()
+                    ? "Hold on player: player menu" : "ALT + RMB: player menu",
                 FontSize = 11f,
                 Padding = new Margin { Left = 6, Right = 6, Top = 4, Bottom = 4 },
                 BackgroundColor = new Color(0, 0, 0, 180),
@@ -84,6 +89,30 @@ namespace Client.Main.Scenes
             _storeHoldPlayerId = null;
             _storeHoldSeconds = 0;
             _storeHoldTriggered = false;
+            _touchHold.Reset();
+            _ignoreOpeningRelease = false;
+        }
+
+        // Called after world picking, before click-to-move/attacks can use the touch.
+        public bool HandlePlayerTouch(GameTime gameTime)
+        {
+            bool hasTouch = TouchInputRouter.TryGetPointerTouch(out var touch);
+            var position = MuGame.Instance.UiMouseState.Position;
+            var player = _scene.MouseHoverObject as PlayerObject;
+            ushort? target = player != null && player != _scene.Hero && player.World == _scene.World &&
+                IsPlayerAvailable(player.NetworkId) ? player.NetworkId : null;
+            bool consumed = _touchHold.Update(hasTouch ? touch.Id : null,
+                hasTouch && touch.State == TouchLocationState.Pressed,
+                hasTouch && (touch.State is TouchLocationState.Pressed or TouchLocationState.Moved),
+                target, _scene.IsMouseInputConsumedThisFrame || _scene.IsInteractiveUIUnderMouse(),
+                position.X, position.Y, gameTime.ElapsedGameTime.TotalSeconds, out bool openMenu);
+            if (consumed) _scene.SetMouseInputConsumed();
+            if (openMenu && player != null)
+            {
+                ShowPlayerContextMenu(player, position);
+                _ignoreOpeningRelease = true;
+            }
+            return consumed;
         }
 
         public void Update(GameTime gameTime, KeyboardState keyboardState, MouseState uiMouse, MouseState prevUiMouse)
@@ -108,10 +137,10 @@ namespace Client.Main.Scenes
                     _scene.SetMouseInputConsumed();
                     contextMenuOpened = true;
                 }
-                else if (shopAdvertised && uiMouse.LeftButton == ButtonState.Pressed)
+                else if (shopAdvertised && !TouchInputRouter.HasPointerTouch && uiMouse.LeftButton == ButtonState.Pressed)
                 {
-                    // Touch systems map long presses to the virtual left button.
-                    // Opening the menu after 650 ms avoids accidental taps.
+                    // Preserve the desktop hold shortcut for advertised shops.
+                    // Touch holds are captured before world movement instead.
                     if (_storeHoldPlayerId != hoveredPlayer.NetworkId)
                     {
                         _storeHoldPlayerId = hoveredPlayer.NetworkId;
@@ -150,12 +179,15 @@ namespace Client.Main.Scenes
 
                 bool targetMissing = !IsPlayerAvailable(_playerContextMenu.TargetPlayerId);
 
-                if (clickReleasedOutside || targetMissing)
+                if ((!_ignoreOpeningRelease && clickReleasedOutside) || targetMissing)
                 {
                     _playerContextMenu.Visible = false;
                     _playerMenuHintCooldown = PlayerMenuHintCooldownSeconds;
                 }
             }
+
+            if (_ignoreOpeningRelease && uiMouse.LeftButton == ButtonState.Released)
+                _ignoreOpeningRelease = false;
 
             UpdatePlayerMenuHint(gameTime, keyboardState, _scene.MouseHoverObject as PlayerObject, uiMouse.Position);
         }
@@ -308,7 +340,7 @@ namespace Client.Main.Scenes
             bool ctrlDown = keyboardState.IsKeyDown(Keys.LeftControl) || keyboardState.IsKeyDown(Keys.RightControl);
             bool menuOpen = _playerContextMenu?.Visible == true;
             bool playerValid = hoveredPlayer != null && hoveredPlayer != _scene.Hero && hoveredPlayer.World == _scene.World;
-            bool shouldShow = playerValid && !ctrlDown && !menuOpen && _playerMenuHintCooldown <= 0;
+            bool shouldShow = !_scene.IsInteractiveUIUnderMouse() && playerValid && !ctrlDown && !menuOpen && _playerMenuHintCooldown <= 0;
 
             if (!playerValid)
             {

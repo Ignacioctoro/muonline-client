@@ -1,4 +1,4 @@
-﻿using Client.Main.Controllers;
+using Client.Main.Controllers;
 using Client.Main.Graphics;
 using Client.Main.Models;
 using Client.Main.Objects;
@@ -92,6 +92,9 @@ namespace Client.Main.Controls
             HeroTile = World.Terrain.GetHeroTile(
                 Walker.Position.X,
                 Walker.Position.Y);
+
+            if (Scene is Client.Main.Scenes.GameScene touchScene && touchScene.HandlePlayerMenuTouch(time))
+                return;
 
             // Any interactive UI control has priority over the world.
             // Do a fresh hit-test because MouseHoverControl/IsMouseOver
