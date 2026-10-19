@@ -5,6 +5,7 @@
 using Client.Main.Core.Utilities;
 using Client.Main.Objects.Effects;
 using Microsoft.Xna.Framework;
+using Microsoft.Extensions.Logging;
 
 namespace Client.Main.Objects.Effects.Skills
 {
@@ -15,15 +16,24 @@ namespace Client.Main.Objects.Effects.Skills
         {
             if (context.Caster == null || context.World == null ||
                 !ReferenceEquals(context.Caster.World, context.World))
+            {
+                MuGame.AppLoggerFactory?.CreateLogger("ClassicFX.PowerSlash")?
+                    .LogWarning("[ClassicFX][PowerSlash] Rejected cast: caster/world mismatch.");
                 return false;
+            }
 
             var fx = context.World.ClassicFx;
             if (fx == null || !fx.Enabled || fx.IsDisposed)
+            {
+                MuGame.AppLoggerFactory?.CreateLogger("ClassicFX.PowerSlash")?
+                    .LogWarning("[ClassicFX][PowerSlash] Runtime unavailable or disabled.");
                 return false;
+            }
 
             return fx.EmitMgPowerSlash(
                 context.Caster.WorldPosition.Translation,
-                context.Caster.Angle);
+                context.Caster.Angle,
+                context.Caster);
         }
 
         // Never allocate the legacy WorldObject or a second renderer.
