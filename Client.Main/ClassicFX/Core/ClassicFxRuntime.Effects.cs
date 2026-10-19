@@ -2325,14 +2325,16 @@ namespace Client.Main.ClassicFX.Core
 
         public override void DrawModel(bool isAfterDraw)
         {
-            if (!_nativeDestructionBmdLighting || !isAfterDraw)
+            if ((!_nativeDestructionBmdLighting && !_nativeMagic2BmdLighting)
+                || !isAfterDraw)
             {
                 base.DrawModel(isAfterDraw);
                 return;
             }
 
-            // Keep grouped and per-mesh paths consistent for the
-            // visible ground-crack geometry, without affecting other BMDs.
+            // Ground cracks and Magic2 scroll UVs outside [0,1]. Both
+            // require the native repeating texture sampler, scoped here so
+            // other BMD renderers keep their previous materials.
             var device = GraphicsDevice;
             var previousDepth = device.DepthStencilState;
             var previousSampler = device.SamplerStates[0];
@@ -2340,12 +2342,10 @@ namespace Client.Main.ClassicFX.Core
             {
                 // Grouped rendering uses the same scoped depth policy
                 // as the per-mesh DrawMesh path.
-                device.DepthStencilState = GetBlendMeshDepthState();
-                // The original lines2.jpg BMD UVs go from about -2.067 to
-                // +4.587 in V (grand/plancrack A), using GL_REPEAT.
-                // Clamp collapses repeated lightning into a flat edge
-                // color instead of drawing the branching ground cracks.
-                // Apply only to these four native destruction BMD views.
+                if (_nativeDestructionBmdLighting)
+                    device.DepthStencilState = GetBlendMeshDepthState();
+                // The original lines2.jpg cracks and Magic2 magic_g.jpg
+                // both rely on GL_REPEAT rather than Clamp.
                 device.SamplerStates[0] = SamplerState.LinearWrap;
                 base.DrawModel(true);
             }
