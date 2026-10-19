@@ -664,10 +664,17 @@ namespace Client.Main.Scenes
                 return;
             }
 
-            if (password.Length < 8)
+            if (password.Length < 8 || password.Length > 20)
             {
                 MessageWindow.Show(
-                    "La contraseña debe tener al menos 8 caracteres.");
+                    "La contraseña debe tener entre 8 y 20 caracteres.");
+
+                return;
+            }
+            if (password.Any(c => c < ' ' || c > '~'))
+            {
+                MessageWindow.Show(
+                    "La contraseña no puede contener tildes, emojis ni caracteres especiales fuera de ASCII.");
 
                 return;
             }

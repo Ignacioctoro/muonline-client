@@ -124,7 +124,7 @@ namespace Client.Main.Controls.UI.Login
             _passwordInput.Skin =
                 TextFieldSkin.NineSlice;
 
-            _passwordInput.MaxLength = 72;
+            _passwordInput.MaxLength = 20;
 
             _passwordInput.EnterKeyPressed +=
                 PasswordInput_EnterPressed;

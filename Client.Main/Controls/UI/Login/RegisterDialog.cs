@@ -70,13 +70,13 @@ namespace Client.Main.Controls.UI.Login
             _passwordInput = CreateTextField(
                 x: 145,
                 y: 152,
-                maxLength: 72,
+                maxLength: 20,
                 masked: true);
 
             _confirmPasswordInput = CreateTextField(
                 x: 145,
                 y: 192,
-                maxLength: 72,
+                maxLength: 20,
                 masked: true);
 
             Controls.Add(_usernameInput);
