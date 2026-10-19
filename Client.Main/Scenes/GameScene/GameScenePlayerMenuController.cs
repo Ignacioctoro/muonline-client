@@ -27,9 +27,6 @@ namespace Client.Main.Scenes
         private ushort? _playerMenuHoverId;
         private double _playerMenuHintCooldown;
         private float _playerMenuHintAlpha;
-        private ushort? _storeHoldPlayerId;
-        private double _storeHoldSeconds;
-        private bool _storeHoldTriggered;
         private readonly PlayerMenuHoldGesture _touchHold = new();
         private bool _ignoreOpeningRelease;
 
@@ -48,7 +45,7 @@ namespace Client.Main.Scenes
             _playerMenuHint = new LabelControl
             {
                 Text = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS()
-                    ? "Hold on player: player menu" : "ALT + RMB: player menu",
+                    ? "Hold on player: player menu" : "Hold LMB / ALT + RMB: player menu",
                 FontSize = 11f,
                 Padding = new Margin { Left = 6, Right = 6, Top = 4, Bottom = 4 },
                 BackgroundColor = new Color(0, 0, 0, 180),
@@ -86,9 +83,6 @@ namespace Client.Main.Scenes
             _playerMenuHoverId = null;
             _playerMenuHintCooldown = 0;
             _playerMenuHintAlpha = 0;
-            _storeHoldPlayerId = null;
-            _storeHoldSeconds = 0;
-            _storeHoldTriggered = false;
             _touchHold.Reset();
             _ignoreOpeningRelease = false;
         }
@@ -97,14 +91,28 @@ namespace Client.Main.Scenes
         public bool HandlePlayerTouch(GameTime gameTime)
         {
             bool hasTouch = TouchInputRouter.TryGetPointerTouch(out var touch);
-            var position = MuGame.Instance.UiMouseState.Position;
+            var mouse = MuGame.Instance.UiMouseState;
+            var previousMouse = MuGame.Instance.PrevUiMouseState;
+            bool desktopMouse = !hasTouch && !OperatingSystem.IsAndroid() && !OperatingSystem.IsIOS();
+            bool down = hasTouch
+                ? touch.State is TouchLocationState.Pressed or TouchLocationState.Moved
+                : desktopMouse && mouse.LeftButton == ButtonState.Pressed;
+            bool pressed = hasTouch ? touch.State == TouchLocationState.Pressed
+                : down && previousMouse.LeftButton == ButtonState.Released;
+            int? pointer = hasTouch ? touch.Id : desktopMouse ? -1 : null;
+            var keyboard = MuGame.Instance.Keyboard;
+            bool pvpModifier = keyboard.IsKeyDown(Keys.LeftControl) || keyboard.IsKeyDown(Keys.RightControl);
+            var position = mouse.Position;
             var player = _scene.MouseHoverObject as PlayerObject;
             ushort? target = player != null && player != _scene.Hero && player.World == _scene.World &&
                 IsPlayerAvailable(player.NetworkId) ? player.NetworkId : null;
-            bool consumed = _touchHold.Update(hasTouch ? touch.Id : null,
-                hasTouch && touch.State == TouchLocationState.Pressed,
-                hasTouch && (touch.State is TouchLocationState.Pressed or TouchLocationState.Moved),
-                target, _scene.IsMouseInputConsumedThisFrame || _scene.IsInteractiveUIUnderMouse(),
+            var state = MuGame.Network?.GetCharacterState();
+            bool duelClick = desktopMouse && state?.IsDuelActive == true && target.HasValue &&
+                state.GetDuelPlayerId(Client.Main.Core.Client.CharacterState.DuelPlayerType.Enemy) == target.Value;
+            // Preserve Ctrl-click/duel attacks and exclude the mouse-driven test joystick.
+            bool consumed = _touchHold.Update(pointer, pressed, down,
+                target, pvpModifier || duelClick || _scene.IsMobileJoystickCapturingMouse ||
+                    _scene.IsMouseInputConsumedThisFrame || _scene.IsInteractiveUIUnderMouse(),
                 position.X, position.Y, gameTime.ElapsedGameTime.TotalSeconds, out bool openMenu);
             if (consumed) _scene.SetMouseInputConsumed();
             if (openMenu && player != null)
@@ -137,37 +145,6 @@ namespace Client.Main.Scenes
                     _scene.SetMouseInputConsumed();
                     contextMenuOpened = true;
                 }
-                else if (shopAdvertised && !TouchInputRouter.HasPointerTouch && uiMouse.LeftButton == ButtonState.Pressed)
-                {
-                    // Preserve the desktop hold shortcut for advertised shops.
-                    // Touch holds are captured before world movement instead.
-                    if (_storeHoldPlayerId != hoveredPlayer.NetworkId)
-                    {
-                        _storeHoldPlayerId = hoveredPlayer.NetworkId;
-                        _storeHoldSeconds = 0;
-                        _storeHoldTriggered = false;
-                    }
-                    _storeHoldSeconds += gameTime.ElapsedGameTime.TotalSeconds;
-                    if (!_storeHoldTriggered && _storeHoldSeconds >= 0.65)
-                    {
-                        ShowPlayerContextMenu(hoveredPlayer, uiMouse.Position);
-                        _scene.SetMouseInputConsumed();
-                        _storeHoldTriggered = true;
-                        contextMenuOpened = true;
-                    }
-                }
-                else if (uiMouse.LeftButton != ButtonState.Pressed)
-                {
-                    _storeHoldPlayerId = null;
-                    _storeHoldSeconds = 0;
-                    _storeHoldTriggered = false;
-                }
-            }
-            else if (uiMouse.LeftButton != ButtonState.Pressed)
-            {
-                _storeHoldPlayerId = null;
-                _storeHoldSeconds = 0;
-                _storeHoldTriggered = false;
             }
 
             if (_playerContextMenu?.Visible == true && !contextMenuOpened)
