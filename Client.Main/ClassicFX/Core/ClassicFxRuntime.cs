@@ -135,6 +135,7 @@ namespace Client.Main.ClassicFX.Core
             BeginClassicFxMoveFrame();
 
             MoveEffects();
+            MoveMgPowerSlash();
             MoveParticles();
             MoveJoints();
             MoveBlurs();
@@ -155,6 +156,7 @@ namespace Client.Main.ClassicFX.Core
             }
 
             Pools.Clear();
+            ClearMgPowerSlash();
 
             ClearSpriteStorage();
 
@@ -178,6 +180,7 @@ namespace Client.Main.ClassicFX.Core
             }
 
             Pools.Clear();
+            ClearMgPowerSlash();
 
             ClearSpriteStorage();
 
