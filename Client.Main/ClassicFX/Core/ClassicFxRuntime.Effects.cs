@@ -2241,6 +2241,7 @@ namespace Client.Main.ClassicFX.Core
     {
         private readonly string _bmdPath;
         private readonly FuryQuakeUvDeformer _furyQuakeUvDeformer;
+        private readonly Magic2UvDeformer _magic2UvDeformer;
         private readonly KnightPlancrackUvDeformer _knightPlancrackUvDeformer;
         private readonly bool _renderRagefulBlendOnLowQuality;
         private readonly bool _nativeRagefulBmdLighting;
@@ -2259,6 +2260,7 @@ namespace Client.Main.ClassicFX.Core
         // luminous billboards. Render their solid meshes without the
         // generic blue/additive spell material.
         private readonly bool _nativeGroundStoneBmdLighting;
+        private readonly bool _nativeMagic2BmdLighting;
         // Fire Burst's Fire02 trail owns a PierPart ModelView. Expose the
         // already-recorded effect identity to correct its 25-Hz velocity
         // scaling without altering generic Fire02 particles of other skills.
@@ -2271,7 +2273,7 @@ namespace Client.Main.ClassicFX.Core
         private bool NeedsNativeBmdLighting =>
             NeedsRagefulBmdLighting || _nativeDestructionBmdLighting ||
             _nativePierPartBmdLighting || _nativeAirForceBmdLighting ||
-            _nativeGroundStoneBmdLighting;
+            _nativeGroundStoneBmdLighting || _nativeMagic2BmdLighting;
 
         // Preserve the existing Rageful Blow call site. The original
         // Strike of Destruction impact emits the same Stone01/Stone02
@@ -2323,14 +2325,16 @@ namespace Client.Main.ClassicFX.Core
 
         public override void DrawModel(bool isAfterDraw)
         {
-            if (!_nativeDestructionBmdLighting || !isAfterDraw)
+            if ((!_nativeDestructionBmdLighting && !_nativeMagic2BmdLighting)
+                || !isAfterDraw)
             {
                 base.DrawModel(isAfterDraw);
                 return;
             }
 
-            // Keep grouped and per-mesh paths consistent for the
-            // visible ground-crack geometry, without affecting other BMDs.
+            // Ground cracks and Magic2 scroll UVs outside [0,1]. Both
+            // require the native repeating texture sampler, scoped here so
+            // other BMD renderers keep their previous materials.
             var device = GraphicsDevice;
             var previousDepth = device.DepthStencilState;
             var previousSampler = device.SamplerStates[0];
@@ -2338,12 +2342,10 @@ namespace Client.Main.ClassicFX.Core
             {
                 // Grouped rendering uses the same scoped depth policy
                 // as the per-mesh DrawMesh path.
-                device.DepthStencilState = GetBlendMeshDepthState();
-                // The original lines2.jpg BMD UVs go from about -2.067 to
-                // +4.587 in V (grand/plancrack A), using GL_REPEAT.
-                // Clamp collapses repeated lightning into a flat edge
-                // color instead of drawing the branching ground cracks.
-                // Apply only to these four native destruction BMD views.
+                if (_nativeDestructionBmdLighting)
+                    device.DepthStencilState = GetBlendMeshDepthState();
+                // The original lines2.jpg cracks and Magic2 magic_g.jpg
+                // both rely on GL_REPEAT rather than Clamp.
                 device.SamplerStates[0] = SamplerState.LinearWrap;
                 base.DrawModel(true);
             }
@@ -2385,9 +2387,25 @@ namespace Client.Main.ClassicFX.Core
                 new Vector2(u, meshIndex == 1 ? v + OffsetV : v);
         }
 
+        // Data_Broyal Skill/Magic02.bmd has one mesh. Its source Main model
+        // scrolls BlendMeshTexCoordU by -LifeTime*0.2 per native frame.
+        // Keep this UV movement per-instance; never alter the shared BMD.
+        private sealed class Magic2UvDeformer : IVertexDeformer, IMeshTexCoordDeformer
+        {
+            public float OffsetU;
+
+            public Vector3 DeformVertex(in BMDTextureVertex vertex,
+                in Vector3 transformedPosition) => transformedPosition;
+
+            public Vector2 DeformTexCoord(float u, float v) => new Vector2(u, v);
+
+            public Vector2 DeformTexCoord(int meshIndex, float u, float v) =>
+                new Vector2(meshIndex == 0 ? u + OffsetU : u, v);
+        }
+
         protected override IVertexDeformer GetVertexDeformer() =>
             _knightPlancrackUvDeformer ?? _furyQuakeUvDeformer ??
-            base.GetVertexDeformer();
+            _magic2UvDeformer ?? base.GetVertexDeformer();
 
         public void SetKnightPlancrackUvScroll(float offsetV)
         {
@@ -2395,6 +2413,17 @@ namespace Client.Main.ClassicFX.Core
                 MathF.Abs(_knightPlancrackUvDeformer.OffsetV - offsetV) < 0.00001f)
                 return;
             _knightPlancrackUvDeformer.OffsetV = offsetV;
+            InvalidateBuffers(BufferFlagTexture | BufferFlagAnimation);
+        }
+
+        public void SetMagic2UvScroll(float offsetU)
+        {
+            if (_magic2UvDeformer == null ||
+                MathF.Abs(_magic2UvDeformer.OffsetU - offsetU) < 0.00001f)
+                return;
+            _magic2UvDeformer.OffsetU = offsetU;
+            // Shared 25-Hz native effect clock avoids per-display-frame
+            // CPU vertex regeneration, especially important on Android.
             InvalidateBuffers(BufferFlagTexture | BufferFlagAnimation);
         }
 
@@ -2440,6 +2469,9 @@ namespace Client.Main.ClassicFX.Core
             _nativeGroundStoneBmdLighting =
                 type is ClassicFxEffectType.GroundStoneModel or
                     ClassicFxEffectType.GroundStone2Model;
+            _nativeMagic2BmdLighting = type == ClassicFxEffectType.Magic2;
+            if (_nativeMagic2BmdLighting)
+                _magic2UvDeformer = new Magic2UvDeformer();
             if (_nativeKnightPlancrackLighting)
                 _knightPlancrackUvDeformer = new KnightPlancrackUvDeformer();
             // The native wheel uses RenderPartObject for the equipped
@@ -2450,7 +2482,7 @@ namespace Client.Main.ClassicFX.Core
                     ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&
                  type <= ClassicFxEffectType.FuryQuake8) ||
-                _nativeDestructionBmdLighting;
+                _nativeDestructionBmdLighting || _nativeMagic2BmdLighting;
             if (type is ClassicFxEffectType.FuryQuake2 or
                 ClassicFxEffectType.FuryQuake5 or
                 ClassicFxEffectType.FuryQuake8)

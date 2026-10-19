@@ -122,8 +122,12 @@ namespace Client.Main.ClassicFX.Core
             if (type == ClassicFxEffectType.Magic2)
             {
                 view.BlendMesh = 0;
-                if (subType == 2)
-                    view.HiddenMesh = 0;
+                // Native Main hides mesh 0 for subtype 2, but Data_Broyal's
+                // Skill/Magic02.bmd contains ONLY ONE mesh (magic_g.jpg).
+                // Applying HiddenMesh=0 would discard the entire wave,
+                // leaving just smoke/light sprites at the character.
+                // Preserve its actual BMD wave mesh with the native UV scroll.
+                view.HiddenMesh = -1;
             }
         }
 
@@ -181,6 +185,12 @@ namespace Client.Main.ClassicFX.Core
         {
             // Native MODEL_MAGIC2 has 20 ticks and no position translation.
             e.BlendMeshLight = e.LifeTime * 0.1f;
+            // Move_MODEL_MAGIC2(): BlendMeshTexCoordU=-LifeTime*0.2.
+            // Recreate the texture flow which gives the stationary BMD
+            // the appearance of energy travelling away from the caster.
+            // The per-instance BMD deformation updates at native 25 Hz.
+            if (Clock.AdvancedReferenceFrame && e.ModelView != null)
+                e.ModelView.SetMagic2UvScroll(-e.LifeTime * 0.2f);
             if (!Clock.AdvancedReferenceFrame)
                 return true;
 
