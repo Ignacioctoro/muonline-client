@@ -6,6 +6,7 @@ using Client.Main.Networking.Services;
 using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -115,6 +116,25 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         [PacketHandler(0x44, PacketRouter.NoSubCode)]
         public Task HandlePartyHealthUpdateAsync(Memory<byte> packet)
         {
+            // S6: 4 + count bytes. Extended: 4 + count * 17 bytes, all uints little endian.
+            // Validate the complete payload before changing any member state.
+            var data = packet.Span;
+            if (data.Length < 4 || data[0] != 0xC1 || data[1] != data.Length) return Task.CompletedTask;
+            int count = data[3];
+            if (count > 0 && data.Length == 4 + count * 17)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var entry = data.Slice(4 + i * 17, 17);
+                    _partyManager.UpdateMemberVitals(entry[0],
+                        BinaryPrimitives.ReadUInt32LittleEndian(entry.Slice(1)),
+                        BinaryPrimitives.ReadUInt32LittleEndian(entry.Slice(5)),
+                        BinaryPrimitives.ReadUInt32LittleEndian(entry.Slice(9)),
+                        BinaryPrimitives.ReadUInt32LittleEndian(entry.Slice(13)));
+                }
+                return Task.CompletedTask;
+            }
+            if (data.Length != 4 + count) return Task.CompletedTask;
             var healthUpdate = new PartyHealthUpdate(packet);
             for (int i = 0; i < healthUpdate.Count; i++)
             {

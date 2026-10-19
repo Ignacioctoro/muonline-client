@@ -7,7 +7,6 @@ using Client.Main.Controls.UI.Common;
 using Client.Main.Controls.UI.Game.Buffs;
 using Client.Main.Core.Client;
 using Client.Main.Core.Models;
-using Client.Main.Core.Utilities;
 using Client.Main.Helpers;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
@@ -17,12 +16,12 @@ namespace Client.Main.Controls.UI.Game.Party
 {
     public class PartyMemberControl : UIControl
     {
-        public const int RowWidth = 230;
-        public const int RowHeight = 92;
-        private Texture2D _background, _selected, _hp, _mp, _crown;
+        public const int RowWidth = 170;
+        public const int RowHeight = 59;
+        private Texture2D _background, _hp, _mp, _crown;
         private readonly ButtonControl _leaveButton;
         private readonly BuffSlotControl[] _buffs = new BuffSlotControl[10];
-        private string _location = "", _healthText = "";
+        private string _healthText = "";
         private double _refreshTime;
         private bool _inScope;
         public PartyMemberInfo MemberInfo { get; private set; }
@@ -36,7 +35,7 @@ namespace Client.Main.Controls.UI.Game.Party
             BorderThickness = 0;
             _leaveButton = new ButtonControl
             {
-                X = 207, Y = 5, AutoViewSize = false, ViewSize = new Point(18, 18),
+                X = 150, Y = 3, AutoViewSize = false, ViewSize = new Point(16, 16),
                 TexturePath = "Interface/GFx/party_xbtn01_1.ozd", Visible = false,
                 BackgroundColor = Color.Transparent, BorderThickness = 0
             };
@@ -49,7 +48,7 @@ namespace Client.Main.Controls.UI.Game.Party
             Controls.Add(_leaveButton);
             for (int i = 0; i < _buffs.Length; i++)
             {
-                _buffs[i] = new BuffSlotControl { X = 5 + i * 22, Y = 62, Visible = false };
+                _buffs[i] = new BuffSlotControl(16, 22) { X = 4 + i * 16, Y = 36, Visible = false };
                 Controls.Add(_buffs[i]);
             }
         }
@@ -58,7 +57,6 @@ namespace Client.Main.Controls.UI.Game.Party
         {
             var loader = TextureLoader.Instance;
             _background = await loader.PrepareAndGetTexture("Interface/GFx/party_bg.ozd");
-            _selected = await loader.PrepareAndGetTexture("Interface/GFx/party_bg01.ozd");
             _hp = await loader.PrepareAndGetTexture("Interface/GFx/party_hpbar.ozd");
             _mp = await loader.PrepareAndGetTexture("Interface/GFx/party_mpbar.ozd");
             _crown = await loader.PrepareAndGetTexture("Interface/GFx/party_crown.ozd");
@@ -70,7 +68,6 @@ namespace Client.Main.Controls.UI.Game.Party
             MemberInfo = memberInfo;
             IsCurrentPlayer = isCurrentPlayer;
             _healthText = $"{Math.Clamp((int)(memberInfo.HealthPercentage * 100), 0, 100)}%";
-            _location = $"{MapDatabase.GetMapName(memberInfo.MapId)} ({memberInfo.PositionX}, {memberInfo.PositionY})";
             _leaveButton.Visible = isCurrentPlayer;
         }
 
@@ -110,25 +107,22 @@ namespace Client.Main.Controls.UI.Game.Party
             using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.NonPremultiplied,
                 transform: UiScaler.SpriteTransform);
             var rect = DisplayRectangle;
-            var background = IsCurrentPlayer ? _selected ?? _background : _background;
+            var background = _background;
             // These are complete standalone GFx sprites; no atlas gutters or generated frame.
-            if (background != null) sb.Draw(background, new Rectangle(rect.X, rect.Y, RowWidth, 52), Color.White);
+            if (background != null) sb.Draw(background, new Rectangle(rect.X, rect.Y, RowWidth, 36), Color.White);
             if (MemberInfo.Index == 0 && _crown != null)
-                sb.Draw(_crown, new Rectangle(rect.X + 7, rect.Y + 25, 24, 12), Color.White);
+                sb.Draw(_crown, new Rectangle(rect.X + 6, rect.Y + 6, 19, 10), Color.White);
             float health = Math.Clamp(MemberInfo.HealthPercentage, 0f, 1f);
             if (_hp != null && health > 0)
-                sb.Draw(_hp, new Rectangle(rect.X + 34, rect.Y + 28, (int)(190 * health), 6), Color.White);
+                sb.Draw(_hp, new Rectangle(rect.X + 4, rect.Y + 20, (int)(162 * health), 5), Color.White);
             var state = MuGame.Network?.GetCharacterState();
-            if (IsCurrentPlayer && state != null && _mp != null && state.MaximumMana > 0)
-            {
-                float mana = Math.Clamp((float)state.CurrentMana / state.MaximumMana, 0f, 1f);
-                if (mana > 0) sb.Draw(_mp, new Rectangle(rect.X + 34, rect.Y + 38, (int)(190 * mana), 4), Color.White);
-            }
-            if (!IsCurrentPlayer) Text(sb, "MP --", rect.X + 35, rect.Y + 35, 7, Color.Gray);
-            Text(sb, MemberInfo.Name, rect.X + 35, rect.Y + 8, 11, _inScope ? Color.White : Color.Gray);
-            Text(sb, _healthText, rect.X + 5, rect.Y + 9, 8, Color.Gold);
-            Text(sb, _location, rect.X + 5, rect.Y + 49, 9, new Color(190, 190, 180));
-            // Remote mana is not part of the Season 6 party packets. Never invent it.
+            float? mana = IsCurrentPlayer && state != null && state.MaximumMana > 0
+                ? Math.Clamp((float)state.CurrentMana / state.MaximumMana, 0f, 1f)
+                : MemberInfo.ManaPercentage;
+            if (mana.HasValue && mana.Value > 0 && _mp != null)
+                sb.Draw(_mp, new Rectangle(rect.X + 4, rect.Y + 28, (int)(162 * mana.Value), 4), Color.White);
+            Text(sb, MemberInfo.Name, rect.X + 29, rect.Y + 5, 10, _inScope ? Color.White : Color.Gray);
+            if (MemberInfo.Index != 0) Text(sb, _healthText, rect.X + 5, rect.Y + 7, 7, Color.Gold);
             for (int i = 0; i < Controls.Count; i++) Controls[i].Draw(gameTime);
         }
 

@@ -37,14 +37,14 @@ namespace Client.Main.Controls.UI.Game.Buffs
             }
         }
 
-        public BuffSlotControl()
+        public BuffSlotControl(int width = SLOT_WIDTH, int height = SLOT_HEIGHT)
         {
             AutoViewSize = false;
 
             ControlSize =
                 new Point(
-                    SLOT_WIDTH,
-                    SLOT_HEIGHT);
+                    width,
+                    height);
 
             ViewSize =
                 ControlSize;
@@ -75,13 +75,13 @@ namespace Client.Main.Controls.UI.Game.Buffs
 
                     ControlSize =
                         new Point(
-                            BuffIconAtlas.IconWidth,
-                            BuffIconAtlas.IconHeight),
+                            width,
+                            height),
 
                     ViewSize =
                         new Point(
-                            BuffIconAtlas.IconWidth,
-                            BuffIconAtlas.IconHeight),
+                            width,
+                            height),
 
                     Visible = false,
 

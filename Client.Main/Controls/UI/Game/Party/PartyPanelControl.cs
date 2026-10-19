@@ -23,14 +23,14 @@ namespace Client.Main.Controls.UI.Game.Party
             _logger = MuGame.AppLoggerFactory.CreateLogger<PartyPanelControl>();
             Align = ControlAlign.Top | ControlAlign.Right;
             AutoViewSize = false;
-            ViewSize = new Point(PartyMemberControl.RowWidth, 28);
+            ViewSize = new Point(PartyMemberControl.RowWidth, 22);
             Margin = new Margin { Top = 12, Right = 10 };
             Controls.Add(new TextureControl
             {
-                Name = "PartyHeader", AutoViewSize = false, ViewSize = new Point(PartyMemberControl.RowWidth, 24),
+                Name = "PartyHeader", AutoViewSize = false, ViewSize = new Point(PartyMemberControl.RowWidth, 20),
                 TexturePath = "Interface/GFx/party_gragbar.ozd"
             });
-            Controls.Add(new LabelControl { Text = "Party", X = 96, Y = 4, FontSize = 12, TextColor = Color.Gold });
+            Controls.Add(new LabelControl { Text = "Party", X = 70, Y = 3, FontSize = 10, TextColor = Color.Gold });
             Visible = false;
         }
 
@@ -58,7 +58,7 @@ namespace Client.Main.Controls.UI.Game.Party
                 { row.Dispose(); Controls.Remove(row); }
             }
             Visible = members.Count > 1;
-            int currentY = 28;
+            int currentY = 22;
             foreach (var member in members)
             {
                 var row = Controls.OfType<PartyMemberControl>().FirstOrDefault(c => c.MemberInfo.Index == member.Index);

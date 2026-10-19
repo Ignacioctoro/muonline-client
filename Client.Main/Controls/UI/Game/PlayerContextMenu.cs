@@ -41,7 +41,7 @@ namespace Client.Main.Controls.UI.Game
             public static readonly Color BgLighter = new(64, 53, 36);
             public static readonly Color Gold = new(212, 175, 85);
         }
-        private Texture2D _frame, _panel;
+        private Texture2D _header, _body, _bottom;
         private RenderTarget2D _surface;
         private readonly BlendState _surfaceBlend = new()
         {
@@ -438,15 +438,15 @@ namespace Client.Main.Controls.UI.Game
         private void RefreshButtonLayout()
         {
             const int x =
-                16;
+                10;
 
             const int firstY =
-                48;
+                36;
 
             const int width =
-                188;
+                150;
 
-            int height = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 34;
+            int height = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 24;
 
             int y =
                 firstY;
@@ -472,7 +472,7 @@ namespace Client.Main.Controls.UI.Game
                     button.ControlSize;
 
                 y +=
-                    height + 5;
+                    height;
             }
 
             PositionButton(
@@ -504,7 +504,7 @@ namespace Client.Main.Controls.UI.Game
 
             ControlSize =
                 new Point(
-                    220,
+                    170,
                     totalHeight);
 
             ViewSize =
@@ -513,8 +513,9 @@ namespace Client.Main.Controls.UI.Game
 
         public override async Task Load()
         {
-            _frame = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/FriendMenu_I1.ozd");
-            _panel = await TextureLoader.Instance.PrepareAndGetTexture(NewUiFrameRenderer.PersonalShopAtlasPath);
+            _header = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/command_chatip_bg01.ozd");
+            _body = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/command_chatip_bg02.ozd");
+            _bottom = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/command_chatip_bg03.ozd");
             await base.Load();
         }
 
@@ -540,10 +541,9 @@ namespace Client.Main.Controls.UI.Game
                 gd.Clear(Color.Transparent);
                 using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, _surfaceBlend))
                 {
-                    NewUiFrameRenderer.DrawPersonalShopInset(sb, _panel,
-                        new Rectangle(0, 0, ViewSize.X, ViewSize.Y));
-                    NewUiFrameRenderer.DrawNineSlice(sb, _frame, new Rectangle(18, 340, 490, 31),
-                        new Rectangle(14, 14, ViewSize.X - 28, 31), 18, 8, 18, 8);
+                    if (_body != null) sb.Draw(_body, new Rectangle(0, 42, ViewSize.X, ViewSize.Y - 50), Color.White);
+                    if (_header != null) sb.Draw(_header, new Rectangle(0, 0, ViewSize.X, 42), Color.White);
+                    if (_bottom != null) sb.Draw(_bottom, new Rectangle(0, ViewSize.Y - 8, ViewSize.X, 8), Color.White);
                 }
                 gd.SetRenderTargets(previous);
             }
@@ -563,7 +563,7 @@ namespace Client.Main.Controls.UI.Game
                     var size = font.MeasureString(_targetPlayerName) * scale;
                     var bounds = DisplayRectangle;
                     sb.DrawString(font, _targetPlayerName,
-                        new Vector2(bounds.Center.X - size.X / 2, bounds.Y + 29 - size.Y / 2),
+                        new Vector2(bounds.Center.X - size.X / 2, bounds.Y + 23 - size.Y / 2),
                         Theme.Gold, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
                 }
                 for (int i = 0; i < Controls.Count; i++) Controls[i].Draw(gameTime);
@@ -579,23 +579,20 @@ namespace Client.Main.Controls.UI.Game
 
         private sealed class NewUiMenuButton : ButtonControl
         {
-            private Texture2D _normal, _hover, _pressed;
-            public override async Task Load()
-            {
-                var loader = TextureLoader.Instance;
-                _normal = await loader.PrepareAndGetTexture("Interface/GFx/btn_l01.ozd");
-                _hover = await loader.PrepareAndGetTexture("Interface/GFx/btn_l02.ozd");
-                _pressed = await loader.PrepareAndGetTexture("Interface/GFx/btn_l03.ozd");
-                await base.Load();
-                SetTexture(_normal);
-            }
             public override void Draw(GameTime gameTime)
             {
-                if (!Visible) return;
-                SetTexture(!Enabled ? _normal : IsMousePressed ? _pressed ?? _normal : IsMouseOver ? _hover ?? _normal : _normal);
-                using var scope = new SpriteBatchScope(GraphicsManager.Instance.Sprite,
-                    SpriteSortMode.Deferred, BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform);
-                base.Draw(gameTime);
+                if (!Visible || Status != GameControlStatus.Ready) return;
+                var sb = GraphicsManager.Instance.Sprite;
+                var font = GraphicsManager.Instance.Font;
+                if (font == null) return;
+                using var scope = new SpriteBatchScope(sb, SpriteSortMode.Deferred,
+                    BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform);
+                var bounds = DisplayRectangle;
+                float scale = FontSize / Constants.BASE_FONT_SIZE;
+                var size = font.MeasureString(Text) * scale;
+                var color = !Enabled ? Color.Gray : IsMouseOver || IsMousePressed ? Color.Gold : new Color(220, 220, 210);
+                sb.DrawString(font, Text, new Vector2(bounds.Center.X - size.X / 2, bounds.Center.Y - size.Y / 2),
+                    color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
             }
         }
 
@@ -611,9 +608,9 @@ namespace Client.Main.Controls.UI.Game
             CreateButtons()
         {
             const int width =
-                188;
+                150;
 
-            int height = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 34;
+            int height = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 24;
 
             ButtonControl Make(
                 string text)
@@ -639,7 +636,7 @@ namespace Client.Main.Controls.UI.Game
                     BackgroundColor = Theme.BgDark,
                     HoverBackgroundColor = Theme.BgLight,
                     PressedBackgroundColor = Theme.BgDarkest,
-                    FontSize = 13f,
+                    FontSize = 11f,
                     TextColor = Theme.Gold,
                     HoverTextColor = new Color(255, 225, 155)
                 };
