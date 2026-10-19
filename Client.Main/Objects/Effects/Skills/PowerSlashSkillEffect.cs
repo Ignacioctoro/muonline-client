@@ -25,7 +25,7 @@ namespace Client.Main.Objects.Effects.Skills
                 return false;
 
             Vector3 origin = context.Caster.WorldPosition.Translation;
-            Vector3 angle = context.Caster.TotalAngle;
+            Vector3 angle = context.Caster.Angle;
             ClassicFxOwner owner = ClassicFxOwner.FromWorldObject(context.Caster);
 
             // Native CreateEffect(MODEL_MAGIC2, position, angle, light, 2, owner).
