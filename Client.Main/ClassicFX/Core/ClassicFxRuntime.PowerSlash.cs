@@ -117,6 +117,41 @@ namespace Client.Main.ClassicFX.Core
                 Vector3 head = arc.Start + arc.Direction * (MgSlashSpeed * arc.Age);
                 float fade = MathHelper.Lerp(.35f, 1f,
                     MathHelper.Clamp(1f - arc.Age / MgSlashSeconds, 0f, 1f));
+
+                // Native Move_MODEL_MAGIC2 (Power Slash subtype 2) emits
+                // four BITMAP_SMOKE/3 plus one BITMAP_SMOKE/11 per tick.
+                // Keep our already-working travelling projectiles, and
+                // emit the existing ClassicFX smoke particles along their
+                // tail instead of creating an extra SpriteBatch renderer.
+                // The 25-Hz gate preserves native density at 60/120 FPS.
+                if (Clock.AdvancedReferenceFrame)
+                {
+                    // The native smoke3 mover produces the blue-white
+                    // light (0.8*l, 0.8*l, l) and expands the puff.
+                    // Distribute its four emissions behind the moving
+                    // head to make the characteristic continuous fan.
+                    for (int smoke = 0; smoke < 4; ++smoke)
+                    {
+                        float back = MgTrail[smoke];
+                        Vector3 smokePosition = head - arc.Direction * back +
+                            new Vector3(0f, 0f, 45f);
+                        CreateParticle(ClassicTextureIds.BitmapSmoke,
+                            smokePosition, Vector3.Zero, Vector3.One,
+                            subType: 3);
+                    }
+
+                    // Native subtype 11 is the larger, drifting cloud.
+                    // Its existing ClassicFX initializer/mover supplies
+                    // the random offset, expansion and lifetime.
+                    CreateParticle(ClassicTextureIds.BitmapSmoke,
+                        head - arc.Direction * MgTrail[2] +
+                            new Vector3(0f, 0f, 45f),
+                        Vector3.Zero,
+                        new Vector3(0.55f, 0.75f, 1f),
+                        subType: 11,
+                        scale: (Random.Modulo(32) + 80f) * 0.015f);
+                }
+
                 for (int orb = 0; orb < MgTrail.Length; ++orb)
                 {
                     Vector3 spot = head - arc.Direction * MgTrail[orb] +
