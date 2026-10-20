@@ -14,7 +14,7 @@ namespace Client.Main.Networking.Services
     /// Manages sending character‐related packets to the game server,
     /// including character list requests, character selection, movement, and animations.
     /// </summary>
-    public class CharacterService
+    public partial class CharacterService
     {
         private readonly ConnectionManager _connectionManager;
         private readonly ILogger<CharacterService> _logger;
@@ -2463,3 +2463,4 @@ namespace Client.Main.Networking.Services
         }
     }
 }
+

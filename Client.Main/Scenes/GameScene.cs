@@ -1,3 +1,4 @@
+using Client.Main.Controls.UI.Game.Messenger;
 // File: GameScene.cs
 using Client.Main.Controls;
 using System.Collections.Generic;
@@ -44,6 +45,7 @@ namespace Client.Main.Scenes
         // ──────────────────────────── Fields ────────────────────────────
         private readonly HeroObject _hero;
         private readonly MainControl _main;
+        public FriendsControl FriendsWindow { get; private set; }
         private GameSceneMapController _mapController;
         private MapListControl _mapListControl;
         private ChatLogWindow _chatLog;
@@ -1124,6 +1126,9 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(TradeControl.Instance))
                     return true;
 
+                foreach (var control in Controls)
+                    if (control is MessengerWindow messenger && IsWindowCovering(messenger)) return true;
+
                 if (IsWindowCovering(MyQuestsControl.Instance))
                     return true;
 
@@ -1278,6 +1283,8 @@ namespace Client.Main.Scenes
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
+            FriendsWindow = new FriendsControl();
+            Controls.Add(FriendsWindow);
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);
@@ -3161,3 +3168,4 @@ namespace Client.Main.Scenes
         }
     }
 }
+

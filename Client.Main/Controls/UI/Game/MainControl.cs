@@ -263,6 +263,7 @@ namespace Client.Main.Controls.UI.Game
 
             ControlFactories["button2"] = CreateHudButton;
             ControlFactories["button4"] = CreateHudButton;
+            ControlFactories["button5"] = CreateHudButton;
             ControlFactories["Bar1"] = _ => _shieldBar = new ResourceBarControl(state, true);
             ControlFactories["Bar2"] = _ => _abilityBar = new ResourceBarControl(state, false);
 
@@ -388,6 +389,16 @@ namespace Client.Main.Controls.UI.Game
                 {
                     Scene?.SetMouseInputConsumed();
                     (Scene as GameScene)?.ToggleCharacterInfoWindow();
+                };
+            }
+
+            if (Controls.FirstOrDefault(c => c.Name == "button5") is TextureControl friendsButton)
+            {
+                friendsButton.BringToFront();
+                friendsButton.Click += (_, _) =>
+                {
+                    Scene?.SetMouseInputConsumed();
+                    if (Scene is GameScene game) game.FriendsWindow?.Toggle();
                 };
             }
 

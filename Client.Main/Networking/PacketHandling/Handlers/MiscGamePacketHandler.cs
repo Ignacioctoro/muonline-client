@@ -1569,22 +1569,41 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
-        [PacketHandler(0xC0, PacketRouter.NoSubCode)]  // MessengerInitialization
+        [PacketHandler(0xC0, PacketRouter.NoSubCode)]
         public Task HandleMessengerInitializationAsync(Memory<byte> packet)
         {
-            try
-            {
-                var init = new MessengerInitialization(packet);
-                _logger.LogInformation(
-                    "Messenger initialized: {Letters}/{MaxLetters} letters, {Friends} friends",
-                    init.LetterCount, init.MaximumLetterCount, init.FriendCount);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error parsing MessengerInitialization packet.");
-            }
+            // The receive buffer belongs to the connection; retain a copy for UI-thread dispatch.
+            byte[] copy = packet.ToArray();
+            MuGame.ScheduleOnMainThread(() => _characterService.Messenger.Receive(copy, _characterService));
             return Task.CompletedTask;
         }
+
+        [PacketHandler(0xC1, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC1Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC2, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC2Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC3, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC3Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC4, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC4Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC5, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC5Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC6, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC6Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC7, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC7Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xC8, PacketRouter.NoSubCode)]
+        public Task HandleMessengerC8Async(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
+        [PacketHandler(0xCA, PacketRouter.NoSubCode)]
+        public Task HandleMessengerCAAsync(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
 
         [PacketHandler(0xA0, PacketRouter.NoSubCode)]  // LegacyQuestStateList
         public Task HandleLegacyQuestStateListAsync(Memory<byte> packet)
@@ -1780,4 +1799,5 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         }
     }
 }
+
 
