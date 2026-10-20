@@ -844,7 +844,10 @@ namespace Client.Main.Controls.UI
                 DrawTextSelectionAndCursor(spriteBatch);
             }
 
-            base.Draw(gameTime);
+            // The background was already drawn before the text. GameControl.Draw
+            // paints it again, hiding text, selection and caret in opaque fields.
+            for (int i = 0; i < Controls.Count; i++)
+                Controls[i].Draw(gameTime);
         }
 
         private void DrawFlatBackground(SpriteBatch spriteBatch)

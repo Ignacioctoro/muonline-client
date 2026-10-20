@@ -31,6 +31,7 @@ namespace Client.Main.Controls.UI.Game
         private readonly ButtonControl _hostilityRequestButton;
         private readonly ButtonControl _storeButton;
         private readonly ButtonControl _whisperButton;
+        private readonly ButtonControl _friendButton;
 
         private static class Theme
         {
@@ -99,6 +100,10 @@ namespace Client.Main.Controls.UI.Game
 
             _whisperButton =
                 buttons.whisper;
+
+            _friendButton = buttons.friend;
+            _friendButton.Click += OnAddFriendClicked;
+            Controls.Add(_friendButton);
 
             _partyButton.Click +=
                 OnPartyInviteClicked;
@@ -412,6 +417,24 @@ namespace Client.Main.Controls.UI.Game
                 false;
         }
 
+        private void OnAddFriendClicked(object sender, EventArgs e)
+        {
+            string name = _targetPlayerName;
+            Visible = false;
+            Scene?.SetMouseInputConsumed();
+            var service = MuGame.Network?.GetCharacterService();
+            if (service == null || string.IsNullOrWhiteSpace(name)) return;
+
+            // Keep the server's response visible in the friends window.
+            if (MuGame.Instance?.ActiveScene is Client.Main.Scenes.GameScene scene &&
+                scene.FriendsWindow != null)
+            {
+                scene.FriendsWindow.Visible = true;
+                scene.FriendsWindow.BringToFront();
+            }
+            _ = service.SendFriendActionAsync(0xC1, name);
+        }
+
         private void OnWhisperClicked(
             object sender,
             EventArgs e)
@@ -498,6 +521,8 @@ namespace Client.Main.Controls.UI.Game
 
             PositionButton(
                 _whisperButton);
+
+            PositionButton(_friendButton);
 
             int totalHeight =
                 y + 10;
@@ -604,7 +629,8 @@ namespace Client.Main.Controls.UI.Game
             ButtonControl allianceRequest,
             ButtonControl hostilityRequest,
             ButtonControl store,
-            ButtonControl whisper)
+            ButtonControl whisper,
+            ButtonControl friend)
             CreateButtons()
         {
             const int width =
@@ -683,7 +709,8 @@ namespace Client.Main.Controls.UI.Game
                 allianceRequest,
                 hostilityRequest,
                 store,
-                whisper);
+                whisper,
+                Make("Add Friend"));
         }
     }
 }
