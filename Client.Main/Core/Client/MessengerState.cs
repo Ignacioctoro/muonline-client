@@ -31,6 +31,10 @@ public sealed class MessengerState
     public bool RefuseChat { get; set; }
     public string Notice { get; set; } = "Waiting for messenger data from OpenMU.";
     public uint LastLetterRequest;
+    public uint LastChatInvitation;
+    public string PendingChatName { get; private set; }
+    private DateTime _chatDeadline;
+    private readonly Dictionary<uint, (MessengerChatRoom Room, DateTime Deadline)> _invitations = new();
     public int MaximumLetters { get; private set; }
     public event Action<Letter> LetterOpened;
     public event Action<MessengerChatRoom> RoomOpened;
@@ -40,6 +44,7 @@ public sealed class MessengerState
     {
         foreach (var room in Rooms) room.Dispose();
         Rooms.Clear(); Friends.Clear(); Letters.Clear(); Initialized = false; RefuseChat = false;
+        PendingChatName = null; _invitations.Clear();
         Notice = "Waiting for messenger data from OpenMU."; Changed();
     }
     private static string Text(ReadOnlySpan<byte> p, int offset, int length)
@@ -53,6 +58,36 @@ public sealed class MessengerState
         if (friend == null) { friend = new Friend { Name = name }; Friends.Add(friend); }
         friend.Server = server;
         Friends.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool BeginChat(string name)
+    {
+        var existing = Rooms.Find(r => !r.IsClosed && string.Equals(r.FriendName, name, StringComparison.OrdinalIgnoreCase));
+        if (existing != null) { RoomOpened?.Invoke(existing); Notice = "Conversation already open."; return false; }
+        var friend = Friends.Find(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (friend == null || friend.Server >= 254) { Notice = "Choose an online friend who accepts chat."; return false; }
+        if (PendingChatName != null) { Notice = "A chat request is already pending. Please wait."; return false; }
+        if (Rooms.Count >= 10 && !Rooms.Exists(r => r.IsClosed && string.Equals(r.FriendName, name, StringComparison.OrdinalIgnoreCase)))
+        { Notice = "Close a chat first (maximum 10)."; return false; }
+        PendingChatName = name; _chatDeadline = DateTime.UtcNow.AddSeconds(15);
+        Notice = "Requesting chat with " + name + "..."; return true;
+    }
+    public void TrackInvitation(uint id, MessengerChatRoom room)
+    {
+        _invitations[id] = (room, DateTime.UtcNow.AddSeconds(15));
+        room.SetInvitationStatus("Invitation sent; waiting for OpenMU.");
+    }
+    public void UpdateTimeouts()
+    {
+        var now = DateTime.UtcNow;
+        if (PendingChatName != null && now >= _chatDeadline)
+        { PendingChatName = null; Notice = "No chat response. Check friend visibility and ChatServer, then retry."; }
+        // Remove one expired request per frame without allocating a list.
+        uint? expired = null;
+        foreach (var entry in _invitations)
+            if (now >= entry.Value.Deadline)
+            { entry.Value.Room.SetInvitationStatus("Invitation timed out. Check whether your friend joined before retrying."); expired = entry.Key; break; }
+        if (expired.HasValue) _invitations.Remove(expired.Value);
     }
 
     public void Receive(byte[] packet, CharacterService service)
@@ -111,17 +146,31 @@ public sealed class MessengerState
                 foreach (var remaining in Letters) if (remaining.Index > removed) remaining.Index--;
                 Notice = "Letter deleted."; break;
             case 0xCA when p.Length >= 36:
+                PendingChatName = null;
                 if (p[35] == 0) { Notice = "Chat unavailable. Check that your friend is online."; break; }
                 ushort roomId = BinaryPrimitives.ReadUInt16LittleEndian(p.Slice(18));
                 var old = Rooms.Find(r => r.Id == roomId);
-                if (old != null) { RoomOpened?.Invoke(old); break; }
+                if (old != null && !old.IsClosed) { RoomOpened?.Invoke(old); break; }
+                if (old != null) { old.Dispose(); Rooms.Remove(old); }
                 string host = Text(p, 3, 15), friendName = Text(p, 25, 10);
+                for (int i = Rooms.Count - 1; i >= 0; i--)
+                    if (Rooms[i].IsClosed && string.Equals(Rooms[i].FriendName, friendName, StringComparison.OrdinalIgnoreCase))
+                    { Rooms[i].Dispose(); Rooms.RemoveAt(i); }
                 uint token = BinaryPrimitives.ReadUInt32LittleEndian(p.Slice(20));
-                int port = int.TryParse(MuGame.AppConfiguration?["MuOnlineSettings:ChatServerPort"], out int configured) ? configured : 55980;
+                int port = int.TryParse(MuGame.AppConfiguration?["MuOnlineSettings:ChatServerPort"], out int configured) ? configured : 45980;
                 if (port < 1 || port > 65535 || string.IsNullOrWhiteSpace(host)) { Notice = "Invalid ChatServer address or port."; break; }
                 if (Rooms.Count >= 10) { Notice = "Close a chat before opening another (maximum 10)."; break; }
                 var room = new MessengerChatRoom(roomId, friendName);
-                Rooms.Add(room); RoomOpened?.Invoke(room); _ = room.ConnectAsync(host, port, token); break;
+                Rooms.Add(room); Notice = "Opening chat with " + friendName + ".";
+                _ = room.ConnectAsync(host, port, token); RoomOpened?.Invoke(room); break;
+            case 0xCB when p.Length >= 8:
+                uint request = BinaryPrimitives.ReadUInt32BigEndian(p.Slice(4));
+                if (_invitations.Remove(request, out var invitation))
+                {
+                    Notice = p[3] != 0 ? "Chat invitation accepted by the server." : "Could not invite this friend. Check online status and friendship.";
+                    invitation.Room.SetInvitationStatus(Notice);
+                }
+                break;
         }
         Changed();
     }

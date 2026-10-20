@@ -39,6 +39,29 @@ public partial class CharacterService
         return SendMessengerPacketAsync(packet);
     }
 
+    public Task RequestChatAsync(string name)
+    {
+        name = name?.Trim() ?? "";
+        return Messenger.BeginChat(name) ? SendFriendActionAsync(0xCA, name) : Task.CompletedTask;
+    }
+
+    public Task InviteToChatAsync(MessengerChatRoom room, string name)
+    {
+        name = name?.Trim() ?? "";
+        if (!room.Connected || room.IsClosed)
+        { room.SetInvitationStatus("Connect to the conversation before inviting a friend."); return Task.CompletedTask; }
+        var friend = Messenger.Friends.Find(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (friend == null || friend.Server >= 254 || Encoding.UTF8.GetByteCount(name) > 10 || name.Contains('\0'))
+        { room.SetInvitationStatus("Enter the name of an online friend who accepts chat."); return Task.CompletedTask; }
+        var packet = new byte[19]; packet[0] = 0xC1; packet[1] = 19; packet[2] = 0xCB;
+        Encoding.UTF8.GetBytes(name, packet.AsSpan(3, 10));
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(13), room.Id);
+        uint request = ++Messenger.LastChatInvitation;
+        BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(15), request);
+        Messenger.TrackInvitation(request, room);
+        return SendMessengerPacketAsync(packet);
+    }
+
     public Task AnswerFriendAsync(string name, bool accept)
     {
         var packet = new byte[14]; packet[0] = 0xC1; packet[1] = 14; packet[2] = 0xC2;

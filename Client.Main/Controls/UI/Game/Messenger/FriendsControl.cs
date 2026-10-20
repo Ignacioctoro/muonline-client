@@ -66,7 +66,7 @@ public sealed class FriendsControl : MessengerWindow
             if (action == 0) { if (_adding) AddFriend(); else { _adding = true; _name.Visible = true; _name.Focus(); } return; }
             if (name == null) { State.Notice = "Select a friend."; return; }
             if (action == 1) RequestDialog.Show($"Delete {name} from your friends?", () => { _ = _service.SendFriendActionAsync(0xC3, name); });
-            if (action == 2) _ = _service.SendFriendActionAsync(0xCA, name);
+            if (action == 2) _ = _service.RequestChatAsync(name);
             if (action == 3) Compose(name, "");
         }
         else if (_tab == 1)
@@ -119,7 +119,12 @@ public sealed class FriendsControl : MessengerWindow
     }
     public override void Update(GameTime time)
     {
-        base.Update(time); if (!Visible) return;
+        base.Update(time);
+        State.UpdateTimeouts();
+        for (int i = _windows.Count - 1; i >= 0; i--)
+            if (!State.Rooms.Contains(_windows[i].Room))
+            { var window = _windows[i]; window.CloseWindow(); Scene.Controls.Remove(window); window.Dispose(); _windows.RemoveAt(i); }
+        if (!Visible) return;
         int revision = State.Revision;
         if (_tab == 2) foreach (var room in State.Rooms) revision = unchecked(revision * 31 + room.Revision);
         if (_revision != revision)

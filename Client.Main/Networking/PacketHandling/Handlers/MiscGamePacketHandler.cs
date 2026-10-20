@@ -1605,6 +1605,9 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         [PacketHandler(0xCA, PacketRouter.NoSubCode)]
         public Task HandleMessengerCAAsync(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
 
+        [PacketHandler(0xCB, PacketRouter.NoSubCode)]
+        public Task HandleMessengerCBAsync(Memory<byte> packet) => HandleMessengerInitializationAsync(packet);
+
         [PacketHandler(0xA0, PacketRouter.NoSubCode)]  // LegacyQuestStateList
         public Task HandleLegacyQuestStateListAsync(Memory<byte> packet)
         {

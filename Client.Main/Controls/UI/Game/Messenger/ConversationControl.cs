@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Client.Main.Core.Client;
+using Client.Main.Controls.UI.Common;
 
 namespace Client.Main.Controls.UI.Game.Messenger;
 
@@ -10,19 +11,26 @@ public sealed class ConversationControl : MessengerWindow
 {
     public MessengerChatRoom Room { get; }
     private readonly TextFieldControl _input;
+    private readonly TextFieldControl _inviteName;
+    private readonly ButtonControl _sendButton, _retryButton, _inviteButton;
     private readonly List<string> _lines = new();
     private int _revision = -1, _scroll;
     private bool _sending, _disposed;
-    public ConversationControl(MessengerChatRoom room) : base("Chat: " + room.FriendName, 420, 340)
+    public ConversationControl(MessengerChatRoom room) : base("Chat: " + room.FriendName, 420, 430)
     {
         Room = room;
         _input = AddInput(26, 254, 280, 200, "Message");
         _input.EnterKeyPressed += (_, _) => Send();
-        AddButton("Send", 314, 252, 80, Send);
-        AddButton("Hide", 314, 288, 80, CloseWindow);
-        AddButton("<", 246, 288, 28, () => _scroll = Math.Max(0, _scroll - 8));
-        AddButton(">", 280, 288, 28, () => _scroll = Math.Min(Math.Max(0, _lines.Count - 9), _scroll + 8));
+        _sendButton = AddButton("Send", 314, 252, 80, Send);
+        _inviteName = AddInput(26, 303, 280, 10, "Online friend to invite");
+        _inviteName.EnterKeyPressed += (_, _) => Invite();
+        _inviteButton = AddButton("Invite", 314, 301, 80, Invite);
+        _retryButton = AddButton("Retry", 26, 380, 80, () => { _ = MuGame.Network.GetCharacterService().RequestChatAsync(Room.FriendName); });
+        AddButton("Hide", 314, 380, 80, CloseWindow);
+        AddButton("<", 246, 380, 28, () => _scroll = Math.Max(0, _scroll - 8));
+        AddButton(">", 280, 380, 28, () => _scroll = Math.Min(Math.Max(0, _lines.Count - 9), _scroll + 8));
     }
+    private void Invite() => _ = MuGame.Network.GetCharacterService().InviteToChatAsync(Room, _inviteName.Value);
     private async void Send()
     {
         if (_sending) return;
@@ -33,6 +41,9 @@ public sealed class ConversationControl : MessengerWindow
     public override void Update(GameTime time)
     {
         base.Update(time); if (!Visible) return;
+        _sendButton.Enabled = Room.Connected && !Room.IsClosed && !_sending;
+        _inviteButton.Enabled = Room.Connected && !Room.IsClosed;
+        _retryButton.Visible = Room.IsClosed;
         if (_revision != Room.Revision)
         {
             bool atEnd = _scroll >= Math.Max(0, _lines.Count - 9);
@@ -44,9 +55,12 @@ public sealed class ConversationControl : MessengerWindow
     }
     protected override void DrawContent(SpriteBatch sb)
     {
-        Fill(sb, new Rectangle(24, 82, 372, 163), Theme.Darkest * .85f);
-        for (int i = 0; i < 9 && _scroll + i < _lines.Count; i++) Text(sb, _lines[_scroll + i], 29, 87 + 17 * i, 362);
-        Text(sb, Room.Status, 26, 297, 215, Theme.Gold, 10);
+        Text(sb, Room.Participants, 26, 80, 366, Theme.Gold, 10);
+        Fill(sb, new Rectangle(24, 96, 372, 151), Theme.Darkest * .85f);
+        for (int i = 0; i < 9 && _scroll + i < _lines.Count; i++) Text(sb, _lines[_scroll + i], 29, 99 + 16 * i, 362);
+        Text(sb, "Invite an online friend to this conversation:", 26, 286, 366, Theme.Gold, 10);
+        Text(sb, Room.InvitationStatus, 26, 334, 366, Theme.Gold, 10);
+        Text(sb, Room.Status, 26, 356, 366, Theme.Gold, 10);
     }
     public override void Dispose() { _disposed = true; Room.Dispose(); base.Dispose(); }
 }
