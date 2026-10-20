@@ -29,6 +29,9 @@ public abstract class MessengerWindow : UIControl
     private readonly Dictionary<(string, int, float), string> _labels = new();
     protected SpriteFont Font => GraphicsManager.Instance.Font;
     protected string Caption;
+    protected virtual string FramePath => "Interface/GFx/FriendMenu_I1.ozd";
+    protected virtual Rectangle FrameBody => new(0, 0, 530, 295);
+    protected virtual Rectangle FrameHeader => new(0, 300, 530, 78);
     public override bool BlocksPointerInput => true;
     protected MessengerWindow(string caption, int width, int height)
     {
@@ -65,7 +68,7 @@ public abstract class MessengerWindow : UIControl
     }
     public override async Task Load()
     {
-        _atlas = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/FriendMenu_I1.ozd");
+        _atlas = await TextureLoader.Instance.PrepareAndGetTexture(FramePath);
         if (ViewSize.X == 420) _chatHeader = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/FriendWindow_I1.ozd");
         await base.Load();
     }
@@ -80,9 +83,9 @@ public abstract class MessengerWindow : UIControl
             var previous = gd.GetRenderTargets(); gd.SetRenderTarget(_surface); gd.Clear(Color.Transparent);
             using (new SpriteBatchScope(sb, blend: _cacheBlend))
             {
-                sb.Draw(_atlas, new Rectangle(0, 76, ViewSize.X, ViewSize.Y - 76), new Rectangle(0, 0, 530, 295), Color.White);
+                sb.Draw(_atlas, new Rectangle(0, 76, ViewSize.X, ViewSize.Y - 76), FrameBody, Color.White);
                 sb.Draw(_chatHeader ?? _atlas, new Rectangle(0, 0, ViewSize.X, 78),
-                    _chatHeader != null ? new Rectangle(0, 0, 530, 76) : new Rectangle(0, 300, 530, 78), Color.White);
+                    _chatHeader != null ? new Rectangle(0, 0, 530, 76) : FrameHeader, Color.White);
             }
             gd.SetRenderTargets(previous);
         }

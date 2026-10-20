@@ -177,6 +177,7 @@ namespace Client.Main.Scenes
             }
 
             hotkeys.OnKeyPressed(Keys.F, _ => _scene.FriendsWindow?.Toggle(), when: WhenNotUiInput);
+            hotkeys.OnKeyPressed(Keys.P, _ => _scene.PartyMatchingWindow?.Toggle(), when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.T, _ => Client.Main.Controls.UI.Game.Quest.MyQuestsControl.Instance.Toggle(), when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.I, ToggleInventory, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.V, ToggleInventory, when: WhenNotUiInput);

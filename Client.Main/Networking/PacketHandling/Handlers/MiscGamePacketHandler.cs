@@ -47,6 +47,14 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
         // ─────────────────────── Packet Handlers ────────────────────────
 
+        [PacketHandler(0xED, PacketRouter.NoSubCode)]
+        public Task HandlePartyMatchingAsync(Memory<byte> packet)
+        {
+            var copy = packet.ToArray();
+            MuGame.ScheduleOnMainThread(() => _characterService.PartyMatching.Receive(copy));
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0x54, PacketRouter.NoSubCode)] // ShowGuildMasterDialog (S2C)
         public Task HandleShowGuildMasterDialogAsync(Memory<byte> packet)
         {

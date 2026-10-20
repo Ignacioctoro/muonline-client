@@ -46,6 +46,7 @@ namespace Client.Main.Scenes
         private readonly HeroObject _hero;
         private readonly MainControl _main;
         public FriendsControl FriendsWindow { get; private set; }
+        public Client.Main.Controls.UI.Game.Party.PartyMatchingControl PartyMatchingWindow { get; private set; }
         private GameSceneMapController _mapController;
         private MapListControl _mapListControl;
         private ChatLogWindow _chatLog;
@@ -1285,6 +1286,9 @@ namespace Client.Main.Scenes
             Controls.Add(MyQuestsControl.Instance);
             FriendsWindow = new FriendsControl();
             Controls.Add(FriendsWindow);
+            PartyMatchingWindow = new Client.Main.Controls.UI.Game.Party.PartyMatchingControl();
+            Controls.Add(PartyMatchingWindow);
+            Controls.Add(new Client.Main.Controls.UI.Game.Party.PartyMatchingLauncher());
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);

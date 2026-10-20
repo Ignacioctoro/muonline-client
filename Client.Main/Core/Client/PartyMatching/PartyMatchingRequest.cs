@@ -1,0 +1,28 @@
+using System;
+
+namespace Client.Main.Core.Client.PartyMatching;
+
+/// <summary>Version 1 party matching data, shared by the extended client and server.</summary>
+public sealed class PartyMatchingRequest
+{
+    /// <summary>Gets or sets Operation.</summary>
+    public int Operation { get; set; } = 0;
+    /// <summary>Gets or sets Id.</summary>
+    public string Id { get; set; } = "";
+    /// <summary>Gets or sets Title.</summary>
+    public string Title { get; set; } = "";
+    /// <summary>Gets or sets Password.</summary>
+    public string Password { get; set; } = "";
+    /// <summary>Gets or sets MinLevel.</summary>
+    public int MinLevel { get; set; } = 1;
+    /// <summary>Gets or sets MaxLevel.</summary>
+    public int MaxLevel { get; set; } = 400;
+    /// <summary>Gets or sets ClassMask.</summary>
+    public int ClassMask { get; set; } = 127;
+    /// <summary>Gets or sets AutoAccept.</summary>
+    public bool AutoAccept { get; set; } = false;
+    /// <summary>Gets or sets Page.</summary>
+    public int Page { get; set; } = 0;
+    /// <summary>Gets or sets Search.</summary>
+    public string Search { get; set; } = "";
+}

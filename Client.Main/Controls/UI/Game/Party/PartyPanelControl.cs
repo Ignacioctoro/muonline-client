@@ -24,7 +24,7 @@ namespace Client.Main.Controls.UI.Game.Party
             Align = ControlAlign.Top | ControlAlign.Right;
             AutoViewSize = false;
             ViewSize = new Point(PartyMemberControl.RowWidth, 22);
-            Margin = new Margin { Top = 12, Right = 10 };
+            Margin = new Margin { Top = 44, Right = 10 };
             Controls.Add(new TextureControl
             {
                 Name = "PartyHeader", AutoViewSize = false, ViewSize = new Point(PartyMemberControl.RowWidth, 20),
