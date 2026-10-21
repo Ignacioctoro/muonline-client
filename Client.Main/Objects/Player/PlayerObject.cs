@@ -56,6 +56,8 @@ namespace Client.Main.Objects.Player
 
         public VehicleObject Vehicle { get; private set; }
         public DarkRavenObject DarkRaven { get; private set; }
+        private readonly CompanionPetObject[] _companionPets;
+        private short? _remoteCompanionOverride;
 
         internal const int LeftHandBoneIndex = 33;
         internal const int RightHandBoneIndex = 42;
@@ -203,6 +205,13 @@ namespace Client.Main.Objects.Player
             EquippedWings = new WingObject { LinkParentAnimation = true, Hidden = true };
             Vehicle = new VehicleObject { Hidden = true };
             DarkRaven = new DarkRavenObject(this);
+            _companionPets = new[]
+            {
+                new CompanionPetObject(this, 0),
+                new CompanionPetObject(this, 1),
+                new CompanionPetObject(this, 64),
+                new CompanionPetObject(this, 80)
+            };
 
             Children.Add(HelmMask);
             Children.Add(Helm);
@@ -221,6 +230,7 @@ namespace Client.Main.Objects.Player
             Children.Add(GuildEmblem3D = new GuildEmblem3DObject());
             Children.Add(Vehicle);
             Children.Add(DarkRaven);
+            foreach (var pet in _companionPets) Children.Add(pet);
 
             // Classic MU +15 armor attachments (NextGradeObjectRender).
             // They stay loaded once and toggle automatically according to each
@@ -1604,6 +1614,23 @@ namespace Client.Main.Objects.Player
         }
 
         // ───────────────────────────────── UPDATE LOOP ─────────────────────────────────
+
+        private void UpdateCompanionEquipment()
+        {
+            short number = _remoteCompanionOverride ?? Appearance.CompanionPetItemNumber;
+            if (IsMainWalker)
+            {
+                number = -1;
+                var state = _networkManager?.GetCharacterState();
+                if (state != null && state.TryGetInventoryItem(InventoryConstants.PetSlot, out var item)
+                    && ItemDatabase.GetItemDurability(item) > 0
+                    && ItemDatabase.TryGetItemGroupAndNumber(item, out byte group, out short itemNumber)
+                    && group == 13)
+                    number = itemNumber;
+            }
+            foreach (var pet in _companionPets) pet.SetEquipped(pet.ItemNumber == number);
+        }
+
         public override void Update(GameTime gameTime)
         {
             if (IsMainWalker)
@@ -1617,7 +1644,9 @@ namespace Client.Main.Objects.Player
                 UpdateHeadRotationTowardsCursor();
             }
 
+            UpdateCompanionEquipment();
             base.Update(gameTime); // movement, camera for main walker, etc.
+            foreach (var pet in _companionPets) pet.SyncAfterOwnerMovement();
 
             UpdateEquipmentAnimationStride();
 
@@ -4960,6 +4989,8 @@ namespace Client.Main.Objects.Player
 
                     case InventoryConstants.PetSlot: // 8 - Pet
                     {
+                        _remoteCompanionOverride = equipmentData.ItemGroup == 13
+                            ? (short)equipmentData.ItemNumber : (short)-1;
                         short vehicleIndex = -1;
 
                         if (equipmentData.ItemGroup == 13)
@@ -5101,6 +5132,7 @@ namespace Client.Main.Objects.Player
                     EquippedWings.ItemIndex = -1;
                     break;
                     case InventoryConstants.PetSlot:
+                    _remoteCompanionOverride = -1;
                     // Explicitly override the initial AppearanceData:
                     // this remote player no longer has a rideable pet.
                     _remoteVehicleOverrideIndex = -1;

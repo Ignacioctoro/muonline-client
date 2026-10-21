@@ -904,6 +904,30 @@ namespace Client.Main.Models
         /// <summary>
         /// Gets the pet/helper item index.
         /// </summary>
+        // Resolve the actual helper item, not the old bit-field index.
+        // A missing helper is -1; zero is a real Guardian Angel.
+        public short CompanionPetItemNumber
+        {
+            get
+            {
+                if (IsExtendedFormat)
+                {
+                    var helper = ParseExtendedHelper(RawData,
+                        Format == AppearanceFormat.Extended25Byte ? 23 : 25);
+                    return helper.Group == 13 && helper.ItemNumber is 0 or 1 or 64 or 80
+                        ? helper.ItemNumber : (short)-1;
+                }
+                if (RawData.Length < 18) return -1;
+                // S6 OpenMU reserves byte 16's high three bits for cash pets.
+                int special = RawData[16] & 0xE0;
+                if (special != 0)
+                    return special == 0x20 ? (short)64 : special == 0xE0 ? (short)80 : (short)-1;
+                if ((RawData[10] & 1) != 0 || (RawData[12] & 5) != 0) return -1;
+                int basic = RawData[5] & 3;
+                return basic <= 1 ? (short)basic : (short)-1;
+            }
+        }
+
         public byte PetItemIndex
         {
             get

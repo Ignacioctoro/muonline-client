@@ -94,6 +94,8 @@ namespace Client.Main.Controls.UI.Game.Hud
                         3 => "Dinorant",
                         4 => "Dark Horse",
                         37 => "Fenrir",
+                        64 => "Demon",
+                        80 => "Panda",
                         _ => null
                     };
 
