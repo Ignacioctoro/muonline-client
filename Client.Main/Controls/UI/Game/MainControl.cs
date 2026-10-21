@@ -1,4 +1,6 @@
 using Client.Main.Controllers;
+using Client.Main.Content;
+using System.Threading.Tasks;
 using Client.Main.Controls.UI;
 using Client.Main.Controls.UI.Game.Hud;
 using Client.Main.Controls.UI.Game.Inventory;
@@ -261,6 +263,7 @@ namespace Client.Main.Controls.UI.Game
             ControlFactories["InventoryButton"] =
                 CreateHudButton;
 
+            ControlFactories["Button_1"] = CreateHudButton;
             ControlFactories["button2"] = CreateHudButton;
             ControlFactories["button4"] = CreateHudButton;
             ControlFactories["button5"] = CreateHudButton;
@@ -398,7 +401,7 @@ namespace Client.Main.Controls.UI.Game
                 friendsButton.Click += (_, _) =>
                 {
                     Scene?.SetMouseInputConsumed();
-                    if (Scene is GameScene game) game.FriendsWindow?.Toggle();
+                    if (Scene is GameScene game) game.CommunityMenu?.Toggle(friendsButton);
                 };
             }
 
@@ -939,7 +942,8 @@ namespace Client.Main.Controls.UI.Game
             Visible &&
             ((_experienceBar?.IsMouseOver == true && _experienceBar.Visible) ||
              (_shieldBar?.IsMouseOver == true && _shieldBar.Visible) ||
-             (_abilityBar?.IsMouseOver == true && _abilityBar.Visible));
+             (_abilityBar?.IsMouseOver == true && _abilityBar.Visible) ||
+             Controls.Any(c => c is HudTextureButton b && b.ShowHelp));
 
         public void DrawExperienceTooltip(GameTime gameTime)
         {
@@ -947,6 +951,8 @@ namespace Client.Main.Controls.UI.Game
             _experienceBar?.DrawTooltip(gameTime);
             _shieldBar?.DrawTooltip(gameTime);
             _abilityBar?.DrawTooltip(gameTime);
+            foreach (var control in Controls)
+                if (control is HudTextureButton button) button.DrawHelp(gameTime);
         }
 
         // =============================================================
@@ -1044,6 +1050,7 @@ namespace Client.Main.Controls.UI.Game
                         info.Width,
                         info.Height);
 
+            button.ConfigureSkin(info.Name);
             return button;
         }
 
@@ -1054,6 +1061,63 @@ namespace Client.Main.Controls.UI.Game
         private sealed class HudTextureButton :
             TextureControl
         {
+            private readonly Texture2D[] _states = new Texture2D[4];
+            private string _skin;
+            private LabelControl _help;
+            public bool ShowHelp => Visible && IsMouseOver && _help != null &&
+                Scene?.IsPointerInputBlockedFor(this) != true;
+
+            public void ConfigureSkin(string name)
+            {
+                var settings = name switch
+                {
+                    "SettingsButton" => (1, "Esc  Sistema y opciones"),
+                    "button5" => (2, "Community: Amigos, Guild y Party"),
+                    "button4" => (3, "T  Misiones"),
+                    "InventoryButton" => (4, "I  Inventario"),
+                    "button2" => (5, "C  Personaje"),
+                    "Button_1" => (6, "Tienda"),
+                    _ => (0, "Cambiar barra de habilidades")
+                };
+                if (settings.Item1 != 0)
+                    _skin = $"Interface/GFx/button_btn{settings.Item1:00}_";
+                _help = new LabelControl
+                {
+                    Text = settings.Item2, FontSize = 11f, Interactive = false,
+                    TextColor = Color.White,
+                    BackgroundColor = new Color(12, 10, 9, 240),
+                    Padding = new Margin { Left = 7, Right = 7, Top = 4, Bottom = 4 }
+                };
+            }
+
+            public override async Task Load()
+            {
+                await base.Load();
+                if (_skin == null) return;
+                for (int i = 0; i < _states.Length; i++)
+                    _states[i] = await TextureLoader.Instance.PrepareAndGetTexture(_skin + (i + 1) + ".ozd");
+            }
+
+            public override void Draw(GameTime gameTime)
+            {
+                if (!Visible || Status != GameControlStatus.Ready) return;
+                int state = !Interactive ? 3 : IsMousePressed ? 2 : IsMouseOver ? 1 : 0;
+                var texture = _states[state] ?? _states[0];
+                if (texture == null) { base.Draw(gameTime); return; }
+                // Whole, transparent GFx sprites include the original illuminated rim.
+                GraphicsManager.Instance.Sprite.Draw(texture, DisplayRectangle, Color.White * Alpha);
+            }
+
+            public void DrawHelp(GameTime gameTime)
+            {
+                if (!ShowHelp) return;
+                var bounds = DisplayRectangle;
+                _help.X = Math.Clamp(bounds.Center.X - _help.ControlSize.X / 2, 0,
+                    Math.Max(0, UiScaler.VirtualSize.X - _help.ControlSize.X));
+                _help.Y = Math.Max(0, bounds.Y - _help.ControlSize.Y - 6);
+                _help.Draw(gameTime);
+            }
+
             public HudTextureButton()
             {
                 Interactive =

@@ -50,6 +50,7 @@ namespace Client.Main.Scenes
         private GameSceneMapController _mapController;
         private MapListControl _mapListControl;
         private ChatLogWindow _chatLog;
+        public CommunityMenuControl CommunityMenu { get; private set; }
         private MoveCommandWindow _moveCommandWindow;
         public MoveCommandWindow MoveCommandWindow => _moveCommandWindow;
         private ChatInputBoxControl _chatInput;
@@ -1288,7 +1289,8 @@ namespace Client.Main.Scenes
             Controls.Add(FriendsWindow);
             PartyMatchingWindow = new Client.Main.Controls.UI.Game.Party.PartyMatchingControl();
             Controls.Add(PartyMatchingWindow);
-            Controls.Add(new Client.Main.Controls.UI.Game.Party.PartyMatchingLauncher());
+            CommunityMenu = new CommunityMenuControl();
+            Controls.Add(CommunityMenu);
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);
