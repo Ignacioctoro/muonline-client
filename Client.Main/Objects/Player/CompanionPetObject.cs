@@ -48,7 +48,7 @@ namespace Client.Main.Objects.Player
                 80 => "Item/PandaPet.bmd",
                 _ => throw new ArgumentOutOfRangeException(nameof(itemNumber))
             };
-            _nativeScale = itemNumber switch { 64 => 0.32f, 80 => 1f, _ => 0.8f };
+            _nativeScale = itemNumber switch { 64 => 0.16f, 80 => 1f, _ => 0.8f };
             Hidden = true;
             Interactive = false;
             LinkParentAnimation = false;
@@ -149,6 +149,33 @@ namespace Client.Main.Objects.Player
             if (!_equipped || !_hasPosition || World == null) return;
             Position = Vector3.Transform(_position, Matrix.Invert(_owner.WorldPosition));
             Angle = new Vector3(0f, 0f, _yaw - _owner.Angle.Z);
+            if (ItemNumber == 80) FitPandaToTerrain();
+        }
+
+        private void FitPandaToTerrain()
+        {
+            var bones = GetBoneTransforms();
+            if (Model?.Meshes == null || bones == null || bones.Length == 0) return;
+
+            // Use the animated, transformed mesh rather than its BMD origin.
+            // This includes skeletal offsets and the owner's current transform.
+            float bottom = float.PositiveInfinity;
+            foreach (var mesh in Model.Meshes)
+            {
+                if (mesh.Vertices == null) continue;
+                foreach (var vertex in mesh.Vertices)
+                {
+                    int node = vertex.Node;
+                    if (node < 0 || node >= bones.Length) continue;
+                    var local = Vector3.Transform(vertex.Position, bones[node]);
+                    float z = Vector3.Transform(local, WorldPosition).Z;
+                    if (float.IsFinite(z)) bottom = Math.Min(bottom, z);
+                }
+            }
+            if (!float.IsFinite(bottom)) return;
+            float ground = World.Terrain.RequestTerrainHeight(_position.X, _position.Y);
+            _position.Z += ground + 3f - bottom;
+            Position = Vector3.Transform(_position, Matrix.Invert(_owner.WorldPosition));
         }
 
 

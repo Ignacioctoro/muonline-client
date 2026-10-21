@@ -1646,7 +1646,7 @@ namespace Client.Main.Objects.Player
 
             UpdateCompanionEquipment();
             base.Update(gameTime); // movement, camera for main walker, etc.
-            foreach (var pet in _companionPets) pet.SyncAfterOwnerMovement();
+
 
             UpdateEquipmentAnimationStride();
 
@@ -1664,6 +1664,8 @@ namespace Client.Main.Objects.Player
             // child objects. Keep a perched Raven exactly on the raised arm
             // after this frame's owner position and animation selection.
             DarkRaven?.SyncPerchAfterOwnerMovement();
+            // Mount/facing updates above may change the owner transform again.
+            foreach (var pet in _companionPets) pet.SyncAfterOwnerMovement();
 
             // Native horse muzzle particles must use the fully advanced rider
             // transform, not the previous child-update transform.
