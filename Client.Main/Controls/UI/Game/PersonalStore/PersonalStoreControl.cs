@@ -52,7 +52,7 @@ namespace Client.Main.Controls.UI.Game
         private static readonly Rectangle CloseStoreButton = PersonalStoreLayout.CloseStore;
         private static readonly Rectangle ExitButton = PersonalStoreLayout.Exit;
         private static readonly Rectangle CloseButton = PersonalStoreLayout.Close;
-        private static readonly Rectangle PriceDialog = new(31, 226, 286, 181);
+        private static readonly Rectangle PriceDialog = new(31, 192, 286, 215);
         private static readonly Rectangle PriceConfirmButton = new(48, 350, 119, 32);
         private static readonly Rectangle PriceCancelButton = new(180, 350, 119, 32);
         private static readonly Rectangle StoreNameEditBox = PersonalStoreLayout.Name;
@@ -109,10 +109,14 @@ namespace Client.Main.Controls.UI.Game
         private bool _priceFeedbackError;
         private byte? _pendingPriceSlot;
         private uint _pendingPriceZen;
+        private ushort _priceCurrency, _pendingPriceCurrency;
+        private string _currencyLabel = "Zen  >";
+        private static readonly Rectangle CurrencyButton = new(51, 233, 246, 32);
+        private Client.Main.Core.Client.StoreCurrencyState Currencies => MuGame.Network.GetCharacterService().StoreCurrencies;
         private byte[] _pendingPriceRaw;
         // Confirmed by OpenMU in this session; item bytes guard against
         // displaying an old price when another item occupies the same slot.
-        private readonly Dictionary<byte, (uint Price, byte[] Raw)> _confirmedPrices = new();
+        private readonly Dictionary<byte, (uint Price, ushort Currency, byte[] Raw)> _confirmedPrices = new();
 
         private PersonalStoreControl()
         {
@@ -138,7 +142,7 @@ namespace Client.Main.Controls.UI.Game
             _priceInput.BackgroundColor = new Color(17, 18, 22, 245);
             _priceInput.BorderColor = new Color(129, 103, 65);
             _priceInput.BorderThickness = 1;
-            _priceInput.Placeholder = "Enter Zen amount";
+            _priceInput.Placeholder = "Enter amount";
             _priceInput.Visible = false;
             _priceInput.Click += (sender, args) =>
             {
@@ -533,13 +537,17 @@ namespace Client.Main.Controls.UI.Game
             _priceInput.Value = _confirmedPrices.TryGetValue(_priceEditorSlot, out var price)
                 ? price.Price.ToString(CultureInfo.InvariantCulture)
                 : string.Empty;
+            _priceCurrency = _confirmedPrices.TryGetValue(_priceEditorSlot, out var existing) && Currencies.IsAllowed(existing.Currency) ? existing.Currency : (ushort)0;
+            _currencyLabel = Currencies.Name(_priceCurrency) + "  >";
             _storeNameInput.Blur();
             _storeNameInput.Visible = false;
             _priceEditorVisible = true;
             _priceInput.Visible = true;
-            _priceInput.Focus();
-            if (Scene != null)
-                Scene.FocusControl = _priceInput;
+            if (!OperatingSystem.IsAndroid())
+            {
+                _priceInput.Focus();
+                if (Scene != null) Scene.FocusControl = _priceInput;
+            }
             SoundController.Instance.PlayBuffer("Sound/iButton.wav");
         }
 
@@ -563,9 +571,10 @@ namespace Client.Main.Controls.UI.Game
             if (!_priceEditorVisible || _pendingPriceSlot.HasValue || _storePublic)
                 return;
             if (!uint.TryParse(_priceInput.Value, NumberStyles.None, CultureInfo.InvariantCulture,
-                    out var price) || price > MaximumPriceZen)
+                    out var price) || price > MaximumPriceZen ||
+                (Client.Main.Core.Client.StoreCurrencyState.IsItem(_priceCurrency) && price > ushort.MaxValue) || !Currencies.IsAllowed(_priceCurrency))
             {
-                _priceInputError = "Enter 0 to 2,147,483,647 Zen (0 clears the price).";
+                _priceInputError = "Invalid amount or disabled currency. 0 clears the price.";
                 return;
             }
 
@@ -580,6 +589,8 @@ namespace Client.Main.Controls.UI.Game
             byte slot = _priceEditorSlot;
             _pendingPriceSlot = slot;
             _pendingPriceZen = price;
+            ushort currency = _priceCurrency;
+            _pendingPriceCurrency = currency;
             _pendingPriceRaw = (byte[])itemRaw.Clone();
             CancelPriceEditor();
             _priceFeedback = "Waiting for OpenMU price confirmation...";
@@ -589,7 +600,7 @@ namespace Client.Main.Controls.UI.Game
             _ = Task.Run(async () =>
             {
                 bool sent;
-                try { sent = await service.SendPlayerShopSetItemPriceAsync(slot, price); }
+                try { sent = await service.SendPlayerShopCurrencyPriceAsync(slot, price, currency); }
                 catch { sent = false; }
                 if (!sent)
                 {
@@ -631,10 +642,10 @@ namespace Client.Main.Controls.UI.Game
                 _state.GetInventoryItems().TryGetValue(slot, out var currentRaw) &&
                 raw != null && currentRaw.SequenceEqual(raw))
             {
-                _confirmedPrices[slot] = (attempted, raw);
+                _confirmedPrices[slot] = (attempted, _pendingPriceCurrency, raw);
                 _priceFeedback = attempted == 0
                     ? "Price removed. Item is not for sale."
-                    : $"Price confirmed by OpenMU: {FormatZen(attempted)} Zen.";
+                    : $"Price confirmed by OpenMU: {Currencies.Format(attempted, _pendingPriceCurrency)}.";
                 _priceFeedbackError = false;
             }
             else
@@ -686,7 +697,7 @@ namespace Client.Main.Controls.UI.Game
                     price.Price == 0 || !inventory.TryGetValue(slot, out var raw) ||
                     !raw.SequenceEqual(price.Raw))
                 {
-                    SetStoreFeedback("Set a confirmed Zen price on every shop item.", true);
+                    SetStoreFeedback("Set a confirmed price on every shop item.", true);
                     return;
                 }
             }
@@ -962,6 +973,15 @@ namespace Client.Main.Controls.UI.Game
                         _priceInput.Focus();
                         if (Scene != null)
                             Scene.FocusControl = _priceInput;
+                    }
+                    else if (ToScreen(CurrencyButton).Contains(current.Position))
+                    {
+                        _priceInput.Blur();
+                        int index = 0;
+                        for (int i = 0; i < Currencies.Allowed.Count; i++) if (Currencies.Allowed[i] == _priceCurrency) index = i;
+                        _priceCurrency = Currencies.Allowed[(index + 1) % Currencies.Allowed.Count];
+                        _currencyLabel = Currencies.Name(_priceCurrency) + "  >";
+                        _priceInputError = string.Empty;
                     }
                     else if (ToScreen(PriceConfirmButton).Contains(current.Position))
                         SubmitPrice();
@@ -1381,7 +1401,7 @@ namespace Client.Main.Controls.UI.Game
             if (_state != null && _state.TryGetPetInfo(slot, out var info)) petInfo = info;
             var lines = ClassicItemTooltipBuilder.Build(item, petInfo);
             if (_confirmedPrices.TryGetValue(slot, out var price))
-                lines.Add((price.Price > 0 ? "Store Price: " + FormatZen(price.Price) + " Zen"
+                lines.Add((price.Price > 0 ? "Store Price: " + Currencies.Format(price.Price, price.Currency)
                     : "Not for sale", Color.Goldenrod));
             var rect = ToScreen(new Rectangle(ItemGrid.X + item.GridPosition.X * CellSize,
                 ItemGrid.Y + item.GridPosition.Y * CellSize,
@@ -1402,13 +1422,15 @@ namespace Client.Main.Controls.UI.Game
             sprite.Draw(pixel, new Rectangle(modal.Right - 2, modal.Y, 2, modal.Height), outline);
 
             DrawTextInRect(sprite, "SET ITEM PRICE",
-                ToScreen(new Rectangle(45, 238, 257, 30)), 0.50f * Scale,
+                ToScreen(new Rectangle(45, 199, 257, 30)), 0.50f * Scale,
                 new Color(245, 221, 183));
-            DrawTextInRect(sprite, "Price in Zen (0 removes price)",
+            DrawThreeSlice(sprite, _buttonNormal, ToScreen(CurrencyButton), Color.White * Alpha);
+            DrawTextInRect(sprite, _currencyLabel, ToScreen(CurrencyButton), 0.43f * Scale, Color.Goldenrod);
+            DrawTextInRect(sprite, "Amount (0 removes price)",
                 ToScreen(new Rectangle(51, 268, 246, 24)), 0.40f * Scale,
                 new Color(187, 181, 170));
             DrawEditableText(sprite, _priceInput, new Rectangle(60, 301, 228, 31),
-                "Type Zen amount", 0.51f);
+                "Enter amount", 0.51f);
             DrawTextInRect(sprite, _priceInputError,
                 ToScreen(new Rectangle(44, 333, 260, 17)), 0.28f * Scale,
                 new Color(246, 123, 112));

@@ -321,6 +321,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private long _zenAmount;
         private long _wCoinAmount;
+        private double _balanceRefreshSeconds;
+        private bool _hasCoinBalance;
         private GameTime _currentGameTime;
         private bool _closeHovered;
 
@@ -774,7 +776,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             UpdateZenFromNetwork();
             UpdateZenText();
 
-            // Placeholder visual until WCoinC is connected to OpenMU.
+            // Filled only from the authoritative account-balance response.
             WCoinAmount = 0;
             UpdateWCoinText();
 
@@ -828,6 +830,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         public void Show()
         {
+            _ = MuGame.Network?.GetCharacterService()?.RequestStoreBalancesAsync();
             // Force correct position BEFORE first draw to prevent flash on wrong side
             ForceAlignNow();
             Align = ControlAlign.None; // Prevent auto-realignment
@@ -932,6 +935,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public override void Update(GameTime gameTime)
         {
             _currentGameTime = gameTime;
+            var coinService = MuGame.Network?.GetCharacterService();
+            if (coinService != null)
+            {
+                bool known = coinService.StoreCurrencies.HasBalance;
+                WCoinAmount = coinService.StoreCurrencies.WCoinC;
+                if (_hasCoinBalance != known) { _hasCoinBalance = known; UpdateWCoinText(); }
+                _balanceRefreshSeconds += gameTime.ElapsedGameTime.TotalSeconds;
+                if (Visible && _balanceRefreshSeconds >= 10)
+                { _balanceRefreshSeconds = 0; _ = coinService.RequestStoreBalancesAsync(); }
+            }
 
             if (!PersonalStoreControl.IsEditingText &&
                 MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) &&
@@ -1235,7 +1248,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
         {
             if (_wCoinText != null)
             {
-                _wCoinText.Text = $"WCOIN   {WCoinAmount}";
+                _wCoinText.Text = _hasCoinBalance ? $"WC   {WCoinAmount:N0}" : "WC   --";
             }
         }
 
@@ -1882,7 +1895,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             // TEMPORAL:
             // usamos el icono Ruud para la segunda moneda mientras
-            // WCoin sigue siendo sólo un placeholder visual.
+            // WCoin C balance is provided by OpenMU.
             if (_ruudCurrencyIcon != null)
             {
                 spriteBatch.Draw(

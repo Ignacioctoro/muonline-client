@@ -17,7 +17,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
     /// <summary>
     /// Handles packets related to NPC shops (StoreItemList etc.).
     /// </summary>
-    public class ShopHandler : IGamePacketHandler
+    public partial class ShopHandler : IGamePacketHandler
     {
         private readonly ILogger<ShopHandler> _logger;
         private readonly CharacterState _characterState;
@@ -182,11 +182,14 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             string shopName = Encoding.UTF8.GetString(span.Slice(18, 36)).TrimEnd('\0');
             int itemCount = span[54];
             int position = 55;
-            bool classic = span.Length - position == itemCount * 20;
-            var entries = new System.Collections.Generic.List<(byte Slot, uint Price, byte[] Data)>(itemCount);
+            // Extended entries may have the same byte length as classic entries.
+            // Use the negotiated protocol, never infer currency layout from length.
+            bool classic = _targetVersion < TargetProtocolVersion.Season6;
+            var entries = new System.Collections.Generic.List<(byte Slot, uint Price, ushort Currency, byte[] Data)>(itemCount);
             for (int i = 0; i < itemCount; i++)
             {
                 byte slot;
+                ushort currency = 0;
                 uint price;
                 byte[] data;
                 if (classic)
@@ -209,6 +212,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         return Task.CompletedTask;
                     }
                     price = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(position, 4));
+                    currency = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(position + 4, 2));
+                    ushort pieces = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(position + 6, 2));
+                    if (pieces > 0) price = pieces;
+                    else if (!Client.Main.Core.Client.StoreCurrencyState.IsAccountCoin(currency)) currency = 0;
                     slot = span[position + 8];
                     position += 9;
                     if (!ItemDataParser.TryGetExtendedItemLength(span.Slice(position),
@@ -227,7 +234,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     _logger.LogWarning("Ignoring invalid Personal Store slot {Slot}.", slot);
                     continue;
                 }
-                entries.Add((slot, price, data));
+                entries.Add((slot, price, currency, data));
             }
 
             if (position != span.Length)
@@ -287,7 +294,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     extended = true;
             }
             byte result = extended ? span[6] : span[4];
-            if (result > 9)
+            if (result > 10)
             {
                 _logger.LogWarning("Invalid Personal Store buy result: {Result}.", result);
                 return Task.CompletedTask;
@@ -302,7 +309,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     span.Slice(dataStart, dataLength).ToArray());
             }
             MuGame.ScheduleOnMainThread(() =>
-                PersonalStoreBuyerControl.Instance.HandleBuyResult(result));
+            {
+                PersonalStoreBuyerControl.Instance.HandleBuyResult(result);
+                _ = _networkManager.GetCharacterService().RequestStoreBalancesAsync();
+            });
             return Task.CompletedTask;
         }
 

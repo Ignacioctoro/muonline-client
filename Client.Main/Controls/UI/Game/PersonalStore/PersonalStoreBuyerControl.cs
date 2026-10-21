@@ -59,7 +59,7 @@ namespace Client.Main.Controls.UI.Game
         private bool _confirm;
         private bool _buyPending;
         private int _buyRequestGeneration;
-        private string _feedback = "Select an item to see its Zen price.";
+        private string _feedback = "Select an item to see its price.";
         private float _previewCooldown;
         private int _previewCursor;
 
@@ -67,6 +67,8 @@ namespace Client.Main.Controls.UI.Game
         {
             public byte Slot { get; init; }
             public uint Price { get; init; }
+            public ushort Currency { get; init; }
+            public string PriceText { get; init; }
             public InventoryItem Item { get; init; }
             public List<(string text, Color color)> TooltipLines { get; init; }
             public string DisplayName { get; init; }
@@ -108,7 +110,7 @@ namespace Client.Main.Controls.UI.Game
 
         /// <summary>Called on the MonoGame main thread after parsing a confirmed server list.</summary>
         public void ShowListing(ushort sellerId, string sellerName, string storeName,
-            IReadOnlyList<(byte Slot, uint Price, byte[] Data)> received)
+            IReadOnlyList<(byte Slot, uint Price, ushort Currency, byte[] Data)> received)
         {
             bool sameSeller = Visible && IsViewing(sellerId);
             _sellerId = (ushort)(sellerId & 0x7FFF);
@@ -131,11 +133,11 @@ namespace Client.Main.Controls.UI.Game
                 var tooltip = ClassicItemTooltipBuilder.Build(item);
                 string fullName = tooltip.Count > 0 ? tooltip[0].text : def.Name;
                 Color nameColor = tooltip.Count > 0 ? tooltip[0].color : Color.Wheat;
-                tooltip.Add(("Store Price: " + entry.Price.ToString("N0", CultureInfo.InvariantCulture)
-                    + " Zen", new Color(255, 220, 130)));
+                tooltip.Add(("Store Price: " + MuGame.Network.GetCharacterService().StoreCurrencies.Format(entry.Price, entry.Currency), new Color(255, 220, 130)));
                 _listings[entry.Slot] = new Listing
                 {
-                    Slot = entry.Slot, Price = entry.Price, Item = item,
+                    Slot = entry.Slot, Price = entry.Price, Currency = entry.Currency, Item = item,
+                    PriceText = MuGame.Network.GetCharacterService().StoreCurrencies.Format(entry.Price, entry.Currency),
                     TooltipLines = tooltip, DisplayName = fullName, NameColor = nameColor
                 };
                 if (!string.IsNullOrEmpty(def.TexturePath) &&
@@ -153,7 +155,7 @@ namespace Client.Main.Controls.UI.Game
             }
             _feedback = _listings.Count == 0
                 ? "This store has no items for sale."
-                : "Select an item to see its Zen price.";
+                : "Select an item to see its price.";
             _previewCursor = 0;
             _previewCooldown = 0;
 
@@ -212,6 +214,7 @@ namespace Client.Main.Controls.UI.Game
                 5 => "This item is no longer available.",
                 6 => "Seller name or item price no longer matches.",
                 7 => "Not enough Zen.",
+                10 => "Insufficient currency or exact jewel payment unavailable.",
                 8 => "Not enough inventory space, or seller Zen limit reached.",
                 9 => "This item is blocked.",
                 _ => $"Purchase rejected by OpenMU (result {result})."
@@ -437,7 +440,7 @@ namespace Client.Main.Controls.UI.Game
                     Text(sprite, "CONFIRM PURCHASE", ToScreen(new Rectangle(38, 241, 272, 35)), .53f * Scale, Color.Wheat);
                     Text(sprite, current?.DisplayName ?? "",
                         ToScreen(new Rectangle(38, 283, 272, 28)), .40f * Scale, Color.White);
-                    Text(sprite, current == null ? "" : current.Price.ToString("N0", CultureInfo.InvariantCulture) + " Zen",
+                    Text(sprite, current == null ? "" : current.PriceText,
                         ToScreen(new Rectangle(38, 312, 272, 26)), .43f * Scale, Color.Goldenrod);
                     Button(sprite, ConfirmYes, "Confirm");
                     Button(sprite, ConfirmNo, "Cancel");

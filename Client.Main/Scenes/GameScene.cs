@@ -3149,6 +3149,7 @@ namespace Client.Main.Scenes
 
         public override void Dispose()
         {
+            MuGame.Network?.GetCharacterService()?.StoreCurrencies.Reset();
             // Liberar cualquier touch capturado por los controles móviles.
             if (_mobileJoystick != null)
             {
@@ -3172,4 +3173,3 @@ namespace Client.Main.Scenes
         }
     }
 }
-
