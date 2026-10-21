@@ -116,7 +116,7 @@ namespace Client.Main.Objects
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private BlendState GetMeshBlendState(int mesh, bool isBlendMesh)
+        protected virtual BlendState GetMeshBlendState(int mesh, bool isBlendMesh)
         {
             if (Model?.Meshes == null || mesh < 0 || mesh >= Model.Meshes.Length)
                 return isBlendMesh ? BlendMeshState : BlendState;
@@ -145,7 +145,7 @@ namespace Client.Main.Objects
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsMeshTwoSided(int mesh, bool isBlendMesh)
+        protected virtual bool IsMeshTwoSided(int mesh, bool isBlendMesh)
         {
             if (_meshIsRGBA == null || mesh < 0 || mesh >= _meshIsRGBA.Length)
                 return false;

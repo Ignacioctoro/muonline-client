@@ -2,6 +2,10 @@ using System;
 using System.Threading.Tasks;
 using Client.Main.Content;
 using Client.Main.Models;
+using Client.Main.Controllers;
+using Client.Main.ClassicFX.Core;
+using Client.Main.ClassicFX.Data;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xna.Framework;
 
@@ -23,6 +27,8 @@ namespace Client.Main.Objects.Player
         private Vector3 _position;
         private float _yaw;
         private double _phase;
+        private float _effectElapsed;
+        private readonly Random _random = new();
 
         protected override bool RequiresPerFrameAnimation => true;
         public override bool IsStaticForCaching => false;
@@ -42,7 +48,7 @@ namespace Client.Main.Objects.Player
                 80 => "Item/PandaPet.bmd",
                 _ => throw new ArgumentOutOfRangeException(nameof(itemNumber))
             };
-            _nativeScale = itemNumber is 64 or 80 ? 0.7f : 1f;
+            _nativeScale = itemNumber switch { 64 => 0.32f, 80 => 1f, _ => 0.8f };
             Hidden = true;
             Interactive = false;
             LinkParentAnimation = false;
@@ -58,6 +64,7 @@ namespace Client.Main.Objects.Player
             _equipped = equipped;
             Hidden = !equipped;
             _hasPosition = false;
+            _effectElapsed = 0f;
         }
 
         private async Task LoadModelAsync()
@@ -132,6 +139,7 @@ namespace Client.Main.Objects.Player
             Scale = _nativeScale / Math.Max(0.01f, _owner.Scale);
             SyncAfterOwnerMovement();
             base.Update(gameTime);
+            EmitCompanionEffects(dt);
         }
 
         // Children update before WalkerObject moves. Recompute only the parent
@@ -143,9 +151,107 @@ namespace Client.Main.Objects.Player
             Angle = new Vector3(0f, 0f, _yaw - _owner.Angle.Z);
         }
 
+
+        protected override bool RenderBlendMeshOnLowQuality => true;
+
+        protected override bool IsMeshTwoSided(int mesh, bool isBlendMesh) =>
+            ItemNumber == 80 || base.IsMeshTwoSided(mesh, isBlendMesh);
+
+        protected override bool IsBlendMesh(int mesh) =>
+            ItemNumber == 0 || base.IsBlendMesh(mesh);
+
+        protected override BlendState GetMeshBlendState(int mesh, bool isBlendMesh)
+        {
+            // Fairy JPGs have a black backdrop, not an alpha channel.
+            // Keep this per instance: inventory thumbnails share the same BMD.
+            if (ItemNumber == 0) return _classicItemBrightAdditive;
+            return base.GetMeshBlendState(mesh, isBlendMesh);
+        }
+
+        public override void DrawModel(bool isAfterDraw)
+        {
+            if (!_equipped || !Visible || Model?.Meshes == null) return;
+            if (ItemNumber != 80)
+            {
+                base.DrawModel(isAfterDraw);
+                return;
+            }
+            if (isAfterDraw) return; // PandaPet.jpg is a solid textured mesh.
+            // The fast opaque path can inherit effect colour/state left by
+            // the player's equipment. Give the Panda its complete material pass.
+            var effect = GraphicsManager.Instance.AlphaTestEffect3D;
+            var colour = effect.DiffuseColor;
+            var depth = GraphicsDevice.DepthStencilState;
+            try
+            {
+                effect.DiffuseColor = Vector3.One;
+                effect.World = WorldPosition;
+                GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+                for (int mesh = 0; mesh < Model.Meshes.Length; mesh++) DrawMesh(mesh);
+            }
+            finally
+            {
+                effect.DiffuseColor = colour;
+                GraphicsDevice.DepthStencilState = depth;
+            }
+        }
+
+        private Vector3 EffectPosition(int bone, Vector3 fallback)
+        {
+            var bones = GetBoneTransforms();
+            return bones != null && bone >= 0 && bone < bones.Length
+                ? Vector3.Transform(Vector3.Zero, bones[bone] * WorldPosition)
+                : fallback;
+        }
+
+        private void EmitCompanionEffects(float dt)
+        {
+            var fx = World?.ClassicFx;
+            if (fx == null || !fx.Enabled || fx.IsDisposed || !Visible || Model == null) return;
+            _effectElapsed += dt;
+            // No catch-up bursts after frame stalls; at most 12.5 emissions/sec.
+            if (_effectElapsed < 0.08f) return;
+            _effectElapsed %= 0.08f;
+            var offset = new Vector3(_random.Next(-10, 11), _random.Next(-10, 11), _random.Next(0, 16));
+            if (ItemNumber == 64)
+            {
+                var colour = new Vector3(0.55f, 0.22f, 0.18f);
+                // Native PetActionDemon smoke on the wing/body bones.
+                int bone = _random.Next(2) == 0 ? 34 : 51;
+                fx.CreateParticle(ClassicTextureIds.BitmapClud64,
+                    EffectPosition(bone, _position), Angle, colour, subType: 11, scale: 0.25f);
+                fx.CreateParticle(ClassicTextureIds.BitmapLight,
+                    EffectPosition(8, _position), Angle, new Vector3(0.9f, 0.35f, 0.15f),
+                    subType: 6, scale: 0.35f);
+            }
+            else if (ItemNumber == 0)
+            {
+                fx.CreateParticle(ClassicTextureIds.BitmapSpark, _position + offset,
+                    Angle, new Vector3(0.8f, 0.7f, 0.45f), subType: 1, scale: 0.35f);
+            }
+            else if (ItemNumber == 1)
+            {
+                fx.CreateParticle(ClassicTextureIds.BitmapClud64, _position + offset,
+                    Angle, new Vector3(0.25f, 0.12f, 0.1f), subType: 11, scale: 0.15f);
+                fx.CreateParticle(ClassicTextureIds.BitmapLight, _position + offset,
+                    Angle, new Vector3(0.65f, 0.18f, 0.08f), subType: 6, scale: 0.2f);
+            }
+            else
+            {
+                fx.CreateParticle(ClassicTextureIds.BitmapLight, _position + offset,
+                    Angle, new Vector3(0.65f, 0.5f, 0.15f), subType: 6, scale: 0.2f);
+            }
+        }
+
         public override void Draw(GameTime gameTime)
         {
             if (_equipped) base.Draw(gameTime);
+        }
+
+        public override void DrawShadowCaster(Effect shadowEffect, Matrix lightViewProjection)
+        {
+            if (_equipped && Visible && RenderShadow)
+                base.DrawShadowCaster(shadowEffect, lightViewProjection);
         }
 
         public override void DrawAfter(GameTime gameTime)
