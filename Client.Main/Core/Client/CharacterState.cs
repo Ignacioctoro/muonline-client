@@ -88,7 +88,23 @@ namespace Client.Main.Core.Client
         public QuestJournal Quests { get; } = new();
         public string Name { get; set; } = "???";
         public ushort Id { get; set; } = 0xFFFF;
-        public bool IsInGame { get; set; } = false;
+        private bool _isInGame;
+        private bool _hasServerAttackSpeed;
+        private bool _hasServerMagicSpeed;
+
+        public bool IsInGame
+        {
+            get => _isInGame;
+            set
+            {
+                _isInGame = value;
+                if (!value)
+                {
+                    _hasServerAttackSpeed = false;
+                    _hasServerMagicSpeed = false;
+                }
+            }
+        }
         public CharacterClassNumber Class { get; set; } = CharacterClassNumber.DarkWizard;
         public CharacterStatus Status { get; set; } = CharacterStatus.Normal;
         public CharacterHeroState HeroState { get; set; } = CharacterHeroState.Normal;
@@ -1328,6 +1344,8 @@ namespace Client.Main.Core.Client
         /// </summary>
         public void UpdateAttackSpeeds(ushort attackSpeed, ushort magicSpeed, ushort? maximumAttackSpeed = null)
         {
+            _hasServerAttackSpeed = attackSpeed != 0;
+            _hasServerMagicSpeed = magicSpeed != 0;
             // Fallback to calculated values when server sends 0
             if (attackSpeed == 0)
             {
@@ -1634,8 +1652,10 @@ namespace Client.Main.Core.Client
         private void RecalculateAttackSpeedsFromEquipment()
         {
             // Recalculate using current equipment
-            ushort newAttackSpeed = CalculateAttackSpeed();
-            ushort newMagicSpeed = CalculateMagicSpeed();
+            // Equipment packets may arrive after authoritative stat updates.
+            // The local fallback does not know server pet/buff bonuses.
+            ushort newAttackSpeed = _hasServerAttackSpeed ? AttackSpeed : CalculateAttackSpeed();
+            ushort newMagicSpeed = _hasServerMagicSpeed ? MagicSpeed : CalculateMagicSpeed();
 
             // Only fire event if values actually changed
             bool changed = AttackSpeed != newAttackSpeed || MagicSpeed != newMagicSpeed;

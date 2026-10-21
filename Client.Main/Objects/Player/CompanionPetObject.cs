@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Client.Main.Content;
 using Client.Main.Models;
+using Client.Main.Core.Models;
 using Client.Main.Controllers;
 using Client.Main.ClassicFX.Core;
 using Client.Main.ClassicFX.Data;
@@ -29,6 +30,10 @@ namespace Client.Main.Objects.Player
         private double _phase;
         private float _effectElapsed;
         private readonly Random _random = new();
+        private float _zenScanElapsed;
+        private float _zenRetryElapsed;
+        private ushort? _lastZenAttempt;
+        private bool _zenRequestInFlight;
 
         protected override bool RequiresPerFrameAnimation => true;
         public override bool IsStaticForCaching => false;
@@ -67,6 +72,8 @@ namespace Client.Main.Objects.Player
             Hidden = !equipped;
             _hasPosition = false;
             _effectElapsed = 0f;
+            _zenScanElapsed = 0f;
+            _lastZenAttempt = null;
         }
 
         private async Task LoadModelAsync()
@@ -104,6 +111,7 @@ namespace Client.Main.Objects.Player
 
             float dt = Math.Clamp((float)gameTime.ElapsedGameTime.TotalSeconds, 0f, 0.1f);
             _phase += dt;
+            UpdateZenCollection(dt);
             Vector3 ownerPosition = _owner.WorldPosition.Translation;
             bool groundPet = ItemNumber == 80;
             float radius = groundPet ? 70f : ItemNumber == 64 ? 50f : 100f;
@@ -142,6 +150,72 @@ namespace Client.Main.Objects.Player
             SyncAfterOwnerMovement();
             base.Update(gameTime);
             EmitCompanionEffects(dt);
+        }
+
+        private void UpdateZenCollection(float dt)
+        {
+            // Only the local, equipped Panda issues ordinary pickup requests.
+            // The server still validates ownership, range and the Zen limit.
+            if (ItemNumber != 80 || !_owner.IsMainWalker) return;
+            _zenScanElapsed += dt;
+            _zenRetryElapsed += dt;
+            if (_zenScanElapsed < 0.5f || _zenRequestInFlight) return;
+            _zenScanElapsed = 0f;
+
+            var network = MuGame.Network;
+            var state = network?.GetCharacterState();
+            if (network == null || !network.IsConnected || state == null ||
+                !state.IsInGame || state.CurrentHealth == 0 ||
+                state.PendingPickupRawId.HasValue) return;
+
+            ushort? nearestRawId = null;
+            float nearestDistance = float.MaxValue;
+            foreach (var drop in network.GetScopeManager().GetScopeItems(ScopeObjectType.Money))
+            {
+                // Back off rejected/protected drops and let another pile be tried.
+                if (drop.RawId == _lastZenAttempt && _zenRetryElapsed < 3f) continue;
+                float dx = drop.PositionX - _owner.Location.X;
+                float dy = drop.PositionY - _owner.Location.Y;
+                float distance = dx * dx + dy * dy;
+                if (distance > 9f || distance >= nearestDistance) continue;
+                nearestDistance = distance;
+                nearestRawId = drop.RawId;
+            }
+
+            if (!nearestRawId.HasValue) return;
+            ushort rawId = nearestRawId.Value;
+            _lastZenAttempt = rawId;
+            _zenRetryElapsed = 0f;
+            _zenRequestInFlight = true;
+            state.SetPendingPickupRawId(rawId);
+            _ = SendZenPickupAsync(rawId);
+        }
+
+        private async Task SendZenPickupAsync(ushort rawId)
+        {
+            var network = MuGame.Network;
+            var state = network?.GetCharacterState();
+            bool sent = false;
+            try
+            {
+                if (network != null)
+                    sent = await network.GetCharacterService()
+                        .SendPickupItemRequestAsync(rawId, network.TargetVersion);
+            }
+            catch (Exception ex)
+            {
+                MuGame.AppLoggerFactory?.CreateLogger<CompanionPetObject>()
+                    .LogWarning(ex, "Panda Zen pickup request failed");
+            }
+            finally
+            {
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    _zenRequestInFlight = false;
+                    if (!sent && state?.PendingPickupRawId == rawId)
+                        state.ClearPendingPickupRawId();
+                });
+            }
         }
 
         // Children update before WalkerObject moves. Recompute only the parent

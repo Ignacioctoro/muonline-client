@@ -1062,6 +1062,7 @@ namespace Client.Main.Objects.Player
             short rightHandNumber = Appearance.RightHandItemNumber;
             bool remoteHasDarkRaven = Appearance.RightHandItemGroup == 13 && rightHandNumber == 5;
             DarkRaven.SetEquipped(remoteHasDarkRaven);
+            DarkRaven.SetCharacterSelectionVisualLevel(Appearance.DarkRavenPreviewVisualLevel);
             if (remoteHasDarkRaven)
             {
                 Weapon2.Model = null;
@@ -4963,6 +4964,7 @@ namespace Client.Main.Objects.Player
                     case InventoryConstants.RightHandSlot: // 1 - Weapon or Dark Raven
                         bool changedToRaven = equipmentData.ItemGroup == 13 && equipmentData.ItemNumber == 5;
                         DarkRaven.SetEquipped(changedToRaven);
+                        DarkRaven.SetCharacterSelectionVisualLevel(equipmentData.ItemLevel);
                         if (changedToRaven)
                         {
                             Weapon2.Model = null;

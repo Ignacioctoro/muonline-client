@@ -2,8 +2,8 @@
 
 Shared client visuals for Guardian Angel (13:0), Imp (13:1), Demon (13:64)
 and Panda (13:80). OpenMU continues to own bonuses, equipment and durability.
-This change adds their animated followers; it does not send combat or automatic
-loot requests. Panda uses its pet model, not the transformation-ring model.
+Panda uses its pet model, not the transformation-ring model. The local Panda
+also requests nearby Zen pickups through the normal server-validated protocol.
 
 ## Assets
 
@@ -47,3 +47,28 @@ model completion is applied on the main thread and ignored after disposal.
 Validation performed without building: C# syntax parsing, inspection of OpenMU
 appearance serialization, and helper-model/texture checks. Runtime rendering
 and platform builds remain to be verified in the game.
+
+## Gameplay and Raven synchronization
+
+- Panda scans Zen only, twice per second, within three tiles of its owner. It
+  pauses while dead, disconnected, unequipped, or another pickup is pending.
+  Failed/protected piles have a retry delay. It never adds Zen locally, collects
+  other items, moves the player, or bypasses server ownership/range/Zen limits.
+- Server-provided attack and magic speed remain authoritative across equipment
+  updates. Local formulas are used only when the server supplies no speed. This
+  prevents an equipment notification from erasing Demon's +10 speed in panel C.
+- OpenMU's existing pet definitions provide Demon's damage/speed bonuses and
+  Panda's experience/defense bonuses. No bonus is added a second time client-side.
+- The matching server update encodes Raven visual tiers in reserved bits 0..1
+  of the extended right-hand appearance byte (25/27-byte format). Initial remote
+  appearance and character selection use it; equipment updates carry the actual
+  level. Crossing level 20 or 40 invalidates the server appearance cache and
+  notifies observers. Original 18-byte appearance packets are unchanged.
+
+Additional manual checks: equip/unequip Demon while watching panel C, wait for
+health/mana updates, then reconnect. With Panda, drop Zen within/outside three
+tiles, try protected drops and manual item pickup, then unequip it. Check Raven
+levels 19/20/39/40/50 in selection and from a second client, including leaving
+and re-entering view and leveling through each boundary. Both client and server
+updates are required for Raven synchronization. No compilation or runtime test
+was performed for this change.
