@@ -1667,6 +1667,9 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 byte y = drop.PositionY;
 
                 _scopeManager.AddOrUpdateMoneyInScope(masked, raw, x, y, amount);
+                // Scope registration makes money pickable, but creates no world visual.
+                var money = new MoneyScopeObject(masked, raw, x, y, amount);
+                _ = RenderExtendedMoneyAsync(money, masked);
                 _logger.LogInformation("💰 MoneyDroppedExtended: ID={Id:X4}, Amount={Amount}, Pos=({X},{Y})", masked, amount, x, y);
             }
             catch (Exception ex)
@@ -1674,6 +1677,18 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 _logger.LogError(ex, "Error parsing MoneyDroppedExtended (0x2F).");
             }
             return Task.CompletedTask;
+        }
+
+        private async Task RenderExtendedMoneyAsync(MoneyScopeObject money, ushort id)
+        {
+            try
+            {
+                await ProcessDroppedItemAsync(money, id, "Sound/pDropMoney.wav");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error rendering extended money drop {Id:X4}", id);
+            }
         }
 
         [PacketHandler(0x14, PacketRouter.NoSubCode)] // MapObjectOutOfScope

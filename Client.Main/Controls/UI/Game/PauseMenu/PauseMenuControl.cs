@@ -1,4 +1,6 @@
 using System;
+using Client.Main.Content;
+using Client.Main.Models;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Client.Main.Controls.UI.Common;
@@ -23,7 +25,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
         private readonly ILogger _logger = MuGame.AppLoggerFactory?.CreateLogger<PauseMenuControl>();
         private EventHandler<System.Collections.Generic.List<(string Name, MUnique.OpenMU.Network.Packets.CharacterClassNumber Class, ushort Level, byte[] Appearance)>> _characterListHandler;
         private EventHandler<LogOutType> _logoutResponseHandler;
-        private sealed class PanelControl : UIControl { }
+        private sealed class PanelControl : ClassicPanel { }
         private PanelControl _panel;
         private LabelControl _titleLabel;
         private ButtonControl _btnCharacterSelect;
@@ -55,34 +57,34 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
             _panel = new PanelControl
             {
                 AutoViewSize = false,
-                ControlSize = new Point(360, 400),
-                ViewSize = new Point(360, 400),
+                ControlSize = new Point(300, 340),
+                ViewSize = new Point(300, 340),
                 Align = Models.ControlAlign.HorizontalCenter | Models.ControlAlign.VerticalCenter,
-                BackgroundColor = new Color(20, 20, 30, 230),
-                BorderColor = new Color(80, 80, 120, 255),
-                BorderThickness = 1,
+                BackgroundColor = Color.Transparent,
+                BorderColor = new Color(100, 79, 44),
+                BorderThickness = 0,
                 Interactive = true
             };
             Controls.Add(_panel);
 
             _titleLabel = new LabelControl
             {
-                Text = "Menu",
+                Text = "System Menu",
                 FontSize = 18f,
-                TextColor = Color.White,
+                TextColor = new Color(230, 213, 173),
                 X = 0,
                 Y = 18,
                 Align = Models.ControlAlign.HorizontalCenter
             };
             _panel.Controls.Add(_titleLabel);
 
-            int btnWidth = 280;
-            int btnHeight = 40;
+            int btnWidth = 160;
+            int btnHeight = 36;
             int x = (_panel.ViewSize.X - btnWidth) / 2;
             int y = 60;
-            int spacing = 18;
+            int spacing = 14;
 
-            _btnResume = CreateButton("Resume", x, y, btnWidth, btnHeight);
+            _btnResume = CreateButton("Close", x, y, btnWidth, btnHeight);
             _btnResume.Click += (s, e) =>
             {
                 ResumeClicked?.Invoke(this, EventArgs.Empty);
@@ -95,7 +97,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
             _panel.Controls.Add(_btnResume);
             y += btnHeight + spacing;
 
-            _btnCharacterSelect = CreateButton("Return to Character Select", x, y, btnWidth, btnHeight);
+            _btnCharacterSelect = CreateButton("Switch Character", x, y, btnWidth, btnHeight);
             _btnCharacterSelect.Click += async (s, e) =>
             {
                 if (_returnInProgress) return; // prevent reentrancy / double-requests
@@ -113,7 +115,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
             _panel.Controls.Add(_btnCharacterSelect);
             y += btnHeight + spacing;
 
-            _btnServerSelect = CreateButton("Return to Server Select", x, y, btnWidth, btnHeight);
+            _btnServerSelect = CreateButton("Select Server", x, y, btnWidth, btnHeight);
             _btnServerSelect.Click += async (s, e) => { ServerSelectClicked?.Invoke(this, EventArgs.Empty); await HandleReturnToServerSelectAsync(); };
             _panel.Controls.Add(_btnServerSelect);
             y += btnHeight + spacing;
@@ -143,11 +145,19 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 }
             };
             _panel.Controls.Add(_btnExit);
+            // Original vertical order; keep Options available on desktop and touch.
+            _btnExit.Y = 60;
+            _btnServerSelect.Y = 110;
+            _btnCharacterSelect.Y = 160;
+            _btnOptions.Y = 210;
+            _btnResume.Y = 280;
+            _btnResume.X = 100;
+            _btnResume.ControlSize = _btnResume.ViewSize = new Point(100, 36);
         }
 
         private static ButtonControl CreateButton(string text, int x, int y, int width, int height)
         {
-            return new ButtonControl
+            return new ClassicButton
             {
                 Text = text,
                 X = x,
@@ -155,11 +165,11 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 ControlSize = new Point(width, height),
                 ViewSize = new Point(width, height),
                 AutoViewSize = false,
-                BackgroundColor = new Color(50, 50, 80, 200),
-                HoverBackgroundColor = new Color(70, 70, 110, 220),
-                PressedBackgroundColor = new Color(40, 40, 70, 220),
+                BackgroundColor = new Color(41, 29, 15, 230),
+                HoverBackgroundColor = new Color(75, 53, 22, 240),
+                PressedBackgroundColor = new Color(25, 18, 9, 240),
                 FontSize = 14f,
-                TextColor = Color.White
+                TextColor = new Color(230, 213, 173)
             };
         }
 
@@ -583,7 +593,52 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
             _logoutResponseHandler = null;
         }
 
-        private sealed class OptionsPanelControl : UIControl
+
+        // Reuse the original nine-slice popup frame instead of stretching an atlas.
+        private class ClassicPanel : PopupFieldDialog { }
+
+        private sealed class ClassicButton : ButtonControl
+        {
+            private Texture2D _atlas;
+
+            public override async Task Load()
+            {
+                _atlas = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/winSystemMenu_I3.ozd");
+                await base.Load();
+            }
+
+            public override void Draw(GameTime gameTime)
+            {
+                if (!Visible || Status != GameControlStatus.Ready) return;
+                if (_atlas == null)
+                {
+                    base.Draw(gameTime);
+                    return;
+                }
+
+                var sprite = GraphicsManager.Instance.Sprite;
+                using var batch = new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
+                    BlendState.NonPremultiplied, sampler: SamplerState.LinearClamp, transform: UiScaler.SpriteTransform);
+                int state = !Enabled ? 3 : IsMousePressed ? 2 : IsMouseOver ? 1 : 0;
+                // The system-menu atlas has horizontal 128-pixel cells, not vertical states.
+                var source = new Rectangle(state * 128, 0, 124, 32);
+                sprite.Draw(_atlas, DisplayRectangle, source, Color.White * Alpha);
+                var font = GraphicsManager.Instance.Font;
+                if (font == null || string.IsNullOrEmpty(Text)) return;
+                var bounds = DisplayRectangle;
+                float scale = FontSize / Constants.BASE_FONT_SIZE;
+                var measured = font.MeasureString(Text);
+                if (measured.X > 0)
+                    scale = Math.Min(scale, Math.Max(1, bounds.Width - 12) / measured.X);
+                var size = measured * scale;
+                var color = !Enabled ? DisabledTextColor : IsMouseOver ? HoverTextColor : TextColor;
+                sprite.DrawString(font, Text,
+                    new Vector2(bounds.Center.X - size.X / 2, bounds.Center.Y - size.Y / 2),
+                    color * Alpha, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
+        }
+
+        private sealed class OptionsPanelControl : ClassicPanel
         {
             private readonly PauseMenuControl _owner;
             private readonly List<IOptionRow> _options = new();
@@ -600,9 +655,9 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 ControlSize = new Point(480, 700);
                 ViewSize = ControlSize;
                 Align = Models.ControlAlign.HorizontalCenter | Models.ControlAlign.VerticalCenter;
-                BackgroundColor = new Color(20, 20, 30, 230);
-                BorderColor = new Color(80, 80, 120, 255);
-                BorderThickness = 1;
+                BackgroundColor = Color.Transparent;
+                BorderColor = new Color(100, 79, 44);
+                BorderThickness = 0;
                 Interactive = true;
                 _panelWidth = ControlSize.X;
 
@@ -610,7 +665,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 {
                     Text = "Options",
                     FontSize = 18f,
-                    TextColor = Color.White,
+                    TextColor = new Color(230, 213, 173),
                     Align = Models.ControlAlign.HorizontalCenter,
                     X = 0,
                     Y = 18
@@ -646,7 +701,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 AddCategoryButton("Mobile Controls", () => BuildMobileControlsCategory(), categoryStartY,
                     ref categoryX, categoryWidth, categoryHeight, categorySpacing, categoriesPerRow, ref categoryIndex);    
 
-                _closeButton = new ButtonControl
+                _closeButton = new ClassicButton
                 {
                     Text = "Back",
                     ControlSize = new Point(140, 32),
@@ -654,11 +709,11 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                     X = (ControlSize.X - 140) / 2,
                     Y = ContentStartY,
                     AutoViewSize = false,
-                    BackgroundColor = new Color(50, 50, 80, 200),
-                    HoverBackgroundColor = new Color(70, 70, 110, 220),
-                    PressedBackgroundColor = new Color(40, 40, 70, 220),
+                    BackgroundColor = new Color(41, 29, 15, 230),
+                    HoverBackgroundColor = new Color(75, 53, 22, 240),
+                    PressedBackgroundColor = new Color(25, 18, 9, 240),
                     FontSize = 14f,
-                    TextColor = Color.White
+                    TextColor = new Color(230, 213, 173)
                 };
                 _closeButton.Click += (s, e) => _owner.ToggleOptionsPanel();
                 Controls.Add(_closeButton);
@@ -1103,7 +1158,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                 int x = 20 + col * (width + spacing);
                 int y = startY + row * (height + spacing);
 
-                var button = new ButtonControl
+                var button = new ClassicButton
                 {
                     Text = label,
                     X = x,
@@ -1111,11 +1166,11 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                     ControlSize = new Point(width, height),
                     ViewSize = new Point(width, height),
                     AutoViewSize = false,
-                    BackgroundColor = new Color(50, 50, 80, 200),
-                    HoverBackgroundColor = new Color(70, 70, 110, 220),
-                    PressedBackgroundColor = new Color(40, 40, 70, 220),
+                    BackgroundColor = new Color(41, 29, 15, 230),
+                    HoverBackgroundColor = new Color(75, 53, 22, 240),
+                    PressedBackgroundColor = new Color(25, 18, 9, 240),
                     FontSize = 12f,
-                    TextColor = Color.White
+                    TextColor = new Color(230, 213, 173)
                 };
                 button.Click += (s, e) => onClick();
                 Controls.Add(button);
@@ -1168,7 +1223,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                     X = 14,
                     Y = currentY,
                     FontSize = 13f,
-                    TextColor = new Color(180, 200, 255)
+                    TextColor = new Color(230, 193, 95)
                 };
                 Controls.Add(heading);
                 _dynamicControls.Add(heading);
@@ -1217,21 +1272,21 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                         X = 20,
                         Y = y,
                         FontSize = 12f,
-                        TextColor = Color.White
+                        TextColor = new Color(230, 213, 173)
                     };
 
-                    _button = new ButtonControl
+                    _button = new ClassicButton
                     {
                         ControlSize = new Point(110, 26),
                         ViewSize = new Point(110, 26),
                         AutoViewSize = false,
                         X = panelWidth - 150,
                         Y = y - 4,
-                        BackgroundColor = new Color(50, 50, 80, 200),
-                        HoverBackgroundColor = new Color(70, 70, 110, 220),
-                        PressedBackgroundColor = new Color(40, 40, 70, 220),
+                        BackgroundColor = new Color(41, 29, 15, 230),
+                        HoverBackgroundColor = new Color(75, 53, 22, 240),
+                        PressedBackgroundColor = new Color(25, 18, 9, 240),
                         FontSize = 12f,
-                        TextColor = Color.White
+                        TextColor = new Color(230, 213, 173)
                     };
                     _button.Click += (s, e) =>
                     {
@@ -1288,7 +1343,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                         X = 20,
                         Y = y,
                         FontSize = 12f,
-                        TextColor = Color.White
+                        TextColor = new Color(230, 213, 173)
                     };
 
                     _valueLabel = new LabelControl
@@ -1302,7 +1357,7 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                         ViewSize = new Point(70, 24)
                     };
 
-                    _minusButton = new ButtonControl
+                    _minusButton = new ClassicButton
                     {
                         Text = "-",
                         ControlSize = new Point(28, 24),
@@ -1310,14 +1365,14 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                         AutoViewSize = false,
                         X = panelWidth - 130,
                         Y = y - 2,
-                        BackgroundColor = new Color(50, 50, 80, 200),
-                        HoverBackgroundColor = new Color(70, 70, 110, 220),
-                        PressedBackgroundColor = new Color(40, 40, 70, 220),
+                        BackgroundColor = new Color(41, 29, 15, 230),
+                        HoverBackgroundColor = new Color(75, 53, 22, 240),
+                        PressedBackgroundColor = new Color(25, 18, 9, 240),
                         FontSize = 12f,
-                        TextColor = Color.White
+                        TextColor = new Color(230, 213, 173)
                     };
 
-                    _plusButton = new ButtonControl
+                    _plusButton = new ClassicButton
                     {
                         Text = "+",
                         ControlSize = new Point(28, 24),
@@ -1325,11 +1380,11 @@ namespace Client.Main.Controls.UI.Game.PauseMenu
                         AutoViewSize = false,
                         X = panelWidth - 96,
                         Y = y - 2,
-                        BackgroundColor = new Color(50, 50, 80, 200),
-                        HoverBackgroundColor = new Color(70, 70, 110, 220),
-                        PressedBackgroundColor = new Color(40, 40, 70, 220),
+                        BackgroundColor = new Color(41, 29, 15, 230),
+                        HoverBackgroundColor = new Color(75, 53, 22, 240),
+                        PressedBackgroundColor = new Color(25, 18, 9, 240),
                         FontSize = 12f,
-                        TextColor = Color.White
+                        TextColor = new Color(230, 213, 173)
                     };
 
                     _minusButton.Click += (s, e) => AdjustVolume(-_step);
