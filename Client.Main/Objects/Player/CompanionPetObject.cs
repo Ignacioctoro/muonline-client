@@ -48,7 +48,9 @@ namespace Client.Main.Objects.Player
                 80 => "Item/PandaPet.bmd",
                 _ => throw new ArgumentOutOfRangeException(nameof(itemNumber))
             };
-            _nativeScale = itemNumber switch { 64 => 0.16f, 80 => 1f, _ => 0.8f };
+            // MuMain GOBoid renders Angel/Imp at 1.0. Local/pet.bmd in both
+            // Season 6 and Data_Broyal specifies Demon=0.2 and Panda=0.8.
+            _nativeScale = itemNumber switch { 64 => 0.2f, 80 => 0.8f, _ => 1f };
             Hidden = true;
             Interactive = false;
             LinkParentAnimation = false;
@@ -111,7 +113,7 @@ namespace Client.Main.Objects.Player
             float height = groundPet ? 20f : ItemNumber == 64
                 ? 230f * _owner.Scale : 150f + (float)Math.Sin(_phase * 2.5) * 25f;
             target.Z = groundPet
-                ? World.Terrain.RequestTerrainHeight(target.X, target.Y) + height
+                ? World.Terrain.RequestTerrainRenderHeight(target.X, target.Y) + height
                 : ownerPosition.Z + height;
 
             // Recover after warps without crossing the whole map.
@@ -134,7 +136,7 @@ namespace Client.Main.Objects.Player
                 }
             }
             if (groundPet)
-                _position.Z = World.Terrain.RequestTerrainHeight(_position.X, _position.Y) + height;
+                _position.Z = World.Terrain.RequestTerrainRenderHeight(_position.X, _position.Y) + height;
 
             Scale = _nativeScale / Math.Max(0.01f, _owner.Scale);
             SyncAfterOwnerMovement();
@@ -173,7 +175,7 @@ namespace Client.Main.Objects.Player
                 }
             }
             if (!float.IsFinite(bottom)) return;
-            float ground = World.Terrain.RequestTerrainHeight(_position.X, _position.Y);
+            float ground = World.Terrain.RequestTerrainRenderHeight(_position.X, _position.Y);
             _position.Z += ground + 3f - bottom;
             Position = Vector3.Transform(_position, Matrix.Invert(_owner.WorldPosition));
         }
@@ -231,42 +233,87 @@ namespace Client.Main.Objects.Player
                 : fallback;
         }
 
+        private static readonly int[] DemonSmokeBones = { 34, 51, 61, 56, 66 };
+
         private void EmitCompanionEffects(float dt)
         {
             var fx = World?.ClassicFx;
             if (fx == null || !fx.Enabled || fx.IsDisposed || !Visible || Model == null) return;
             _effectElapsed += dt;
-            // No catch-up bursts after frame stalls; at most 12.5 emissions/sec.
-            if (_effectElapsed < 0.08f) return;
-            _effectElapsed %= 0.08f;
-            var offset = new Vector3(_random.Next(-10, 11), _random.Next(-10, 11), _random.Next(0, 16));
-            if (ItemNumber == 64)
+            const float tick = 1f / 25f; // Native MU simulation cadence.
+            int ticks = Math.Min(3, (int)(_effectElapsed / tick));
+            _effectElapsed %= tick;
+            for (int i = 0; i < ticks; i++)
             {
-                var colour = new Vector3(0.55f, 0.22f, 0.18f);
-                // Native PetActionDemon smoke on the wing/body bones.
-                int bone = _random.Next(2) == 0 ? 34 : 51;
-                fx.CreateParticle(ClassicTextureIds.BitmapClud64,
-                    EffectPosition(bone, _position), Angle, colour, subType: 11, scale: 0.25f);
-                fx.CreateParticle(ClassicTextureIds.BitmapLight,
-                    EffectPosition(8, _position), Angle, new Vector3(0.9f, 0.35f, 0.15f),
-                    subType: 6, scale: 0.35f);
+                if (ItemNumber == 64)
+                {
+                    float pulse = (float)Math.Sin(Math.PI / 2.5 * (_phase % 25)) + 0.4f;
+                    var light = new Vector3(pulse * 0.7f, pulse * 0.5f, pulse * 0.6f);
+                    int stride = LowQuality ? 3 : 1;
+                    for (int b = 0; b < DemonSmokeBones.Length; b += stride)
+                        fx.CreateParticle(ClassicTextureIds.BitmapClud64,
+                            EffectPosition(DemonSmokeBones[b], _position), Angle, light,
+                            subType: 11, scale: 0.5f);
+                    fx.CreateParticle(ClassicTextureIds.BitmapFireHik3,
+                        EffectPosition(44, _position), Angle, light, subType: 1, scale: 0.4f);
+                }
+                else if (ItemNumber == 0)
+                {
+                    int count = LowQuality ? 1 : 4;
+                    for (int j = 0; j < count; j++)
+                    {
+                        var offset = new Vector3(_random.Next(-8, 8),
+                            _random.Next(-8, 8), _random.Next(-8, 8));
+                        fx.CreateParticle(ClassicTextureIds.BitmapSpark, _position + offset,
+                            Angle, new Vector3(0.4f), subType: 1, scale: 1f);
+                    }
+                }
+                else if (ItemNumber == 80 && _random.Next(3) == 0)
+                {
+                    fx.CreateParticle(ClassicTextureIds.BitmapLight + 3,
+                        EffectPosition(7, _position), Angle, new Vector3(0.6f, 1f, 0.4f),
+                        subType: 1, scale: 1f);
+                }
+                // GOBoid has no continuous smoke emitter for the basic Imp.
             }
-            else if (ItemNumber == 0)
+        }
+
+        private void EmitCompanionSprites()
+        {
+            var fx = World?.ClassicFx;
+            if (!_equipped || !Visible || Model == null ||
+                fx == null || !fx.Enabled || fx.IsDisposed) return;
+            var owner = ClassicFxOwner.FromWorldObject(this);
+            if (ItemNumber == 0)
             {
-                fx.CreateParticle(ClassicTextureIds.BitmapSpark, _position + offset,
-                    Angle, new Vector3(0.8f, 0.7f, 0.45f), subType: 1, scale: 0.35f);
+                float light = _random.Next(70, 100) * 0.01f;
+                fx.CreateSprite(ClassicTextureIds.BitmapLight, _position, 1f,
+                    new Vector3(light * 0.5f, light * 0.8f, light * 0.6f), owner);
             }
-            else if (ItemNumber == 1)
+            else if (ItemNumber == 80)
             {
-                fx.CreateParticle(ClassicTextureIds.BitmapClud64, _position + offset,
-                    Angle, new Vector3(0.25f, 0.12f, 0.1f), subType: 11, scale: 0.15f);
-                fx.CreateParticle(ClassicTextureIds.BitmapLight, _position + offset,
-                    Angle, new Vector3(0.65f, 0.18f, 0.08f), subType: 6, scale: 0.2f);
+                float size = (float)Math.Sin(Math.PI / 3 * (_phase % 3)) * 0.2f;
+                var pos = EffectPosition(4, _position);
+                fx.CreateSprite(ClassicTextureIds.BitmapLight, pos, 1.5f + size,
+                    new Vector3(0.9f, 0.9f, 0f), owner);
+                fx.CreateSprite(ClassicTextureIds.BitmapLight, pos, 2.5f + size,
+                    new Vector3(0.6f, 1f, 0.2f), owner);
             }
-            else
+            else if (ItemNumber == 64)
             {
-                fx.CreateParticle(ClassicTextureIds.BitmapLight, _position + offset,
-                    Angle, new Vector3(0.65f, 0.5f, 0.15f), subType: 6, scale: 0.2f);
+                float pulse = (float)Math.Sin(Math.PI / 2.5 * (_phase % 25)) + 0.4f;
+                var light = new Vector3(pulse * 0.7f, pulse * 0.5f, pulse * 0.6f);
+                var head = EffectPosition(8, _position);
+                fx.CreateSprite(ClassicTextureIds.BitmapLightMarks, head, 1f, light, owner);
+                fx.CreateSprite(ClassicTextureIds.BitmapFlare, head, 0.5f, light, owner);
+                fx.CreateSprite(ClassicTextureIds.BitmapLightMarks,
+                    EffectPosition(52, _position), 0.5f, light, owner);
+                fx.CreateSprite(ClassicTextureIds.BitmapLightMarks,
+                    EffectPosition(58, _position), 0.5f, light, owner);
+                var tail = EffectPosition(44, _position);
+                fx.CreateSprite(ClassicTextureIds.BitmapFlare, tail, 1.5f, light, owner);
+                fx.CreateSprite(ClassicTextureIds.BitmapFlare, tail, 0.5f,
+                    new Vector3(0.7f, 0.3f, 0.3f), owner);
             }
         }
 
@@ -284,6 +331,7 @@ namespace Client.Main.Objects.Player
         public override void DrawAfter(GameTime gameTime)
         {
             if (_equipped) base.DrawAfter(gameTime);
+            EmitCompanionSprites();
         }
     }
 }
