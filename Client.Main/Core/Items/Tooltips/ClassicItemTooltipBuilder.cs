@@ -556,7 +556,7 @@ namespace Client.Main.Core.Items.Tooltips
             {
                 int durability = Math.Max(0, item.Durability);
                 int maxDurability = ItemUiHelper.CalculateMaxDurability(
-                    item.Definition, level);
+                    item.Definition, item.Details, isStaff: false);
                 result.Add((maxDurability > 0
                     ? $"Durability : [{durability}/{maxDurability}]"
                     : $"Durability : {durability}", Color.White));
