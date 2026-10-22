@@ -143,6 +143,11 @@ namespace Client.Main.Controls.UI.Game.Common
 
         public static Color GetItemGlowColor(InventoryItem item, ItemGlowPalette palette)
         {
+            // Wings have their own rendering styles in the classic client:
+            // the ordinary inventory rarity-border glow is not one of them.
+            if (item?.Definition?.IsWing() == true)
+                return Color.Transparent;
+
             if (item?.Details is null)
                 return palette.Normal;
 

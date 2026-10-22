@@ -81,6 +81,74 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private const int MaxRotatingCacheSize = 96;
         private const float AnimatedUpdateInterval = 1f / 23f; // limit
 
+        // Only these Season 6 preview assets use black-backed artwork which must
+        // not paint an opaque rectangle into the transparent inventory target.
+        private static readonly Dictionary<Texture2D, Texture2D> _inventoryCutoutTextures = new();
+        private static GraphicsDevice _inventoryCutoutDevice;
+
+        private static bool UsesClassicPreviewStyle(ItemDefinition def) =>
+            def != null && (def.IsWing() || def.IsSocketSeed() ||
+                def.IsSocketSphere() || def.IsSeedSphere() ||
+                (def.Group == 0 && def.Id == 26) ||  // Flamberge
+                (def.Group == 13 && def.Id == 0));  // Guardian Angel
+
+        // Element sequence from MuMain's RenderSocketSeed/RenderSocketSeedSphere.
+        private static Vector3 GetSocketElementColor(int elementIndex) =>
+            elementIndex switch
+            {
+                0 => new Vector3(0.9f, 0.1f, 0.2f), // Fire
+                1 => new Vector3(0.4f, 0.5f, 1.0f), // Water
+                2 => Vector3.One,                   // Ice
+                3 => new Vector3(0.4f, 1.0f, 0.6f), // Wind
+                4 => new Vector3(1.0f, 0.8f, 0.4f), // Lightning
+                _ => new Vector3(1.0f, 0.4f, 1.0f)  // Earth
+            };
+
+        private static Texture2D GetInventoryCutoutTexture(Texture2D source)
+        {
+            if (source == null || source.IsDisposed || source.Format != SurfaceFormat.Color)
+                return source;
+
+            var device = source.GraphicsDevice;
+            if (!ReferenceEquals(_inventoryCutoutDevice, device))
+            {
+                foreach (Texture2D old in _inventoryCutoutTextures.Values)
+                    if (old != null && !old.IsDisposed) old.Dispose();
+                _inventoryCutoutTextures.Clear();
+                _inventoryCutoutDevice = device;
+            }
+
+            if (_inventoryCutoutTextures.TryGetValue(source, out var cached) &&
+                cached != null && !cached.IsDisposed)
+                return cached;
+
+            // This is an inventory-only copy: never mutate the source texture
+            // shared with world objects or ClassicFX.
+            try
+            {
+                var pixels = new Color[source.Width * source.Height];
+                source.GetData(pixels);
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    Color p = pixels[i];
+                    int brightness = Math.Max(p.R, Math.Max(p.G, p.B));
+                    byte alpha = brightness <= 12 ? (byte)0 :
+                        brightness < 36 ? (byte)Math.Min(p.A, (brightness - 12) * 255 / 24) : p.A;
+                    pixels[i] = new Color(p.R, p.G, p.B, alpha);
+                }
+
+                var cutout = new Texture2D(device, source.Width, source.Height, false, SurfaceFormat.Color);
+                cutout.SetData(pixels);
+                _inventoryCutoutTextures[source] = cutout;
+                return cutout;
+            }
+            catch
+            {
+                // Compressed/unsupported formats keep their original texture.
+                return source;
+            }
+        }
+
         private static ItemRenderProperties CreateRenderProperties(InventoryItem item)
         {
             if (item == null)
@@ -130,7 +198,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return string.Empty;
             }
 
-            string key = $"{definition.TexturePath}:{width}x{height}";
+            // Several seeds share the same BMD but have different element colors.
+            // Their item group and index must be part of the cache identity.
+            string key = $"{definition.Group}:{definition.Id}:{definition.TexturePath}:{width}x{height}";
             if (definition.PackedJewelPreviewSource != null) key += ":packed";
             if (rotationAngle != 0f)
             {
@@ -473,6 +543,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // preview 23 times per second just for the base pass.
             bool requiresAnimation =
                 props.ShouldUseItemMaterial &&
+                !UsesClassicPreviewStyle(definition) &&
                 Constants.ENABLE_ITEM_MATERIAL_ANIMATION;
 
             PreviewCacheEntry entry = useCache ? GetCacheEntry(key, isRotating) : null;
@@ -634,6 +705,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Vector3 rotatedSize = rotatedBounds.Max - rotatedBounds.Min;
 
                 float scale = 15f / Math.Max(rotatedSize.X, Math.Max(rotatedSize.Y, rotatedSize.Z));
+                // Classic wings fill noticeably more of their 3x2 item slots
+                // than the generic model fit. Keep this in the preview only.
+                if (def.IsWing())
+                    scale *= 1.22f;
 
                 Vector3 originalCenter = (originalBounds.Min + originalBounds.Max) * 0.5f;
 
@@ -669,7 +744,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Matrix worldViewProjection = world * view * projection;
                 Vector3 eyePosition = new Vector3(0f, 0f, 40f);
 
-                bool useItemMaterial = def.PackedJewelPreviewSource == null && props.ShouldUseItemMaterial &&
+                bool useItemMaterial = def.PackedJewelPreviewSource == null &&
+                                       !UsesClassicPreviewStyle(def) && props.ShouldUseItemMaterial &&
                                        Constants.ENABLE_ITEM_MATERIAL_SHADER &&
                                        GraphicsManager.Instance.ItemMaterialEffect != null;
 
@@ -684,20 +760,60 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                     effect.View = view;
                     effect.Projection = projection;
-                    int copies = def.PackedJewelPreviewSource == null ? 1 : 3;
-                    for (int copy = 0; copy < copies; copy++)
-                    {
-                        // Render a recognizable bundle using the actual jewel BMD,
-                        // without borrowing weapon IDs or replacing existing pack models.
-                        effect.World = copies == 1 ? world : world * Matrix.CreateScale(0.55f) *
-                            Matrix.CreateTranslation(copy == 0 ? -3.4f : copy == 1 ? 3.4f : 0f, copy == 2 ? 3.4f : -2.5f, 0f);
-                        foreach (int meshIdx in meshOrder)
-                            RenderMeshWithBlendState(gd, effect, bmd, meshIdx, bones);
-                    }
+                    Vector3 oldDiffuse = effect.DiffuseColor;
+                    Vector3 oldEmissive = effect.EmissiveColor;
+                    float oldAlpha = effect.Alpha;
+                    bool isSeed = def.IsSocketSeed();
+                    bool isSeedSphere = def.IsSeedSphere();
+                    bool useCutout = (def.Group == 0 && def.Id == 26) ||
+                                     (def.Group == 13 && def.Id == 0);
+                    Vector3 socketColor = isSeed
+                        ? GetSocketElementColor(def.Id - 60)
+                        : isSeedSphere ? GetSocketElementColor((def.Id - 100) % 6) : Vector3.One;
 
-                    effect.View = oldV;
-                    effect.Projection = oldP;
-                    effect.World = oldW;
+                    try
+                    {
+                        int copies = def.PackedJewelPreviewSource == null ? 1 : 3;
+                        for (int copy = 0; copy < copies; copy++)
+                        {
+                            // Render a recognizable bundle using the actual jewel BMD.
+                            effect.World = copies == 1 ? world : world * Matrix.CreateScale(0.55f) *
+                                Matrix.CreateTranslation(copy == 0 ? -3.4f : copy == 1 ? 3.4f : 0f, copy == 2 ? 3.4f : -2.5f, 0f);
+
+                            // On seed spheres mesh 1 is the plain sphere shell;
+                            // the other meshes get their element-specific color.
+                            if (isSeedSphere && bmd.Meshes.Length > 1)
+                            {
+                                effect.DiffuseColor = Vector3.One;
+                                effect.EmissiveColor = Vector3.Zero;
+                                RenderMeshWithBlendState(gd, effect, bmd, 1, bones);
+                            }
+
+                            foreach (int meshIdx in meshOrder)
+                            {
+                                if (isSeedSphere && bmd.Meshes.Length > 1 && meshIdx == 1)
+                                    continue;
+
+                                bool tint = isSeed || isSeedSphere;
+                                effect.DiffuseColor = tint ? socketColor : oldDiffuse;
+                                effect.EmissiveColor = tint ? socketColor * 0.15f : oldEmissive;
+                                // The opaque sword meshes keep their original dark metal.
+                                // Its bright meshes (and Angel) use black-keyed previews.
+                                bool cutoutMesh = useCutout &&
+                                    (def.Group == 13 || (meshIdx != 0 && meshIdx != 2));
+                                RenderMeshWithBlendState(gd, effect, bmd, meshIdx, bones, cutoutMesh);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        effect.DiffuseColor = oldDiffuse;
+                        effect.EmissiveColor = oldEmissive;
+                        effect.Alpha = oldAlpha;
+                        effect.View = oldV;
+                        effect.Projection = oldP;
+                        effect.World = oldW;
+                    }
                 }
                 else
                 {
@@ -767,7 +883,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private static void RenderMeshWithBlendState(GraphicsDevice gd, BasicEffect effect,
                                                    Client.Data.BMD.BMD bmd, int meshIdx,
-                                                   Matrix[] bones)
+                                                   Matrix[] bones, bool blackKeyCutout = false)
         {
             var mesh = bmd.Meshes[meshIdx];
 
@@ -779,6 +895,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             {
                 // Get custom BlendState from mesh configuration
                 BlendState customBlendState = GetBlendStateForMesh(mesh);
+                // Black-keyed JPG textures carry straight, not premultiplied alpha.
+                if (blackKeyCutout && customBlendState == BlendState.AlphaBlend)
+                    customBlendState = BlendState.NonPremultiplied;
 
                 // Apply BlendState
                 if (customBlendState != null)
@@ -803,9 +922,11 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 if (vb != null && ib != null)
                 {
                     // Set texture
-                    effect.Texture = TextureLoader.Instance.GetTexture2D(
-                                         BMDLoader.Instance.GetTexturePath(
-                                             bmd, mesh.TexturePath));
+                    Texture2D meshTexture = TextureLoader.Instance.GetTexture2D(
+                        BMDLoader.Instance.GetTexturePath(bmd, mesh.TexturePath));
+                    effect.Texture = blackKeyCutout
+                        ? GetInventoryCutoutTexture(meshTexture)
+                        : meshTexture;
 
                     // Render the mesh
                     foreach (var pass in effect.CurrentTechnique.Passes)
@@ -1338,6 +1459,17 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             short group = (short)definition.Group;
+
+            // Explicit Season 6 inventory poses from the original item models.
+            if (definition.IsSocketSeed())
+                return MuRotationConverter.ConvertToMonoGame(10f, -10f, 10f);
+
+            // The first three spheres and all completed Seed Spheres use a
+            // neutral, unrotated pose; they are not wings or generic jewellery.
+            if ((definition.IsSocketSphere() && definition.Id <= 72) ||
+                definition.IsSeedSphere())
+                return Matrix.Identity;
+
             if (group == 6)
             {
                 return MuRotationConverter.ConvertToMonoGame(270f, 270f, 0f);
@@ -1401,6 +1533,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             short group = (short)definition.Group;
+
+            // Keep world-drop pose in sync with each special inventory family.
+            if (definition.IsSocketSeed())
+                return (10f, -10f, 10f);
+            if ((definition.IsSocketSphere() && definition.Id <= 72) ||
+                definition.IsSeedSphere())
+                return (0f, 0f, 0f);
 
             // Shields
             if (group == 6)

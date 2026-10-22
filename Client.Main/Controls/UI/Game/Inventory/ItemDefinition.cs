@@ -14,6 +14,19 @@ namespace Client.Main.Controls.UI.Game.Inventory
         // Compatibility packs use a cluster of this single-jewel model when item.bmd omits the pack.
         public ItemDefinition PackedJewelPreviewSource { get; set; }
 
+        // Season 6 item families have distinct inventory rendering rules.
+        // In particular, group 12 also contains gems, seeds and spheres.
+        public bool IsWing() =>
+            Group == 12 && (EquipmentSlot == 7 ||
+                (Id >= 0 && Id <= 6) ||
+                (Id >= 36 && Id <= 43) ||
+                Id == 49 || Id == 50 ||
+                (Id >= 130 && Id <= 135));
+
+        public bool IsSocketSeed() => Group == 12 && Id >= 60 && Id <= 65;
+        public bool IsSocketSphere() => Group == 12 && Id >= 70 && Id <= 74;
+        public bool IsSeedSphere() => Group == 12 && Id >= 100 && Id <= 129;
+
         // Additional stats loaded from items.json for richer tooltips
         public int DamageMin { get; set; }
         public int DamageMax { get; set; }
