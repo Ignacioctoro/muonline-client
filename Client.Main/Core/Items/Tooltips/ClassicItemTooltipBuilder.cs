@@ -166,6 +166,11 @@ namespace Client.Main.Core.Items.Tooltips
             if (def.IsSocketSeed() || def.IsSocketSphere() || def.IsSeedSphere())
                 return BuildClassicSeedSphereTooltip(item);
 
+            // Original Wizard's Ring variants (13:20) have level-dependent
+            // names and extra rules absent from the tooltip BMD lines.
+            if (def.Group == 13 && def.Id == 20)
+                return BuildClassicWizardsRingTooltip(item);
+
             // Trainable pets use OpenMU A9, not the serialized item +level.
             if (def.Group == 13 && (def.Id == 4 || def.Id == 5))
                 return BuildTrainablePetTooltip(item, petInfo);
@@ -527,6 +532,56 @@ namespace Client.Main.Core.Items.Tooltips
         /// Season 6 SocketItemMgr::AttachToolTipForSeedSphereItem equivalent.
         /// Option names/values are read directly from Data/Local/socketitem.bmd.
         /// </summary>
+        private static List<(string text, Color color)> BuildClassicWizardsRingTooltip(
+            InventoryItem item)
+        {
+            int level = item.Details.Level;
+            string name = level switch
+            {
+                1 or 2 => "Ring of Warrior",
+                3 => "Ring of Glory",
+                _ => ItemTooltipDataRepository.IsLoaded
+                    ? ItemTooltipDataRepository.GetLegacyItem(13, 20)?.Name
+                        ?? "Wizard's Ring"
+                    : "Wizard's Ring"
+            };
+
+            var result = new List<(string text, Color color)>
+            {
+                (name, new Color(255, 204, 25))
+            };
+
+            // The original client suppresses durability for +1 and +2.
+            if (level != 1 && level != 2)
+            {
+                int durability = Math.Max(0, item.Durability);
+                int maxDurability = ItemUiHelper.CalculateMaxDurability(
+                    item.Definition, level);
+                result.Add((maxDurability > 0
+                    ? $"Durability : [{durability}/{maxDurability}]"
+                    : $"Durability : {durability}", Color.White));
+            }
+
+            // ZzzInventory.cpp: Wizard's Ring special-option text by item level.
+            switch (level)
+            {
+                case 0:
+                case 3:
+                    result.Add(("Cannot be repaired", Color.Red));
+                    break;
+                case 1:
+                case 2:
+                    result.Add(($"Can be dropped after level {(level == 1 ? 40 : 80)}",
+                        Color.White));
+                    result.Add(("Cannot be stored in Vault", Color.Red));
+                    result.Add(("Cannot be traded", Color.Red));
+                    result.Add(("Cannot be sold", Color.Red));
+                    break;
+            }
+
+            return result;
+        }
+
         private static List<(string text, Color color)> BuildClassicSeedSphereTooltip(
             InventoryItem item)
         {
@@ -556,12 +611,28 @@ namespace Client.Main.Core.Items.Tooltips
             if (ItemTooltipDataRepository.IsLoaded)
             {
                 // IDs 2640..2645 are also used by the classic SocketItemMgr.
-                string originalName = ItemTooltipDataRepository.GetGlobalText(2640 + element);
-                if (!string.IsNullOrWhiteSpace(originalName))
-                    elementName = originalName.Trim();
+                // text.bmd may be Korean even when ItemTooltip_eng.bmd
+                // is installed. Use the English Season 6 text source.
+                // English option names are loaded from socketitem_eng.bmd.
+                var englishAttribute = ItemTooltipDataRepository.GetText(
+                    (ushort)(41 + element), preferLegacy: true);
+                if (englishAttribute != null &&
+                    !string.IsNullOrWhiteSpace(englishAttribute.Text))
+                {
+                    string attribute = englishAttribute.Text.Trim();
+                    const string suffix = " attribute";
+                    if (attribute.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                        attribute = attribute.Substring(0, attribute.Length - suffix.Length);
+                    if (!string.IsNullOrWhiteSpace(attribute))
+                        elementName = attribute;
+                }
             }
 
-            result.Add(($"Element: {elementName}", Color.White));
+            string elementTemplate = ItemTooltipDataRepository.IsLoaded
+                ? ItemTooltipDataRepository.GetText(47, preferLegacy: true)?.Text
+                    ?? "Element: %s"
+                : "Element: %s";
+            result.Add((elementTemplate.Replace("%s", elementName), Color.White));
 
             if (!ItemTooltipDataRepository.IsLoaded)
                 return result;
@@ -575,8 +646,16 @@ namespace Client.Main.Core.Items.Tooltips
 
             SocketItemBMD socket = ItemTooltipDataRepository.GetSocketOption(
                 0, starts[element] + optionIndex);
-            if (socket == null || string.IsNullOrWhiteSpace(socket.Name))
+            if (socket == null)
                 return result;
+
+            string englishOptionName = ItemTooltipDataRepository
+                .GetEnglishSocketOptionName(0, starts[element] + optionIndex);
+
+            // Do not show Korean bytes as replacement question marks if
+            // the optional localization file has not yet been installed.
+            if (string.IsNullOrWhiteSpace(englishOptionName))
+                englishOptionName = $"Socket Option {starts[element] + optionIndex}";
 
             // Match the original blank separator before the blue option.
             result.Add((" ", Color.White));
@@ -585,7 +664,7 @@ namespace Client.Main.Core.Items.Tooltips
             {
                 // Uncombined Seed: show only the option name, never a
                 // fabricated Sphere value.
-                result.Add((socket.Name.Trim(), new Color(127, 178, 255)));
+                result.Add((englishOptionName, new Color(127, 178, 255)));
                 return result;
             }
 
@@ -625,7 +704,7 @@ namespace Client.Main.Core.Items.Tooltips
                     break;
             }
 
-            string description = socket.Name.Trim();
+            string description = englishOptionName;
             if (suffix.Length > 0)
                 description += " " + suffix;
 

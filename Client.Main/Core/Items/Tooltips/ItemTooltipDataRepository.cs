@@ -62,6 +62,12 @@ namespace Client.Main.Core.Items.Tooltips
             _socketOptions =
                 new();
 
+        // Original English socket option names, stored separately because
+        // the older BMD has a different record layout and fewer value fields.
+        private static Dictionary<int, string>
+            _englishSocketNames =
+                new();
+
         private static Dictionary<int, HarmonyOptionBMD>
             _harmonyOptions =
                 new();
@@ -178,7 +184,7 @@ namespace Client.Main.Core.Items.Tooltips
                 Path.Combine(
                     Constants.DataPath,
                     "Local",
-                    "ItemTooltip_s6.bmd");
+                    "ItemTooltip_eng.bmd");
 
             string itemTooltipTextPath =
                 Path.Combine(
@@ -214,6 +220,12 @@ namespace Client.Main.Core.Items.Tooltips
                     Constants.DataPath,
                     "Local",
                     "socketitem.bmd");
+
+            string englishSocketItemPath =
+                Path.Combine(
+                    Constants.DataPath,
+                    "Local",
+                    "socketitem_eng.bmd");
 
             string harmonyOptionPath =
                 Path.Combine(
@@ -263,6 +275,9 @@ namespace Client.Main.Core.Items.Tooltips
 
             var socketReader =
                 new SocketItemBMDReader();
+
+            var englishSocketReader =
+                new LegacySocketItemEnglishBMDReader();
 
             var harmonyReader =
                 new HarmonyOptionBMDReader();
@@ -319,6 +334,25 @@ namespace Client.Main.Core.Items.Tooltips
                 await socketReader
                     .Load(socketItemPath)
                     .ConfigureAwait(false);
+
+            // Optional Season 6 English file supplied separately by users.
+            // Never feed its 104-byte records to the 168-byte modern reader.
+            var englishSocketEntries = new Dictionary<int, string>();
+            if (File.Exists(englishSocketItemPath))
+            {
+                try
+                {
+                    englishSocketEntries = await englishSocketReader
+                        .Load(englishSocketItemPath)
+                        .ConfigureAwait(false);
+                }
+                catch (InvalidDataException ex)
+                {
+                    // A different version must not block all item tooltips.
+                    Console.WriteLine(
+                        $"[ItemTooltipData] English socket table ignored: {ex.Message}");
+                }
+            }
 
             var harmonyEntries =
                 await harmonyReader
@@ -558,6 +592,9 @@ namespace Client.Main.Core.Items.Tooltips
             _socketOptions =
                 socketDictionary;
 
+            _englishSocketNames =
+                englishSocketEntries;
+
             _harmonyOptions =
                 harmonyDictionary;
 
@@ -584,6 +621,7 @@ namespace Client.Main.Core.Items.Tooltips
                 $"{_excellentCommonOptions.Count} common excellent options, " +
                 $"{_excellentWingOptions.Count} wing excellent options, " +
                 $"{_socketOptions.Count} socket entries, " +
+                $"{_englishSocketNames.Count} English socket names, " +
                 $"{_globalTexts.Count} global texts, " +
                 $"{_harmonyOptions.Count} harmony entries, " +
                 $"{_itemSetTypes.Count} ancient item set entries, " +
@@ -844,6 +882,19 @@ namespace Client.Main.Core.Items.Tooltips
                 out var result);
 
             return result;
+        }
+
+        public static string GetEnglishSocketOptionName(
+            int table,
+            int id)
+        {
+            EnsureLoaded();
+
+            return _englishSocketNames.TryGetValue(
+                MakeSocketOptionKey(table, id),
+                out var name)
+                    ? name
+                    : string.Empty;
         }
 
         public static bool TryGetSocketOption(
