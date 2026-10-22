@@ -3349,7 +3349,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             // Material animation for non-hovered items (if enabled)
             if (!isHovered && (Constants.ENABLE_ITEM_MATERIAL_ANIMATION ||
-                (item.Definition.Group == 0 && item.Definition.Id == 26)))
+                (item.Definition.Group == 0 && item.Definition.Id == 26) ||
+                (item.Definition.Group == 12 && item.Definition.Id is 36 or 39)))
             {
                 try
                 {

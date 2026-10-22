@@ -545,7 +545,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 (props.ShouldUseItemMaterial &&
                  !UsesClassicPreviewStyle(definition) &&
                  Constants.ENABLE_ITEM_MATERIAL_ANIMATION) ||
-                (definition.Group == 0 && definition.Id == 26); // Native Flamberge flame.
+                (definition.Group == 0 && definition.Id == 26) ||
+                (definition.Group == 12 && definition.Id is 36 or 39); // Animated native wing meshes.
 
             PreviewCacheEntry entry = useCache ? GetCacheEntry(key, isRotating) : null;
 
@@ -804,7 +805,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
                             bool nativeFlamberge = def.Group == 0 && def.Id == 26 &&
                                 TryRenderNativeFlambergePreview(
                                     gd, effect, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
-                            if (!nativeFlamberge)
+                            bool nativeWing = !nativeFlamberge && def.IsWing() &&
+                                TryRenderNativeWingPreview(
+                                    gd, effect, def.Id, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
+                            if (!nativeFlamberge && !nativeWing)
                             foreach (int meshIdx in meshOrder)
                             {
                                 if (isSeedSphere && bmd.Meshes.Length > 1 && meshIdx == 1)

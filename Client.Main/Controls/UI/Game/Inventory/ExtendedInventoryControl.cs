@@ -301,7 +301,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             {
                 if (hovered) return BmdPreviewRenderer.GetSmoothAnimatedPreview(item, rect.Width, rect.Height, _time);
                 if (Constants.ENABLE_ITEM_MATERIAL_ANIMATION ||
-                    (item.Definition.Group == 0 && item.Definition.Id == 26))
+                    (item.Definition.Group == 0 && item.Definition.Id == 26) ||
+                    (item.Definition.Group == 12 && item.Definition.Id is 36 or 39))
                     return BmdPreviewRenderer.GetMaterialAnimatedPreview(item, rect.Width, rect.Height, _time);
                 return BmdPreviewRenderer.GetPreview(item, rect.Width, rect.Height);
             }

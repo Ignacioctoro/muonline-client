@@ -93,7 +93,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             int passMode,
             Vector3 color,
             Vector2 uvOffset,
-            Texture2D chrome)
+            Texture2D chrome,
+            Texture2D diffuseOverride = null)
         {
             DynamicVertexBuffer vertices = null;
             DynamicIndexBuffer indices = null;
@@ -106,7 +107,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             string path = BMDLoader.Instance.GetTexturePath(bmd, mesh.TexturePath);
             if (string.IsNullOrWhiteSpace(path))
                 return;
-            Texture2D diffuse = TextureLoader.Instance.GetTexture2D(path);
+            Texture2D diffuse = diffuseOverride ?? TextureLoader.Instance.GetTexture2D(path);
             if (diffuse == null)
                 return;
 
