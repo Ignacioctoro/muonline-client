@@ -14,7 +14,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
     /// <summary>
     /// Utility for generating simple 3D previews of BMD models with proper BlendState support.
     /// </summary>
-    public static class BmdPreviewRenderer
+    public static partial class BmdPreviewRenderer
     {
         private readonly struct ItemRenderProperties
         {
@@ -542,9 +542,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // validating the world renderer. There is no reason to regenerate the
             // preview 23 times per second just for the base pass.
             bool requiresAnimation =
-                props.ShouldUseItemMaterial &&
-                !UsesClassicPreviewStyle(definition) &&
-                Constants.ENABLE_ITEM_MATERIAL_ANIMATION;
+                (props.ShouldUseItemMaterial &&
+                 !UsesClassicPreviewStyle(definition) &&
+                 Constants.ENABLE_ITEM_MATERIAL_ANIMATION) ||
+                (definition.Group == 0 && definition.Id == 26); // Native Flamberge flame.
 
             PreviewCacheEntry entry = useCache ? GetCacheEntry(key, isRotating) : null;
 
@@ -800,6 +801,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
                                 RenderMeshWithBlendState(gd, effect, bmd, 1, bones);
                             }
 
+                            bool nativeFlamberge = def.Group == 0 && def.Id == 26 &&
+                                TryRenderNativeFlambergePreview(
+                                    gd, effect, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
+                            if (!nativeFlamberge)
                             foreach (int meshIdx in meshOrder)
                             {
                                 if (isSeedSphere && bmd.Meshes.Length > 1 && meshIdx == 1)

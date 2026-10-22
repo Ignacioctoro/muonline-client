@@ -3348,7 +3348,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             bool isHovered = item == _hoveredItem;
 
             // Material animation for non-hovered items (if enabled)
-            if (!isHovered && Constants.ENABLE_ITEM_MATERIAL_ANIMATION)
+            if (!isHovered && (Constants.ENABLE_ITEM_MATERIAL_ANIMATION ||
+                (item.Definition.Group == 0 && item.Definition.Id == 26)))
             {
                 try
                 {
