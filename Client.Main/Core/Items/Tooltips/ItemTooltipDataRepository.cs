@@ -184,7 +184,7 @@ namespace Client.Main.Core.Items.Tooltips
                 Path.Combine(
                     Constants.DataPath,
                     "Local",
-                    "ItemTooltip_eng.bmd");
+                    "ItemTooltip_s6.bmd");
 
             string itemTooltipTextPath =
                 Path.Combine(

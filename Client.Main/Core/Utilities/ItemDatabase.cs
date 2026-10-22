@@ -39,11 +39,23 @@ namespace Client.Main.Core.Utilities
 
             try
             {
-                // Load original MU tooltip data.
-                await ItemTooltipDataRepository
-                    .LoadAsync()
-                    .ConfigureAwait(false);
-
+                // Tooltips are optional metadata. A missing, incompatible or
+                // corrupt localization BMD must NEVER prevent item.bmd from
+                // loading: doing so empties the item catalog and produces
+                // "Unknown Item" for every equipped/inventory item.
+                try
+                {
+                    await ItemTooltipDataRepository
+                        .LoadAsync()
+                        .ConfigureAwait(false);
+                }
+                catch (Exception tooltipException)
+                {
+                    Console.WriteLine(
+                        "[ItemDatabase] Tooltip data failed to load; " +
+                        "continuing with item.bmd definitions. " +
+                        tooltipException);
+                }
 
                 var reader = new ItemBMDReader();
 
