@@ -322,74 +322,36 @@ namespace Client.Main.Controls.UI.Game.Inventory
         private static Texture2D
             _previewShiny01;
 
-        private static bool
-            _previewClassicTexturesAttempted;
-
-
-        private static Texture2D LoadClassicPreviewTexture(
-            string path)
+        // Preview textures are prepared on a background thread and realized on
+        // the graphics thread. A transient miss must never disable Chrome for
+        // the rest of the session (including after device reset/reconnect).
+        private static Texture2D LoadClassicPreviewTexture(string path)
         {
             try
             {
-                TextureLoader.Instance
-                    .Prepare(path)
-                    .GetAwaiter()
-                    .GetResult();
-
-                return
-                    TextureLoader.Instance
-                        .GetTexture2D(path);
+                _ = TextureLoader.Instance.Prepare(path);
+                return TextureLoader.Instance.GetTexture2D(path);
             }
-            catch
+            catch (Exception)
             {
                 return null;
             }
         }
 
-
         private static bool EnsureClassicPreviewTextures()
         {
-            bool ready =
-                _previewChrome01 != null &&
-                !_previewChrome01.IsDisposed &&
-                _previewChrome02 != null &&
-                !_previewChrome02.IsDisposed &&
-                _previewShiny01 != null &&
-                !_previewShiny01.IsDisposed;
+            if (_previewChrome01 == null || _previewChrome01.IsDisposed)
+                _previewChrome01 = LoadClassicPreviewTexture("Effect/Chrome01.jpg");
 
-            if (ready)
-            {
-                return true;
-            }
+            if (_previewChrome02 == null || _previewChrome02.IsDisposed)
+                _previewChrome02 = LoadClassicPreviewTexture("Effect/Chrome02.jpg");
 
+            if (_previewShiny01 == null || _previewShiny01.IsDisposed)
+                _previewShiny01 = LoadClassicPreviewTexture("Effect/Shiny01.jpg");
 
-            if (_previewClassicTexturesAttempted)
-            {
-                return false;
-            }
-
-
-            _previewClassicTexturesAttempted =
-                true;
-
-
-            _previewChrome01 =
-                LoadClassicPreviewTexture(
-                    "Effect/Chrome01.jpg");
-
-            _previewChrome02 =
-                LoadClassicPreviewTexture(
-                    "Effect/Chrome02.jpg");
-
-            _previewShiny01 =
-                LoadClassicPreviewTexture(
-                    "Effect/Shiny01.jpg");
-
-
-            return
-                _previewChrome01 != null &&
-                _previewChrome02 != null &&
-                _previewShiny01 != null;
+            return _previewChrome01 != null && !_previewChrome01.IsDisposed &&
+                   _previewChrome02 != null && !_previewChrome02.IsDisposed &&
+                   _previewShiny01 != null && !_previewShiny01.IsDisposed;
         }
 
         public static Texture2D GetPreview(InventoryItem item, int width, int height, float rotationAngle = 0f)
