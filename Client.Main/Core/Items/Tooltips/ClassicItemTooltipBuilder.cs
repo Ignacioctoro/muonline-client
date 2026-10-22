@@ -620,9 +620,9 @@ namespace Client.Main.Core.Items.Tooltips
                     !string.IsNullOrWhiteSpace(englishAttribute.Text))
                 {
                     string attribute = englishAttribute.Text.Trim();
-                    const string suffix = " attribute";
-                    if (attribute.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                        attribute = attribute.Substring(0, attribute.Length - suffix.Length);
+                    const string attributeSuffix = " attribute";
+                    if (attribute.EndsWith(attributeSuffix, StringComparison.OrdinalIgnoreCase))
+                        attribute = attribute.Substring(0, attribute.Length - attributeSuffix.Length);
                     if (!string.IsNullOrWhiteSpace(attribute))
                         elementName = attribute;
                 }
