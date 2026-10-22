@@ -136,6 +136,12 @@ namespace Client.Main.Core.Utilities
                         ItemValue = item.ItemValue
                     };
 
+                    // The original MU client maps Wizard's Ring (13,20)
+                    // to special event models instead of the item.bmd model.
+                    // The preview renderer swaps to the +1..+3 model below.
+                    if (item.ItemSubGroup == 13 && item.ItemSubIndex == 20)
+                        definition.TexturePath = "Item/MagicRing00.bmd";
+
                     data.Add(key, definition);
                 }
             }

@@ -161,6 +161,11 @@ namespace Client.Main.Core.Items.Tooltips
             var details = item.Details;
             if (SpiritItemInfo.IsSpirit(def)) return SpiritItemInfo.BuildTooltip(item);
 
+            // Season 6 renders socket Seeds and Spheres through SocketItemMgr,
+            // not the generic itemtooltip.bmd equipment pipeline.
+            if (def.IsSocketSeed() || def.IsSocketSphere() || def.IsSeedSphere())
+                return BuildClassicSeedSphereTooltip(item);
+
             // Trainable pets use OpenMU A9, not the serialized item +level.
             if (def.Group == 13 && (def.Id == 4 || def.Id == 5))
                 return BuildTrainablePetTooltip(item, petInfo);
@@ -518,6 +523,116 @@ namespace Client.Main.Core.Items.Tooltips
 
             return result;
         }
+        /// <summary>
+        /// Season 6 SocketItemMgr::AttachToolTipForSeedSphereItem equivalent.
+        /// Option names/values are read directly from Data/Local/socketitem.bmd.
+        /// </summary>
+        private static List<(string text, Color color)> BuildClassicSeedSphereTooltip(
+            InventoryItem item)
+        {
+            ItemDefinition def = item.Definition;
+            var result = new List<(string text, Color color)>
+            {
+                // Socket items use a violet title in the original client.
+                (def.Name ?? string.Empty, new Color(179, 102, 255))
+            };
+
+            if (def.IsSocketSphere())
+            {
+                // Pure Spheres display their sphere tier, not an option.
+                result.Add(($"Level {def.Id - 69}", Color.White));
+                return result;
+            }
+
+            int element = def.IsSocketSeed()
+                ? def.Id - 60
+                : (def.Id - 100) % 6;
+
+            string[] elementNames = { "Fire", "Water", "Ice", "Wind", "Lightning", "Earth" };
+            if (element < 0 || element >= elementNames.Length)
+                return result;
+
+            string elementName = elementNames[element];
+            if (ItemTooltipDataRepository.IsLoaded)
+            {
+                // IDs 2640..2645 are also used by the classic SocketItemMgr.
+                string originalName = ItemTooltipDataRepository.GetGlobalText(2640 + element);
+                if (!string.IsNullOrWhiteSpace(originalName))
+                    elementName = originalName.Trim();
+            }
+
+            result.Add(($"Element: {elementName}", Color.White));
+
+            if (!ItemTooltipDataRepository.IsLoaded)
+                return result;
+
+            // Element-specific socket option indices from the original code.
+            int[] starts = { 0, 10, 16, 21, 29, 34 };
+            int[] counts = { 10, 6, 5, 8, 5, 7 };
+            int optionIndex = item.Details.Level;
+            if (optionIndex < 0 || optionIndex >= counts[element])
+                return result;
+
+            SocketItemBMD socket = ItemTooltipDataRepository.GetSocketOption(
+                0, starts[element] + optionIndex);
+            if (socket == null || string.IsNullOrWhiteSpace(socket.Name))
+                return result;
+
+            // Match the original blank separator before the blue option.
+            result.Add((" ", Color.White));
+
+            if (def.IsSocketSeed())
+            {
+                // Uncombined Seed: show only the option name, never a
+                // fabricated Sphere value.
+                result.Add((socket.Name.Trim(), new Color(127, 178, 255)));
+                return result;
+            }
+
+            // Completed Seed Sphere: tier 1..5 is encoded in the item index,
+            // and the socket-option selection is encoded in item +level.
+            int sphereLevel = (def.Id - 100) / 6 + 1;
+            if (sphereLevel < 1 || sphereLevel > socket.Values.Length)
+                return result;
+
+            int value = socket.Values[sphereLevel - 1];
+            var character = MuGame.Network?.GetCharacterState();
+            // Original MU CalcSocketOptionValueText: percentage for type 2.
+            // Types 3..5 depend on actual player stats, not raw option values.
+            string suffix;
+            switch (socket.BonusType)
+            {
+                case 2:
+                    suffix = $"+{value}%";
+                    break;
+                case 3 when value > 0 && character != null:
+                    suffix = $"+{(character.Level + character.MasterLevel) / value}";
+                    break;
+                case 4 when value > 0 && character != null:
+                    suffix = $"+{character.MaximumHealth / (uint)value}";
+                    break;
+                case 5 when value > 0 && character != null:
+                    suffix = $"+{character.MaximumMana / (uint)value}";
+                    break;
+                case 3:
+                case 4:
+                case 5:
+                    // Before character data is loaded, don't show a false value.
+                    suffix = string.Empty;
+                    break;
+                default:
+                    suffix = $"+{value}";
+                    break;
+            }
+
+            string description = socket.Name.Trim();
+            if (suffix.Length > 0)
+                description += " " + suffix;
+
+            result.Add((description, new Color(127, 178, 255)));
+            return result;
+        }
+
         private static List<(string text, Color color)> BuildTrainablePetTooltip(
             InventoryItem item, PetInfoSnapshot? info)
         {

@@ -640,7 +640,14 @@ namespace Client.Main.Controls.UI.Game.Inventory
             bool capturedStates = false;
             try
             {
-                var modelTask = BMDLoader.Instance.Prepare(def.TexturePath);
+                // ZzzInventory.cpp: Wizard's Ring 13,20 draws MODEL_EVENT+15
+                // at +0 and MODEL_EVENT+14 for levels +1, +2 and +3.
+                string modelPath = def.Group == 13 && def.Id == 20
+                    ? (props.Level is >= 1 and <= 3
+                        ? "Item/RingOfLordEvent00.bmd"
+                        : "Item/MagicRing00.bmd")
+                    : def.TexturePath;
+                var modelTask = BMDLoader.Instance.Prepare(modelPath);
 
                 // DirectX requires more careful thread synchronization to avoid deadlocks
                 // Only wait for model if it's already completed, otherwise return and retry next frame
@@ -686,7 +693,11 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 Matrix view = Matrix.CreateLookAt(new Vector3(0, 0, 40f), Vector3.Zero, Vector3.Up);
                 Matrix projection = Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(30f), (float)width / height, 1f, 100f);
 
-                Matrix baseRotation = ItemOrientationHelper.GetInventoryBaseRotation(modelDefinition);
+                Matrix baseRotation = def.Group == 13 && def.Id == 20
+                    ? (props.Level is >= 1 and <= 3
+                        ? MuRotationConverter.ConvertToMonoGame(255f, 160f, 0f)
+                        : MuRotationConverter.ConvertToMonoGame(270f, 0f, 0f))
+                    : ItemOrientationHelper.GetInventoryBaseRotation(modelDefinition);
 
                 Matrix mouseRotation = Matrix.CreateRotationY(MathHelper.ToRadians(rotationAngle));
 
