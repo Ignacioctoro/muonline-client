@@ -51,6 +51,9 @@ namespace Client.Main.Scenes
         private MapListControl _mapListControl;
         private ChatLogWindow _chatLog;
         public CommunityMenuControl CommunityMenu { get; private set; }
+        public CommandWindowControl CommandWindow { get; private set; }
+        internal void BeginPlayerCommand(PlayerCommand action) => _playerMenuController?.BeginCommand(action);
+        internal void CancelPlayerCommand() => _playerMenuController?.CancelCommand();
         private MoveCommandWindow _moveCommandWindow;
         public MoveCommandWindow MoveCommandWindow => _moveCommandWindow;
         private ChatInputBoxControl _chatInput;
@@ -1291,6 +1294,9 @@ namespace Client.Main.Scenes
             Controls.Add(PartyMatchingWindow);
             CommunityMenu = new CommunityMenuControl();
             Controls.Add(CommunityMenu);
+            CommandWindow = new CommandWindowControl();
+            Controls.Add(CommandWindow);
+            Controls.Add(new MobileCommandsLauncher());
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);

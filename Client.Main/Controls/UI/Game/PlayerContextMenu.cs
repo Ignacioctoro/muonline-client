@@ -179,6 +179,25 @@ namespace Client.Main.Controls.UI.Game
                 string.Empty;
         }
 
+        // Both entry points use these handlers and the same target eligibility.
+        internal bool TryExecuteCommand(PlayerCommand action)
+        {
+            switch (action)
+            {
+                case PlayerCommand.Trade: OnTradeRequestClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Buy when _storeButton.Enabled: OnStoreRequestClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Party: OnPartyInviteClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Whisper: OnWhisperClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Guild when _guildRequestButton.Visible: OnGuildRequestClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Alliance when _allianceRequestButton.Visible: OnAllianceRequestClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Hostility when _hostilityRequestButton.Visible: OnHostilityRequestClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.AddFriend: OnAddFriendClicked(this, EventArgs.Empty); break;
+                case PlayerCommand.Duel when _duelButton.Enabled: OnDuelRequestClicked(this, EventArgs.Empty); break;
+                default: return false;
+            }
+            return true;
+        }
+
         public ushort TargetPlayerId =>
             _targetPlayerId;
 

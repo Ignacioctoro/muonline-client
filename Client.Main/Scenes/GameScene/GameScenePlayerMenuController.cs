@@ -29,6 +29,105 @@ namespace Client.Main.Scenes
         private float _playerMenuHintAlpha;
         private readonly PlayerMenuHoldGesture _touchHold = new();
         private bool _ignoreOpeningRelease;
+        private PlayerCommand? _pendingCommand;
+        private bool _commandPointerCaptured;
+        private PlayerObject _followTarget;
+        private double _followElapsed;
+        private ushort _followMap;
+
+        public void BeginCommand(PlayerCommand action)
+        {
+            HideMenu();
+            if (_followTarget != null) _scene.Hero?.StopMovement();
+            _followTarget = null;
+            _pendingCommand = action;
+            _scene.CommandWindow?.SetHint("Toca un jugador para aplicar la acción.");
+        }
+
+        public void CancelCommand()
+        {
+            _pendingCommand = null;
+            _commandPointerCaptured = false;
+            _scene.CommandWindow?.SetHint("Elige una acción y luego un jugador.");
+        }
+
+        private void ExecuteCommand(PlayerCommand action, PlayerObject target)
+        {
+            if (action == PlayerCommand.Follow)
+            {
+                _followTarget = target;
+                _followMap = MuGame.Network.GetCharacterState().MapId;
+                _followElapsed = 0.5;
+                _scene.CommandWindow?.SetHint("Siguiendo a " + target.Name);
+                return;
+            }
+            if (action == PlayerCommand.SuspendHostilities)
+            {
+                if (GuildInfoCache.IsPlayerGuildMaster(_scene.Hero.NetworkId))
+                {
+                    ushort localId = _scene.Hero.NetworkId;
+                    RequestDialog.Show("¿Seguro que quieres finalizar la hostilidad?",
+                        onAccept: () => { _ = MuGame.Network.GetCharacterService().SendEndHostilityRequestAsync(localId); },
+                        onReject: () => { });
+                }
+                else
+                    _scene.CommandWindow?.SetHint("Solo el Guild Master puede hacerlo.");
+                return;
+            }
+            ShowPlayerContextMenu(target, Point.Zero, false);
+            bool applied = _playerContextMenu.TryExecuteCommand(action);
+            _scene.CommandWindow?.SetHint(applied ? "Acción enviada para " + target.Name :
+                "Este jugador no cumple los requisitos.");
+        }
+
+        private void UpdateFollow(GameTime time, KeyboardState keyboard, MouseState mouse, MouseState previous)
+        {
+            if (_followTarget == null) return;
+            var hero = _scene.Hero;
+            var state = MuGame.Network?.GetCharacterState();
+            bool manual = _scene.IsMobileJoystickActive ||
+                (mouse.LeftButton == ButtonState.Pressed && previous.LeftButton == ButtonState.Released &&
+                 !_scene.IsInteractiveUIUnderMouse() && !_commandPointerCaptured) ||
+                (mouse.RightButton == ButtonState.Pressed && previous.RightButton == ButtonState.Released) ||
+                keyboard.IsKeyDown(Keys.Up) || keyboard.IsKeyDown(Keys.Down) ||
+                keyboard.IsKeyDown(Keys.Left) || keyboard.IsKeyDown(Keys.Right) ||
+                keyboard.IsKeyDown(Keys.Escape);
+            if (manual)
+            {
+                // A ground click/joystick has already supplied a new movement
+                // intent this frame. Stop only for cancellation keys/right click.
+                if (keyboard.IsKeyDown(Keys.Escape) || keyboard.IsKeyDown(Keys.Up) ||
+                    keyboard.IsKeyDown(Keys.Down) || keyboard.IsKeyDown(Keys.Left) ||
+                    keyboard.IsKeyDown(Keys.Right) || mouse.RightButton == ButtonState.Pressed)
+                    hero?.StopMovement();
+                _followTarget = null;
+                _scene.CommandWindow?.SetHint("Seguimiento cancelado.");
+                return;
+            }
+            if (hero == null || hero.IsDead || _followTarget.IsDead || _followTarget.World != _scene.World ||
+                !IsPlayerAvailable(_followTarget.NetworkId, _followTarget) || state == null || state.MapId != _followMap ||
+                state.IsTeleporting || !state.IsInGame)
+            {
+                _followTarget = null;
+                hero?.StopMovement();
+                return;
+            }
+            if (_scene.PauseMenu?.Visible == true ||
+                Client.Main.Controls.UI.Game.Inventory.InventoryControl.Instance.Visible)
+            {
+                hero.StopMovement();
+                return;
+            }
+            _followElapsed += time.ElapsedGameTime.TotalSeconds;
+            if (_followElapsed < 0.5) return;
+            _followElapsed = 0;
+            float distance = Vector2.DistanceSquared(hero.Location, _followTarget.Location);
+            if (distance > 400) { _followTarget = null; hero.StopMovement(); return; }
+            if (distance <= 4) { hero.StopMovement(); return; }
+            // Normal walk/pathfinding packets; never teleport or move the target.
+            hero.MoveTo(_followTarget.Location);
+        }
+
 
         public GameScenePlayerMenuController(GameScene scene, Action<string> whisperRequested, Action<ushort, string> duelRequested)
         {
@@ -71,6 +170,8 @@ namespace Client.Main.Scenes
 
         public void ResetOnWorldUnavailable()
         {
+            CancelCommand();
+            _followTarget = null;
             if (_playerContextMenu?.Visible == true)
             {
                 _playerContextMenu.Visible = false;
@@ -110,6 +211,28 @@ namespace Client.Main.Scenes
             bool duelClick = desktopMouse && state?.IsDuelActive == true && target.HasValue &&
                 state.GetDuelPlayerId(Client.Main.Core.Client.CharacterState.DuelPlayerType.Enemy) == target.Value;
             // Preserve Ctrl-click/duel attacks and exclude the mouse-driven test joystick.
+            if (_commandPointerCaptured)
+            {
+                _scene.SetMouseInputConsumed();
+                if (!down) _commandPointerCaptured = false;
+                return true;
+            }
+            if (_pendingCommand.HasValue && pressed &&
+                !_scene.IsMouseInputConsumedThisFrame && !_scene.IsInteractiveUIUnderMouse())
+            {
+                _commandPointerCaptured = true;
+                _scene.SetMouseInputConsumed();
+                _touchHold.Reset();
+                if (target.HasValue && player != null && !player.IsDead)
+                {
+                    var action = _pendingCommand.Value;
+                    _pendingCommand = null;
+                    ExecuteCommand(action, player);
+                }
+                else
+                    _scene.CommandWindow?.SetHint("Selecciona otro jugador cercano.");
+                return true;
+            }
             bool consumed = _touchHold.Update(pointer, pressed, down,
                 target, pvpModifier || duelClick || _scene.IsMobileJoystickCapturingMouse ||
                     _scene.IsMouseInputConsumedThisFrame || _scene.IsInteractiveUIUnderMouse(),
@@ -125,6 +248,7 @@ namespace Client.Main.Scenes
 
         public void Update(GameTime gameTime, KeyboardState keyboardState, MouseState uiMouse, MouseState prevUiMouse)
         {
+            UpdateFollow(gameTime, keyboardState, uiMouse, prevUiMouse);
             bool contextMenuOpened = false;
 
             if (!_scene.IsMouseInputConsumedThisFrame &&
@@ -169,7 +293,7 @@ namespace Client.Main.Scenes
             UpdatePlayerMenuHint(gameTime, keyboardState, _scene.MouseHoverObject as PlayerObject, uiMouse.Position);
         }
 
-        private void ShowPlayerContextMenu(PlayerObject targetPlayer, Point mousePos)
+        private void ShowPlayerContextMenu(PlayerObject targetPlayer, Point mousePos, bool show = true)
         {
             if (_playerContextMenu == null)
             {
@@ -294,8 +418,12 @@ namespace Client.Main.Scenes
                 .SetHostilityRequestVisible(
                     canRequestHostility);
                     
-            _playerContextMenu.ShowAt(mousePos.X, mousePos.Y);
-            _playerContextMenu.BringToFront();
+            if (show)
+            {
+                _playerContextMenu.ShowAt(mousePos.X, mousePos.Y);
+                _playerContextMenu.BringToFront();
+            }
+            else _playerContextMenu.Visible = false;
             _playerMenuHintCooldown = PlayerMenuHintCooldownSeconds;
             _playerMenuHintAlpha = 0;
             if (_playerMenuHint != null)
@@ -365,14 +493,14 @@ namespace Client.Main.Scenes
             _playerMenuHint.BringToFront();
         }
 
-        private bool IsPlayerAvailable(ushort playerId)
+        private bool IsPlayerAvailable(ushort playerId, PlayerObject expected = null)
         {
             if (playerId == 0 || _scene.World is not WalkableWorldControl walkableWorld)
                 return false;
 
             if (walkableWorld.WalkerObjectsById.TryGetValue(playerId, out var walker) && walker is PlayerObject po)
             {
-                return po.World == _scene.World;
+                return po.World == _scene.World && (expected == null || ReferenceEquals(po, expected));
             }
 
             return false;
