@@ -683,7 +683,14 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 // Classic wings fill noticeably more of their 3x2 item slots
                 // than the generic model fit. Keep this in the preview only.
                 if (def.IsWing())
+                {
                     scale *= 1.22f;
+                    // MuMain Group12_Wing.json: Wings of Darkness (12,6)
+                    // inventory.scale=0.0015 vs 0.002 for other classic wings.
+                    // Preserve that source-relative ratio in our fitted camera.
+                    if (def.Group == 12 && def.Id == 6)
+                        scale *= 0.75f;
+                }
 
                 Vector3 originalCenter = (originalBounds.Min + originalBounds.Max) * 0.5f;
 
@@ -1442,7 +1449,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             short group = (short)definition.Group;
 
-            // Explicit Season 6 inventory poses from the original item models.
+            // Explicit Season 6 inventory poses from MuMain's item model data.
+            // These are INVENTORY poses only: dropped items use separate angles.
+            if (group == 0 && definition.Id == 26)
+                return MuRotationConverter.ConvertToMonoGame(180f, 270f, 10f); // Flamberge
+            if (group == 12 && definition.Id == 42)
+                return MuRotationConverter.ConvertToMonoGame(270f, 0f, 2f); // Wings of Despair
+
             if (definition.IsSocketSeed())
                 return MuRotationConverter.ConvertToMonoGame(10f, -10f, 10f);
 
