@@ -1,4 +1,5 @@
 using Client.Main.Controllers;
+using Client.Main.Controls.UI.Game.Common;
 using Client.Main.Content;
 using System.Threading.Tasks;
 using Client.Main.Controls.UI;
@@ -1063,31 +1064,27 @@ namespace Client.Main.Controls.UI.Game
         {
             private readonly Texture2D[] _states = new Texture2D[4];
             private string _skin;
-            private LabelControl _help;
-            public bool ShowHelp => Visible && IsMouseOver && _help != null &&
+            private string _helpKey;
+            private string _helpText;
+            public bool ShowHelp => Visible && IsMouseOver && _helpText != null &&
                 Scene?.IsPointerInputBlockedFor(this) != true;
 
             public void ConfigureSkin(string name)
             {
                 var settings = name switch
                 {
-                    "SettingsButton" => (1, "Esc  Sistema y opciones"),
-                    "button5" => (2, "Community: Amigos, Guild y Party"),
-                    "button4" => (3, "T  Misiones"),
-                    "InventoryButton" => (4, "I  Inventario"),
-                    "button2" => (5, "C  Personaje"),
-                    "Button_1" => (6, "Tienda"),
-                    _ => (0, "Cambiar barra de habilidades")
+                    "SettingsButton" => (1, "Esc", "Sistema"),
+                    "button5" => (2, "", "Community"),
+                    "button4" => (3, "T", "Misiones"),
+                    "InventoryButton" => (4, "I", "Inventario"),
+                    "button2" => (5, "C", "Personaje"),
+                    "Button_1" => (6, "", "Tienda"),
+                    _ => (0, "", "Cambiar barra de habilidades")
                 };
                 if (settings.Item1 != 0)
                     _skin = $"Interface/GFx/button_btn{settings.Item1:00}_";
-                _help = new LabelControl
-                {
-                    Text = settings.Item2, FontSize = 11f, Interactive = false,
-                    TextColor = Color.White,
-                    BackgroundColor = new Color(12, 10, 9, 240),
-                    Padding = new Margin { Left = 7, Right = 7, Top = 4, Bottom = 4 }
-                };
+                _helpKey = settings.Item2;
+                _helpText = settings.Item3;
             }
 
             public override async Task Load()
@@ -1110,12 +1107,23 @@ namespace Client.Main.Controls.UI.Game
 
             public void DrawHelp(GameTime gameTime)
             {
-                if (!ShowHelp) return;
+                if (!ShowHelp || Texture == null) return;
+                var font = GraphicsManager.Instance.Font;
+                if (font == null) return;
+                float scale = 12f / Constants.BASE_FONT_SIZE;
+                var keySize = font.MeasureString(_helpKey) * scale;
+                var textSize = font.MeasureString(_helpText) * scale;
+                float textOffset = string.IsNullOrEmpty(_helpKey) ? 10f : Math.Max(30f, keySize.X + 16f);
+                int width = Math.Max(72, (int)Math.Ceiling(textOffset + textSize.X + 12));
                 var bounds = DisplayRectangle;
-                _help.X = Math.Clamp(bounds.Center.X - _help.ControlSize.X / 2, 0,
-                    Math.Max(0, UiScaler.VirtualSize.X - _help.ControlSize.X));
-                _help.Y = Math.Max(0, bounds.Y - _help.ControlSize.Y - 6);
-                _help.Draw(gameTime);
+                int x = Math.Clamp(bounds.Center.X - width / 2, 0, Math.Max(0, UiScaler.VirtualSize.X - width));
+                var box = new Rectangle(x, Math.Max(0, bounds.Top - 30), width, 28);
+                var sprite = GraphicsManager.Instance.Sprite;
+                NativeHudMenuSkin.DrawHelp(sprite, Texture, box);
+                sprite.DrawString(font, _helpKey, new Vector2(box.X + 8, box.Center.Y - keySize.Y / 2),
+                    new Color(254, 42, 42), 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                sprite.DrawString(font, _helpText, new Vector2(box.X + textOffset, box.Center.Y - textSize.Y / 2),
+                    Color.White, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
             }
 
             public HudTextureButton()

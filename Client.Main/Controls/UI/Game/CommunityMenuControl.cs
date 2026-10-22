@@ -23,27 +23,27 @@ namespace Client.Main.Controls.UI.Game
 
         public CommunityMenuControl()
         {
-            int rowHeight = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 28;
+            int rowHeight = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 18;
             AutoViewSize = false;
-            ViewSize = ControlSize = new Point(180, 24 + rowHeight * 3);
+            ViewSize = ControlSize = new Point(145, 29 + rowHeight * 3);
             Interactive = true;
             Visible = false;
-            AddEntry("F   Amigos", 0, rowHeight, game => game.FriendsWindow?.Toggle());
-            AddEntry("G   Guild", 1, rowHeight, game => game.OpenGuildMenu());
-            AddEntry("P   Party", 2, rowHeight, game => game.PartyMatchingWindow?.Toggle());
+            AddEntry("F", "Amigos", 0, rowHeight, game => game.FriendsWindow?.Toggle());
+            AddEntry("G", "Guild", 1, rowHeight, game => game.OpenGuildMenu());
+            AddEntry("P", "Party", 2, rowHeight, game => game.PartyMatchingWindow?.Toggle());
         }
 
-        private void AddEntry(string text, int index, int height, Action<GameScene> action)
+        private void AddEntry(string key, string text, int index, int height, Action<GameScene> action)
         {
-            var button = new ButtonControl
+            var button = new CommunityEntry(key)
             {
-                Text = text, X = 12, Y = 12 + index * height,
-                AutoViewSize = false, ViewSize = new Point(156, height),
-                ControlSize = new Point(156, height), FontSize = 12f,
+                Text = text, X = 9, Y = 14 + index * height,
+                AutoViewSize = false, ViewSize = new Point(127, height),
+                ControlSize = new Point(127, height), FontSize = 12f,
                 BackgroundColor = Color.Transparent,
-                HoverBackgroundColor = new Color(65, 48, 22, 190),
-                PressedBackgroundColor = new Color(85, 62, 25, 220),
-                TextColor = new Color(225, 218, 197), HoverTextColor = Color.Gold
+                HoverBackgroundColor = Color.Transparent,
+                PressedBackgroundColor = Color.Transparent,
+                TextColor = new Color(145, 145, 145), HoverTextColor = Color.Red
             };
             button.Click += (_, _) =>
             {
@@ -56,7 +56,7 @@ namespace Client.Main.Controls.UI.Game
 
         public override async Task Load()
         {
-            _frame = await TextureLoader.Instance.PrepareAndGetTexture(NewUiFrameRenderer.PersonalShopAtlasPath);
+            _frame = await TextureLoader.Instance.PrepareAndGetTexture(NativeHudMenuSkin.AtlasPath);
             await base.Load();
         }
 
@@ -109,9 +109,34 @@ namespace Client.Main.Controls.UI.Game
             var sprite = GraphicsManager.Instance.Sprite;
             using var scope = new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
                 BlendState.NonPremultiplied, transform: UiScaler.SpriteTransform);
-            sprite.Draw(GraphicsManager.Instance.Pixel, DisplayRectangle, new Color(14, 12, 10, 245));
-            NewUiFrameRenderer.DrawPersonalShopInset(sprite, _frame, DisplayRectangle);
+            NativeHudMenuSkin.DrawCommunity(sprite, _frame, DisplayRectangle);
             foreach (var control in Controls) control.Draw(gameTime);
+        }
+
+        // LRSubMenu in main.ozg uses separate key/name fields, no colored row fill.
+        private sealed class CommunityEntry : ButtonControl
+        {
+            private readonly string _key;
+            public CommunityEntry(string key) => _key = key;
+
+            public override void Draw(GameTime gameTime)
+            {
+                if (!Visible || Status != GameControlStatus.Ready) return;
+                var font = GraphicsManager.Instance.Font;
+                if (font == null) return;
+                var sprite = GraphicsManager.Instance.Sprite;
+                var bounds = DisplayRectangle;
+                float scale = 12f / Constants.BASE_FONT_SIZE;
+                var keySize = font.MeasureString(_key) * scale;
+                var textSize = font.MeasureString(Text) * scale;
+                sprite.DrawString(font, _key,
+                    new Vector2(bounds.X + 16 - keySize.X / 2, bounds.Center.Y - keySize.Y / 2),
+                    new Color(254, 42, 42), 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+                sprite.DrawString(font, Text,
+                    new Vector2(bounds.X + 75 - textSize.X / 2, bounds.Center.Y - textSize.Y / 2),
+                    IsMouseOver ? Color.Red : new Color(145, 145, 145),
+                    0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            }
         }
     }
 }
