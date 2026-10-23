@@ -2,6 +2,7 @@
 // Ordered mesh sequence from MuMain ItemRenderStyles.cpp::RenderFlamberge.
 // World/equipped Flamberge remains in ModelObject.Flamberge.
 using Client.Data.BMD;
+using Client.Main;
 using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Graphics;
@@ -20,7 +21,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             Matrix world,
             Matrix view,
             Matrix projection,
-            float seconds)
+            float seconds,
+            in ItemRenderProperties props)
         {
             // Never apply the six-mesh Flamberge effect to unrelated models.
             var shader = GraphicsManager.Instance.ItemMaterialEffect;
@@ -31,6 +33,19 @@ namespace Client.Main.Controls.UI.Game.Inventory
             baseEffect.World = world;
             RenderMeshWithBlendState(gd, baseEffect, bmd, 0, bones);
             RenderMeshWithBlendState(gd, baseEffect, bmd, 2, bones);
+
+            // The native animated flame is independent of the weapon's +7..+15
+            // and Excellent material. Keep those overlays on its solid blade/hilt,
+            // before drawing the additive flame geometry.
+            if (props.ShouldUseItemMaterial && Constants.ENABLE_ITEM_MATERIAL_SHADER)
+            {
+                Matrix worldViewProjection = world * view * projection;
+                Vector3 eyePosition = new Vector3(0f, 0f, 40f);
+                RenderMeshWithItemMaterialPreview(gd, bmd, 0, bones, world, view,
+                    projection, worldViewProjection, eyePosition, props, seconds, overlayOnly: true);
+                RenderMeshWithItemMaterialPreview(gd, bmd, 2, bones, world, view,
+                    projection, worldViewProjection, eyePosition, props, seconds, overlayOnly: true);
+            }
 
             BlendState oldBlend = gd.BlendState;
             DepthStencilState oldDepth = gd.DepthStencilState;
@@ -46,6 +61,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 shader.Parameters["ShadowStrength"]?.SetValue(0f);
                 shader.Parameters["BaseLightScale"]?.SetValue(1f);
                 shader.Parameters["MaterialIntensity"]?.SetValue(1f);
+                // Black-backed effect textures are invisible under original
+                // GL_ONE/GL_ONE blending, but must not become opaque in an RT.
+                shader.Parameters["PreviewAlphaFromLuminance"]?.SetValue(1f);
 
                 gd.BlendState = _classicPreviewBrightAdditive;
                 gd.DepthStencilState = DepthStencilState.DepthRead;
@@ -54,7 +72,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 // Mesh 1: red BRIGHT diffuse then white CHROME.
                 DrawFlambergePreviewPass(gd, shader, bmd, bones, 1, 5,
                     new Vector3(1f, 0f, 0.2f), Vector2.Zero, null);
-                if (EnsureClassicPreviewTextures() && _previewChrome01 != null)
+                EnsureClassicPreviewTextures();
+                if (_previewChrome01 != null && !_previewChrome01.IsDisposed)
                     DrawFlambergePreviewPass(gd, shader, bmd, bones, 1, 1,
                         Vector3.One, Vector2.Zero, _previewChrome01);
 
@@ -76,6 +95,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 shader.Parameters["DiffuseUVOffset"]?.SetValue(Vector2.Zero);
                 shader.Parameters["MaterialColor"]?.SetValue(Vector3.One);
                 shader.Parameters["MaterialIntensity"]?.SetValue(1f);
+                shader.Parameters["PreviewAlphaFromLuminance"]?.SetValue(0f);
                 gd.BlendState = oldBlend;
                 gd.DepthStencilState = oldDepth;
                 gd.RasterizerState = oldRasterizer;

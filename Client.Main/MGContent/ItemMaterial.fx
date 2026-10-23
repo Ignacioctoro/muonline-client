@@ -164,6 +164,11 @@ float Alpha = 1.0;
 float2 DiffuseUVOffset =
     float2(0.0, 0.0);
 
+// Only inventory render targets opt in: preserve opaque world item behavior.
+// Classic additive GL_ONE/GL_ONE treats black as invisible; a transparent RT
+// additionally needs zero alpha wherever its additive contribution is black.
+float PreviewAlphaFromLuminance = 0.0;
+
 
 // ============================================================================
 // SHADOW MAP
@@ -772,6 +777,9 @@ float4 MainPS(
         excellent.a *=
             Alpha;
 
+        float previewAlpha = saturate(max(excellent.r, max(excellent.g, excellent.b)));
+        excellent.a = lerp(excellent.a, previewAlpha, saturate(PreviewAlphaFromLuminance));
+
         return excellent;
     }
         // ========================================================================
@@ -805,6 +813,9 @@ float4 MainPS(
 
             flame.a *=
                 Alpha;
+
+            float previewAlpha = saturate(max(flame.r, max(flame.g, flame.b)));
+            flame.a = lerp(flame.a, previewAlpha, saturate(PreviewAlphaFromLuminance));
 
             return flame;
         }
@@ -900,10 +911,12 @@ float4 MainPS(
     // Alpha does not control the hardware blend in that mode, therefore it
     // has already been multiplied into RGB above.
 
+    float previewAlpha = saturate(max(finalColor.r, max(finalColor.g, finalColor.b)));
+
     return
         float4(
             finalColor,
-            1.0);
+            lerp(1.0, previewAlpha, saturate(PreviewAlphaFromLuminance)));
 }
 
 

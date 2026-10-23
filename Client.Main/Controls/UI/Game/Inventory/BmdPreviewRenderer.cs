@@ -773,7 +773,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                             bool nativeFlamberge = def.Group == 0 && def.Id == 26 &&
                                 TryRenderNativeFlambergePreview(
-                                    gd, effect, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
+                                    gd, effect, bmd, bones, world, view, projection, ResolveEffectTime(gameTime), props);
                             bool nativeWing = !nativeFlamberge && def.IsWing() &&
                                 TryRenderNativeWingPreview(
                                     gd, effect, def.Id, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
@@ -947,7 +947,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             Matrix worldViewProjection,
             Vector3 eyePosition,
             in ItemRenderProperties props,
-            float shaderTime)
+            float shaderTime,
+            bool overlayOnly = false)
         {
             var effect =
                 GraphicsManager.Instance
@@ -1050,6 +1051,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 effect.Parameters["ShadowStrength"]
                     ?.SetValue(0.0f);
 
+                // Additive preview passes must not write alpha for black texels.
+                // World/equipped item rendering keeps the shader default (0).
+                effect.Parameters["PreviewAlphaFromLuminance"]
+                    ?.SetValue(1.0f);
 
                 gd.SetVertexBuffer(vb);
                 gd.Indices = ib;
@@ -1109,13 +1114,16 @@ namespace Client.Main.Controls.UI.Game.Inventory
                         : RasterizerState.CullClockwise;
 
 
-                pass.Apply();
+                if (!overlayOnly)
+                {
+                    pass.Apply();
 
-                gd.DrawIndexedPrimitives(
-                    PrimitiveType.TriangleList,
-                    0,
-                    0,
-                    primitiveCount);
+                    gd.DrawIndexedPrimitives(
+                        PrimitiveType.TriangleList,
+                        0,
+                        0,
+                        primitiveCount);
+                }
 
 
                 // ================================================================
@@ -1320,6 +1328,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 effect.Parameters["MaterialIntensity"]
                     ?.SetValue(1.0f);
 
+                effect.Parameters["PreviewAlphaFromLuminance"]
+                    ?.SetValue(0.0f);
 
                 gd.BlendState =
                     oldBlend;
