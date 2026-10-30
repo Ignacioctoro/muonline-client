@@ -2,6 +2,12 @@ using Microsoft.Xna.Framework.Input;
 
 namespace Client.Main.Controls.UI.Common
 {
+    /// <summary>Capture overlap before any window can close or change visibility this frame.</summary>
+    public interface IUiOcclusionAware
+    {
+        void CapturePointerFrame(MouseState current, MouseState previous);
+    }
+
     /// <summary>
     /// Resolves blocking windows before controls update, so lower buttons cannot
     /// react first. Retains the owner through release, including a closing window.

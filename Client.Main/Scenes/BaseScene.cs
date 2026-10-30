@@ -199,6 +199,11 @@ namespace Client.Main.Scenes
                         ButtonState.Released);
             }
 
+            // Snapshot HUD overlap before a close button can hide its window.
+            for (int i = 0; i < Controls.Count; i++)
+                if (Controls[i] is IUiOcclusionAware observer)
+                    observer.CapturePointerFrame(MuGame.Instance.UiMouseState, MuGame.Instance.PrevUiMouseState);
+
             // Capture the blocking window before any HUD button processes this frame.
             _pointerInputBarrier.Update(this, MuGame.Instance.UiMouseState, MuGame.Instance.PrevUiMouseState);
             if (_pointerInputBarrier.HasBlocker)
