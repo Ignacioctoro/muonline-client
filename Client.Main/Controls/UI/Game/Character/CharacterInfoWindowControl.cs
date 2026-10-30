@@ -296,11 +296,16 @@ namespace Client.Main.Controls.UI.Game.Character
                     _statIncreaseButtonTexture == null ? "+" : null);
             }
 
-            // Keep the Season 6 Quest shortcut connected to the shared journal.
+            // Connect the native character shortcuts to their shared windows.
             Rectangle buttonNormal = s_attributeBandSource;
             _petButton = CreateButton(new Rectangle(23, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
-                () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "PETS");
+                () =>
+                {
+                    Scene?.SetMouseInputConsumed();
+                    Client.Main.Controls.UI.Game.PetInfoControl.Instance.ShowWindow();
+                    SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+                }, "PETS");
             _skillsButton = CreateButton(new Rectangle(127, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
                 () =>
@@ -485,6 +490,13 @@ namespace Client.Main.Controls.UI.Game.Character
             }
 
             base.Update(gameTime);
+            if (Scene?.IsPointerInputBlockedFor(this) == true)
+            {
+                _pressedButtonIndex = _hoveredButtonIndex = -1;
+                _isDragging = false;
+                UpdateDisplayData();
+                return;
+            }
 
             _clickFlashSeconds = Math.Max(0d, _clickFlashSeconds - gameTime.ElapsedGameTime.TotalSeconds);
             if (!HandleWindowDrag())

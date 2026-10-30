@@ -40,13 +40,15 @@ namespace Client.Main.Controls.UI.Game
             bool covered = false;
             if (Parent != null)
             {
+                // Hidden controls do not run their normal layout update.
+                AlignControl();
                 bool aboveLauncher = false;
                 var bounds = DisplayRectangle;
                 for (int i = 0; i < Parent.Controls.Count; i++)
                 {
                     var control = Parent.Controls[i];
                     if (ReferenceEquals(control, this)) { aboveLauncher = true; continue; }
-                    if (aboveLauncher && control.Visible && (control.Interactive || control.BlocksPointerInput) &&
+                    if (aboveLauncher && control.Visible && IsOccludingMenu(control) &&
                         control.DisplayRectangle.Intersects(bounds))
                     {
                         covered = true;
@@ -58,12 +60,26 @@ namespace Client.Main.Controls.UI.Game
                 previous.LeftButton == ButtonState.Pressed);
         }
 
+        private static bool IsOccludingMenu(GameControl control)
+        {
+            // HUD indicators/launchers are not windows, even if they own pointer input.
+            if (control is Party.PartyMatchingLauncher or Hud.PetStatusHudControl)
+                return false;
+            return control.BlocksPointerInput ||
+                control is InventoryControl or Character.CharacterInfoWindowControl or
+                    NpcShopControl or MoveCommandWindow or PetTrainerControl or
+                    PauseMenu.PauseMenuControl or Skills.SkillSelectionPanel or
+                    Map.MapListControl or DevilSquareEnterControl or BloodCastleEnterControl or
+                    BloodCastleTimeControl or BloodCastleResultControl or DialogControl;
+        }
+
         public override void Update(GameTime time)
         {
             bool enabled = Constants.SHOW_MOBILE_CONTROLS;
             bool inventoryOpen = InventoryControl.Instance.Visible;
             bool paused = (Scene as GameScene)?.PauseMenu?.Visible == true;
-            Visible = enabled && !inventoryOpen && !paused && !_occlusion.IsSuppressed;
+            Visible = enabled && !inventoryOpen && !paused;
+            Interactive = !_occlusion.IsSuppressed;
             Alpha = Constants.MOBILE_CONTROLS_OPACITY;
             _label.Alpha = Alpha;
             if ((!enabled || inventoryOpen) && (Scene as GameScene)?.CommandWindow?.Visible == true)
