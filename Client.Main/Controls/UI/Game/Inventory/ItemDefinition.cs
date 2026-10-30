@@ -11,7 +11,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public int Width { get; set; }  // Width in slots
         public int Height { get; set; } // Height in slots
         public string TexturePath { get; set; } // Path to the item's texture/model
-        // Compatibility packs use a cluster of this single-jewel model when item.bmd omits the pack.
+        // Packed jewels share the individual jewel model; quantity is drawn separately.
         public ItemDefinition PackedJewelPreviewSource { get; set; }
 
         // Season 6 item families have distinct inventory rendering rules.
@@ -22,6 +22,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 (Id >= 36 && Id <= 43) ||
                 Id == 49 || Id == 50 ||
                 (Id >= 130 && Id <= 135));
+
+        public bool IsPackedJewel() => Group == 12 && (Id is 30 or 31 || Id is >= 136 and <= 143);
 
         public bool IsSocketSeed() => Group == 12 && Id >= 60 && Id <= 65;
         public bool IsSocketSphere() => Group == 12 && Id >= 70 && Id <= 74;

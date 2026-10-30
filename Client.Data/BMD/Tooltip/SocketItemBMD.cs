@@ -6,8 +6,8 @@ namespace Client.Data.BMD.Tooltip
     /// The file contains three groups of 50 records:
     ///
     /// 0..49   = seed/socket options
-    /// 50..99  = socket set/bonus entries
-    /// 100..149 = socket bonus entries
+    /// 50..99  = individual item bonus entries
+    /// 100..149 = equipment socket package entries
     ///
     /// Each physical record is 168 bytes.
     /// </summary>

@@ -31,6 +31,24 @@ public class InventoryItem
         Details = ItemDatabase.ParseItemDetails(RawData);
     }
 
+    // Lahap packs encode 10/20/30 pieces in level, not durability.
+    public int DisplayQuantity
+    {
+        get
+        {
+            if (Definition.IsPackedJewel())
+            {
+                int level = RawData.Length > 0 ? Details.Level : Level;
+                return level is >= 0 and <= 2 ? (level + 1) * 10 : 0;
+            }
+
+            return Definition.BaseDurability == 0 && Definition.MagicDurability == 0 && Durability > 1
+                ? Durability : 0;
+        }
+    }
+
+    public bool ShowLevelBadge => !Definition.IsPackedJewel() && Details.Level > 0;
+
     public Rectangle GetBounds() => new(GridPosition.X, GridPosition.Y,
                                         Definition.Width, Definition.Height);
 }

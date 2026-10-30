@@ -253,7 +253,15 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private readonly List<InventoryTextEntry> _texts = new();
         private InventoryTextEntry _titleText;
-        private InventoryTextEntry _subtitleText;
+        private InventoryTextEntry _setOptionText;
+        private InventoryTextEntry _socketOptionText;
+        private int _hoveredEquipmentSummary;
+        private int _pinnedEquipmentSummary;
+        private readonly InventoryItem[] _summaryEquipment = new InventoryItem[12];
+        private readonly int[] _summaryDurability = new int[12];
+        private List<(string text, Color color)> _setSummaryLines;
+        private List<(string text, Color color)> _socketSummaryLines;
+        private bool _summarySocketDataLoaded;
         private InventoryTextEntry _zenText;
         private InventoryTextEntry _wCoinText;
 
@@ -895,6 +903,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             Visible = false;
+            _pinnedEquipmentSummary = 0;
+            _hoveredEquipmentSummary = 0;
             if (Scene?.FocusControl == this)
             {
                 Scene.FocusControl = null;
@@ -1193,12 +1203,14 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 TextAlignment.Center);
             _titleText.Text = "Inventory";
 
-            _subtitleText = CreateText(
-                new Vector2(WINDOW_WIDTH / 2f, HEADER_HEIGHT - 18f),
-                9.5f,
-                new Color(170, 170, 170),
-                TextAlignment.Center);
-            _subtitleText.Text = "[Set option]   [Socket option]";
+            _setOptionText = CreateText(
+                new Vector2(WINDOW_WIDTH / 2f - 6, HEADER_HEIGHT - 18f),
+                9.5f, Theme.TextGray, TextAlignment.Right);
+            _setOptionText.Text = "[Set items]";
+            _socketOptionText = CreateText(
+                new Vector2(WINDOW_WIDTH / 2f + 6, HEADER_HEIGHT - 18f),
+                9.5f, Theme.TextGray, TextAlignment.Left);
+            _socketOptionText.Text = "[Socket items]";
 
             _zenText = CreateText(
                 new Vector2(
@@ -2334,11 +2346,61 @@ namespace Client.Main.Controls.UI.Game.Inventory
             _storeButtonHovered = storeRect.Contains(mousePos);
             _extendedButtonHovered = extendedRect.Contains(mousePos);
             _repairButtonHovered = repairRect.Contains(mousePos);
+            _hoveredEquipmentSummary = GetTextBounds(_setOptionText).Contains(mousePos) ? 1
+                : GetTextBounds(_socketOptionText).Contains(mousePos) ? 2 : 0;
+            int selected = _hoveredEquipmentSummary != 0 ? _hoveredEquipmentSummary : _pinnedEquipmentSummary;
+            _setOptionText.Color = selected == 1 ? Color.Yellow : Theme.TextGray;
+            _socketOptionText.Color = selected == 2 ? Color.Yellow : Theme.TextGray;
+        }
+
+        private Rectangle GetTextBounds(InventoryTextEntry entry)
+        {
+            if (_font == null || entry == null) return Rectangle.Empty;
+            Vector2 size = _font.MeasureString(entry.Text) * entry.FontScale * Scale;
+            Vector2 position = DisplayRectangle.Location.ToVector2() + entry.BasePosition * Scale;
+            if (entry.Alignment == TextAlignment.Right) position.X -= size.X;
+            else if (entry.Alignment == TextAlignment.Center) position.X -= size.X * 0.5f;
+            var bounds = new Rectangle((int)position.X, (int)position.Y,
+                (int)MathF.Ceiling(size.X), (int)MathF.Ceiling(size.Y));
+            bounds.Inflate(3, 3);
+            return bounds;
+        }
+
+        private bool DrawEquipmentSummary(SpriteBatch spriteBatch)
+        {
+            int selected = _hoveredEquipmentSummary != 0 ? _hoveredEquipmentSummary : _pinnedEquipmentSummary;
+            if (selected == 0 || _isDragging) return false;
+            bool changed = _setSummaryLines == null || _summarySocketDataLoaded != ItemTooltipDataRepository.IsLoaded;
+            for (byte slot = 0; slot < 12; slot++)
+            {
+                _equippedItems.TryGetValue(slot, out var item);
+                int durability = item?.Durability ?? 0;
+                changed |= !ReferenceEquals(_summaryEquipment[slot], item) || _summaryDurability[slot] != durability;
+                _summaryEquipment[slot] = item;
+                _summaryDurability[slot] = durability;
+            }
+            if (changed)
+            {
+                _setSummaryLines = ClassicItemTooltipBuilder.BuildEquipmentSetSummary(_equippedItems);
+                _socketSummaryLines = ClassicItemTooltipBuilder.BuildEquipmentSocketSummary(_equippedItems);
+                _summarySocketDataLoaded = ItemTooltipDataRepository.IsLoaded;
+            }
+            var anchor = GetTextBounds(selected == 1 ? _setOptionText : _socketOptionText);
+            ClassicItemTooltipRenderer.DrawSummary(spriteBatch, _font,
+                selected == 1 ? _setSummaryLines : _socketSummaryLines, anchor, MuGame.Instance.UiMouseState.Position);
+            return true;
         }
 
 
         private bool HandleChromeClick()
         {
+            if (_hoveredEquipmentSummary != 0 && _pickedItemRenderer.Item == null && ExtendedInventoryControl.PickedItem == null)
+            {
+                // Clicking also supports touch: keep the summary open until the next tap elsewhere.
+                _pinnedEquipmentSummary = _pinnedEquipmentSummary == _hoveredEquipmentSummary ? 0 : _hoveredEquipmentSummary;
+                return true;
+            }
+            _pinnedEquipmentSummary = 0;
             if (_closeHovered)
             {
                 Hide();
@@ -3072,14 +3134,14 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             string name = item.Definition?.Name ?? ItemDatabase.GetItemName(item.RawData) ?? "item";
-            if (item.Details.Level > 0)
+            if (item.ShowLevelBadge)
             {
                 name += $" +{item.Details.Level}";
             }
 
-            if (item.Definition?.BaseDurability == 0 && item.Definition.MagicDurability == 0 && item.Durability > 1)
+            if (item.DisplayQuantity > 1)
             {
-                name += $" x{item.Durability}";
+                name += $" x{item.DisplayQuantity}";
             }
 
             return name;
@@ -3267,13 +3329,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 }
 
                 // Stack count
-                if (item.Definition.BaseDurability == 0 && item.Definition.MagicDurability == 0 && item.Durability > 1)
+                if (item.DisplayQuantity > 1)
                 {
-                    ItemGridRenderHelper.DrawItemStackCount(spriteBatch, font, itemRect, item.Durability, Theme.TextGold, 1f);
+                    ItemGridRenderHelper.DrawItemStackCount(spriteBatch, font, itemRect, item.DisplayQuantity, Theme.TextGold, 1f);
                 }
 
                 // Level indicator
-                if (item.Details.Level > 0)
+                if (item.ShowLevelBadge)
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, itemRect, item.Details.Level,
                                        lvl => lvl >= 9 ? Theme.Danger :
@@ -3638,7 +3700,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         private void DrawTooltip(SpriteBatch spriteBatch)
         {
-            if (_pickedItem_renderer_item() != null || ExtendedInventoryControl.PickedItem != null || _hoveredItem == null || _font == null)
+            if (_pickedItem_renderer_item() != null || ExtendedInventoryControl.PickedItem != null || _font == null)
+                return;
+            if (DrawEquipmentSummary(spriteBatch) || _hoveredItem == null)
                 return;
 
             Client.Main.Core.Client.PetInfoSnapshot? petInfo = null;

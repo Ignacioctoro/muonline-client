@@ -176,12 +176,19 @@ namespace Client.Main.Core.Utilities
                 (139,14,41), (140,14,42), (141,12,15), (142,14,43), (143,14,44)
             })
             {
-                if (definitions.ContainsKey((12, pack)) || !definitions.TryGetValue((group, single), out var source)) continue;
-                definitions.Add((12, pack), new ItemDefinition(pack, $"Packed {source.Name}", 1, 1, source.TexturePath)
+                if (!definitions.TryGetValue((group, single), out var source)) continue;
+                if (!definitions.TryGetValue((12, pack), out var definition))
                 {
-                    Group = 12, EquipmentSlot = -1, BaseDurability = 1,
-                    PackedJewelPreviewSource = source
-                });
+                    definition = new ItemDefinition(pack, $"Packed {source.Name}", 1, 1, source.TexturePath)
+                    {
+                        Group = 12, EquipmentSlot = -1, BaseDurability = 1
+                    };
+                    definitions.Add((12, pack), definition);
+                }
+
+                // Apply the same presentation even when item.bmd defines the pack.
+                definition.TexturePath = source.TexturePath;
+                definition.PackedJewelPreviewSource = source;
             }
         }
 

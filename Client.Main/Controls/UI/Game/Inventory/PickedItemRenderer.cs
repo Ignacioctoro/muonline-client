@@ -113,9 +113,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             // Draw quantity for stackable items (BaseDurability = 0 and MagicDurability = 0 means it's stackable)
-            if (Item.Definition.BaseDurability == 0 && Item.Definition.MagicDurability == 0 && Item.Durability > 1 && _font != null)
+            if (Item.DisplayQuantity > 1 && _font != null)
             {
-                string quantityText = Item.Durability.ToString();
+                string quantityText = Item.DisplayQuantity.ToString();
                 Vector2 textSize = _font.MeasureString(quantityText);
                 float textScale = 0.4f; // Small text
                 Vector2 scaledTextSize = textSize * textScale;

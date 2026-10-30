@@ -24,7 +24,7 @@ namespace Client.Main.Core.Items.Tooltips
     /// Wings, Ancient and miscellaneous items currently fall back to
     /// ItemUiHelper.BuildTooltipLines.
     /// </summary>
-    public static class ClassicItemTooltipBuilder
+    public static partial class ClassicItemTooltipBuilder
     {   
         private static readonly HashSet<string>
         s_loggedMiscTooltipLines =
@@ -159,6 +159,13 @@ namespace Client.Main.Core.Items.Tooltips
 
             var def = item.Definition;
             var details = item.Details;
+            if (def.IsPackedJewel())
+            {
+                var packLines = new List<(string text, Color color)> { (def.Name, ResolveMuColor(0)) };
+                if (item.DisplayQuantity > 0)
+                    packLines.Add(($"Quantity: {item.DisplayQuantity}", ResolveMuColor(1)));
+                return packLines;
+            }
             if (SpiritItemInfo.IsSpirit(def)) return SpiritItemInfo.BuildTooltip(item);
 
             // Season 6 renders socket Seeds and Spheres through SocketItemMgr,
@@ -2001,6 +2008,10 @@ namespace Client.Main.Core.Items.Tooltips
             GetAncientSetName(
                 InventoryItem item)
         {
+            var openMuSet = EquipmentBonusCalculator.FindAncientSet(item);
+            if (openMuSet != null)
+                return openMuSet.Name;
+
             var details =
                 item.Details;
 
@@ -2297,6 +2308,13 @@ namespace Client.Main.Core.Items.Tooltips
             List<(string text, Color color)> lines,
             InventoryItem item)
         {
+            var openMuSet = EquipmentBonusCalculator.FindAncientSet(item);
+            if (openMuSet != null)
+            {
+                AppendOpenMuAncientOptions(lines, item, openMuSet);
+                return;
+            }
+
             var setOption =
                 GetAncientSetOption(
                     item);

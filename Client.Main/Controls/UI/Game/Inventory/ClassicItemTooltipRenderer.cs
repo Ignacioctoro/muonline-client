@@ -25,7 +25,20 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public static void Draw(SpriteBatch spriteBatch, SpriteFont font, InventoryItem item,
             List<(string text, Color color)> lines, Rectangle itemRect, Point mousePosition)
         {
-            if (spriteBatch == null || font == null || item == null || lines == null || lines.Count == 0)
+            if (item == null) return;
+            DrawCore(spriteBatch, font, item, lines, itemRect, mousePosition, false);
+        }
+
+        public static void DrawSummary(SpriteBatch spriteBatch, SpriteFont font,
+            List<(string text, Color color)> lines, Rectangle anchor, Point mousePosition)
+        {
+            DrawCore(spriteBatch, font, null, lines, anchor, mousePosition, true);
+        }
+
+        private static void DrawCore(SpriteBatch spriteBatch, SpriteFont font, InventoryItem item,
+            List<(string text, Color color)> lines, Rectangle itemRect, Point mousePosition, bool summary)
+        {
+            if (spriteBatch == null || font == null || lines == null || lines.Count == 0)
                 return;
 
             const float titleScale = 0.44f;
@@ -62,7 +75,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             // Add separator after the first line
-            totalHeight += 6;
+            if (!summary) totalHeight += 6;
 
             int tooltipWidth = maxWidth + paddingX * 2;
             int tooltipHeight = totalHeight + paddingY * 2;
@@ -70,7 +83,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
             Rectangle hoveredItemRect = itemRect;
 
             // Tooltip positioning
-            Rectangle tooltipRect = new(mousePosition.X + 16, mousePosition.Y + 16, tooltipWidth, tooltipHeight);
+            Rectangle tooltipRect = summary
+                ? new(itemRect.Center.X - tooltipWidth / 2, itemRect.Bottom + 6, tooltipWidth, tooltipHeight)
+                : new(mousePosition.X + 16, mousePosition.Y + 16, tooltipWidth, tooltipHeight);
             Rectangle screenBounds = new(0, 0, UiScaler.VirtualSize.X, UiScaler.VirtualSize.Y);
 
             // Avoid overlapping the item
@@ -111,7 +126,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
             spriteBatch.Draw(pixel, shadowRect, Color.Black * 0.5f);
 
             // Main background
-            UiDrawHelper.DrawVerticalGradient(spriteBatch, tooltipRect, new Color(20, 24, 32, 252), new Color(12, 14, 18, 254));
+            if (summary)
+                spriteBatch.Draw(pixel, tooltipRect, new Color(0, 0, 0, 205));
+            else
+                UiDrawHelper.DrawVerticalGradient(spriteBatch, tooltipRect, new Color(20, 24, 32, 252), new Color(12, 14, 18, 254));
 
             // =========================================================
             // ANCIENT ITEM NAME BACKGROUND
@@ -121,7 +139,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // =========================================================
 
             bool isAncient =
-                item.Details.IsAncient;
+                item != null && item.Details.IsAncient;
 
             if (isAncient &&
                 lines.Count > 0)
@@ -164,24 +182,28 @@ namespace Client.Main.Controls.UI.Game.Inventory
             // - Destroy / Protect / Illusion use the Fenrir title blue.
             // - Fenrir must not inherit the generic Excellent border.
             bool isExcellent =
-                item.Details.IsExcellent;
+                item != null && item.Details.IsExcellent;
 
             bool isHighLevel =
-                item.Details.Level >= 7;
+                item != null && item.Details.Level >= 7;
 
             bool isFenrir =
-                item.Definition != null &&
+                item?.Definition != null &&
                 item.Definition.Group == 13 &&
                 item.Definition.Id == 37;
 
             byte fenrirVariant =
                 (byte)(
-                    item.Details.FenrirFlags &
+                    (item == null ? 0 : item.Details.FenrirFlags) &
                     0x3F);
 
             Color borderColor;
 
-            if (isFenrir)
+            if (summary)
+            {
+                borderColor = new Color(100, 100, 100, 160);
+            }
+            else if (isFenrir)
             {
                 borderColor =
                     fenrirVariant == 0x00
@@ -200,7 +222,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             // Uniform border all around
-            const int borderThickness = 2;
+            int borderThickness = summary ? 1 : 2;
             spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X, tooltipRect.Y, tooltipRect.Width, borderThickness), borderColor);
             spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X, tooltipRect.Bottom - borderThickness, tooltipRect.Width, borderThickness), borderColor);
             spriteBatch.Draw(pixel, new Rectangle(tooltipRect.X, tooltipRect.Y, borderThickness, tooltipRect.Height), borderColor);
@@ -259,7 +281,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 // independently from its border (the red Fenrir border
                 // is white, while its title is still blue).
                 Color lineColor =
-                    isFirstLine && !isFenrir
+                    isFirstLine && !isFenrir && !summary
                         ? borderColor
                         : color;
 
@@ -281,7 +303,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     lineSpacing;
 
                 // Separator after item name
-                if (isFirstLine)
+                if (isFirstLine && !summary)
                 {
                     textY += 2;
 

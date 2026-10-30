@@ -1296,9 +1296,8 @@ namespace Client.Main.Controls.UI.Game
                     ItemGridRenderHelper.DrawItemPlaceholder(sprite, pixel, _font, rect,
                         item, new Color(39, 34, 32, 225), new Color(225, 213, 196));
 
-                if (_font != null && item.Definition.BaseDurability == 0 &&
-                    item.Definition.MagicDurability == 0 && item.Durability > 1)
-                    ItemGridRenderHelper.DrawItemStackCount(sprite, _font, rect, item.Durability,
+                if (_font != null && item.DisplayQuantity > 1)
+                    ItemGridRenderHelper.DrawItemStackCount(sprite, _font, rect, item.DisplayQuantity,
                         new Color(240, 210, 140), Alpha);
 
             }

@@ -331,8 +331,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     var texture = Preview(pair.Value, rect, pair.Key == _hoveredSlot);
                     if (texture != null) gm.Sprite.Draw(texture, rect, Color.White);
                     else ItemGridRenderHelper.DrawItemPlaceholder(gm.Sprite, gm.Pixel, _font, rect, pair.Value, new Color(25, 23, 23), Color.Gray);
-                    if (pair.Value.Definition.BaseDurability == 0 && pair.Value.Definition.MagicDurability == 0 && pair.Value.Durability > 1)
-                        ItemGridRenderHelper.DrawItemStackCount(gm.Sprite, _font, rect, pair.Value.Durability, Color.Gold, 1);
+                    if (pair.Value.DisplayQuantity > 1)
+                        ItemGridRenderHelper.DrawItemStackCount(gm.Sprite, _font, rect, pair.Value.DisplayQuantity, Color.Gold, 1);
                 }
                 if (_hoveredSlot is byte hovered && _items.TryGetValue(hovered, out var item))
                 {

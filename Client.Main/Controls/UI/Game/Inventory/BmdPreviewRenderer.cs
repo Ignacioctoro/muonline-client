@@ -755,43 +755,38 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                     try
                     {
-                        int copies = def.PackedJewelPreviewSource == null ? 1 : 3;
-                        for (int copy = 0; copy < copies; copy++)
+                        // One jewel for packs, just like an individual jewel.
+                        effect.World = world;
+
+                        // On seed spheres mesh 1 is the plain sphere shell;
+                        // the other meshes get their element-specific color.
+                        if (isSeedSphere && bmd.Meshes.Length > 1)
                         {
-                            // Render a recognizable bundle using the actual jewel BMD.
-                            effect.World = copies == 1 ? world : world * Matrix.CreateScale(0.55f) *
-                                Matrix.CreateTranslation(copy == 0 ? -3.4f : copy == 1 ? 3.4f : 0f, copy == 2 ? 3.4f : -2.5f, 0f);
+                            effect.DiffuseColor = Vector3.One;
+                            effect.EmissiveColor = Vector3.Zero;
+                            RenderMeshWithBlendState(gd, effect, bmd, 1, bones);
+                        }
 
-                            // On seed spheres mesh 1 is the plain sphere shell;
-                            // the other meshes get their element-specific color.
-                            if (isSeedSphere && bmd.Meshes.Length > 1)
-                            {
-                                effect.DiffuseColor = Vector3.One;
-                                effect.EmissiveColor = Vector3.Zero;
-                                RenderMeshWithBlendState(gd, effect, bmd, 1, bones);
-                            }
+                        bool nativeFlamberge = def.Group == 0 && def.Id == 26 &&
+                            TryRenderNativeFlambergePreview(
+                                gd, effect, bmd, bones, world, view, projection, ResolveEffectTime(gameTime), props);
+                        bool nativeWing = !nativeFlamberge && def.IsWing() &&
+                            TryRenderNativeWingPreview(
+                                gd, effect, def.Id, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
+                        if (!nativeFlamberge && !nativeWing)
+                        foreach (int meshIdx in meshOrder)
+                        {
+                            if (isSeedSphere && bmd.Meshes.Length > 1 && meshIdx == 1)
+                                continue;
 
-                            bool nativeFlamberge = def.Group == 0 && def.Id == 26 &&
-                                TryRenderNativeFlambergePreview(
-                                    gd, effect, bmd, bones, world, view, projection, ResolveEffectTime(gameTime), props);
-                            bool nativeWing = !nativeFlamberge && def.IsWing() &&
-                                TryRenderNativeWingPreview(
-                                    gd, effect, def.Id, bmd, bones, world, view, projection, ResolveEffectTime(gameTime));
-                            if (!nativeFlamberge && !nativeWing)
-                            foreach (int meshIdx in meshOrder)
-                            {
-                                if (isSeedSphere && bmd.Meshes.Length > 1 && meshIdx == 1)
-                                    continue;
-
-                                bool tint = isSeed || isSeedSphere;
-                                effect.DiffuseColor = tint ? socketColor : oldDiffuse;
-                                effect.EmissiveColor = tint ? socketColor * 0.15f : oldEmissive;
-                                // The opaque sword meshes keep their original dark metal.
-                                // Its bright meshes (and Angel) use black-keyed previews.
-                                bool cutoutMesh = useCutout &&
-                                    (def.Group == 13 || (meshIdx != 0 && meshIdx != 2));
-                                RenderMeshWithBlendState(gd, effect, bmd, meshIdx, bones, cutoutMesh);
-                            }
+                            bool tint = isSeed || isSeedSphere;
+                            effect.DiffuseColor = tint ? socketColor : oldDiffuse;
+                            effect.EmissiveColor = tint ? socketColor * 0.15f : oldEmissive;
+                            // The opaque sword meshes keep their original dark metal.
+                            // Its bright meshes (and Angel) use black-keyed previews.
+                            bool cutoutMesh = useCutout &&
+                                (def.Group == 13 || (meshIdx != 0 && meshIdx != 2));
+                            RenderMeshWithBlendState(gd, effect, bmd, meshIdx, bones, cutoutMesh);
                         }
                     }
                     finally
