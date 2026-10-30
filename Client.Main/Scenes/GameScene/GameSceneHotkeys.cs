@@ -146,7 +146,7 @@ namespace Client.Main.Scenes
         }
 
         private static bool WhenEscapeNotConsumed(HotkeyContext context)
-            => !context.Scene.IsKeyboardEscapeConsumedThisFrame && !PetTrainerControl.IsOpen;
+            => !context.Scene.IsKeyboardEscapeConsumedThisFrame && !PetTrainerControl.IsOpen && !PetInfoControl.IsOpen;
 
         private static bool WhenMoveCommandFocused(HotkeyContext context)
         {
@@ -179,6 +179,7 @@ namespace Client.Main.Scenes
             hotkeys.OnKeyPressed(Keys.F, _ => _scene.FriendsWindow?.Toggle(), when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.P, _ => _scene.PartyMatchingWindow?.Toggle(), when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.T, _ => Client.Main.Controls.UI.Game.Quest.MyQuestsControl.Instance.Toggle(), when: WhenNotUiInput);
+            hotkeys.OnKeyPressed(Keys.Y, _ => PetInfoControl.Instance.Toggle(), when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.I, ToggleInventory, when: WhenNotUiInput);
             hotkeys.OnKeyPressed(Keys.V, ToggleInventory, when: WhenNotUiInput);
             // S is only a shop shortcut while Inventory is open; otherwise it

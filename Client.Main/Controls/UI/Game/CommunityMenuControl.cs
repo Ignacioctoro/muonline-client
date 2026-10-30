@@ -25,12 +25,13 @@ namespace Client.Main.Controls.UI.Game
         {
             int rowHeight = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? 44 : 18;
             AutoViewSize = false;
-            ViewSize = ControlSize = new Point(145, 29 + rowHeight * 3);
+            ViewSize = ControlSize = new Point(145, 29 + rowHeight * 4);
             Interactive = true;
             Visible = false;
             AddEntry("F", "Amigos", 0, rowHeight, game => game.FriendsWindow?.Toggle());
             AddEntry("G", "Guild", 1, rowHeight, game => game.OpenGuildMenu());
             AddEntry("P", "Party", 2, rowHeight, game => game.PartyMatchingWindow?.Toggle());
+            AddEntry("Y", "Pets", 3, rowHeight, _ => PetInfoControl.Instance.Toggle());
         }
 
         private void AddEntry(string key, string text, int index, int height, Action<GameScene> action)

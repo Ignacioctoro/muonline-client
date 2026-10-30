@@ -177,6 +177,25 @@ namespace Client.Main.Core.Client
         // Inventory and Money
         private readonly ConcurrentDictionary<byte, byte[]> _inventoryItems = new();
         private readonly ConcurrentDictionary<byte, PetInfoSnapshot> _petInfoBySlot = new();
+        private volatile int _ravenCommandMode = -1;
+        private int _ravenCommandRevision;
+        public byte? RavenCommandMode
+        {
+            get
+            {
+                int mode = _ravenCommandMode;
+                return mode >= 0 ? (byte)mode : null;
+            }
+        }
+        public int RavenCommandRevision => System.Threading.Volatile.Read(ref _ravenCommandRevision);
+
+        public void UpdateRavenCommandMode(byte mode)
+        {
+            if (mode > 3 || !HasEquippedDarkRaven) return;
+            _ravenCommandMode = mode;
+            System.Threading.Interlocked.Increment(ref _ravenCommandRevision);
+        }
+
 
         public void UpdatePetInfo(byte slot, byte petType, byte level,
             uint experience, byte health)
@@ -1569,6 +1588,7 @@ namespace Client.Main.Core.Client
         {
             _inventoryItems.Clear();
             _petInfoBySlot.Clear();
+            _ravenCommandMode = -1;
             InventoryChanged?.Invoke();
             _logger.LogDebug("Inventory cleared.");
         }
@@ -1578,6 +1598,7 @@ namespace Client.Main.Core.Client
         /// </summary>
         public void AddOrUpdateInventoryItem(byte slot, byte[] itemData)
         {
+            if (slot == 1) _ravenCommandMode = -1;
             _petInfoBySlot.TryRemove(slot, out _);
             _inventoryItems[slot] = itemData;
             InventoryChanged?.Invoke();
@@ -1601,6 +1622,7 @@ namespace Client.Main.Core.Client
         /// </summary>
         public void RemoveInventoryItem(byte slot)
         {
+            if (slot == 1) _ravenCommandMode = -1;
             bool removed = _inventoryItems.TryRemove(slot, out _);
             _petInfoBySlot.TryRemove(slot, out _);
             if (removed)

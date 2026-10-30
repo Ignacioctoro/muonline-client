@@ -42,6 +42,18 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         // ─────────────────────── Packet Handlers ────────────────────────
 
         /// <summary>
+        /// OpenMU A7 acknowledgement of the current Dark Raven command.
+        /// </summary>
+        [PacketHandler(0xA7, PacketRouter.NoSubCode)]
+        public Task HandlePetModeAsync(Memory<byte> packet)
+        {
+            var data = packet.Span;
+            if (data.Length == 7 && data[0] == 0xC1 && data[1] == 7 && data[3] == 0 && data[4] <= 3)
+                _characterState.UpdateRavenCommandMode(data[4]);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// OpenMU C1 0D A9 PetInfoResponse. Storage 254 is sent on level up.
         /// </summary>
         [PacketHandler(0xA9, PacketRouter.NoSubCode)]

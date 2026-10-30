@@ -54,6 +54,17 @@ namespace Client.Main.Scenes
         public CommandWindowControl CommandWindow { get; private set; }
         internal void BeginPlayerCommand(PlayerCommand action) => _playerMenuController?.BeginCommand(action);
         internal void CancelPlayerCommand() => _playerMenuController?.CancelCommand();
+
+        internal bool SelectPetTargetCommand()
+        {
+            var state = MuGame.Network?.GetCharacterState();
+            if (state?.HasEquippedDarkRaven != true || _skillQuickSlot == null) return false;
+            _skillQuickSlot.SelectSkill(new Client.Main.Core.Client.SkillEntryState
+                { SkillId = DarkRavenCommands.AttackTarget });
+            ChatLog?.AddMessage("System", "Dark Raven: select a target and use the skill attack.", Models.MessageType.System);
+            return true;
+        }
+
         private MoveCommandWindow _moveCommandWindow;
         public MoveCommandWindow MoveCommandWindow => _moveCommandWindow;
         private ChatInputBoxControl _chatInput;
@@ -1125,6 +1136,8 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(VaultControl.Instance))
                     return true;
 
+                if (IsWindowCovering(PetInfoControl.Instance)) return true;
+
                 if (IsWindowCovering(LahapControl.Instance))
                     return true;
 
@@ -1289,6 +1302,7 @@ namespace Client.Main.Scenes
             Controls.Add(PersonalStoreBuyerControl.Instance);
             Controls.Add(PetTrainerControl.Instance);
             Controls.Add(LahapControl.Instance);
+            Controls.Add(PetInfoControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
@@ -3181,6 +3195,7 @@ namespace Client.Main.Scenes
 
             PetTrainerControl.Instance.HideWithoutServerRequest();
             LahapControl.Instance.HideWithoutServerRequest();
+            PetInfoControl.Instance.HideWindow();
 
             base.Dispose();
         }

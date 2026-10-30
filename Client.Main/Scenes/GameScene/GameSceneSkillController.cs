@@ -251,7 +251,15 @@ namespace Client.Main.Scenes
             }
 
             if (DarkRavenCommands.IsCommandSkill(skill.SkillId))
-                return false;
+            {
+                if (target == null || target.IsDead || target.World != _scene.World || hero.DarkRaven?.IsEquipped != true)
+                    return false;
+                byte mode = DarkRavenCommands.ToMode(skill.SkillId);
+                _ = MuGame.Network.GetCharacterService().SendDarkRavenCommandAsync(mode,
+                    mode == 3 ? target.NetworkId : (ushort)0xFFFF);
+                _scene.SetMouseInputConsumed();
+                return true;
+            }
 
             // Self / friendly buffs must never require the monster
             // which happened to be selected when the player pressed

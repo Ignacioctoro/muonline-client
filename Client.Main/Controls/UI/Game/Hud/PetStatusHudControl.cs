@@ -50,6 +50,8 @@ namespace Client.Main.Controls.UI.Game.Hud
         private static readonly int BarOffsetX = Scale(4);
         private static readonly int BarOffsetY = Scale(16);
 
+        public override bool BlocksPointerInput => _entryCount > 0;
+
         private readonly CharacterState _state;
         private readonly PetEntry[] _entries = new PetEntry[2];
         private int _entryCount;
@@ -60,7 +62,7 @@ namespace Client.Main.Controls.UI.Game.Hud
         {
             _state = state ?? throw new ArgumentNullException(nameof(state));
             Name = "PetStatusHud";
-            Interactive = false;
+            Interactive = true;
             Visible = true;
             ControlSize = new Point(FrameWidth, FrameHeight + RowPitch);
             ViewSize = ControlSize;
@@ -95,8 +97,12 @@ namespace Client.Main.Controls.UI.Game.Hud
                         4 => "Dark Horse",
                         37 => "Fenrir",
                         64 => "Demon",
+                        65 => "Spirit of Guardian",
+                        67 => "Rudolf",
                         80 => "Panda",
-                        _ => null
+                        106 => "Unicorn",
+                        123 => "Skeleton",
+                        _ => ItemDatabase.GetItemName(helper)
                     };
 
                     if (name != null)
@@ -108,7 +114,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                         {
                             health = info.Health;
                         }
-                        _entries[_entryCount++] = new PetEntry(name, health);
+                        _entries[_entryCount++] = new PetEntry(name, health, HelperSlot);
                     }
                 }
 
@@ -121,11 +127,23 @@ namespace Client.Main.Controls.UI.Game.Hud
                     {
                         health = info.Health;
                     }
-                    _entries[_entryCount++] = new PetEntry("Dark Raven", health);
+                    _entries[_entryCount++] = new PetEntry("Dark Raven", health, RavenSlot);
                 }
             }
 
+            ViewSize = new Point(FrameWidth, Math.Max(FrameHeight, FrameHeight + (_entryCount - 1) * RowPitch));
             base.Update(gameTime);
+            var mouse = MuGame.Instance.UiMouseState;
+            if (_entryCount > 0 && DisplayRectangle.Contains(mouse.Position))
+            {
+                Scene?.SetMouseInputConsumed();
+                if (mouse.LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Pressed &&
+                    MuGame.Instance.PrevUiMouseState.LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Released)
+                {
+                    int index = (mouse.Position.Y - DisplayRectangle.Y) / RowPitch;
+                    if (index < _entryCount) PetInfoControl.Instance.ShowWindow(_entries[index].Slot);
+                }
+            }
         }
 
         public override void Draw(GameTime gameTime)
@@ -195,11 +213,13 @@ namespace Client.Main.Controls.UI.Game.Hud
         {
             public readonly string Name;
             public readonly byte Health;
+            public readonly byte Slot;
 
-            public PetEntry(string name, byte health)
+            public PetEntry(string name, byte health, byte slot)
             {
                 Name = name;
                 Health = health;
+                Slot = slot;
             }
         }
     }
