@@ -375,6 +375,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 var resp = new NpcWindowResponse(packet);
                 _lastWindow = resp.Window;
+                if (resp.Window != NpcWindowResponse.NpcWindow.Lahap)
+                    MuGame.ScheduleOnMainThread(() => LahapControl.Instance.HideWithoutServerRequest());
 
                 if (resp.Window == NpcWindowResponse.NpcWindow.Merchant || resp.Window == NpcWindowResponse.NpcWindow.Merchant1)
                 {
@@ -412,6 +414,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         var scene = MuGame.Instance?.ActiveScene as GameScene;
                         scene?.InventoryControl?.Show();
                     });
+                }
+                else if (resp.Window == NpcWindowResponse.NpcWindow.Lahap)
+                {
+                    // Open only after the server accepts the NPC conversation.
+                    MuGame.ScheduleOnMainThread(() => LahapControl.Instance.ShowWindow());
                 }
                 else if (resp.Window == NpcWindowResponse.NpcWindow.PetTrainer)
                 {

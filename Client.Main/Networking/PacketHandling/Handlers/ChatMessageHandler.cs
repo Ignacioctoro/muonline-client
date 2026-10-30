@@ -77,6 +77,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 if (serverMsg.Type == ServerMessage.MessageType.BlueNormal &&
                     !string.IsNullOrWhiteSpace(cleaned))
                 {
+                    MuGame.ScheduleOnMainThread(() =>
+                    {
+                        if (Client.Main.Controls.UI.Game.LahapControl.IsOpen)
+                            Client.Main.Controls.UI.Game.LahapControl.Instance.ReceiveServerMessage(cleaned);
+                    });
                     lock (_lastMsgLock)
                     {
                         _lastBlueSystemMessage =

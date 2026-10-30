@@ -1125,6 +1125,9 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(VaultControl.Instance))
                     return true;
 
+                if (IsWindowCovering(LahapControl.Instance))
+                    return true;
+
                 if (IsWindowCovering(ChaosMixControl.Instance))
                     return true;
 
@@ -1285,6 +1288,7 @@ namespace Client.Main.Scenes
             Controls.Add(PersonalStoreControl.Instance);
             Controls.Add(PersonalStoreBuyerControl.Instance);
             Controls.Add(PetTrainerControl.Instance);
+            Controls.Add(LahapControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
@@ -3176,6 +3180,7 @@ namespace Client.Main.Scenes
             }
 
             PetTrainerControl.Instance.HideWithoutServerRequest();
+            LahapControl.Instance.HideWithoutServerRequest();
 
             base.Dispose();
         }

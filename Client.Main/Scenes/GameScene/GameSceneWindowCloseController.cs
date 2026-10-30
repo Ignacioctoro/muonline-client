@@ -20,6 +20,8 @@ namespace Client.Main.Scenes
 
         public void OnHeroMoved(object sender, EventArgs e)
         {
+            if (LahapControl.IsOpen) LahapControl.Instance.CloseWindow();
+
             if (NpcShopControl.Instance.Visible)
             {
                 _logger?.LogInformation("Hero moved, closing NPC shop window.");
@@ -66,6 +68,8 @@ namespace Client.Main.Scenes
 
         public void OnHeroTookDamage(object sender, EventArgs e)
         {
+            if (LahapControl.IsOpen) LahapControl.Instance.CloseWindow();
+
             if (PetTrainerControl.IsOpen)
             {
                 _logger?.LogInformation("Hero moved or took damage; closing Pet Trainer dialog.");
