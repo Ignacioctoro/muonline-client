@@ -30,6 +30,7 @@ namespace Client.Main.Controls.UI.Game
         private static readonly Rectangle ButtonPressed = new(156, 0, 74, 36);
         private static readonly Color Gold = new(224, 189, 35);
         private static readonly Color Body = new(185, 185, 185);
+        private static readonly Color DialogBackground = new(30, 22, 12, 180);
 
         private enum Page { Menu, Jewels, Quantities, Bundles, Confirm, Waiting, Result }
         private readonly record struct Button(int Action, Rectangle Bounds, string Text, bool Enabled = true, bool Row = false);
@@ -437,9 +438,17 @@ namespace Client.Main.Controls.UI.Game
                     for (int x = 0; x < 3; x++)
                     {
                         var texture = _frameTiles[y * 3 + x];
-                        if (texture != null)
-                            sb.Draw(texture, new Rectangle(xs[x], ys[y], xs[x + 1] - xs[x], ys[y + 1] - ys[y]),
-                                y == 1 && x == 1 ? Color.White * 0.55f : Color.White);
+                        var target = new Rectangle(xs[x], ys[y], xs[x + 1] - xs[x], ys[y + 1] - ys[y]);
+                        if (y == 1 && x == 1)
+                        {
+                            // A black texture cannot be tinted brown by multiplication.
+                            // Draw a warm, darker backdrop while keeping the original border.
+                            sb.Draw(GraphicsManager.Instance.Pixel, target, DialogBackground);
+                        }
+                        else if (texture != null)
+                        {
+                            sb.Draw(texture, target, Color.White);
+                        }
                     }
                     if (_divider != null) sb.Draw(_divider, new Rectangle(16, 37, 268, 9), Color.White);
                 }
