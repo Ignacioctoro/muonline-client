@@ -376,6 +376,7 @@ namespace Client.Main.Networking
             }
             _logger.LogInformation("Sending select character request for: {CharacterName}", characterName);
             _selectedCharacterNameForLogin = characterName;
+            _characterState.ResetCharacterSkills();
 
             // C3 F3 03 supplies current/next EXP but no normal level.
             // Retain the authoritative level from the character-list packet.
@@ -634,6 +635,7 @@ namespace Client.Main.Networking
         {
             _logger.LogInformation(">>> ProcessLogoutResponse: Received logout response type {Type}", type);
             _characterState.IsInGame = false;
+            _characterState.ResetCharacterSkills();
             GuildInfoCache.Clear();
 
             switch (type)

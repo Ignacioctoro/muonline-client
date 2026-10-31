@@ -1733,6 +1733,18 @@ namespace Client.Main.Core.Client
         // --- Skill List Methods ---
 
         private int _skillListRevision;
+        private int _skillSessionRevision;
+        public int SkillSessionRevision => System.Threading.Volatile.Read(ref _skillSessionRevision);
+
+        /// <summary>Starts a fresh skill session before selecting another character.</summary>
+        public void ResetCharacterSkills()
+        {
+            System.Threading.Interlocked.Increment(ref _skillSessionRevision);
+            ClearSkillList();
+            LastAreaSkillId = 0;
+            LastAreaSkillSentAtMs = 0;
+        }
+
         public int SkillListRevision => System.Threading.Volatile.Read(ref _skillListRevision);
 
         public bool IsSkillSelectable(ushort skillId) =>

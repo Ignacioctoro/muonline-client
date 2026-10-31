@@ -24,6 +24,22 @@ static InventoryItem Item(int group, int number, byte level = 0, byte discrimina
         { Group = group, BaseDurability = 1 }, Point.Zero, raw.ToArray(), durability, level);
 }
 
+// Switching characters must invalidate the old learned palette and queued updates.
+var characterSkills = new Client.Main.Core.Client.CharacterState(
+    Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+characterSkills.AddOrUpdateSkill(new Client.Main.Core.Client.SkillEntryState { SkillId = 24 });
+characterSkills.LastAreaSkillId = 24;
+characterSkills.LastAreaSkillSentAtMs = 500;
+int elfSession = characterSkills.SkillSessionRevision;
+characterSkills.ResetCharacterSkills();
+Check(characterSkills.SkillSessionRevision != elfSession, "Old queued skill packets must belong to another session");
+Check(!characterSkills.GetSkills().Any(), "Elf skills must be cleared before selecting DL");
+Check(characterSkills.LastAreaSkillId == 0 && characterSkills.LastAreaSkillSentAtMs == 0,
+    "Pending area cast must not cross character sessions");
+characterSkills.AddOrUpdateSkill(new Client.Main.Core.Client.SkillEntryState { SkillId = 60 });
+Check(characterSkills.IsSkillSelectable(60) && !characterSkills.IsSkillSelectable(24),
+    "New DL palette must not inherit Elf skills");
+
 // Ammunition uses durability as quantity despite base durability 255.
 foreach (int ammoId in new[] { 7, 15 })
 {

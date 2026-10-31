@@ -973,8 +973,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             // Packet memory belongs to the network buffer. Copy before queuing,
             // then apply a complete list atomically relative to UI reconciliation.
             byte[] data = packet.ToArray();
+            int skillSession = _characterState.SkillSessionRevision;
             MuGame.ScheduleOnMainThread(() =>
             {
+                if (skillSession != _characterState.SkillSessionRevision)
+                    return;
                 try
                 {
                     byte flag = data[4];

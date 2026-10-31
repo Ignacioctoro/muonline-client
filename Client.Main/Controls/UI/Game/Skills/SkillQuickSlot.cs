@@ -47,6 +47,7 @@ namespace Client.Main.Controls.UI.Game.Skills
             0.55;
 
         private int _skillListRevision = -1;
+        private int _skillSessionRevision = -1;
         private bool _hadDarkRaven;
         private bool _trackingPress;
         private bool _longPressTriggered;
@@ -78,6 +79,7 @@ namespace Client.Main.Controls.UI.Game.Skills
             _hudAnchor = hudAnchor;
             _characterState =
                 characterState;
+            _skillSessionRevision = characterState.SkillSessionRevision;
 
             // Es importante dejarlo en false:
             // la barra clásica tendrá hijos fuera
@@ -325,6 +327,20 @@ namespace Client.Main.Controls.UI.Game.Skills
             GameTime gameTime)
         {
             UpdateHudPlacement();
+
+            int skillSession = _characterState.SkillSessionRevision;
+            if (skillSession != _skillSessionRevision)
+            {
+                // Do not inherit another character's active spell or shortcuts,
+                // even when both characters happen to know the same skill ID.
+                _skillSessionRevision = skillSession;
+                _skillListRevision = -1;
+                SelectedSkill = null;
+                _currentSkillSlot.Skill = null;
+                _classicSkillBar.SetSelectedSkill(null);
+                _classicSkillBar.Close();
+                _selectionPanel?.ResetForCharacter();
+            }
 
             // Reconcile on the UI thread after an authoritative skill update.
             int revision = _characterState.SkillListRevision;

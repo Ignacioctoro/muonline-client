@@ -709,6 +709,22 @@ namespace Client.Main.Controls.UI.Game.Skills
         // OPEN / CLOSE
         // =============================================================
 
+        public void ResetForCharacter()
+        {
+            // Clear even shared spells: bindings belong to one character.
+            for (int i = 0; i < _quickSlotSkills.Length; i++)
+                ClearQuickSlot(i);
+            _selectedSkill = null;
+            _hoveredSkill = null;
+            _allSkills.Clear();
+            _currentPage = 0;
+            _quickSlotBank = 0;
+            UpdateSkillInfo(null);
+            ClearSkillGrid();
+            RefreshQuickSlotBank();
+            Close();
+        }
+
         public void RefreshAvailableSkills(CharacterState characterState)
         {
             for (int i = 0; i < _quickSlotSkills.Length; i++)
