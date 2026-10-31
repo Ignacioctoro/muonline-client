@@ -24,6 +24,19 @@ static InventoryItem Item(int group, int number, byte level = 0, byte discrimina
         { Group = group, BaseDurability = 1 }, Point.Zero, raw.ToArray(), durability, level);
 }
 
+// Ammunition uses durability as quantity despite base durability 255.
+foreach (int ammoId in new[] { 7, 15 })
+{
+    var ammo = Item(4, ammoId, durability: 255);
+    ammo.Definition.BaseDurability = 255;
+    Check(ammo.IsAmmunition && ammo.DisplayQuantity == 255, "Full ammunition stack count");
+    ammo.Durability = 254; // Authoritative 0x2A inventory update.
+    Check(ammo.DisplayQuantity == 254, "Ammunition count follows server durability");
+    ammo.Durability = 1;
+    Check(ammo.DisplayQuantity == 1, "Last arrow/bolt remains visible");
+}
+Check(!Item(4, 0).IsAmmunition, "A bow must not be treated as ammunition");
+
 foreach (int id in new[] { 30, 31, 136, 137, 138, 139, 140, 141, 142, 143 })
 {
     for (byte level = 0; level < 3; level++)

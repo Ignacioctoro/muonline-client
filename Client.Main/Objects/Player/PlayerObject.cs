@@ -1860,7 +1860,8 @@ namespace Client.Main.Objects.Player
             // uses the Dark Lord's strike pose even when riding. Its
             // mounted animations differ from the normal on-foot strike.
             if ((skillId == 78 || skillId == 518 ||
-                 skillId == 61 || skillId == 508 || skillId == 514) &&
+                 skillId == 61 || skillId == 508 || skillId == 514 ||
+                 skillId == 60 || skillId == 66 || skillId == 509) &&
                 _isRiding && !isInSafeZone)
                 return IsFenrirVehicle(_currentVehicleIndex)
                     ? PlayerAction.PlayerFenrirAttackDarklordStrike

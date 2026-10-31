@@ -1732,12 +1732,19 @@ namespace Client.Main.Core.Client
 
         // --- Skill List Methods ---
 
-        /// <summary>
-        /// Clears the character's skill list.
-        /// </summary>
+        private int _skillListRevision;
+        public int SkillListRevision => System.Threading.Volatile.Read(ref _skillListRevision);
+
+        public bool IsSkillSelectable(ushort skillId) =>
+            DarkRavenCommands.IsCommandSkill(skillId)
+                ? HasEquippedDarkRaven
+                : _skillList.ContainsKey(skillId);
+
+        /// <summary>Clears the character's authoritative skill list.</summary>
         public void ClearSkillList()
         {
             _skillList.Clear();
+            System.Threading.Interlocked.Increment(ref _skillListRevision);
             _logger.LogDebug("Skill list cleared.");
         }
 
@@ -1747,6 +1754,7 @@ namespace Client.Main.Core.Client
         public void AddOrUpdateSkill(SkillEntryState skill)
         {
             _skillList[skill.SkillId] = skill;
+            System.Threading.Interlocked.Increment(ref _skillListRevision);
             _logger.LogDebug("Skill added/updated. Skill ID: {SkillId}, Level: {SkillLevel}", skill.SkillId, skill.SkillLevel);
         }
 
@@ -1758,6 +1766,7 @@ namespace Client.Main.Core.Client
             bool removed = _skillList.TryRemove(skillId, out _);
             if (removed)
             {
+                System.Threading.Interlocked.Increment(ref _skillListRevision);
                 _logger.LogDebug("Skill removed. Skill ID: {SkillId}", skillId);
             }
             else

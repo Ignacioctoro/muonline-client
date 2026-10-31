@@ -120,7 +120,7 @@ namespace Client.Main.Core.Utilities
             // Do not let the server echo overwrite mounted actions
             // with PlayerAttackStrike. Remote casts resolve via
             // PlayerObject.GetSkillAction directly.
-            if (skillId is 78 or 518 or 61 or 508 or 514)
+            if (skillId is 78 or 518 or 61 or 508 or 514 or 60 or 66 or 509)
                 return -1;
 
             if (Season6SkillActionDatabase.TryGet(

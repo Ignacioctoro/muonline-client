@@ -42,10 +42,17 @@ public class InventoryItem
                 return level is >= 0 and <= 2 ? (level + 1) * 10 : 0;
             }
 
+            // Season 6 ammunition stores remaining arrows/bolts in durability,
+            // even though its base durability is 255 in item data.
+            if (IsAmmunition)
+                return Durability;
+
             return Definition.BaseDurability == 0 && Definition.MagicDurability == 0 && Durability > 1
                 ? Durability : 0;
         }
     }
+
+    public bool IsAmmunition => Definition.Group == 4 && (Definition.Id == 7 || Definition.Id == 15);
 
     public bool ShowLevelBadge => !Definition.IsPackedJewel() && Details.Level > 0;
 

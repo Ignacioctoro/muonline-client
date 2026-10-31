@@ -27,6 +27,19 @@ internal static class Program
                 }
             }
 
+            foreach (ushort id in new ushort[] { 60, 66, 509 })
+            {
+                if (!Season6SkillActionDatabase.TryGet(id, out var route) ||
+                    route.SkillType != SkillType.Target ||
+                    route.AnimationMode != Season6SkillAnimationMode.Explicit ||
+                    route.ExplicitAction != PlayerAction.PlayerAttackStrike)
+                    throw new Exception($"Force route {id} must use the DL strike action.");
+            }
+            if (!Season6SkillActionDatabase.TryGet(55, out var fireSlash) ||
+                fireSlash.SkillType != SkillType.Area ||
+                fireSlash.ExplicitAction != PlayerAction.PlayerAttackSkillWheel)
+                throw new Exception("Fire Slash must use the area wheel action.");
+
             Console.WriteLine($"PASS: initialized {definitions.Count} unique Season 6 skill routes.");
             Console.WriteLine("PASS: Fire Burst 61, Strengthener 508, Mastery 514 use PlayerAttackStrike.");
             return 0;

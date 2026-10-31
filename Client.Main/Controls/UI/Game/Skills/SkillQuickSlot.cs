@@ -46,6 +46,8 @@ namespace Client.Main.Controls.UI.Game.Skills
         private const double LONG_PRESS_SECONDS =
             0.55;
 
+        private int _skillListRevision = -1;
+        private bool _hadDarkRaven;
         private bool _trackingPress;
         private bool _longPressTriggered;
         private bool _pressCancelled;
@@ -246,7 +248,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         private void ApplySelectedSkill(
             SkillEntryState skill)
         {
-            if (skill == null)
+            if (skill == null || !_characterState.IsSkillSelectable(skill.SkillId))
             {
                 return;
             }
@@ -324,23 +326,23 @@ namespace Client.Main.Controls.UI.Game.Skills
         {
             UpdateHudPlacement();
 
-            // Native Main clears the pet-command selection when the Raven
-            // is unequipped. Don't leave an unusable A7 mode as active skill.
-            if (SelectedSkill != null &&
-                DarkRavenCommands.IsCommandSkill(SelectedSkill.SkillId) &&
-                !_characterState.HasEquippedDarkRaven)
+            // Reconcile on the UI thread after an authoritative skill update.
+            int revision = _characterState.SkillListRevision;
+            bool hasRaven = _characterState.HasEquippedDarkRaven;
+            if (revision != _skillListRevision || hasRaven != _hadDarkRaven)
             {
-                SkillEntryState? replacement = _characterState.GetSkills().FirstOrDefault();
-                if (replacement != null)
-                {
-                    ApplySelectedSkill(replacement);
-                }
-                else
+                _skillListRevision = revision;
+                _hadDarkRaven = hasRaven;
+                if (SelectedSkill != null &&
+                    !_characterState.IsSkillSelectable(SelectedSkill.SkillId))
                 {
                     SelectedSkill = null;
                     _currentSkillSlot.Skill = null;
                     _classicSkillBar.SetSelectedSkill(null);
                 }
+                _selectionPanel?.RefreshAvailableSkills(_characterState);
+                if (_classicSkillBar.Visible)
+                    _classicSkillBar.RefreshSkills();
             }
 
             base.Update(

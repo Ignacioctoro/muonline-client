@@ -531,15 +531,15 @@ namespace Client.Main.Core.Utilities
             // =========================================================
 
             //
-            // Fire Slash and Power Slash both use the dedicated
-            // two-hand-sword-two action in this Player.bmd.
+            // Native Fire Slash uses PLAYER_ATTACK_SKILL_WHEEL.
+            // Power Slash retains the dedicated sword action.
             //
             Add(
                 55,
                 "Fire Slash",
                 SkillType.Area,
                 Season6SkillAnimationMode.Explicit,
-                PlayerAction.PlayerAttackTwoHandSwordTwo);
+                PlayerAction.PlayerAttackSkillWheel);
 
             Add(
                 56,
@@ -587,7 +587,15 @@ namespace Client.Main.Core.Utilities
                 60,
                 "Force",
                 SkillType.Target,
-                Season6SkillAnimationMode.WeaponAttack);
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
+
+            Add(
+                509,
+                "Force Wave Strengthener",
+                SkillType.Target,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
 
             Add(
                 62,

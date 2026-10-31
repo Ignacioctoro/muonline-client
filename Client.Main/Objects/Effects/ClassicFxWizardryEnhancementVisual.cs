@@ -68,6 +68,12 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
+            if (MuGame.Instance?.IsActive == false)
+            {
+                ReleaseCarrier();
+                return;
+            }
+
             Position = _owner.WorldPosition.Translation;
             Hidden = _owner.Hidden || _owner.IsDead;
             if (Hidden)

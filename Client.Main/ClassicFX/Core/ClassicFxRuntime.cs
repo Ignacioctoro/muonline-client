@@ -130,6 +130,17 @@ namespace Client.Main.ClassicFX.Core
                 return;
             }
 
+            // Sprites live for one simulation frame. Draw may be skipped while
+            // minimized; never replay all queued aura sprites on return.
+            if (Pools.Sprites.ActiveCount > 0)
+            {
+                for (int i = 0; i < ClassicFxPools.MaxSprites; i++)
+                {
+                    if (Pools.Sprites.IsActive(i))
+                        ReleaseSpriteAt(i);
+                }
+            }
+
             // ClassicFX transient state used by MoveParticles().
             // Resets/reuses the fixed terrain-light pool; no allocations.
             BeginClassicFxMoveFrame();

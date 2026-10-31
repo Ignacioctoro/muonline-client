@@ -61,11 +61,21 @@ namespace Client.Main.Objects.Effects
                 return;
             }
 
+            if (MuGame.Instance?.IsActive == false)
+            {
+                _runtimeFrameSamples = 0;
+                _stableFrameFactor = 0f;
+                ReleaseJoints();
+                return;
+            }
+
             Position = _owner.WorldPosition.Translation;
             bool hidden = _owner.Hidden || _owner.IsDead;
             Hidden = hidden;
             if (hidden)
             {
+                _runtimeFrameSamples = 0;
+                _stableFrameFactor = 0f;
                 ReleaseJoints();
                 return;
             }
@@ -127,7 +137,7 @@ namespace Client.Main.Objects.Effects
         // CreateJoint takes MaxTails = 30 / FrameFactor at creation time;
         // if that one frame is slow, an otherwise fast client gets a
         // permanently tiny trail. Follow the settled frame factor instead,
-        // extending only these persistent auras' preallocated histories.
+        // resizing only these persistent auras' preallocated histories.
         private void RefreshPersistentTailCapacity()
         {
             if (_runtime == null || _runtime.IsDisposed)

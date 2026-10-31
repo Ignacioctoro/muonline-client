@@ -709,6 +709,24 @@ namespace Client.Main.Controls.UI.Game.Skills
         // OPEN / CLOSE
         // =============================================================
 
+        public void RefreshAvailableSkills(CharacterState characterState)
+        {
+            for (int i = 0; i < _quickSlotSkills.Length; i++)
+            {
+                var skill = _quickSlotSkills[i];
+                if (skill != null && !characterState.IsSkillSelectable(skill.SkillId))
+                    ClearQuickSlot(i); // Also clears desktop and mobile bindings.
+            }
+            if (_selectedSkill != null &&
+                !characterState.IsSkillSelectable(_selectedSkill.SkillId))
+            {
+                _selectedSkill = null;
+                UpdateSkillInfo(null);
+            }
+            if (Visible)
+                Open(characterState);
+        }
+
         public void Open(
             CharacterState characterState)
         {

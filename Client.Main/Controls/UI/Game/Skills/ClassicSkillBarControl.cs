@@ -189,7 +189,7 @@ namespace Client.Main.Controls.UI.Game.Skills
         // SKILL LIST
         // =============================================================
 
-        private void RefreshSkills()
+        public void RefreshSkills()
         {
             List<SkillEntryState> skills =
                 _characterState

@@ -970,20 +970,26 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         [PacketHandler(0xF3, 0x11)] // SkillListUpdate / Add / Remove
         public Task HandleSkillListUpdateAsync(Memory<byte> packet)
         {
-            try
+            // Packet memory belongs to the network buffer. Copy before queuing,
+            // then apply a complete list atomically relative to UI reconciliation.
+            byte[] data = packet.ToArray();
+            MuGame.ScheduleOnMainThread(() =>
             {
-                byte flag = packet.Span[4];
-                if (flag == 0xFE)
-                    ParseSkillAdded(packet);
-                else if (flag == 0xFF)
-                    ParseSkillRemoved(packet);
-                else
-                    ParseFullSkillList(packet, flag);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "💥 Error parsing SkillListUpdate/Add/Remove packet.");
-            }
+                try
+                {
+                    byte flag = data[4];
+                    if (flag == 0xFE)
+                        ParseSkillAdded(data);
+                    else if (flag == 0xFF)
+                        ParseSkillRemoved(data);
+                    else
+                        ParseFullSkillList(data, flag);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error parsing SkillListUpdate/Add/Remove packet.");
+                }
+            });
             return Task.CompletedTask;
         }
 

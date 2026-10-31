@@ -1709,6 +1709,11 @@ namespace Client.Main.Scenes
 
             if (characterState != null)
             {
+                // A removed equipment/book skill may still be held by a pending
+                // movement or mobile gesture. Never send that stale selection.
+                if (!characterState.IsSkillSelectable(skill.SkillId))
+                    return false;
+
                 ushort manaCost =
                     SkillDatabase.GetSkillManaCost(
                         skill.SkillId);

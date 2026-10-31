@@ -3374,6 +3374,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 {
                     spriteBatch.Draw(GraphicsManager.Instance.Pixel, itemRect, new Color(40, 40, 40, 200));
                 }
+
+                if (item.IsAmmunition && _font != null)
+                    ItemGridRenderHelper.DrawItemStackCount(spriteBatch, _font,
+                        itemRect, item.DisplayQuantity, Theme.TextGold, 1f);
             }
         }
 
