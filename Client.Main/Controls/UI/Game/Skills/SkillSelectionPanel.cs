@@ -8,6 +8,9 @@ using Client.Main.Controls.UI.Common;
 using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
+using Client.Main.Controllers;
+using Client.Main.Helpers;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.Controls.UI.Game.Skills
@@ -1368,6 +1371,16 @@ namespace Client.Main.Controls.UI.Game.Skills
 
             UpdateSkillInfo(
                 skill);
+        }
+
+        public override void Draw(GameTime gameTime)
+        {
+            if (!Visible || Status != GameControlStatus.Ready || GraphicsManager.Instance == null)
+                return;
+            using (new SpriteBatchScope(GraphicsManager.Instance.Sprite,
+                SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp,
+                transform: UiScaler.SpriteTransform))
+                base.Draw(gameTime);
         }
 
         public override void Update(

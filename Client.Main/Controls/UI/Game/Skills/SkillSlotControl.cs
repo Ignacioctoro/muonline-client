@@ -92,6 +92,12 @@ namespace Client.Main.Controls.UI.Game.Skills
             }
         }
 
+        public bool ShowFrame
+        {
+            get => _slotFrame.Visible;
+            set => _slotFrame.Visible = value;
+        }
+
         public bool IsTooltipEnabled { get; set; } = true;
 
         public event Action<SkillEntryState?>? HoverChanged;

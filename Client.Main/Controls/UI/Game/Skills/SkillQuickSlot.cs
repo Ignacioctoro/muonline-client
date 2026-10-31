@@ -1,9 +1,13 @@
 #nullable enable
 
+using System;
 using System.Linq;
 using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
+using Client.Main.Controllers;
+using Client.Main.Helpers;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
@@ -20,6 +24,8 @@ namespace Client.Main.Controls.UI.Game.Skills
     /// </summary>
     public class SkillQuickSlot : UIControl
     {
+        private readonly GameControl? _hudAnchor;
+
         private readonly CharacterState
             _characterState;
 
@@ -65,8 +71,9 @@ namespace Client.Main.Controls.UI.Game.Skills
                     : null;
 
         public SkillQuickSlot(
-            CharacterState characterState)
+            CharacterState characterState, GameControl? hudAnchor = null)
         {
+            _hudAnchor = hudAnchor;
             _characterState =
                 characterState;
 
@@ -75,33 +82,12 @@ namespace Client.Main.Controls.UI.Game.Skills
             // del rectángulo del skill principal.
             AutoViewSize = false;
 
-            Align =
-                ControlAlign.HorizontalCenter |
-                ControlAlign.Bottom;
-
-            Margin =
-                new Margin
-                {
-                    Bottom = 30
-                };
-            // Al desactivar AutoViewSize para permitir que la barra clásica
-            // tenga hijos fuera del rectángulo del skill central, el control
-            // dejó de encogerse como lo hacía anteriormente.
-            //
-            // Compensamos exactamente ese cambio de geometría para mantener
-            // el skill activo en su posición original del HUD.
-            Offset =
-                new Point(
-                    15,
-                    22);
-
-            ViewSize =
-                new Point(
-                    SLOT_SIZE + 8,
-                    SLOT_SIZE + 22);
-
-            ControlSize =
-                ViewSize;
+            Align = hudAnchor == null
+                ? ControlAlign.HorizontalCenter | ControlAlign.Bottom
+                : ControlAlign.None;
+            Margin = hudAnchor == null ? new Margin { Bottom = 15 } : Margin.Empty;
+            ViewSize = new Point(42, SLOT_SIZE);
+            ControlSize = ViewSize;
 
             // El contenedor ya no será el sensor del click.
             // El propio icono central manejará mouse/touch.
@@ -126,13 +112,6 @@ namespace Client.Main.Controls.UI.Game.Skills
                     SkillSlotControl.SLOT_HEIGHT *
                     slotScale);
 
-            // Ajustes existentes del HUD B Royal.
-            const int HORIZONTAL_NUDGE =
-                -20;
-
-            const int VERTICAL_NUDGE =
-                20;
-
             _currentSkillSlot =
                 new SkillSlotControl
                 {
@@ -142,21 +121,14 @@ namespace Client.Main.Controls.UI.Game.Skills
                     Skill =
                         null,
 
+                    ShowFrame = hudAnchor == null,
+
                     VisualScale =
                         slotScale
                 };
 
-            _currentSkillSlot.X =
-                ((ViewSize.X -
-                  scaledWidth) / 2)
-                +
-                HORIZONTAL_NUDGE;
-
-            _currentSkillSlot.Y =
-                ((SLOT_SIZE -
-                  scaledHeight) / 2)
-                +
-                VERTICAL_NUDGE;
+            _currentSkillSlot.X = (ViewSize.X - scaledWidth) / 2;
+            _currentSkillSlot.Y = (SLOT_SIZE - scaledHeight) / 2;
 
             Controls.Add(
                 _currentSkillSlot);
@@ -348,6 +320,8 @@ namespace Client.Main.Controls.UI.Game.Skills
         public override void Update(
             GameTime gameTime)
         {
+            UpdateHudPlacement();
+
             // Native Main clears the pet-command selection when the Raven
             // is unequipped. Don't leave an unusable A7 mode as active skill.
             if (SelectedSkill != null &&
@@ -469,6 +443,37 @@ namespace Client.Main.Controls.UI.Game.Skills
             {
                 ResetPressState();
             }
+        }
+
+        private void UpdateHudPlacement()
+        {
+            if (_hudAnchor == null) return;
+            Rectangle bounds = _hudAnchor.DisplayRectangle;
+            if (bounds.Width <= 0 || bounds.Height <= 0) return;
+
+            // Use the live HUD socket, including its parent offset and layout scale.
+            Point origin = Parent?.DisplayRectangle.Location ?? Point.Zero;
+            X = bounds.X - origin.X;
+            Y = bounds.Y - origin.Y;
+            ViewSize = ControlSize = bounds.Size;
+            float scale = bounds.Height / (float)SkillSlotControl.SLOT_HEIGHT;
+            if (Math.Abs(_currentSkillSlot.VisualScale - scale) > 0.0001f)
+                _currentSkillSlot.VisualScale = scale;
+            _currentSkillSlot.X = (bounds.Width - _currentSkillSlot.ViewSize.X) / 2;
+            _currentSkillSlot.Y = (bounds.Height - _currentSkillSlot.ViewSize.Y) / 2;
+            _classicSkillBar.X = (bounds.Width - SkillSlotControl.SLOT_WIDTH) / 2;
+            _classicSkillBar.Y = -SkillSlotControl.SLOT_HEIGHT - 3;
+        }
+
+        public override void Draw(GameTime gameTime)
+        {
+            if (!Visible || Status != GameControlStatus.Ready || GraphicsManager.Instance == null)
+                return;
+            // One linear batch for both the current skill and the entire expanded list.
+            using (new SpriteBatchScope(GraphicsManager.Instance.Sprite,
+                SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp,
+                transform: UiScaler.SpriteTransform))
+                base.Draw(gameTime);
         }
 
         private void TriggerLongPress()

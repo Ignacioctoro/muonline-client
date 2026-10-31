@@ -2,6 +2,7 @@ using Client.Main.Controls.UI.Game.Messenger;
 // File: GameScene.cs
 using Client.Main.Controls;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Client.Main.Core.Models;
 using Client.Main.Controls.UI;
@@ -1384,7 +1385,9 @@ namespace Client.Main.Scenes
             Controls.Add(_skillSelectionPanel);
 
             // Skill quick slot
-            _skillQuickSlot = new Controls.UI.Game.Skills.SkillQuickSlot(MuGame.Network.GetCharacterState());
+            _skillQuickSlot = new Controls.UI.Game.Skills.SkillQuickSlot(
+                MuGame.Network.GetCharacterState(),
+                _main.Controls.FirstOrDefault(control => control.Name == "ActiveSkill_2"));
             _skillQuickSlot.SetSelectionPanel(_skillSelectionPanel); // Connect panel
             Controls.Add(_skillQuickSlot);
             // Cuando se asigna una skill desde el menú SKILL,

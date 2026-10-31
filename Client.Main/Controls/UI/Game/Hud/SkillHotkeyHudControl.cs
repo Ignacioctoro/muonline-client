@@ -282,7 +282,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                     spriteBatch,
                     SpriteSortMode.Deferred,
                     BlendState.AlphaBlend,
-                    SamplerState.PointClamp,
+                    SamplerState.LinearClamp,
                     transform:
                         UiScaler.SpriteTransform))
             {

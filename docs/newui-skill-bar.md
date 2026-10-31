@@ -20,3 +20,9 @@ Manual checks that do not require starting Castle Siege:
 4. Check icon alignment, selection border and hotkey banks at supported resolutions. Verify Summoner Lightning Shock, Raven commands and Fenrir icon identity.
 
 Later integration checks: a valid B2/17 start while in map 30 enables the class skills; end disables them and clears pending casts. A start outside map 30 never enables them there. Reject truncated frames and values other than 0/1. Verify event confirmation on map entry/reconnect once server broadcasting is implemented, and separately implement guild-role eligibility before exposing role skills in actual siege combat.
+
+## Filtering and active-skill alignment correction
+
+The current skill and expanded list share one LinearClamp draw scope; the skill-management panel and assigned HUD hotkeys also use LinearClamp. This smooths enlargement of the existing 20x28 source art without changing global UI sampling or allocating textures per frame. The source icons remain the original low-resolution assets.
+
+GameScene now passes the live ActiveSkill_2 HUD control to SkillQuickSlot. The active slot follows that rectangle, including its layout scale and parent translation, instead of historical screen-center nudges. The socket already drawn by MainControl is reused, avoiding a second frame over it. The icon's hit area and expanded list follow the same anchor. Reviewed geometry at 0.75/1/1.5 layout scales and checked the patch; no compilation or in-game verification was performed.
