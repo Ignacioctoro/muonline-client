@@ -109,7 +109,7 @@ namespace Client.Main.Scenes
             }
 
             var skill = _skillQuickSlot.SelectedSkill;
-            if (skill == null)
+            if (skill == null || !CastleSiegeSkillRules.CanUse(skill.SkillId))
             {
                 return false;
             }
@@ -236,7 +236,7 @@ namespace Client.Main.Scenes
         {
             var skill = _skillQuickSlot.SelectedSkill;
 
-            if (skill == null)
+            if (skill == null || !CastleSiegeSkillRules.CanUse(skill.SkillId))
             {
                 return false;
             }
@@ -415,7 +415,7 @@ namespace Client.Main.Scenes
             if (!rightPressed)
                 return;
 
-            if (skill == null)
+            if (skill == null || !CastleSiegeSkillRules.CanUse(skill.SkillId))
                 return;
 
             if (hero == null || hero.IsDead || walkableForSkills == null)
@@ -1026,6 +1026,12 @@ namespace Client.Main.Scenes
 
         private void UpdatePendingSkill()
         {
+            if (_pendingSkill != null && !CastleSiegeSkillRules.CanUse(_pendingSkill.SkillId))
+            {
+                ClearPendingSkill();
+                return;
+            }
+
             var hero = _scene.Hero;
 
             if (_pendingSkill == null ||
@@ -1679,6 +1685,9 @@ namespace Client.Main.Scenes
             Core.Client.SkillEntryState skill,
             PlayerObject hero)
         {
+            if (!CastleSiegeSkillRules.CanUse(skill.SkillId))
+                return false;
+
             if (hero.IsAttackOrSkillAnimationPlaying())
                 return false;
 

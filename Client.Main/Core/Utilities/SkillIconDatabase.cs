@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.Core.Utilities
@@ -10,9 +9,7 @@ namespace Client.Main.Core.Utilities
         public string TexturePath { get; }
         public Rectangle SourceRectangle { get; }
 
-        public SkillIconInfo(
-            string texturePath,
-            Rectangle sourceRectangle)
+        public SkillIconInfo(string texturePath, Rectangle sourceRectangle)
         {
             TexturePath = texturePath;
             SourceRectangle = sourceRectangle;
@@ -23,145 +20,28 @@ namespace Client.Main.Core.Utilities
     {
         public const int IconWidth = 20;
         public const int IconHeight = 28;
+        public const string NewUiAtlas = "Interface/newui_skill00.OZJ";
+        public const string NewUiDisabledAtlas = "Interface/newui_skill00_Non_Icon.OZJ";
 
-        private const ushort SpiralSlash = 57;
-        private const ushort PlasmaStorm = 76;
-        private const ushort KillingBlow = 260;
-        private const ushort MasterSkillFirst = 300;
-
-        private static readonly Dictionary<ushort, Point>
-            Sheet2SpecialCells =
-            new()
-            {
-                { 214, new Point(0, 3) },
-                { 215, new Point(1, 3) },
-                { 216, new Point(2, 3) },
-                { 217, new Point(3, 3) },
-                { 219, new Point(4, 3) },
-                { 220, new Point(5, 3) },
-                { 223, new Point(6, 3) },
-                { 224, new Point(7, 3) },
-                { 221, new Point(8, 3) },
-                { 222, new Point(9, 3) },
-                { 218, new Point(10, 3) },
-                { 225, new Point(11, 3) },
-
-                { 230, new Point(2, 3) },
-
-                { 232, new Point(7, 2) },
-                { 233, new Point(8, 2) },
-                { 234, new Point(9, 2) },
-
-                { 235, new Point(0, 8) },
-                { 236, new Point(1, 8) },
-                { 237, new Point(2, 8) },
-                { 238, new Point(3, 8) }
-            };
-
-        public static SkillIconInfo? GetIcon(
-            ushort skillId,
-            bool disabled = false)
+        public static SkillIconInfo? GetIcon(ushort skillId, bool disabled = false)
         {
-            if (skillId == 0 ||
-                skillId >= MasterSkillFirst)
-            {
-                return null;
-            }
+            if (skillId == 0 || skillId >= 300) return null;
 
-            string skill1 =
-                disabled
-                    ? "Interface/newui_non_skill.OZJ"
-                    : "Interface/newui_skill.OZJ";
-
-            string skill2 =
-                disabled
-                    ? "Interface/newui_non_skill2.OZJ"
-                    : "Interface/newui_skill2.OZJ";
-
-            string skill3 =
-                disabled
-                    ? "Interface/newui_non_skill3.OZJ"
-                    : "Interface/newui_skill3.OZJ";
-
-            string command =
-                disabled
-                    ? "Interface/newui_non_command.OZJ"
-                    : "Interface/newui_command.OZJ";
-
-            // MuMain UI/HUD/Skills/SkillIconAtlas.cpp:
-            // pet commands 120..123 occupy cells (0..3, 0)
-            // in newui_command, not regular skill sheets.
+            // S6 pet commands have a separate sheet and are not regular skills.
             if (DarkRavenCommands.IsCommandSkill(skillId))
-            {
-                return Create(command, skillId - DarkRavenCommands.Normal, 0);
-            }
+                return Create(disabled ? "Interface/newui_non_command.OZJ" : "Interface/newui_command.OZJ",
+                    skillId - DarkRavenCommands.Normal, 0);
 
-            // Fenrir Plasma Storm
-            if (skillId == PlasmaStorm)
-            {
-                return Create(
-                    command,
-                    4,
-                    0);
-            }
+            if (skillId == 76)
+                return Create(disabled ? "Interface/newui_non_command.OZJ" : "Interface/newui_command.OZJ", 4, 0);
 
-            // Special Season 6 skills
-            if (Sheet2SpecialCells.TryGetValue(
-                    skillId,
-                    out Point special))
-            {
-                return Create(
-                    skill2,
-                    special.X,
-                    special.Y);
-            }
-
-            // Rage Fighter
-            if (skillId >= KillingBlow)
-            {
-                int index =
-                    skillId - KillingBlow;
-
-                return Create(
-                    skill3,
-                    index % 12,
-                    index / 12);
-            }
-
-            // Second skill sheet
-            if (skillId >= SpiralSlash)
-            {
-                int index =
-                    skillId - SpiralSlash;
-
-                return Create(
-                    skill2,
-                    index % 8,
-                    index / 8);
-            }
-
-            // Main skill sheet
-            int firstIndex =
-                skillId - 1;
-
-            return Create(
-                skill1,
-                firstIndex % 8,
-                firstIndex / 8);
+            // Data_Broyal NewUI: 25 cells per row, indexed by protocol skill ID.
+            // The zero cell is reserved; unlike S6 sheets, do not subtract one.
+            int iconId = skillId == 230 ? 216 : skillId; // S6 Lightning Shock alias.
+            return Create(disabled ? NewUiDisabledAtlas : NewUiAtlas, iconId % 25, iconId / 25);
         }
 
-        private static SkillIconInfo Create(
-            string texturePath,
-            int column,
-            int row)
-        {
-            return new SkillIconInfo(
-                texturePath,
-                new Rectangle(
-                    column * IconWidth,
-                    row * IconHeight,
-                    IconWidth,
-                    IconHeight));
-        }
+        private static SkillIconInfo Create(string path, int column, int row) =>
+            new(path, new Rectangle(column * IconWidth, row * IconHeight, IconWidth, IconHeight));
     }
 }

@@ -1656,6 +1656,7 @@ namespace Client.Main.Networking.Services
         /// </summary>
         public async Task SendSkillRequestAsync(ushort skillId, ushort targetId)
         {
+            if (!Client.Main.Core.Utilities.CastleSiegeSkillRules.CanUse(skillId)) return;
             if (!_connectionManager.IsConnected)
             {
                 _logger.LogError("Not connected — cannot send skill request.");
@@ -1710,6 +1711,7 @@ namespace Client.Main.Networking.Services
         /// </summary>
         public async Task SendAreaSkillRequestAsync(ushort skillId, byte targetX, byte targetY, byte rotation, ushort extraTargetId = 0, byte animationCounter = 0)
         {
+            if (!Client.Main.Core.Utilities.CastleSiegeSkillRules.CanUse(skillId)) return;
             if (!_connectionManager.IsConnected)
             {
                 _logger.LogError("Not connected — cannot send area skill request.");

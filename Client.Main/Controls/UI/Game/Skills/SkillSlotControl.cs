@@ -9,17 +9,13 @@ using Microsoft.Xna.Framework;
 namespace Client.Main.Controls.UI.Game.Skills
 {
     /// <summary>
-    /// Single skill slot using the original MU skill box art.
+    /// Skill slot using the Data_Broyal NewUI HUD socket and selection art.
     /// Supports independent visual scaling so menus can use
     /// larger icons without affecting quick-slot sizes.
     /// </summary>
     public class SkillSlotControl : UIControl
     {
-        private const string SLOT_TEXTURE_NORMAL =
-            "Interface/newui_skillbox.OZJ";
-
-        private const string SLOT_TEXTURE_SELECTED =
-            "Interface/newui_skillbox2.OZJ";
+        private bool _isUnavailable;
 
         private SkillEntryState? _skill;
 
@@ -37,14 +33,14 @@ namespace Client.Main.Controls.UI.Game.Skills
         // ORIGINAL MU SIZES
         // =============================================================
 
-        public const int SLOT_WIDTH = 32;
-        public const int SLOT_HEIGHT = 38;
+        public const int SLOT_WIDTH = NewUiSkillSkin.Width;
+        public const int SLOT_HEIGHT = NewUiSkillSkin.Height;
 
-        private const int ICON_WIDTH = 20;
-        private const int ICON_HEIGHT = 28;
+        private const int ICON_WIDTH = NewUiSkillSkin.IconWidth;
+        private const int ICON_HEIGHT = NewUiSkillSkin.IconHeight;
 
-        private const int ICON_OFFSET_X = 6;
-        private const int ICON_OFFSET_Y = 6;
+        private const int ICON_OFFSET_X = NewUiSkillSkin.IconX;
+        private const int ICON_OFFSET_Y = NewUiSkillSkin.IconY;
 
         // =============================================================
         // PROPERTIES
@@ -131,7 +127,8 @@ namespace Client.Main.Controls.UI.Game.Skills
                 new TextureControl
                 {
                     TexturePath =
-                        SLOT_TEXTURE_NORMAL,
+                        NewUiSkillSkin.AtlasPath,
+                    TextureRectangle = NewUiSkillSkin.NormalFrame,
 
                     AutoViewSize = false,
 
@@ -377,7 +374,7 @@ namespace Client.Main.Controls.UI.Game.Skills
 
             var iconInfo =
                 SkillIconDatabase.GetIcon(
-                    _skill.SkillId);
+                    _skill.SkillId, _isUnavailable);
 
             if (iconInfo.HasValue)
             {
@@ -414,10 +411,10 @@ namespace Client.Main.Controls.UI.Game.Skills
 
         private void UpdateVisualState()
         {
-            _slotFrame.TexturePath =
-                _isSelected
-                    ? SLOT_TEXTURE_SELECTED
-                    : SLOT_TEXTURE_NORMAL;
+            _slotFrame.TextureRectangle = _isSelected && !_isUnavailable
+                ? NewUiSkillSkin.SelectedFrame : NewUiSkillSkin.NormalFrame;
+            _slotFrame.Alpha = _isUnavailable ? 0.65f : 1f;
+            _fallbackLabel.TextColor = _isUnavailable ? Color.Gray : Color.White;
         }
 
         // =============================================================
@@ -427,6 +424,13 @@ namespace Client.Main.Controls.UI.Game.Skills
         public override void Update(
             GameTime gameTime)
         {
+            bool unavailable = _skill != null && !CastleSiegeSkillRules.CanUse(_skill.SkillId);
+            if (unavailable != _isUnavailable)
+            {
+                _isUnavailable = unavailable;
+                UpdateDisplay();
+            }
+
             base.Update(
                 gameTime);
 
@@ -563,6 +567,9 @@ namespace Client.Main.Controls.UI.Game.Skills
                         $"  Range: {skillDef.Distance}";
                 }
             }
+
+            if (_isUnavailable)
+                tooltip += "\nSolo durante Castle Siege activo en Valley of Loren.";
 
             _tooltipLabel.Text =
                 tooltip;

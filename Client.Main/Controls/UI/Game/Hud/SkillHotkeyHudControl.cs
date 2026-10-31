@@ -1,6 +1,8 @@
 #nullable enable
 
 using System;
+using System.Threading.Tasks;
+using Client.Main.Controls.UI.Game.Skills;
 using Client.Main.Content;
 using Client.Main.Controllers;
 using Client.Main.Core.Client;
@@ -35,8 +37,8 @@ namespace Client.Main.Controls.UI.Game.Hud
         private const int VISIBLE_SLOT_COUNT = 5;
 
         // Visual size inside our HUD.
-        private const int ICON_WIDTH = 24;
-        private const int ICON_HEIGHT = 34;
+        private const int ICON_WIDTH = NewUiSkillSkin.IconWidth;
+        private const int ICON_HEIGHT = NewUiSkillSkin.IconHeight;
 
         // Positions are relative to this control.
         // These are the five physical HUD positions.
@@ -88,7 +90,7 @@ namespace Client.Main.Controls.UI.Game.Hud
             AutoViewSize = false;
 
             ViewSize = new Point(
-                165,
+                166,
                 ICON_HEIGHT);
 
             ControlSize = ViewSize;
@@ -96,6 +98,13 @@ namespace Client.Main.Controls.UI.Game.Hud
             Interactive = true;
 
             _visibleBank = 0;
+        }
+
+        public override async Task Initialize()
+        {
+            await TextureLoader.Instance.Prepare(SkillIconDatabase.NewUiAtlas);
+            await TextureLoader.Instance.Prepare(SkillIconDatabase.NewUiDisabledAtlas);
+            await base.Initialize();
         }
 
         // =============================================================
@@ -295,7 +304,7 @@ namespace Client.Main.Controls.UI.Game.Hud
 
                     SkillIconInfo? iconInfo =
                         SkillIconDatabase.GetIcon(
-                            skill.SkillId);
+                            skill.SkillId, !CastleSiegeSkillRules.CanUse(skill.SkillId));
 
                     if (!iconInfo.HasValue)
                     {

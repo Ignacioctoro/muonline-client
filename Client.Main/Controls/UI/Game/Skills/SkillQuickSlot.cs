@@ -142,7 +142,7 @@ namespace Client.Main.Controls.UI.Game.Skills
                     Skill =
                         null,
 
-                    Scale =
+                    VisualScale =
                         slotScale
                 };
 

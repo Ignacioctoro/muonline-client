@@ -56,6 +56,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
         private ushort _cachedSkillId;
 
         private bool _circularBuildFailed;
+        private bool _cachedDisabled;
 
         private bool _pressTracking;
         private bool _coveredByWindow;
@@ -293,7 +294,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
             SkillIconInfo? iconInfo =
                 SkillIconDatabase.GetIcon(
-                    _skill.SkillId);
+                    _skill.SkillId, !CastleSiegeSkillRules.CanUse(_skill.SkillId));
 
             if (!iconInfo.HasValue)
             {
@@ -593,7 +594,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
             // normal. No rompe el botón.
             SkillIconInfo? info =
                 SkillIconDatabase.GetIcon(
-                    _skill.SkillId);
+                    _skill.SkillId, !CastleSiegeSkillRules.CanUse(_skill.SkillId));
 
             if (!info.HasValue)
             {
@@ -631,6 +632,15 @@ namespace Client.Main.Controls.UI.Game.Mobile
                 return null;
             }
 
+            bool disabled = !CastleSiegeSkillRules.CanUse(_skill.SkillId);
+            if (_cachedDisabled != disabled)
+            {
+                _cachedDisabled = disabled;
+                DisposeCircularIcon();
+                _circularBuildFailed = false;
+                PrepareSkillTexture();
+            }
+
             if (_circularIconTexture !=
                     null &&
                 !_circularIconTexture
@@ -649,7 +659,7 @@ namespace Client.Main.Controls.UI.Game.Mobile
 
             SkillIconInfo? iconInfo =
                 SkillIconDatabase.GetIcon(
-                    _skill.SkillId);
+                    _skill.SkillId, !CastleSiegeSkillRules.CanUse(_skill.SkillId));
 
             if (!iconInfo.HasValue)
             {

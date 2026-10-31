@@ -47,6 +47,19 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
         // ─────────────────────── Packet Handlers ────────────────────────
 
+        [PacketHandler(0xB2, 0x17)]
+        public Task HandleCastleSiegeBattleStartEndAsync(Memory<byte> packet)
+        {
+            // OpenMU S6: C1 B2 17, byte 4 = IsStarted. Ignore malformed frames.
+            if (packet.Length != 5 || packet.Span[0] != 0xC1 || packet.Span[1] != 5 ||
+                packet.Span[2] != 0xB2 || packet.Span[3] != 0x17 || packet.Span[4] > 1)
+                return Task.CompletedTask;
+
+            bool active = packet.Span[4] == 1;
+            MuGame.ScheduleOnMainThread(() => _characterState.IsCastleSiegeBattleActive = active);
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0xED, PacketRouter.NoSubCode)]
         public Task HandlePartyMatchingAsync(Memory<byte> packet)
         {

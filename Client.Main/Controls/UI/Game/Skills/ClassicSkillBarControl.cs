@@ -12,7 +12,7 @@ namespace Client.Main.Controls.UI.Game.Skills
     /// <summary>
     /// Barra clásica de selección de skills de MU.
     ///
-    /// - Usa los skillbox originales de 32x38.
+    /// - Usa los sockets del NewUI de 36x45.
     /// - La lista crece alrededor del skill activo.
     /// - Con muchas skills crea una segunda fila.
     /// - No utiliza ventana, fondo ni título.
@@ -281,8 +281,8 @@ namespace Client.Main.Controls.UI.Game.Skills
                         Y =
                             position.Y,
 
-                        // Tamaño clásico:
-                        // 32 x 38.
+                        // Tamaño nativo del selector NewUI:
+                        // 36 x 45.
                         VisualScale =
                             1.0f,
 

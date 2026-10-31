@@ -89,6 +89,7 @@ namespace Client.Main.Core.Client
         public string Name { get; set; } = "???";
         public ushort Id { get; set; } = 0xFFFF;
         private bool _isInGame;
+        public bool IsCastleSiegeBattleActive { get; set; }
         private bool _hasServerAttackSpeed;
         private bool _hasServerMagicSpeed;
 
@@ -100,6 +101,7 @@ namespace Client.Main.Core.Client
                 _isInGame = value;
                 if (!value)
                 {
+                    IsCastleSiegeBattleActive = false;
                     _hasServerAttackSpeed = false;
                     _hasServerMagicSpeed = false;
                 }
@@ -124,7 +126,16 @@ namespace Client.Main.Core.Client
         // Position and Map Information
         public byte PositionX { get; set; } = 0;
         public byte PositionY { get; set; } = 0;
-        public ushort MapId { get; set; } = 0;
+        private ushort _mapId;
+        public ushort MapId
+        {
+            get => _mapId;
+            set
+            {
+                if (_mapId != value) IsCastleSiegeBattleActive = false;
+                _mapId = value;
+            }
+        }
         public byte Direction { get; set; } = 0; // Default direction, e.g., West
 
         /// <summary>
