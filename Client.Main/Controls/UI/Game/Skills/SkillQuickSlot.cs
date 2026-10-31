@@ -122,6 +122,8 @@ namespace Client.Main.Controls.UI.Game.Skills
                         null,
 
                     ShowFrame = hudAnchor == null,
+                    // The 52px socket includes its border; keep a 26x36 icon inside.
+                    IconScale = hudAnchor == null ? 1f : SkillSlotControl.SLOT_HEIGHT / (float)SLOT_SIZE,
 
                     VisualScale =
                         slotScale
@@ -463,6 +465,12 @@ namespace Client.Main.Controls.UI.Game.Skills
             _currentSkillSlot.Y = (bounds.Height - _currentSkillSlot.ViewSize.Y) / 2;
             _classicSkillBar.X = (bounds.Width - SkillSlotControl.SLOT_WIDTH) / 2;
             _classicSkillBar.Y = -SkillSlotControl.SLOT_HEIGHT - 3;
+        }
+
+        public bool DrawTooltipOverlay(SpriteBatch sprite)
+        {
+            if (!Visible) return false;
+            return _classicSkillBar.DrawTooltipOverlay(sprite) || _currentSkillSlot.DrawTooltipOverlay(sprite);
         }
 
         public override void Draw(GameTime gameTime)

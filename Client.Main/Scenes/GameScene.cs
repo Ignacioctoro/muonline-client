@@ -3099,6 +3099,10 @@ namespace Client.Main.Scenes
                 DepthStencilState.None, RasterizerState.CullNone,
                 transform: UiScaler.SpriteTransform))
             {
+                // Skill helpers are overlays, never children drawn between sibling icons.
+                if (_skillQuickSlot?.DrawTooltipOverlay(sprite) != true)
+                    _main.SkillHotkeys.DrawTooltipOverlay(sprite);
+
                 MyQuestsControl.Instance.DrawTooltipOverlay(sprite);
                 NpcShopControl.Instance.DrawTooltipOverlay(sprite);
                 VaultControl.Instance.DrawTooltipOverlay(sprite);

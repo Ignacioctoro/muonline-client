@@ -5,6 +5,7 @@ using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.Controls.UI.Game.Skills
 {
@@ -22,7 +23,8 @@ namespace Client.Main.Controls.UI.Game.Skills
         private readonly TextureControl _slotFrame;
         private readonly TextureControl _skillIcon;
         private readonly LabelControl _fallbackLabel;
-        private readonly LabelControl _tooltipLabel;
+        private readonly SkillTooltip _tooltip = new();
+        private float _iconScale = 1f;
 
         private bool _isSelected;
         private bool _wasHovered;
@@ -88,6 +90,16 @@ namespace Client.Main.Controls.UI.Game.Skills
                         0.5f,
                         value);
 
+                ApplyVisualScale();
+            }
+        }
+
+        public float IconScale
+        {
+            get => _iconScale;
+            set
+            {
+                _iconScale = Math.Clamp(value, 0.5f, 1f);
                 ApplyVisualScale();
             }
         }
@@ -220,51 +232,6 @@ namespace Client.Main.Controls.UI.Game.Skills
             Controls.Add(
                 _fallbackLabel);
 
-            // =========================================================
-            // TOOLTIP
-            // =========================================================
-
-            _tooltipLabel =
-                new LabelControl
-                {
-                    Text =
-                        string.Empty,
-
-                    TextColor =
-                        Color.White,
-
-                    BackgroundColor =
-                        new Color(
-                            0,
-                            0,
-                            0) * 0.92f,
-
-                    BorderColor =
-                        new Color(
-                            170,
-                            140,
-                            60),
-
-                    BorderThickness = 1,
-
-                    X =
-                        SLOT_WIDTH + 6,
-
-                    Y = 0,
-
-                    ViewSize =
-                        new Point(
-                            210,
-                            90),
-
-                    Visible = false,
-
-                    FontSize = 10f
-                };
-
-            Controls.Add(
-                _tooltipLabel);
-
             ApplyVisualScale();
             UpdateDisplay();
         }
@@ -288,12 +255,12 @@ namespace Client.Main.Controls.UI.Game.Skills
             int iconWidth =
                 (int)MathF.Round(
                     ICON_WIDTH *
-                    _visualScale);
+                    _visualScale * _iconScale);
 
             int iconHeight =
                 (int)MathF.Round(
                     ICON_HEIGHT *
-                    _visualScale);
+                    _visualScale * _iconScale);
 
             int iconOffsetX =
                 (int)MathF.Round(
@@ -304,6 +271,12 @@ namespace Client.Main.Controls.UI.Game.Skills
                 (int)MathF.Round(
                     ICON_OFFSET_Y *
                     _visualScale);
+
+            if (_iconScale < 1f)
+            {
+                iconOffsetX = (slotWidth - iconWidth) / 2;
+                iconOffsetY = (slotHeight - iconHeight) / 2;
+            }
 
             // Outer clickable area
             ControlSize =
@@ -351,9 +324,7 @@ namespace Client.Main.Controls.UI.Game.Skills
                     slotWidth,
                     16);
 
-            // Tooltip starts after enlarged slot
-            _tooltipLabel.X =
-                slotWidth + 6;
+
         }
 
         // =============================================================
@@ -370,8 +341,7 @@ namespace Client.Main.Controls.UI.Game.Skills
                 _fallbackLabel.Visible =
                     false;
 
-                _tooltipLabel.Visible =
-                    false;
+                _tooltip.SetSkill(null, DisplayRectangle);
 
                 UpdateVisualState();
 
@@ -443,22 +413,7 @@ namespace Client.Main.Controls.UI.Game.Skills
             bool isHovered =
                 IsMouseOver;
 
-            if (!IsTooltipEnabled)
-            {
-                _tooltipLabel.Visible =
-                    false;
-            }
-            else if (
-                isHovered &&
-                _skill != null)
-            {
-                RenderTooltip();
-            }
-            else
-            {
-                _tooltipLabel.Visible =
-                    false;
-            }
+            _tooltip.SetSkill(IsTooltipEnabled && isHovered ? _skill : null, DisplayRectangle);
 
             if (_wasHovered !=
                 isHovered)
@@ -477,111 +432,11 @@ namespace Client.Main.Controls.UI.Game.Skills
         // TOOLTIP
         // =============================================================
 
-        private void RenderTooltip()
+        public bool DrawTooltipOverlay(SpriteBatch sprite)
         {
-            if (_skill == null)
-            {
-                _tooltipLabel.Visible =
-                    false;
-
-                return;
-            }
-
-            if (DarkRavenCommands.IsCommandSkill(_skill.SkillId))
-            {
-                _tooltipLabel.Text =
-                    DarkRavenCommands.GetName(_skill.SkillId) + "\n" +
-                    DarkRavenCommands.GetDescription(_skill.SkillId);
-                _tooltipLabel.Visible = true;
-                return;
-            }
-
-            var skillDef =
-                SkillDatabase
-                    .GetSkillDefinition(
-                        _skill.SkillId);
-
-            string skillName =
-                SkillDatabase
-                    .GetSkillName(
-                        _skill.SkillId);
-
-            ushort manaCost =
-                SkillDatabase
-                    .GetSkillManaCost(
-                        _skill.SkillId);
-
-            ushort agCost =
-                SkillDatabase
-                    .GetSkillAGCost(
-                        _skill.SkillId);
-
-            var skillType =
-                SkillDatabase
-                    .GetSkillType(
-                        _skill.SkillId);
-
-            string typeText =
-                skillType switch
-                {
-                    Client.Data.BMD.SkillType.Area =>
-                        "Area",
-
-                    Client.Data.BMD.SkillType.Target =>
-                        "Target",
-
-                    Client.Data.BMD.SkillType.Self =>
-                        "Self",
-
-                    _ =>
-                        string.Empty
-                };
-
-            string tooltip =
-                skillName;
-
-            if (!string.IsNullOrEmpty(
-                typeText))
-            {
-                tooltip +=
-                    $"\nType: {typeText}";
-            }
-
-            if (manaCost > 0)
-            {
-                tooltip +=
-                    $"\nMana: {manaCost}";
-            }
-
-            if (agCost > 0)
-            {
-                tooltip +=
-                    $"  AG: {agCost}";
-            }
-
-            if (skillDef != null)
-            {
-                if (skillDef.Damage > 0)
-                {
-                    tooltip +=
-                        $"\nDamage: {skillDef.Damage}";
-                }
-
-                if (skillDef.Distance > 0)
-                {
-                    tooltip +=
-                        $"  Range: {skillDef.Distance}";
-                }
-            }
-
-            if (_isUnavailable)
-                tooltip += "\nSolo durante Castle Siege activo en Valley of Loren.";
-
-            _tooltipLabel.Text =
-                tooltip;
-
-            _tooltipLabel.Visible =
-                true;
+            if (!Visible || !IsTooltipEnabled || !IsMouseOver || _skill == null ||
+                Scene?.IsPointerInputBlockedFor(this) == true) return false;
+            return _tooltip.Draw(sprite);
         }
     }
 }

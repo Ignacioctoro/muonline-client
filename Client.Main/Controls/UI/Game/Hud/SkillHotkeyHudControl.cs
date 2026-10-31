@@ -59,6 +59,7 @@ namespace Client.Main.Controls.UI.Game.Hud
         // 0 = 1-5
         // 1 = 6-0
         private int _visibleBank;
+        private readonly SkillTooltip _tooltip = new();
 
         /// <summary>
         /// Returns the currently visible bank.
@@ -180,7 +181,9 @@ namespace Client.Main.Controls.UI.Game.Hud
             GameTime gameTime)
         {
             base.Update(gameTime);
+            UpdateTooltip();
 
+            if (Scene?.IsPointerInputBlockedFor(this) == true) return;
             if (!Visible ||
                 !Interactive)
             {
@@ -258,6 +261,25 @@ namespace Client.Main.Controls.UI.Game.Hud
         // =============================================================
         // DRAW
         // =============================================================
+
+        private void UpdateTooltip()
+        {
+            _tooltip.SetSkill(null, Rectangle.Empty);
+            if (!Visible || !Interactive || Scene?.IsPointerInputBlockedFor(this) == true) return;
+            Rectangle bounds = DisplayRectangle;
+            Point mouse = CurrentMouseState.Position;
+            for (int i = 0; i < VISIBLE_SLOT_COUNT; i++)
+            {
+                Point position = SlotPositions[i];
+                var slot = new Rectangle(bounds.X + position.X, bounds.Y + position.Y, ICON_WIDTH, ICON_HEIGHT);
+                if (!slot.Contains(mouse)) continue;
+                _tooltip.SetSkill(_skills[GetRealSlotIndex(i)], slot);
+                return;
+            }
+        }
+
+        public bool DrawTooltipOverlay(SpriteBatch sprite) =>
+            Visible && Scene?.IsPointerInputBlockedFor(this) != true && _tooltip.Draw(sprite);
 
         public override void Draw(
             GameTime gameTime)

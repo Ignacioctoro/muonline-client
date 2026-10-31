@@ -26,3 +26,9 @@ Later integration checks: a valid B2/17 start while in map 30 enables the class 
 The current skill and expanded list share one LinearClamp draw scope; the skill-management panel and assigned HUD hotkeys also use LinearClamp. This smooths enlargement of the existing 20x28 source art without changing global UI sampling or allocating textures per frame. The source icons remain the original low-resolution assets.
 
 GameScene now passes the live ActiveSkill_2 HUD control to SkillQuickSlot. The active slot follows that rectangle, including its layout scale and parent translation, instead of historical screen-center nudges. The socket already drawn by MainControl is reused, avoiding a second frame over it. The icon's hit area and expanded list follow the same anchor. Reviewed geometry at 0.75/1/1.5 layout scales and checked the patch; no compilation or in-game verification was performed.
+
+## Tooltip overlay and central icon inset
+
+Skill helpers no longer draw as children between sibling icons. The scene's final DrawAfter tooltip pass draws one hovered skill helper after ordinary controls, covering the expanded selector, current skill and assigned HUD hotkeys. The tooltip is centered above its source, clamped to the virtual viewport, with a blue title, white body and a red footer with white `Use in Castle Siege` text for the shared siege-only IDs, independently of current availability. Text is cached per skill; the overlay is non-interactive and uses the existing UI font and pixel texture.
+
+The active icon has an independent 45/52 content factor: 26x36 inside the existing 42x52 HUD socket at default layout scale, rather than the former 30x42. Its outer hit area and HUD anchor are unchanged, while the icon remains centered with 8px padding. Selector and hotkey icon sizes are unchanged. Static patch checks and geometry checks at 0.75/1/1.5 scales only; not compiled or tested in game.

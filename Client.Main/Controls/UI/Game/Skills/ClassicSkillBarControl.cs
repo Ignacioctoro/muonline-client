@@ -6,6 +6,7 @@ using System.Linq;
 using Client.Main.Core.Client;
 using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.Controls.UI.Game.Skills
 {
@@ -443,6 +444,14 @@ namespace Client.Main.Controls.UI.Game.Skills
         // =============================================================
         // SELECT
         // =============================================================
+
+        public bool DrawTooltipOverlay(SpriteBatch sprite)
+        {
+            if (!Visible) return false;
+            for (int i = 0; i < _skillSlots.Count; i++)
+                if (_skillSlots[i].DrawTooltipOverlay(sprite)) return true;
+            return false;
+        }
 
         private void SelectSkill(
             SkillEntryState skill)
