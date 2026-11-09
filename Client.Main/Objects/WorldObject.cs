@@ -199,6 +199,9 @@ namespace Client.Main.Objects
                 UpdateWorldBoundingBox();
 
                 Status = GameControlStatus.Ready;
+                // A camera update may have excluded this object while it
+                // was loading. Reevaluate visibility on the next world tick.
+                World?.InvalidateObjectVisibility();
             }
             catch (Exception e)
             {

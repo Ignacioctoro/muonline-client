@@ -157,7 +157,7 @@ namespace Client.Main.Controls
         private readonly List<DroppedItemObject> _droppedItems = [];
         private readonly Queue<WorldObject> _objectsToInitialize = [];
         private readonly List<WorldObject> _visibleObjects = [];
-        private bool _dirtyVisibleObjects = true;
+        private volatile bool _dirtyVisibleObjects = true;
 
         public Dictionary<ushort, WalkerObject> WalkerObjectsById { get; } = [];
 
@@ -217,8 +217,10 @@ namespace Client.Main.Controls
 
         private void Camera_Moved(object sender, EventArgs e)
         {
-            _dirtyVisibleObjects = true;
+            InvalidateObjectVisibility();
         }
+
+        internal void InvalidateObjectVisibility() => _dirtyVisibleObjects = true;
 
         // --- Lifecycle Methods ---
 
@@ -382,6 +384,9 @@ namespace Client.Main.Controls
 
             if (_dirtyVisibleObjects)
             {
+                // Clear before scanning so a load completing during the
+                // rebuild can request another pass.
+                _dirtyVisibleObjects = false;
                 _visibleObjects.Clear();
 
                 for (var i = 0; i < Objects.Count; i++)
@@ -395,7 +400,6 @@ namespace Client.Main.Controls
                         _visibleObjects.Add(obj);
                 }
 
-                _dirtyVisibleObjects = false;
             }
 
             var objects = _visibleObjects;
