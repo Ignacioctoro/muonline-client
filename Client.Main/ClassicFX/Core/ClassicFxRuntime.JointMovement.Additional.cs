@@ -540,13 +540,14 @@ namespace Client.Main.ClassicFX.Core
         // When the model identity bridge is absent, keep the common movement.
         private bool MoveSmokeJointD(ref ClassicJoint j)
         {
-            if (JointTargetModelMatches == null ||
-                !TryGetOwnerPosition(j.Target, out Vector3 targetPosition))
+            if (!TryGetOwnerPosition(j.Target, out Vector3 targetPosition))
                 return true;
-            if (JointTargetModelMatches(j.Target, "MODEL_MAYASTONE1") ||
-                JointTargetModelMatches(j.Target, "MODEL_MAYASTONE2") ||
-                JointTargetModelMatches(j.Target, "MODEL_MAYASTONE3") ||
-                JointTargetModelMatches(j.Target, "MODEL_FIRE"))
+            if (j.Target.WorldObject is ClassicFxEffectModelObject { EffectType: ClassicFxEffectType.Fire } ||
+                (JointTargetModelMatches != null &&
+                 (JointTargetModelMatches(j.Target, "MODEL_MAYASTONE1") ||
+                  JointTargetModelMatches(j.Target, "MODEL_MAYASTONE2") ||
+                  JointTargetModelMatches(j.Target, "MODEL_MAYASTONE3") ||
+                  JointTargetModelMatches(j.Target, "MODEL_FIRE"))))
                 j.Position = targetPosition;
             return true;
         }

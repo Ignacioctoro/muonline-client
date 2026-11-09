@@ -2447,9 +2447,12 @@ namespace Client.Main.ClassicFX.Core
         private const float DarkLordRenderOpacity = 0.48f;
         private const float DarkLordRenderBlendIntensity = 0.70f;
 
+        internal ClassicFxEffectType EffectType { get; }
+
         public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
         {
             _bmdPath = bmdPath;
+            EffectType = type;
             _nativeRagefulBmdLighting =
                 type is ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&

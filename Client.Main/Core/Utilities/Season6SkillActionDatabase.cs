@@ -217,6 +217,7 @@ namespace Client.Main.Core.Utilities
 
             Add(38, "Decay",
                 SkillType.Area);
+            Add(387, "Decay Strengthener", SkillType.Area);
 
             Add(39, "Ice Storm",
                 SkillType.Area);

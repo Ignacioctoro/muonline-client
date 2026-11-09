@@ -5,6 +5,7 @@
 // shared fixed pools. No duplicate damage, combat, networking or skill casts.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Controllers;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -25,9 +26,7 @@ namespace Client.Main.ClassicFX.Core
             switch (type)
             {
                 case ClassicFxEffectType.Fire:
-                    // 6/7/8 need PKKey + special owner/joint setup; not silently
-                    // implemented as regular fire or mapped to another asset.
-                    if (subType is not (0 or 1 or 2 or 3 or 4 or 5 or 9)) return false;
+                    if (subType is not (0 or 1 or 2 or 3 or 4 or 5 or 6 or 9)) return false;
                     definition = new Season6ModelDefinition(
                         "Skill/Fire01.bmd",
                         subType == 3 ? 80f : subType == 9 ? 600f :
@@ -108,6 +107,14 @@ namespace Client.Main.ClassicFX.Core
                         gravity = 5f;
                         direction = new Vector3(0f, -30f, 0f);
                     }
+                    else if (subType == 6)
+                    {
+                        scale = (15f + Random.Modulo(8)) * 0.1f;
+                        position += new Vector3(200f + Random.Modulo(100),
+                            Random.Modulo(100) - 50f, 500f + Random.Modulo(300));
+                        direction = new Vector3(0f, 0f, -50f - Random.Modulo(50));
+                        angle = new Vector3(0f, MathHelper.ToRadians(20f), 0f);
+                    }
                     else if (subType == 9)
                     {
                         scale = (20f + Random.Modulo(10)) * 0.13f;
@@ -176,6 +183,7 @@ namespace Client.Main.ClassicFX.Core
                 case ClassicFxEffectType.Fire:
                     view.BlendMesh = 1;
                     if (subType is 3 or 5) view.HiddenMesh = 0;
+                    if (subType == 6) view.HiddenMesh = -2;
                     break;
                 case ClassicFxEffectType.Ice:
                     view.BlendMesh = 0;
@@ -216,6 +224,14 @@ namespace Client.Main.ClassicFX.Core
 
         private bool MoveS6Fire(ref EffectState e, float f)
         {
+            if (e.SubType == 6 && e.FirstMove && e.ModelView != null)
+            {
+                e.FirstMove = false;
+                CreateJoint(ClassicTextureIds.BitmapSmoke, e.Position, e.Position,
+                    new Vector3(0f, 20f, 0f), subType: 0,
+                    target: ClassicFxOwner.FromWorldObject(e.ModelView), scale: 100f);
+            }
+
             if (e.Direction != Vector3.Zero)
             {
                 Matrix orientation = Matrix.CreateFromYawPitchRoll(
@@ -223,6 +239,9 @@ namespace Client.Main.ClassicFX.Core
                 e.Position += Vector3.TransformNormal(e.Direction, orientation) * f;
             }
             float ground = RequestTerrainHeight(e.Position.X, e.Position.Y);
+            if (e.SubType == 6)
+                return MoveS6DecayFire(ref e, ground);
+
             if (e.SubType is 0 or 2 or 4)
             {
                 if (e.Position.Z <= ground)
@@ -279,6 +298,53 @@ namespace Client.Main.ClassicFX.Core
             }
             e.BlendMeshLight = e.SubType == 0
                 ? (4f + Random.Modulo(4)) * 0.1f : 0f;
+            return true;
+        }
+
+        private bool MoveS6DecayFire(ref EffectState e, float ground)
+        {
+            if (e.Position.Z <= ground)
+            {
+                e.Position.Z = ground;
+                Vector3 green = new Vector3(0.1f, 0.5f, 0.1f);
+                CreateEffect(ClassicFxEffectType.SkillInferno, e.Position,
+                    Vector3.Zero, new Vector3(0f, 0.5f, 0f), ClassicFxOwner.None,
+                    subType: 2, boneIndex: 0, scale: 0.3f);
+                for (int i = 0; i < 15; i++)
+                {
+                    Vector3 smoke = e.Position + new Vector3(
+                        Random.Modulo(160) - 80f, Random.Modulo(160) - 100f, 50f);
+                    CreateParticle(ClassicTextureIds.BitmapSmoke, smoke, e.Angle,
+                        green, subType: 11, scale: (Random.Modulo(32) + 80f) * 0.025f);
+                }
+                for (int i = 0; i < 6; i++)
+                    CreateEffect(Random.Modulo(2) == 0
+                            ? ClassicFxEffectType.Stone1 : ClassicFxEffectType.Stone2,
+                        e.Position, e.Angle, green, ClassicFxOwner.None);
+                CreateParticle(ClassicTextureIds.BitmapExplotion,
+                    e.Position + new Vector3(0f, 0f, 80f), e.Angle, green);
+                SoundController.Instance.PlayBuffer("Sound/eBlastPoison_2.wav");
+                return false;
+            }
+
+            CreateSprite(ClassicTextureIds.BitmapLight, e.Position, 3f,
+                new Vector3(0.5f, 0.5f, 1f));
+            CreateSprite(ClassicTextureIds.BitmapShiny + 1, e.Position, 3f,
+                Vector3.One, rotation: Random.Modulo(360), subType: 1);
+            CreateSprite(ClassicTextureIds.BitmapShiny + 1, e.Position, 4f,
+                e.Light, rotation: Random.Modulo(360));
+
+            float lum = 0.7f + 0.1f * Random.Modulo(4);
+            Vector3 glow = new Vector3(lum * 0.1f, lum, 0f);
+            AddClassicTerrainLight(e.Position.X, e.Position.Y, glow, 2f);
+            if (Clock.AdvancedReferenceFrame)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    Vector3 fire = e.Position + new Vector3(Random.Modulo(50) - 25f, 0f, 0f);
+                    CreateParticle(ClassicTextureIds.BitmapFire, fire, e.Angle, glow, subType: 5);
+                }
+            }
             return true;
         }
 
