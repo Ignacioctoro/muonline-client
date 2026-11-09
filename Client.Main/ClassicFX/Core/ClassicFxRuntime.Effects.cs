@@ -2273,7 +2273,8 @@ namespace Client.Main.ClassicFX.Core
         private bool NeedsNativeBmdLighting =>
             NeedsRagefulBmdLighting || _nativeDestructionBmdLighting ||
             _nativePierPartBmdLighting || _nativeAirForceBmdLighting ||
-            _nativeGroundStoneBmdLighting || _nativeMagic2BmdLighting;
+            _nativeGroundStoneBmdLighting || _nativeMagic2BmdLighting ||
+            EffectType == ClassicFxEffectType.LaserSkillModel;
 
         // Preserve the existing Rageful Blow call site. The original
         // Strike of Destruction impact emits the same Stone01/Stone02

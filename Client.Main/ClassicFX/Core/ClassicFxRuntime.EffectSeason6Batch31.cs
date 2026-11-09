@@ -3,6 +3,7 @@
 // Shared ClassicFX pool and MonoGame BMD renderer; no secondary renderer.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.ClassicFX.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -91,6 +92,14 @@ namespace Client.Main.ClassicFX.Core
         private static void ConfigureS6Batch31ModelView(
             ClassicFxEffectModelObject view, ClassicFxEffectType type)
         {
+            if (type == ClassicFxEffectType.LaserSkillModel)
+            {
+                // Native MODEL_LASER uses RENDER_DARK. Its bright texture
+                // darkens the scene instead of adding light to it.
+                view.BlendMesh = 0;
+                view.BlendMeshState = ClassicRenderStates.Subtract;
+            }
+
             if (IsS6Batch31Warp(type))
                 view.BlendMesh = -2;
             if (type == ClassicFxEffectType.AuroraModel)
