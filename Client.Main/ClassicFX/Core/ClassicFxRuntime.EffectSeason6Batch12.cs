@@ -4,6 +4,7 @@
 // Shared Effect/Sprite/Particle pools; original BMD via MonoGame ModelObject.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Models;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -183,7 +184,28 @@ namespace Client.Main.ClassicFX.Core
 
         private bool MoveS6Magic2(ref EffectState e, float f)
         {
-            // Native MODEL_MAGIC2 has 20 ticks and no position translation.
+            // The reference leaves position translation disabled. Power
+            // Wave opts into flight by supplying a confirmed target.
+            if (e.SubType == 0 &&
+                e.ModelView?.Status == GameControlStatus.Ready &&
+                e.TargetWorldObject is { Status: GameControlStatus.Ready } target &&
+                ReferenceEquals(target.World, World))
+            {
+                Vector3 destination = target.WorldPosition.Translation;
+                destination.Z = MathF.Max(destination.Z,
+                    RequestTerrainHeight(destination.X, destination.Y)) + 40f;
+                Vector3 delta = destination - e.Position;
+                float distance = new Vector2(delta.X, delta.Y).Length();
+                float step = MathF.Abs(e.Direction.Y) * f;
+                if (distance > 0.001f)
+                {
+                    e.Angle.Z = MathF.Atan2(-delta.X, delta.Y);
+                    e.Position += delta * MathF.Min(step / distance, 1f);
+                }
+                if (distance <= step)
+                    e.LifeTime = MathF.Min(e.LifeTime, 2f);
+            }
+
             e.BlendMeshLight = e.LifeTime * 0.1f;
             // Move_MODEL_MAGIC2(): BlendMeshTexCoordU=-LifeTime*0.2.
             // Recreate the texture flow which gives the stationary BMD

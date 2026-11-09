@@ -25,7 +25,10 @@ namespace Client.Main.Objects.Effects.Skills
                     return false;
 
                 Vector3 origin = context.Caster.WorldPosition.Translation;
-                if (context.TargetPosition is { } target &&
+                ushort targetId = (ushort)(context.TargetId & 0x7FFF);
+                context.World.TryGetWalkerById(targetId, out var targetWalker);
+                Vector3? targetPosition = targetWalker?.WorldPosition.Translation ?? context.TargetPosition;
+                if (targetPosition is { } target &&
                     (target.X != origin.X || target.Y != origin.Y))
                 {
                     angle = new Vector3(0f, 0f, MathHelper.ToRadians(
@@ -41,7 +44,7 @@ namespace Client.Main.Objects.Effects.Skills
                 float ground = context.World.Terrain.RequestTerrainHeight(origin.X, origin.Y);
                 origin.Z = MathF.Max(origin.Z, ground) + 40f;
                 return fx.CreateEffect(ClassicFxEffectType.Magic2, origin, angle,
-                    Vector3.One, ClassicFxOwner.None).IsValid;
+                    Vector3.One, ClassicFxOwner.None, nativeTarget: targetWalker).IsValid;
             }
 
             // Area casts can also produce a targeted animation. Only 0x1E
