@@ -421,6 +421,11 @@ namespace Client.Main.ClassicFX.Core
             if (e.SubType == 1)
             {
                 e.BlendMeshLight *= MathF.Pow(1f / 1.1f, f);
+                if (e.NativePkKey == 1 && e.FirstMove && e.LifeTime <= 18f)
+                {
+                    e.FirstMove = false;
+                    SoundController.Instance.PlayBuffer("Sound/eSuddenIce_2.wav");
+                }
                 return true;
             }
             // Original StartPosition tracks the horizontal base independently
@@ -477,7 +482,8 @@ namespace Client.Main.ClassicFX.Core
                 CreateEffect(ClassicFxEffectType.IceSmall,
                     impact, e.Angle, e.Light, ClassicFxOwner.None);
             CreateEffect(ClassicFxEffectType.Blizzard,
-                impact, e.Angle, e.Light, ClassicFxOwner.None, subType: 1);
+                impact, e.Angle, e.Light, ClassicFxOwner.None, subType: 1,
+                nativePkKey: e.NativePkKey);
             return false;
         }
     }
