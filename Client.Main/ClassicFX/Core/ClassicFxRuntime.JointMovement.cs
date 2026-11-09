@@ -1124,9 +1124,20 @@ namespace Client.Main.ClassicFX.Core
                 // CreateEffectFpsChecked(MODEL_LASER). Native 'scale==80'
                 // path, subtype 5 requests laser subtype 3.
                 if (Random.FpsCheck(1, Clock))
-                    JointSecondaryEffectRequested?.Invoke(handle,
-                        "MODEL_LASER", j.Position, j.Angle, j.Light,
-                        j.SubType == 5 ? 3 : 0, 1f);
+                {
+                    if (j.SubType == 0)
+                    {
+                        Vector3 angle = j.Angle * (MathHelper.Pi / 180f);
+                        CreateEffect(ClassicFxEffectType.LaserSkillModel,
+                            j.Position, angle, j.Light, ClassicFxOwner.None);
+                    }
+                    else
+                    {
+                        JointSecondaryEffectRequested?.Invoke(handle,
+                            "MODEL_LASER", j.Position, j.Angle, j.Light,
+                            j.SubType == 5 ? 3 : 0, 1f);
+                    }
+                }
                 if (JointSpiritSiegeNoAttackZoneResolver?.Invoke(j.Position) == true)
                 {
                     j.Velocity = 0f;

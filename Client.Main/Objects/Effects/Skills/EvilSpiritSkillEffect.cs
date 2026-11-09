@@ -1,77 +1,40 @@
 #nullable enable
-using Client.Main.Controls;
+using Client.Main.ClassicFX.Core;
+using Client.Main.ClassicFX.Data;
 using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.Objects.Effects.Skills
 {
-    /// <summary>
-    /// Factory for Evil Spirit skill visual effect (Skill ID 9).
-    /// Creates spirit bolts that move in 4 directions (90° intervals) with trailing effects.
-    /// </summary>
     [SkillVisualEffect(9)]
-    public sealed class EvilSpiritSkillEffect : ISkillVisualEffect
+    public sealed class EvilSpiritSkillEffect : IClassicFxSkillVisualEffect
     {
-        public WorldObject? CreateEffect(SkillEffectContext context)
+        public bool TryCreateClassicFx(SkillEffectContext context)
         {
-            if (context.Caster == null || context.World == null)
-                return null;
+            if (!context.IsAreaSkillAnimation ||
+                context.World?.ClassicFx is not { Enabled: true, IsDisposed: false } fx ||
+                context.Caster == null || !ReferenceEquals(context.Caster.World, context.World))
+                return false;
 
-            // Calculate target angle from caster to target position
-            float targetAngle = 0f;
-            Vector3 casterPos = context.Caster.WorldPosition.Translation;
+            Vector3 origin = context.Caster.WorldPosition.Translation;
+            Vector3 start = origin + new Vector3(0f, 0f, 100f);
+            var owner = ClassicFxOwner.FromWorldObject(context.Caster);
+            bool emitted = false;
 
-            if (context.TargetPosition.HasValue)
+            // MuMain emits two spirit trails at each fixed compass heading.
+            // The joint bridge takes native degrees.
+            for (int i = 0; i < 4; i++)
             {
-                Vector3 targetPos = context.TargetPosition.Value;
-                Vector2 direction = new Vector2(targetPos.X - casterPos.X, targetPos.Y - casterPos.Y);
-
-                if (direction.LengthSquared() > 0.01f)
-                {
-                    targetAngle = MathHelper.ToDegrees(MathF.Atan2(direction.Y, direction.X));
-                }
-            }
-            else if (context.TargetId != 0)
-            {
-                // Try to find the target walker by ID
-                WalkerObject? target = FindTargetById(context.World, context.TargetId);
-                if (target != null)
-                {
-                    Vector3 targetPos = target.WorldPosition.Translation;
-                    Vector2 direction = new Vector2(targetPos.X - casterPos.X, targetPos.Y - casterPos.Y);
-
-                    if (direction.LengthSquared() > 0.01f)
-                    {
-                        targetAngle = MathHelper.ToDegrees(MathF.Atan2(direction.Y, direction.X));
-                    }
-                }
-            }
-            else
-            {
-                // Use caster's facing direction if no target
-                targetAngle = context.Caster.Angle.Z;
+                Vector3 angle = new Vector3(0f, 0f, i * 90f);
+                emitted |= fx.CreateJoint(ClassicTextureIds.BitmapJointSpirit,
+                    start, origin, angle, target: owner, scale: 80f).IsValid;
+                emitted |= fx.CreateJoint(ClassicTextureIds.BitmapJointSpirit,
+                    start, origin, angle, target: owner, scale: 20f).IsValid;
             }
 
-            return new ScrollOfEvilSpiritEffect(context.Caster, targetAngle);
+            return emitted;
         }
 
-        private static WalkerObject? FindTargetById(WalkableWorldControl world, ushort targetId)
-        {
-            // Check monsters
-            foreach (var monster in world.Monsters)
-            {
-                if (monster?.NetworkId == targetId)
-                    return monster;
-            }
-
-            // Check players
-            foreach (var player in world.Players)
-            {
-                if (player?.NetworkId == targetId)
-                    return player;
-            }
-
-            return null;
-        }
+        public WorldObject? CreateEffect(SkillEffectContext context) => null;
     }
 }
