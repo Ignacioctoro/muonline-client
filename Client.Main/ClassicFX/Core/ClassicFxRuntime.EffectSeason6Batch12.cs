@@ -184,26 +184,14 @@ namespace Client.Main.ClassicFX.Core
 
         private bool MoveS6Magic2(ref EffectState e, float f)
         {
-            // The reference leaves position translation disabled. Power
-            // Wave opts into flight by supplying a confirmed target.
+            // Power Wave uses the launch heading and keeps moving through
+            // the confirmed target until the effect expires.
             if (e.SubType == 0 &&
                 e.ModelView?.Status == GameControlStatus.Ready &&
-                e.TargetWorldObject is { Status: GameControlStatus.Ready } target &&
-                ReferenceEquals(target.World, World))
+                e.TargetWorldObject != null)
             {
-                Vector3 destination = target.WorldPosition.Translation;
-                destination.Z = MathF.Max(destination.Z,
-                    RequestTerrainHeight(destination.X, destination.Y)) + 40f;
-                Vector3 delta = destination - e.Position;
-                float distance = new Vector2(delta.X, delta.Y).Length();
-                float step = MathF.Abs(e.Direction.Y) * f;
-                if (distance > 0.001f)
-                {
-                    e.Angle.Z = MathF.Atan2(-delta.X, delta.Y);
-                    e.Position += delta * MathF.Min(step / distance, 1f);
-                }
-                if (distance <= step)
-                    e.LifeTime = MathF.Min(e.LifeTime, 2f);
+                e.Position += Vector3.TransformNormal(e.Direction,
+                    Matrix.CreateRotationZ(e.Angle.Z)) * f;
             }
 
             e.BlendMeshLight = e.LifeTime * 0.1f;
