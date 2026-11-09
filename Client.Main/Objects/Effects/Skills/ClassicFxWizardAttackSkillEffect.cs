@@ -32,6 +32,10 @@ namespace Client.Main.Objects.Effects.Skills
                         AngleUtils.CreateAngleDegrees(origin.X, origin.Y, target.X, target.Y)));
                 }
 
+                // Character headings face local -Y, while the Magic02
+                // mesh extends forward along local +Y.
+                angle.Z = MathHelper.WrapAngle(angle.Z + MathHelper.Pi);
+
                 // Magic02 is a low wave. Lift it above the ground so the
                 // terrain depth pass cannot cover it at the caster's feet.
                 float ground = context.World.Terrain.RequestTerrainHeight(origin.X, origin.Y);
