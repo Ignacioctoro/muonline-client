@@ -51,11 +51,11 @@ namespace Client.Main.ClassicFX.Core
                 if (R(3) < 2)
                 {
                     j.Light = new Vector3(0.5f);
-                    // Main: CreateEffect(MODEL_DESAIR, ..., owner=NULL,
-                    // scale=1, m_sTargetIndex = this joint pool index).
-                    JointSecondaryEffectRequested?.Invoke(
-                        handle, "MODEL_DESAIR", j.Position, j.Angle,
-                        j.Light, 0, 1f);
+                    var effect = CreateEffect(ClassicFxEffectType.DesairModel,
+                        j.Position, j.Angle * (MathHelper.Pi / 180f),
+                        j.Light, ClassicFxOwner.None);
+                    if (effect.IsValid)
+                        _effects[effect.Index].AttachedJoint = handle;
                 }
                 return true;
             }

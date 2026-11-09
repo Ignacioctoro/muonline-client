@@ -533,6 +533,7 @@ namespace Client.Main.ClassicFX.Core
             // Last native tick emitting children for BITMAP_MAGIC+1 subtypes 6/8.
             public int LastChildNativeTick;
             public ClassicFxWheelWeaponSnapshot WheelWeapon;
+            public ClassicFxHandle AttachedJoint;
             public ClassicFxEffectModelObject ModelView;
         }
 

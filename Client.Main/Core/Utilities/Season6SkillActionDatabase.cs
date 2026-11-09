@@ -578,7 +578,12 @@ namespace Client.Main.Core.Utilities
             Add(
                 238,
                 "Chaotic Diseier",
-                SkillType.Area);
+                SkillType.Area,
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerAttackStrike);
+
+            Add(523, "Chaotic Diseier Strengthener", SkillType.Area,
+                Season6SkillAnimationMode.Explicit, PlayerAction.PlayerAttackStrike);
 
             // =========================================================
             // DARK LORD

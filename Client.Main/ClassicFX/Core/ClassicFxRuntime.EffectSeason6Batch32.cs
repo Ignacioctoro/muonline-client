@@ -165,7 +165,8 @@ namespace Client.Main.ClassicFX.Core
             }
             if (type == ClassicFxEffectType.DesairModel)
             {
-                life = 30f; // Registered BMD only; no native Move handler.
+                life = 52f;
+                scale = 1.4f;
                 return true;
             }
             return false;
@@ -250,7 +251,23 @@ namespace Client.Main.ClassicFX.Core
                     return true;
 
                 case ClassicFxEffectType.DesairModel:
-                    // C++ has no specialized movement routine.
+                    if (!e.AttachedJoint.IsValid)
+                        return true;
+                    if (!TryGetJoint(e.AttachedJoint, out var joint))
+                        return false;
+
+                    e.Position = joint.Position;
+                    e.Angle = joint.Angle * (MathHelper.Pi / 180f);
+                    int tick = (int)e.LifeTime;
+                    if (Clock.AdvancedReferenceFrame && tick % 10 == 0 &&
+                        e.LastChildNativeTick != tick)
+                    {
+                        e.LastChildNativeTick = tick;
+                        CreateEffect(ClassicFxEffectType.Feather, e.Position, e.Angle,
+                            e.Light, ClassicFxOwner.None, subType: 2, scale: 1.4f);
+                        CreateEffect(ClassicFxEffectType.Feather, e.Position, e.Angle,
+                            e.Light, ClassicFxOwner.None, subType: 3, scale: 1.4f);
+                    }
                     return true;
 
                 default:

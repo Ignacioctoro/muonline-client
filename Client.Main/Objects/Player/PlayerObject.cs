@@ -1856,12 +1856,21 @@ namespace Client.Main.Objects.Player
             if ((skillId == 77 || skillId == 441) && _isRiding)
                 return GetDefaultSkillAction(isInSafeZone);
 
+            if (skillId == 65 && _isRiding && !isInSafeZone)
+            {
+                if (IsFenrirVehicle(_currentVehicleIndex))
+                    return PlayerAction.PlayerFenrirAttackDarklordFlash;
+                if (_currentVehicleIndex == 0)
+                    return PlayerAction.PlayerAttackRideAttackFlash;
+            }
+
             // ZzzCharacter.cpp: Fire Scream (78 / strengthened 518)
             // uses the Dark Lord's strike pose even when riding. Its
             // mounted animations differ from the normal on-foot strike.
             if ((skillId == 78 || skillId == 518 ||
                  skillId == 61 || skillId == 508 || skillId == 514 ||
-                 skillId == 60 || skillId == 66 || skillId == 509) &&
+                 skillId == 60 || skillId == 66 || skillId == 509 ||
+                 skillId == 238 || skillId == 523) &&
                 _isRiding && !isInSafeZone)
                 return IsFenrirVehicle(_currentVehicleIndex)
                     ? PlayerAction.PlayerFenrirAttackDarklordStrike
