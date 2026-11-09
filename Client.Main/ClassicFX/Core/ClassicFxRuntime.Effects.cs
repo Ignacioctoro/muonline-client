@@ -2292,7 +2292,7 @@ namespace Client.Main.ClassicFX.Core
         }
 
         protected override bool RenderBlendMeshOnLowQuality =>
-            _renderRagefulBlendOnLowQuality;
+            _renderRagefulBlendOnLowQuality || _nativeMagic2BmdLighting;
 
         // MuMain explicitly marks both GroundStone action 0 animations
         // non-looping. They have five BMD keys and Velocity=0.3, so

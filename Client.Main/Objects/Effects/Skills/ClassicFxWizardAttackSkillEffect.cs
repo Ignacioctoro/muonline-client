@@ -32,6 +32,10 @@ namespace Client.Main.Objects.Effects.Skills
                         AngleUtils.CreateAngleDegrees(origin.X, origin.Y, target.X, target.Y)));
                 }
 
+                // Magic02 is a low wave. Lift it above the ground so the
+                // terrain depth pass cannot cover it at the caster's feet.
+                float ground = context.World.Terrain.RequestTerrainHeight(origin.X, origin.Y);
+                origin.Z = MathF.Max(origin.Z, ground) + 40f;
                 return fx.CreateEffect(ClassicFxEffectType.Magic2, origin, angle,
                     Vector3.One, ClassicFxOwner.None).IsValid;
             }
