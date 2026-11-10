@@ -43,6 +43,19 @@ namespace Client.Main.Controls.UI.Game.Skills
             if (ability > 0) _lines.Add($"Stamina Use: {ability}");
         }
 
+        public void SetText(string title, string detail, string? hint, Rectangle anchor)
+        {
+            _anchor = anchor;
+            _visible = true;
+            _siegeOnly = false;
+            _skillId = 0;
+            _lines.Clear();
+            _lines.Add(title);
+            _lines.Add(detail);
+            if (hint != null)
+                _lines.Add(hint);
+        }
+
         public bool Draw(SpriteBatch sprite)
         {
             var graphics = GraphicsManager.Instance;

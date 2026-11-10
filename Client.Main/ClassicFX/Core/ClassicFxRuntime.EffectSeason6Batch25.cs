@@ -5,6 +5,8 @@
 // Does not duplicate BrokenIce, CursedStatue, RaklionBossCrack or Casting.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Objects.Effects;
+using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -42,11 +44,8 @@ namespace Client.Main.ClassicFX.Core
                 subType != 0) return false;
             if (type == ClassicFxEffectType.ShockwaveSpin01 &&
                 (subType < 0 || subType > 1)) return false;
-            // WindForce subtype 1 is a buff-driven persistent effect:
-            // requires g_isCharacterBuff(), not yet bridged. Do not
-            // make a permanently-visible fake effect.
             if (type == ClassicFxEffectType.WindForce &&
-                (subType < 0 || subType > 5 || subType == 1)) return false;
+                (subType < 0 || subType > 5)) return false;
             if (type == ClassicFxEffectType.SdAura && subType != 0)
                 return false;
 
@@ -76,6 +75,7 @@ namespace Client.Main.ClassicFX.Core
             definition = new Season6ModelDefinition(path, life, modelScale,
                 needsOwner: IsS6Batch25CursedTemple(type) ||
                     type == ClassicFxEffectType.SdAura ||
+                    (type == ClassicFxEffectType.WindForce && subType == 1) ||
                     IsS6Batch25Shockwave(type),
                 useCallerScale: IsS6Batch25Shockwave(type) ||
                     type == ClassicFxEffectType.RaklionBossMagic ||
@@ -128,8 +128,8 @@ namespace Client.Main.ClassicFX.Core
             }
             if (type == ClassicFxEffectType.WindForce)
             {
-                life = subType == 2 || subType == 3 ? 70f : 50f;
-                return true;
+                life = subType switch { 1 => 999f, 2 or 3 => 70f, _ => 50f };
+                return subType != 1 || owner.WorldObject is PlayerObject player && HasIncreaseBlock(player);
             }
             if (IsS6Batch25Shockwave(type))
             {
@@ -346,6 +346,18 @@ namespace Client.Main.ClassicFX.Core
                 -0.9f : -0.3f;
             e.Angle.Z = MathHelper.ToRadians(
                 (int)Clock.WorldTimeMilliseconds * rotationSpeed);
+            if (e.SubType == 1)
+            {
+                if (e.Owner.WorldObject is not PlayerObject player ||
+                    !ReferenceEquals(player.World, World) || player.IsDead || !HasIncreaseBlock(player))
+                    return false;
+
+                e.Position = player.WorldPosition.Translation;
+                e.LifeTime = 10f;
+                e.Light = new Vector3(0.6f, 0.6f, 1f) *
+                    ((MathF.Sin((float)Clock.WorldTimeMilliseconds * 0.001f) + 1f) * 0.25f + 0.2f);
+                return true;
+            }
             e.Scale = MathF.Min(3f, e.Scale + 0.1f * f);
             e.Alpha *= MathF.Pow(0.92f, f);
             e.Light *= MathF.Pow(
@@ -376,6 +388,15 @@ namespace Client.Main.ClassicFX.Core
                 }
             }
             return true;
+        }
+
+        private static bool HasIncreaseBlock(PlayerObject player)
+        {
+            var state = MuGame.Network?.GetCharacterState();
+            return state != null &&
+                (state.HasActiveBuff(Season6BuffMapping.IncreaseBlock, player.NetworkId) ||
+                 state.HasActiveBuff(Season6BuffMapping.IncreaseBlockPowerUp, player.NetworkId) ||
+                 state.HasActiveBuff(Season6BuffMapping.IncreaseBlockMastery, player.NetworkId));
         }
     }
 }

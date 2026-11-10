@@ -4,8 +4,10 @@
 // Existing Effect/Particle/Sprite/Joint/terrain pools only.
 using System;
 using Client.Main.ClassicFX.Data;
+using Client.Main.Controllers;
 using Client.Main.Models;
 using Client.Main.Objects;
+using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.ClassicFX.Core
@@ -175,15 +177,7 @@ namespace Client.Main.ClassicFX.Core
                     return true;
 
                 case ClassicFxEffectType.SwordEffCarrier:
-                    if (!S6Batch40OwnerIsAlive(e.Owner))
-                        return false;
-                    if (Clock.AdvancedReferenceFrame &&
-                        TryGetOwnerBonePosition(e.Owner, 5, out Vector3 from) &&
-                        TryGetOwnerBonePosition(e.Owner, 4, out Vector3 to))
-                        CreateJoint(ClassicTextureIds.BitmapSwordEff,
-                            from, to, e.Owner.WorldObject.Angle, 0,
-                            e.Owner, 100f);
-                    return true;
+                    return MoveChainDrive(ref e);
 
                 case ClassicFxEffectType.JointForceCarrier:
                     if (Clock.AdvancedReferenceFrame &&
@@ -226,6 +220,78 @@ namespace Client.Main.ClassicFX.Core
                     return false; // no native ongoing emitter; release after creation
             }
             return false;
+        }
+
+        private bool MoveChainDrive(ref EffectState effect)
+        {
+            if (!S6Batch40OwnerIsAlive(effect.Owner) ||
+                effect.Owner.WorldObject is not PlayerObject caster ||
+                caster.CurrentAction != PlayerAction.PlayerSkillGiantswing)
+                return false;
+            if (!Clock.AdvancedReferenceFrame)
+                return true;
+
+            Vector3 angle = caster.TotalAngle;
+            Vector3 position = caster.WorldPosition.Translation;
+            int action = (int)PlayerAction.PlayerSkillGiantswing;
+            var actions = caster.Model?.Actions;
+            float actionSpeed = actions != null && action < actions.Length
+                ? actions[action]?.PlaySpeed ?? 0f : 0f;
+            if (TryGetOwnerBonePosition(effect.Owner, 5, out Vector3 from) &&
+                TryGetOwnerBonePosition(effect.Owner, 4, out Vector3 to))
+                CreateJoint(ClassicTextureIds.BitmapSwordEff, from, to,
+                    angle * (180f / MathHelper.Pi), 0, effect.Owner, 100f);
+
+            var target = effect.TargetWorldObject;
+            bool hasTarget = target != null && ReferenceEquals(target.World, World) &&
+                target.Status == GameControlStatus.Ready;
+            Vector3 waveAngle = new Vector3(MathHelper.ToRadians(60f), 0f, angle.Z - MathHelper.Pi);
+
+            if (caster.CurrentFrame >= 7 && (effect.TriggerMask & 1) == 0)
+            {
+                effect.TriggerMask |= 1;
+                Vector3 light = new Vector3(0.4f, 0.5f, 1f);
+                if (TryTransformOwnerBonePosition(effect.Owner, 0,
+                    new Vector3(-180f, 100f, 0f), out Vector3 impact))
+                    CreateEffect(ClassicFxEffectType.Shockwave01, impact, waveAngle, light, effect.Owner);
+                CreateEffect(ClassicFxEffectType.WolfHeadEffect2, position, angle, effect.Light,
+                    effect.Owner, subType: 3, nativeAnimationSpeed: actionSpeed);
+                if (hasTarget)
+                {
+                    CreateEffect(ClassicFxEffectType.Damage1ImpactEmitter,
+                        target.WorldPosition.Translation, waveAngle, light, effect.Owner,
+                        scale: 1.4f, nativeTarget: target);
+                    SoundController.Instance.PlayBuffer("Sound/Ragefighter/Rage_Giantswing_Att.wav");
+                }
+            }
+
+            if (caster.CurrentFrame >= 12 && (effect.TriggerMask & 2) == 0)
+            {
+                effect.TriggerMask |= 2;
+                waveAngle.X = MathHelper.PiOver2;
+                if (TryTransformOwnerBonePosition(effect.Owner, 4,
+                    new Vector3(-80f, 120f, 0f), out Vector3 impact))
+                    CreateEffect(ClassicFxEffectType.Shockwave02, impact, waveAngle,
+                        new Vector3(0.5f, 0.5f, 1f), effect.Owner, scale: 0.5f);
+                CreateEffect(ClassicFxEffectType.WolfHeadEffect2, position, angle, effect.Light,
+                    effect.Owner, subType: 5, nativeAnimationSpeed: actionSpeed);
+                if (TryTransformOwnerBonePosition(effect.Owner, 4,
+                    new Vector3(-80f, 20f, 0f), out Vector3 spin))
+                {
+                    CreateEffect(ClassicFxEffectType.ShockwaveSpin01, spin, waveAngle,
+                        Vector3.One, effect.Owner, scale: 0.5f);
+                    CreateEffect(ClassicFxEffectType.ShockwaveSpin01, spin, waveAngle,
+                        Vector3.One, effect.Owner, subType: 1, scale: 0.9f);
+                }
+                if (hasTarget)
+                {
+                    CreateParticle(ClassicTextureIds.BitmapShiny + 4,
+                        target.WorldPosition.Translation, angle, Vector3.One, scale: 1.9f);
+                    SoundController.Instance.PlayBuffer("Sound/Ragefighter/Rage_Giantswing_Att.wav");
+                }
+            }
+
+            return true;
         }
 
         private bool S6Batch40OwnerIsAlive(ClassicFxOwner owner) =>

@@ -3102,6 +3102,7 @@ namespace Client.Main.Scenes
                 // Skill helpers are overlays, never children drawn between sibling icons.
                 if (_skillQuickSlot?.DrawTooltipOverlay(sprite) != true)
                     _main.SkillHotkeys.DrawTooltipOverlay(sprite);
+                _activeBuffsPanel?.DrawTooltipOverlay(sprite);
 
                 MyQuestsControl.Instance.DrawTooltipOverlay(sprite);
                 NpcShopControl.Instance.DrawTooltipOverlay(sprite);

@@ -8,6 +8,8 @@ namespace Client.Main.ClassicFX.Core
 {
     public sealed partial class ClassicFxRuntime
     {
+        internal const float RageFighterBuffVisualScale = 0.8f;
+
         private static bool IsS6Batch39LogicalType(ClassicFxEffectType t, int sub) =>
             t switch
             {
@@ -16,17 +18,17 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.BossLaserShort => sub == 0,
                 ClassicFxEffectType.FireTrail02 => sub == 0,
                 ClassicFxEffectType.LightProjectile => sub == 0,
-                ClassicFxEffectType.MagicGroundBase => sub == 1,
+                ClassicFxEffectType.MagicGroundBase => sub is 1 or 13,
                 ClassicFxEffectType.ShotgunJointBurst => sub == 0,
                 ClassicFxEffectType.FlareForceJointBurst => sub is >= 0 and <= 7,
-                ClassicFxEffectType.LightRedGround => sub is 3 or 4,
+                ClassicFxEffectType.LightRedGround => sub is >= 0 and <= 4,
                 ClassicFxEffectType.ChromeEnergyGround => sub == 0,
                 _ => false
             };
 
         private static bool S6Batch39NeedsOwner(ClassicFxEffectType t, int sub) =>
             t == ClassicFxEffectType.FlareForceJointBurst ||
-            (t == ClassicFxEffectType.LightRedGround && sub == 3);
+            (t == ClassicFxEffectType.LightRedGround && sub != 4);
 
         private static bool IsS6Batch39TerrainType(ClassicFxEffectType t) =>
             t is ClassicFxEffectType.MagicGroundBase or
@@ -91,8 +93,8 @@ namespace Client.Main.ClassicFX.Core
                     break;
                 }
                 case ClassicFxEffectType.MagicGroundBase:
-                    scale = 0.5f;
-                    life = 20f;
+                    scale = sub == 13 ? 1f : 0.5f;
+                    life = sub == 13 ? 30f : 20f;
                     break;
                 case ClassicFxEffectType.ShotgunJointBurst:
                     life = 10f;
@@ -106,7 +108,7 @@ namespace Client.Main.ClassicFX.Core
                     break;
                 case ClassicFxEffectType.LightRedGround:
                     light = Vector3.One;
-                    life = sub == 4 ? 50f : 100f;
+                    life = sub <= 2 ? 12f : sub == 4 ? 50f : 100f;
                     break;
                 case ClassicFxEffectType.ChromeEnergyGround:
                     // No explicit native CreateEffect initializer.
@@ -203,10 +205,28 @@ namespace Client.Main.ClassicFX.Core
                             e.Position, e.Angle, e.Light, 1, e.Scale);
                     return e.Direction.Z >= -2f;
                 case ClassicFxEffectType.MagicGroundBase:
+                    if (e.SubType == 13)
+                    {
+                        e.Scale *= MathF.Pow(1.1f, f);
+                        e.Light *= MathF.Pow(e.Scale > 4f ? 0.475f : 0.95f, f);
+                        return e.Scale <= 8f;
+                    }
                     e.Light *= MathF.Pow(1f / 1.1f, f);
                     e.Scale += 0.05f * f;
                     return true;
                 case ClassicFxEffectType.LightRedGround:
+                    if (e.SubType <= 2)
+                    {
+                        if (!TryGetOwnerPosition(e.Owner, out Vector3 origin))
+                            return false;
+                        if (!TryGetOwnerBonePosition(e.Owner, 18, out Vector3 chest))
+                            chest = origin + new Vector3(0f, 0f, 90f);
+
+                        float fade = MathHelper.Clamp(e.LifeTime / 12f, 0f, 1f);
+                        CreateSprite(ClassicTextureIds.BitmapLightRed, chest,
+                            e.Scale, new Vector3(fade * fade), e.Owner);
+                        return true;
+                    }
                     if (e.SubType == 3)
                     {
                         if (e.Owner.WorldObject == null ||
@@ -237,10 +257,18 @@ namespace Client.Main.ClassicFX.Core
                 !Textures.TryGet(texture, out ClassicTextureResource resource))
                 return;
             if (e.Type == ClassicFxEffectType.MagicGroundBase)
+            {
+                float scale = e.SubType == 13 ? e.Scale * RageFighterBuffVisualScale : e.Scale;
                 QueueTerrainEffect(ref e, resource,
-                    scaleOverride: e.Scale, angleZOverride: -e.Angle.Z);
+                    scaleOverride: scale, angleZOverride: -e.Angle.Z);
+                if (e.SubType == 13)
+                    QueueTerrainEffect(ref e, resource,
+                        scaleOverride: scale, angleZOverride: -e.Angle.Z);
+            }
             else if (e.Type == ClassicFxEffectType.LightRedGround)
             {
+                if (e.SubType <= 2)
+                    return;
                 Vector3 light = new Vector3(MathF.Max(0f, e.LifeTime * 0.01f));
                 QueueTerrainEffect(ref e, resource,
                     scaleOverride: e.Scale, lightOverride: light,

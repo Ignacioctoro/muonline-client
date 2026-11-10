@@ -95,6 +95,45 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             }
         }
 
+        [PacketHandler(0xF3, 0xE8)] // Broyal buff HUD details
+        public Task HandleBuffHudDetailsAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 10 || _characterState.Id == 0)
+                return Task.CompletedTask;
+
+            var data = packet.Span;
+            uint remainingSeconds = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(6, 4));
+            _characterState.UpdateBuffDetails(data[4], remainingSeconds, (data[5] & 1) != 0);
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0x2D, PacketRouter.NoSubCode)] // EffectItemConsumption
+        public Task HandleEffectItemConsumptionAsync(Memory<byte> packet)
+        {
+            const int effectPacketLength = 17;
+            if (packet.Length < effectPacketLength || _characterState.Id == 0)
+                return Task.CompletedTask;
+
+            var data = packet.Span;
+            byte action = data[8];
+            byte effectId = data[16];
+            if (effectId == 0 || action > 2)
+                return Task.CompletedTask;
+
+            ushort playerId = _characterState.Id;
+            if (action == 0)
+            {
+                uint remainingSeconds = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(12, 4));
+                _characterState.ActivateBuff(effectId, playerId, remainingSeconds);
+            }
+            else
+            {
+                _characterState.DeactivateBuff(effectId, playerId);
+            }
+            HandleBuffVisual(effectId, playerId, action == 0);
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0x1B, PacketRouter.NoSubCode)] // MagicEffectCancelled
         public Task HandleMagicEffectCancelledAsync(Memory<byte> packet)
         {

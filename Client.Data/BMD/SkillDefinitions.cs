@@ -349,9 +349,14 @@ namespace Client.Data.BMD
             map[234] = "Sound/recover.wav";              // Recovery (ID 234)
 
             // RAGE FIGHTER SKILLS
+            map[260] = "Sound/Ragefighter/Rage_Thrust.wav";
+            map[262] = "Sound/Ragefighter/Rage_Giantswing.wav";
             map[263] = "Sound/Ragefighter/Rage_Darkside.wav";    // Darkside (ID 263)
             map[265] = "Sound/Ragefighter/Rage_Dragonlower.wav"; // Dragon Lore (ID 265)
             map[264] = "Sound/Ragefighter/Rage_Dragonkick.wav";  // Dragon Slayer (ID 264)
+            map[266] = "Sound/Ragefighter/Rage_Buff_1.wav";
+            map[267] = "Sound/Ragefighter/Rage_Buff_2.wav";
+            map[268] = "Sound/Ragefighter/Rage_Buff_2.wav";
             map[270] = "Sound/Ragefighter/Rage_Giantswing.wav";  // Phoenix Shot (ID 270)
             map[269] = "Sound/Ragefighter/Rage_Stamp.wav";       // Charge (ID 269)
 

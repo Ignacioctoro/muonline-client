@@ -1679,6 +1679,23 @@ namespace Client.Main.Networking.Services
             }
         }
 
+        public async Task SendCancelBuffAsync(ushort skillId, ushort playerId)
+        {
+            if (!_connectionManager.IsConnected)
+                return;
+
+            try
+            {
+                var connection = _connectionManager.Connection;
+                await connection.SendAsync(() =>
+                    PacketBuilder.BuildCancelBuffPacket(connection.Output, skillId, playerId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending buff cancellation for skill {SkillId}.", skillId);
+            }
+        }
+
         /// <summary>
         /// Sends a consume item request packet to the server (potions, jewels, etc.).
         /// </summary>

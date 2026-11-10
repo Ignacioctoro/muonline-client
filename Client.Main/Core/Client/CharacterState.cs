@@ -59,6 +59,8 @@ namespace Client.Main.Core.Client
         /// Gets or sets when this effect was activated.
         /// </summary>
         public DateTime ActivatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? ExpiresAt { get; init; }
+        public bool? CanCancel { get; init; }
     }
 
     /// <summary>
@@ -1835,19 +1837,40 @@ namespace Client.Main.Core.Client
         /// <summary>
         /// Adds or activates a buff/effect.
         /// </summary>
-        public void ActivateBuff(byte effectId, ushort playerId)
+        public void ActivateBuff(byte effectId, ushort playerId, uint remainingSeconds = 0)
         {
             ushort maskedId = (ushort)(playerId & 0x7FFF);
             var key = (effectId, maskedId);
+            DateTime now = DateTime.UtcNow;
             _activeBuffs[key] = new ActiveBuffState
             {
                 EffectId = effectId,
                 PlayerIdRaw = playerId,
                 PlayerIdMasked = maskedId,
-                ActivatedAt = DateTime.UtcNow
+                ActivatedAt = now,
+                ExpiresAt = remainingSeconds > 0 ? now.AddSeconds(remainingSeconds) : null
             };
             ActiveBuffsChanged?.Invoke();
             _logger.LogDebug("Buff activated. Effect ID: {EffectId}, Player ID: {PlayerId} (masked {MaskedId})", effectId, playerId, maskedId);
+        }
+
+        public void UpdateBuffDetails(byte effectId, uint remainingSeconds, bool canCancel)
+        {
+            var key = (effectId, (ushort)(Id & 0x7FFF));
+            if (!_activeBuffs.TryGetValue(key, out var current))
+                return;
+
+            var updated = new ActiveBuffState
+            {
+                EffectId = current.EffectId,
+                PlayerIdRaw = current.PlayerIdRaw,
+                PlayerIdMasked = current.PlayerIdMasked,
+                ActivatedAt = current.ActivatedAt,
+                ExpiresAt = DateTime.UtcNow.AddSeconds(remainingSeconds),
+                CanCancel = canCancel
+            };
+            if (_activeBuffs.TryUpdate(key, updated, current))
+                ActiveBuffsChanged?.Invoke();
         }
 
         /// <summary>

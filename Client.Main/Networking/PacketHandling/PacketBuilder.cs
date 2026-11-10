@@ -371,6 +371,21 @@ namespace Client.Main.Networking.PacketHandling
         }
 
 
+        public static int BuildCancelBuffPacket(IBufferWriter<byte> writer, ushort skillId, ushort playerId)
+        {
+            const int length = 7;
+            Span<byte> data = writer.GetSpan(length).Slice(0, length);
+            // This OpenMU handler requires the encrypted short header.
+            data[0] = 0xC3;
+            data[1] = length;
+            data[2] = 0x1B;
+            data[3] = (byte)(skillId >> 8);
+            data[4] = (byte)skillId;
+            data[5] = (byte)(playerId >> 8);
+            data[6] = (byte)playerId;
+            return length;
+        }
+
         /// <summary>
         /// Builds an area skill hit packet (damage application) for Season 6+ (C3 DB).
         /// </summary>

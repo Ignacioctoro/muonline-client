@@ -49,9 +49,7 @@ namespace Client.Main.Controls.UI.Game.Buffs
             ViewSize =
                 ControlSize;
 
-            // Más adelante podemos habilitar esto para
-            // tooltip clásico al pasar el mouse.
-            Interactive = false;
+            Interactive = true;
 
             BackgroundColor =
                 Color.Transparent;

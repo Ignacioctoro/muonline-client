@@ -4,8 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Client.Main.Controllers;
+using Client.Main.Controls.UI.Game.Skills;
 using Client.Main.Core.Client;
+using Client.Main.Core.Utilities;
+using Client.Main.Objects.Effects;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Client.Main.Controls.UI.Game.Buffs
 {
@@ -27,6 +31,7 @@ namespace Client.Main.Controls.UI.Game.Buffs
         private readonly List<BuffSlotControl>
             _buffSlots =
                 new();
+        private readonly SkillTooltip _tooltip = new();
 
         // SourceMain:
         //
@@ -93,6 +98,7 @@ namespace Client.Main.Controls.UI.Game.Buffs
 
                 _buffSlots.Add(
                     slot);
+                slot.Click += (_, _) => RequestCancel(slot.Buff);
 
                 Controls.Add(
                     slot);
@@ -130,6 +136,65 @@ namespace Client.Main.Controls.UI.Game.Buffs
 
                 UpdateAnchorPosition();
             }
+        }
+
+        public void DrawTooltipOverlay(SpriteBatch sprite)
+        {
+            if (!Visible)
+                return;
+
+            foreach (var slot in _buffSlots)
+            {
+                if (!slot.Visible || !slot.IsMouseOver ||
+                    Scene?.IsPointerInputBlockedFor(slot) == true || slot.Buff is not { } buff)
+                    continue;
+
+                ushort skillId = Season6BuffMapping.GetDisplaySkillId(buff.EffectId);
+                string name = skillId != 0 ? SkillDatabase.GetSkillName(skillId) : $"Efecto #{buff.EffectId}";
+                string time = "Duración no disponible";
+                if (buff.ExpiresAt is { } expiresAt)
+                {
+                    long seconds = (long)Math.Ceiling(Math.Max(0, (expiresAt - DateTime.UtcNow).TotalSeconds));
+                    time = $"Tiempo restante: {seconds / 60}:{seconds % 60:00}";
+                }
+
+                string? hint = GetCancelRequestId(buff) != 0 ? "Clic para quitar" : null;
+                _tooltip.SetText(name, time, hint, slot.DisplayRectangle);
+                _tooltip.Draw(sprite);
+                return;
+            }
+        }
+
+        private ushort GetCancelRequestId(ActiveBuffState buff)
+        {
+            if (buff.CanCancel is { } canCancel)
+                return canCancel ? (ushort)(0x8000 | buff.EffectId) : (ushort)0;
+
+            byte effectId = buff.EffectId;
+            if (effectId == Season6BuffMapping.InfinityArrow)
+                return _characterState.IsSkillSelectable(441) ? (ushort)441 :
+                    _characterState.IsSkillSelectable(77) ? (ushort)77 : (ushort)0;
+
+            ushort skillId = effectId switch
+            {
+                Season6BuffMapping.WizardryEnhance => 233,
+                Season6BuffMapping.WizardryEnhanceStrengthener => 380,
+                Season6BuffMapping.WizardryEnhanceMastery => 383,
+                _ => 0
+            };
+            return skillId != 0 && _characterState.IsSkillSelectable(skillId) ? skillId : (ushort)0;
+        }
+
+        private void RequestCancel(ActiveBuffState? buff)
+        {
+            ushort playerId = (ushort)(_characterState.Id & 0x7FFF);
+            if (buff == null || playerId == 0 || buff.PlayerIdMasked != playerId ||
+                !_characterState.HasActiveBuff(buff.EffectId, playerId))
+                return;
+
+            ushort skillId = GetCancelRequestId(buff);
+            if (skillId != 0 && MuGame.Network is { } network)
+                _ = network.GetCharacterService().SendCancelBuffAsync(skillId, playerId);
         }
 
         private void OnActiveBuffsChanged()

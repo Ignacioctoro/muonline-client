@@ -878,28 +878,26 @@ namespace Client.Main.Core.Utilities
                 Season6SkillAnimationMode.Explicit,
                 PlayerAction.PlayerSkillDragonlore);
 
-            //
-            // The original MonkSystem handles the effects for these
-            // separately and doesn't route them through the standard
-            // Rage attack animation selector.
-            //
             Add(
                 266,
                 "Ignore Defense",
                 SkillType.Self,
-                Season6SkillAnimationMode.KeepCurrent);
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerSkillAttUpOurforces);
 
             Add(
                 267,
                 "Increase Health",
                 SkillType.Self,
-                Season6SkillAnimationMode.KeepCurrent);
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerSkillHpUpOurforces);
 
             Add(
                 268,
                 "Increase Block",
                 SkillType.Self,
-                Season6SkillAnimationMode.KeepCurrent);
+                Season6SkillAnimationMode.Explicit,
+                PlayerAction.PlayerSkillHpUpOurforces);
 
             Add(
                 269,

@@ -46,6 +46,7 @@ namespace Client.Main.Objects.Effects
             public WorldObject CriticalDamageAura;
             public ClassicFxWizardryEnhancementVisual WizardryEnhancement;
             public ClassicFxReflectionVisual Reflection;
+            public ClassicFxIncreaseBlockVisual IncreaseBlock;
         }
 
         private const bool UseClassicFxSpearJoints = true;
@@ -298,6 +299,7 @@ namespace Client.Main.Objects.Effects
             EnsureWizardryEnhancement(world, target, state, wizardryEnhancement);
             EnsureReflection(world, target, state,
                 state.ActiveEffects.Contains(Season6BuffMapping.Reflection));
+            EnsureIncreaseBlock(world, target, state);
         }
 
         private static void EnsureGreenJoint(
@@ -481,6 +483,25 @@ namespace Client.Main.Objects.Effects
             }
         }
 
+        private static void EnsureIncreaseBlock(WalkableWorldControl world,
+            PlayerObject target, PlayerBuffVisualState state)
+        {
+            bool needed = state.ActiveEffects.Contains(Season6BuffMapping.IncreaseBlock) ||
+                state.ActiveEffects.Contains(Season6BuffMapping.IncreaseBlockPowerUp) ||
+                state.ActiveEffects.Contains(Season6BuffMapping.IncreaseBlockMastery);
+            if (needed && state.IncreaseBlock is { } visual &&
+                visual.Status != GameControlStatus.Disposed &&
+                ReferenceEquals(visual.Owner, target) && ReferenceEquals(visual.World, world))
+                return;
+
+            RemoveVisual(ref state.IncreaseBlock);
+            if (needed)
+            {
+                state.IncreaseBlock = new ClassicFxIncreaseBlockVisual(target);
+                AddVisual(world, state.IncreaseBlock);
+            }
+        }
+
         private static void EnsureAttackShine(
             WalkableWorldControl world,
             PlayerObject target,
@@ -589,6 +610,7 @@ namespace Client.Main.Objects.Effects
                 ref state.CriticalDamageAura);
             RemoveVisual(ref state.WizardryEnhancement);
             RemoveVisual(ref state.Reflection);
+            RemoveVisual(ref state.IncreaseBlock);
         }
 
         private static void RemoveVisual<T>(

@@ -191,6 +191,16 @@ namespace Client.Main.Objects.Effects
                 [573] = IncreaseHealthStrengthener
             };
 
+        public static ushort GetDisplaySkillId(byte effectId)
+        {
+            foreach (var entry in SkillToEffect)
+            {
+                if (entry.Value == effectId)
+                    return entry.Key;
+            }
+            return 0;
+        }
+
         public static bool TryGetEffectIdFromSkillId(
             ushort skillId,
             out byte effectId)
@@ -216,6 +226,9 @@ namespace Client.Main.Objects.Effects
                 GreaterFortitude or
                 CriticalDamageIncrease or
                 CriticalDamageIncreaseMastery or
+                IncreaseBlock or
+                IncreaseBlockPowerUp or
+                IncreaseBlockMastery or
                 Reflection or
                 WizardryEnhance or
                 WizardryEnhanceStrengthener or
