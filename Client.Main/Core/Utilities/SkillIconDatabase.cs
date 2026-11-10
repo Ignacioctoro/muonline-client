@@ -25,6 +25,10 @@ namespace Client.Main.Core.Utilities
 
         public static SkillIconInfo? GetIcon(ushort skillId, bool disabled = false)
         {
+            // Lightning Shock Strengthener uses the base skill's NewUI icon.
+            if (skillId == 456)
+                skillId = 230;
+
             if (skillId == 0 || skillId >= 300) return null;
 
             // S6 pet commands have a separate sheet and are not regular skills.
@@ -37,8 +41,7 @@ namespace Client.Main.Core.Utilities
 
             // Data_Broyal NewUI: 25 cells per row, indexed by protocol skill ID.
             // The zero cell is reserved; unlike S6 sheets, do not subtract one.
-            int iconId = skillId == 230 ? 216 : skillId; // S6 Lightning Shock alias.
-            return Create(disabled ? NewUiDisabledAtlas : NewUiAtlas, iconId % 25, iconId / 25);
+            return Create(disabled ? NewUiDisabledAtlas : NewUiAtlas, skillId % 25, skillId / 25);
         }
 
         private static SkillIconInfo Create(string path, int column, int row) =>

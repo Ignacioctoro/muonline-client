@@ -5,6 +5,7 @@ using Client.Main.Objects.Player;
 using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
+using Client.Main.ClassicFX.Core;
 using Client.Data.ATT;
 using Client.Main.Core.Utilities;
 using Client.Main.Core.Client;
@@ -1278,6 +1279,54 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 _logger.LogError(ex, "💥 Error handling SkillStageUpdate packet.");
             }
+
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xBF, 0x0A)] // ChainLightningHitInfo
+        public Task HandleChainLightningHitInfoAsync(Memory<byte> packet)
+        {
+            const int targetsOffset = 10;
+            const int targetSize = sizeof(ushort);
+            var data = packet.Span;
+            if (data.Length < targetsOffset)
+                return Task.CompletedTask;
+
+            int count = data[8];
+            if (count is < 1 or > 3 || data.Length < targetsOffset + count * targetSize)
+                return Task.CompletedTask;
+
+            ushort casterId = (ushort)(BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(6, 2)) & 0x7FFF);
+            var targetIds = new ushort[count];
+            for (int i = 0; i < count; i++)
+            {
+                targetIds[i] = (ushort)(BinaryPrimitives.ReadUInt16LittleEndian(
+                    data.Slice(targetsOffset + i * targetSize, targetSize)) & 0x7FFF);
+            }
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                if (MuGame.Instance?.ActiveScene is not GameScene { World: WalkableWorldControl world } ||
+                    world.ClassicFx is not { Enabled: true, IsDisposed: false } fx ||
+                    !world.TryGetWalkerById(casterId, out var source))
+                    return;
+
+                for (int i = 0; i < targetIds.Length; i++)
+                {
+                    world.TryGetWalkerById(targetIds[i], out var target);
+                    if (source is { Status: GameControlStatus.Ready } &&
+                        target is { Status: GameControlStatus.Ready } &&
+                        !ReferenceEquals(source, target))
+                    {
+                        fx.CreateEffect(ClassicFxEffectType.ChainLightning,
+                            source.WorldPosition.Translation, source.TotalAngle, Vector3.One,
+                            ClassicFxOwner.FromWorldObject(source), subType: i, nativeTarget: target);
+                    }
+
+                    // A missing hop must not draw a link between unrelated endpoints.
+                    source = target;
+                }
+            });
 
             return Task.CompletedTask;
         }
