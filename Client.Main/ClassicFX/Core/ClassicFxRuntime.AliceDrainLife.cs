@@ -105,7 +105,8 @@ namespace Client.Main.ClassicFX.Core
                         new Vector3(0f, 0f,
                             100f + (Random.Modulo(10) - 5f) * 4f);
                     CreateJoint(ClassicTextureIds.BitmapDrainLifeGhost,
-                        bonePos, dest, e.Angle, 0, e.Owner, 40f,
+                        bonePos, dest, e.Angle, 0,
+                        ClassicFxOwner.FromWorldObject(target), 40f,
                         priorColor: new Vector3(0.8f, 0.1f, 0.2f));
                 }
             }

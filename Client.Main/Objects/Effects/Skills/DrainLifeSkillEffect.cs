@@ -5,24 +5,56 @@ using System;
 using Client.Main.ClassicFX.Core;
 using Client.Main.Core.Utilities;
 using Client.Main.Models;
+using Client.Main.Objects.Player;
 using Microsoft.Xna.Framework;
 
 namespace Client.Main.Objects.Effects.Skills
 {
     [SkillVisualEffect(214)]
+    [SkillVisualEffect(458)] // Drain Life Strengthener
+    [SkillVisualEffect(462)] // Drain Life Mastery
     public sealed class DrainLifeSkillEffect : ISkillVisualEffect
     {
         public WorldObject? CreateEffect(SkillEffectContext context)
         {
             if (context.Caster == null || context.World == null ||
-                context.TargetId == 0 ||
-                !context.World.TryGetWalkerById(context.TargetId,
-                    out var target) || target == null ||
                 context.World.ClassicFx == null ||
                 !context.World.ClassicFx.Enabled ||
                 context.World.ClassicFx.IsDisposed)
                 return null;
-            return new ClassicFxDrainLifeCastVisual(context.Caster, target);
+
+            var target = context.TargetId != 0
+                ? context.World.FindWalkerById(context.TargetId)
+                : FindAreaTarget(context);
+            return target != null && !ReferenceEquals(context.Caster, target)
+                ? new ClassicFxDrainLifeCastVisual(context.Caster, target)
+                : null;
+        }
+
+        private static WalkerObject? FindAreaTarget(SkillEffectContext context)
+        {
+            if (!context.IsAreaSkillAnimation || context.TargetPosition is not Vector3 position)
+                return null;
+
+            int tileX = (int)(position.X / Constants.TERRAIN_SCALE);
+            int tileY = (int)(position.Y / Constants.TERRAIN_SCALE);
+            WalkerObject? target = null;
+            // The area animation only includes a tile. Use it if it identifies one target.
+            foreach (var walker in context.World.Walkers)
+            {
+                if (ReferenceEquals(walker, context.Caster) ||
+                    walker is not (MonsterObject or PlayerObject) ||
+                    walker.Status != GameControlStatus.Ready ||
+                    (int)walker.Location.X != tileX || (int)walker.Location.Y != tileY)
+                    continue;
+
+                if (target != null)
+                    return null;
+
+                target = walker;
+            }
+
+            return target;
         }
     }
 

@@ -45,6 +45,7 @@ namespace Client.Main.Objects.Effects
             public ClassicGreaterFortitudeGlowEffect GreaterFortitudeGlow;
             public WorldObject CriticalDamageAura;
             public ClassicFxWizardryEnhancementVisual WizardryEnhancement;
+            public ClassicFxReflectionVisual Reflection;
         }
 
         private const bool UseClassicFxSpearJoints = true;
@@ -295,6 +296,8 @@ namespace Client.Main.Objects.Effects
                 criticalDamage);
 
             EnsureWizardryEnhancement(world, target, state, wizardryEnhancement);
+            EnsureReflection(world, target, state,
+                state.ActiveEffects.Contains(Season6BuffMapping.Reflection));
         }
 
         private static void EnsureGreenJoint(
@@ -461,6 +464,23 @@ namespace Client.Main.Objects.Effects
             // On its first ready update, the adapter acquires the native carrier.
         }
 
+        private static void EnsureReflection(
+            WalkableWorldControl world, PlayerObject target,
+            PlayerBuffVisualState state, bool needed)
+        {
+            if (needed && state.Reflection is { } visual &&
+                visual.Status != GameControlStatus.Disposed &&
+                ReferenceEquals(visual.Owner, target) && ReferenceEquals(visual.World, world))
+                return;
+
+            RemoveVisual(ref state.Reflection);
+            if (needed)
+            {
+                state.Reflection = new ClassicFxReflectionVisual(target);
+                AddVisual(world, state.Reflection);
+            }
+        }
+
         private static void EnsureAttackShine(
             WalkableWorldControl world,
             PlayerObject target,
@@ -568,6 +588,7 @@ namespace Client.Main.Objects.Effects
             RemoveVisual(
                 ref state.CriticalDamageAura);
             RemoveVisual(ref state.WizardryEnhancement);
+            RemoveVisual(ref state.Reflection);
         }
 
         private static void RemoveVisual<T>(

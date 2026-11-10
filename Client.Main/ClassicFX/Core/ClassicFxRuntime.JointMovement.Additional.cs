@@ -17,10 +17,6 @@ namespace Client.Main.ClassicFX.Core
         // Event consumers should use the normal Effect system when ready.
         public event Action<string, Vector3, Vector3, Vector3, int> JointMoveEffectRequested;
 
-        // Native DRAIN_LIFE_GHOST targets o->Target->Owner, which is distinct
-        // from the immediate target. Resolve this OBJECT* relation externally.
-        public Func<ClassicFxOwner, Vector3?> JointDrainDestinationResolver { get; set; }
-
         // MODEL_DOWN_ATTACK_DUMMY_L/R and MODEL_DRAGON_KICK_DUMMY must
         // be verified by a game-specific model ID bridge, not guessed.
         public Func<ClassicFxOwner, string, bool> JointTargetModelMatches { get; set; }
@@ -369,9 +365,8 @@ namespace Client.Main.ClassicFX.Core
         private bool MoveDrainLifeJointD(ref ClassicJoint j, float f)
         {
             if (j.SubType != 0) return true;
-            Vector3? ownerOfTarget = JointDrainDestinationResolver?.Invoke(j.Target);
-            if (!ownerOfTarget.HasValue) return false;
-            Vector3 target = ownerOfTarget.Value;
+            // The cast stores the destination directly instead of borrowing the caster's Owner.
+            if (!TryGetOwnerPosition(j.Target, out Vector3 target)) return false;
             target.Z = j.TargetPosition.Z;
             MoveJointHummingA(ref j.Angle, j.Position, target, j.Velocity, f);
             j.Velocity += 2f * f;
@@ -812,7 +807,7 @@ namespace Client.Main.ClassicFX.Core
                     if (Random.FpsCheck(3, Clock))
                     {
                         Vector3 p = flare43 + new Vector3(
-                            (R(60) - 30f) * f, (R(60) - 30f) * f, 30f * f);
+                            R(60) - 30f, R(60) - 30f, 30f);
                         CreateJoint(ClassicTextureIds.BitmapFlare,
                             p, p, j.Angle, 44, j.Target, j.Scale,
                             priorColor: j.Light);

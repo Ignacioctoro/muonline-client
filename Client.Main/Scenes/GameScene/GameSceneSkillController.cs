@@ -1570,6 +1570,9 @@ namespace Client.Main.Scenes
                 characterState.LastAreaSkillTargetY =
                     requestTargetY;
 
+                characterState.LastAreaSkillTargetId =
+                    extraTargetId;
+
                 characterState.LastAreaSkillAnimationCounter =
                     animationCounter;
 

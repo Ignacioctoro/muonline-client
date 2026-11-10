@@ -160,6 +160,7 @@ namespace Client.Main.Core.Client
         public ushort LastAreaSkillId { get; set; } = 0;
         public byte LastAreaSkillTargetX { get; set; } = 0;
         public byte LastAreaSkillTargetY { get; set; } = 0;
+        public ushort LastAreaSkillTargetId { get; set; }
         public byte LastAreaSkillAnimationCounter { get; set; } = 0;
         public double LastAreaSkillSentAtMs { get; set; } = 0;
 
@@ -1742,6 +1743,7 @@ namespace Client.Main.Core.Client
             System.Threading.Interlocked.Increment(ref _skillSessionRevision);
             ClearSkillList();
             LastAreaSkillId = 0;
+            LastAreaSkillTargetId = 0;
             LastAreaSkillSentAtMs = 0;
         }
 

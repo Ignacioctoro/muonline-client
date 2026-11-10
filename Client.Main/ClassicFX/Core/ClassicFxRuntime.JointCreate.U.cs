@@ -350,6 +350,8 @@ namespace Client.Main.ClassicFX.Core
 
                 case 44:
                     j.Scale = sourceScale;
+                    // Keep this spark's sampled position even though it has an owner.
+                    j.TargetPosition = sourceTargetPosition;
                     j.LifeTime = 15f;
                     j.MaxTails = 30;
                     j.CreateTails = true;

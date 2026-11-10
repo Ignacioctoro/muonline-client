@@ -1337,9 +1337,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             try
             {
                 var skillAnim = new SkillAnimation(packet);
-                ushort playerId = skillAnim.PlayerId;
+                ushort playerId = (ushort)(skillAnim.PlayerId & 0x7FFF);
                 ushort skillId = skillAnim.SkillId;
-                ushort targetId = skillAnim.TargetId;
+                // OpenMU sets the high bit when the target received an effect.
+                ushort targetId = (ushort)(skillAnim.TargetId & 0x7FFF);
 
                 // This is an authoritative OpenMU response. The local
                 // PlayerSkillElf1 animation alone does not prove the server
@@ -1650,6 +1651,20 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                     (ushort)animationId);
                         }
 
+                        ushort targetId = 0;
+                        if (skillId is 214 or 458 or 462)
+                        {
+                            double nowMs = MuGame.Instance?.GameTime?.TotalGameTime.TotalMilliseconds ?? Environment.TickCount64;
+                            double elapsedMs = nowMs - _characterState.LastAreaSkillSentAtMs;
+                            if (_characterState.LastAreaSkillId == skillId &&
+                                _characterState.LastAreaSkillTargetX == targetX &&
+                                _characterState.LastAreaSkillTargetY == targetY &&
+                                elapsedMs is >= 0 and <= 1500)
+                            {
+                                targetId = _characterState.LastAreaSkillTargetId;
+                            }
+                        }
+
                         var effectContext =
                             new Objects.Effects.Skills
                                 .SkillEffectContext
@@ -1658,7 +1673,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                     activeScene.Hero,
 
                                 TargetId =
-                                    0,
+                                    targetId,
 
                                 SkillId =
                                     skillId,

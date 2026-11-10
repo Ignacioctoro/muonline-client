@@ -216,6 +216,7 @@ namespace Client.Main.Objects.Effects
                 GreaterFortitude or
                 CriticalDamageIncrease or
                 CriticalDamageIncreaseMastery or
+                Reflection or
                 WizardryEnhance or
                 WizardryEnhanceStrengthener or
                 WizardryEnhanceMastery;
