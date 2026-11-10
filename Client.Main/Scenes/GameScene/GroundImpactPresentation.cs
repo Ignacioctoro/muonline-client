@@ -85,6 +85,27 @@ namespace Client.Main.Scenes
             });
         }
 
+        public bool TryQueueVisual(WorldControl world, PlayerObject caster,
+            ushort skillId, Action visual)
+        {
+            double now = NowMs();
+            for (int i = _casts.Count - 1; i >= 0; i--)
+            {
+                GroundCast cast = _casts[i];
+                if (!ReferenceEquals(cast.World, world) ||
+                    !ReferenceEquals(cast.Caster, caster) || cast.SkillId != skillId)
+                    continue;
+
+                if (cast.ImpactPresented || HasReachedContact(cast, now))
+                    return false;
+
+                cast.Feedback.Add(visual);
+                return true;
+            }
+
+            return false;
+        }
+
         public bool IsLocalCastAwaitingEcho(PlayerObject hero, ushort skillId)
         {
             double now = NowMs();

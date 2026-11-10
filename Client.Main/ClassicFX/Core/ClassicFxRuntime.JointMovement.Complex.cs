@@ -659,6 +659,10 @@ namespace Client.Main.ClassicFX.Core
                 j.Position = j.StartPosition;
 
             int count = Math.Clamp(j.MaxTails, 0, ClassicJoint.MaxTailSegments);
+            // Subtype 16 builds a sky-to-ground bolt within one update.
+            // Its geometry uses fixed steps, while its lifetime still uses f.
+            bool stormBolt = j.SubType == 16;
+            float geometryFactor = stormBolt ? 1f : f;
             for (int step = 0; step < count && j.SubType != 15; step++)
             {
                 float distance = 0f;
@@ -754,7 +758,7 @@ namespace Client.Main.ClassicFX.Core
                 }
                 if (!float.IsNaN(turn))
                     distance = MoveJointHummingA(ref j.Angle,
-                        j.Position, destination, turn, f);
+                        j.Position, destination, turn, geometryFactor);
 
                 float scale = MathF.Abs(j.Scale) > 0.00001f ? j.Scale : 1f;
                 if (subtype == 1 || subtype == 28)
@@ -790,7 +794,7 @@ namespace Client.Main.ClassicFX.Core
                     j.Direction.X = (R(1024) - 512f) / scale;
                     j.Direction.Z = (R(1024) - 512f) / scale;
                 }
-                var matrix = ClassicMath.AngleMatrix(j.Angle + j.Direction * f);
+                var matrix = ClassicMath.AngleMatrix(j.Angle + j.Direction * geometryFactor);
                 AppendJointTailMoveA(ref j, matrix);
 
                 if (subtype == 3 && distance > 150f) j.LifeTime = 0f;
@@ -798,6 +802,8 @@ namespace Client.Main.ClassicFX.Core
                     subtype != 6 && subtype != 9 && subtype != 7 &&
                     subtype != 18 && subtype != 19)
                 {
+                    if (stormBolt)
+                        j.Position = destination;
                     if (j.Scale == 50f)
                     {
                         CreateParticleFpsChecked(ClassicTextureIds.BitmapEnergy,
@@ -833,7 +839,7 @@ namespace Client.Main.ClassicFX.Core
                     AddClassicTerrainLight(j.Position.X, j.Position.Y, light, 2f);
                 }
                 j.Position += ClassicMath.VectorRotate(
-                    new Vector3(0f, -j.Velocity * f, 0f), matrix) * f;
+                    new Vector3(0f, -j.Velocity * geometryFactor, 0f), matrix) * geometryFactor;
             }
 
             if (j.SubType == 7 || j.SubType == 18)

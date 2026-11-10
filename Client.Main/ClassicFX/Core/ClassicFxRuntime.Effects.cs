@@ -495,6 +495,7 @@ namespace Client.Main.ClassicFX.Core
         // BK Twisting Slash: native MODEL_SKILL_WHEEL1 / MODEL_SKILL_WHEEL2.
         SkillWheel1 = 445,
         SkillWheel2 = 446,
+        GiganticStormThunder = 447,
     }
 
     public sealed partial class ClassicFxRuntime
@@ -1610,6 +1611,10 @@ namespace Client.Main.ClassicFX.Core
                         continue;
                     }
                 }
+                else if (e.Type == ClassicFxEffectType.GiganticStormThunder)
+                {
+                    MoveGiganticStormThunder(ref e);
+                }
                 else if (e.Type == ClassicFxEffectType.Crater)
                 {
                     MoveS6Crater(ref e, f);
@@ -2294,7 +2299,23 @@ namespace Client.Main.ClassicFX.Core
         }
 
         protected override bool RenderBlendMeshOnLowQuality =>
-            _renderRagefulBlendOnLowQuality || _nativeMagic2BmdLighting;
+            _renderRagefulBlendOnLowQuality || _nativeMagic2BmdLighting ||
+            EffectType == ClassicFxEffectType.FlameStrike;
+
+        protected override bool AllowAnimationUpdates =>
+            EffectType != ClassicFxEffectType.FlameStrike;
+
+        internal void SetFlameStrikePose(Matrix[] pose, in Matrix hand)
+        {
+            int boneCount = Model.Bones.Length;
+            if (BoneTransform == null || BoneTransform.Length != boneCount)
+                BoneTransform = new Matrix[boneCount];
+
+            for (int i = 0; i < boneCount; i++)
+                BoneTransform[i] = pose[i] * hand;
+
+            InvalidateBuffers(BufferFlagAnimation);
+        }
 
         // MuMain explicitly marks both GroundStone action 0 animations
         // non-looping. They have five BMD keys and Velocity=0.3, so
@@ -2323,7 +2344,8 @@ namespace Client.Main.ClassicFX.Core
         // Treat the entire four native BMDs as translucent additive
         // geometry. Rageful Blow and all other model types remain as is.
         protected override bool IsBlendMesh(int mesh) =>
-            _nativeDestructionBmdLighting || base.IsBlendMesh(mesh);
+            _nativeDestructionBmdLighting || EffectType == ClassicFxEffectType.FlameStrike ||
+            base.IsBlendMesh(mesh);
 
         public override void DrawModel(bool isAfterDraw)
         {

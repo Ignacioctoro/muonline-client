@@ -175,6 +175,8 @@ namespace Client.Main.ClassicFX.Core
                     return InitializeThunderTargetsS(ref j, sourceTargetPosition);
                 case 16:
                     j.Velocity = 20f + R(10);
+                    j.MaxTails = Math.Max(j.MaxTails,
+                        (int)MathF.Ceiling(Vector3.Distance(j.Position, sourceTargetPosition) / j.Velocity) + 10);
                     j.LifeTime = R(2) + 2f;
                     return true;
                 case 17:

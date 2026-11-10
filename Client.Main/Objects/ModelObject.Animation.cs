@@ -26,6 +26,24 @@ namespace Client.Main.Objects
         /// </summary>
         protected virtual bool UseRealtimeAnimationSampling =>
             false;
+
+        internal float AnimationFramePosition { get; private set; }
+
+        internal bool TrySampleAnimationPose(int actionIndex, float frame, Matrix[] output)
+        {
+            if (Model?.Bones is not { Length: > 0 } bones ||
+                Model.Actions is not { } actions || (uint)actionIndex >= (uint)actions.Length ||
+                actions[actionIndex] is not { NumAnimationKeys: > 0 } action ||
+                output.Length < bones.Length)
+                return false;
+
+            int lastKey = Math.Max(0, action.NumAnimationKeys - (action.LockPositions ? 2 : 1));
+            frame = Math.Clamp(frame, 0f, lastKey);
+            int firstKey = (int)frame;
+            ComputeBoneMatrixTo(actionIndex, firstKey, Math.Min(firstKey + 1, lastKey),
+                frame - firstKey, output);
+            return true;
+        }
         // Local animation optimization - per object only
         private struct LocalAnimationState : IEquatable<LocalAnimationState>
         {
@@ -137,6 +155,7 @@ namespace Client.Main.Objects
                 }
 
                 CurrentFrame = 0;
+                AnimationFramePosition = 0f;
                 return;
             }
 
@@ -235,6 +254,7 @@ namespace Client.Main.Objects
 
             CurrentFrame =
                 f0;
+            AnimationFramePosition = (float)framePos;
 
             GenerateBoneMatrix(
                 currentActionIndex,

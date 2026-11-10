@@ -353,21 +353,7 @@ namespace Client.Main.ClassicFX.Core
                     return true;
                 }
                 case ClassicFxEffectType.FlameStrike:
-                {
-                    // Native two-stage fade; owner animation and bones drive
-                    // three additive object blurs through another subsystem.
-                    if (!TryGetOwnerSnapshot(e.Owner, out _))
-                        return false;
-                    if (e.LifeTime < 20f)
-                    {
-                        e.Alpha -= 0.1f * f;
-                        if (e.Alpha < 0.1f)
-                            return false;
-                    }
-                    else if (e.Alpha < 1f)
-                        e.Alpha = MathF.Min(1f, e.Alpha + 0.1f * f);
-                    return true;
-                }
+                    return MoveFlameStrike(ref e, f);
                 default:
                     return false;
             }
