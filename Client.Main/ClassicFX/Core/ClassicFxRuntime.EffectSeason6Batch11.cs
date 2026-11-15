@@ -205,6 +205,29 @@ namespace Client.Main.ClassicFX.Core
 
         private void MoveS6BlowOfDestruction(ref EffectState e, float f)
         {
+            if (e.SubType == 2)
+            {
+                if (e.LifeTime <= 30f && Clock.AdvancedReferenceFrame && (e.TriggerMask & 1) == 0)
+                {
+                    e.TriggerMask |= 1;
+                    Vector3 direction = e.StartPosition - e.Position;
+                    direction.Z = 0f;
+                    if (direction.LengthSquared() < 1f)
+                        direction = Vector3.TransformNormal(-Vector3.UnitY, Matrix.CreateRotationZ(e.Angle.Z));
+                    Vector3 impact = e.Position + Vector3.Normalize(direction) * 55f;
+                    Vector3 angle = e.Angle;
+                    angle.Z += MathHelper.ToRadians(140f + Random.Modulo(40));
+                    CreateEffect(ClassicFxEffectType.DragonLowerDummy, impact, angle,
+                        Vector3.One, ClassicFxOwner.None, scale: 0.8f);
+                    CreateEffect(ClassicFxEffectType.LightRedGround, impact, angle,
+                        Vector3.One, ClassicFxOwner.None, subType: 4, scale: 3f);
+                    // OpenMU's area animation supplies the cast tile, without the native per-target eruption message.
+                    CreateEffect(ClassicFxEffectType.VolcanoOfMonkModel, e.StartPosition, e.Angle,
+                        Vector3.One, ClassicFxOwner.None, subType: 1);
+                }
+                return;
+            }
+
             if (e.LifeTime > 24f)
                 return;
 

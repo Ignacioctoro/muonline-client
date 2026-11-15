@@ -602,7 +602,7 @@ namespace Client.Main.ClassicFX.Core
             // Native BLOW_OF_DESTRUCTION is a logical Effect with terrain
             // and sprite render paths, not another BMD renderer.
             bool blowOfDestruction = type == ClassicFxEffectType.BlowOfDestruction &&
-                (subType is 0 or 1);
+                (subType is >= 0 and <= 2);
             bool lightningOrb = type == ClassicFxEffectType.LightningOrb &&
                 (subType is 0 or 1);
             // Kind 0 / 2 / 3 is carried in subtype for the logical root.
@@ -1142,12 +1142,17 @@ namespace Client.Main.ClassicFX.Core
                             caster.Angle.Y, caster.Angle.X, caster.Angle.Z));
                     effectPosition += offset;
                 }
-                else
+                else if (subType == 1)
                 {
                     effectPosition.Z = 150f;
                     effectScale = 5f;
                 }
-                light = new Vector3(1.2f);
+                else
+                {
+                    life = 50f;
+                    effectScale = 0.5f;
+                }
+                light = subType == 2 ? Vector3.One : new Vector3(1.2f);
             }
             else if (lightningOrb)
             {
@@ -1303,7 +1308,7 @@ namespace Client.Main.ClassicFX.Core
             ClassicFxEffectModelObject view = null;
             if (modelPath != null)
             {
-                view = new ClassicFxEffectModelObject(modelPath, type);
+                view = new ClassicFxEffectModelObject(modelPath, type, subType);
                 // The native PierPart trail shares a single already-loaded
                 // BMD from its parent effect. NeffisDev otherwise schedules
                 // a separate async Prepare() for every short-lived segment,
@@ -1455,7 +1460,7 @@ namespace Client.Main.ClassicFX.Core
                     : IsS6Batch22HeavyModel(type) && subType == 5
                         ? s6Batch22StoredPosition
                     : (type == ClassicFxEffectType.PierPart && subType == 0) ||
-                      (type == ClassicFxEffectType.BlowOfDestruction && subType == 0)
+                      (type == ClassicFxEffectType.BlowOfDestruction && subType is 0 or 2)
                         ? inputLight : effectPosition,
                 HeadAngle = effectHeading,
                 Angle = angle,
@@ -2272,12 +2277,14 @@ namespace Client.Main.ClassicFX.Core
         // scaling without altering generic Fire02 particles of other skills.
         internal bool IsPierPartModel => _nativePierPartBmdLighting;
         private bool _nativeRagefulStoneLighting;
+        private readonly bool _nativeRageFighterWaveLighting;
 
         private bool NeedsRagefulBmdLighting =>
             _nativeRagefulBmdLighting || _nativeRagefulStoneLighting;
 
         private bool NeedsNativeBmdLighting =>
             NeedsRagefulBmdLighting || _nativeDestructionBmdLighting ||
+            _nativeRageFighterWaveLighting ||
             _nativePierPartBmdLighting || _nativeAirForceBmdLighting ||
             _nativeGroundStoneBmdLighting || _nativeMagic2BmdLighting ||
             EffectType == ClassicFxEffectType.LaserSkillModel;
@@ -2300,6 +2307,7 @@ namespace Client.Main.ClassicFX.Core
 
         protected override bool RenderBlendMeshOnLowQuality =>
             _renderRagefulBlendOnLowQuality || _nativeMagic2BmdLighting ||
+            _nativeRageFighterWaveLighting ||
             EffectType == ClassicFxEffectType.FlameStrike;
 
         protected override bool AllowAnimationUpdates =>
@@ -2344,7 +2352,8 @@ namespace Client.Main.ClassicFX.Core
         // Treat the entire four native BMDs as translucent additive
         // geometry. Rageful Blow and all other model types remain as is.
         protected override bool IsBlendMesh(int mesh) =>
-            _nativeDestructionBmdLighting || EffectType == ClassicFxEffectType.FlameStrike ||
+            _nativeDestructionBmdLighting || _nativeRageFighterWaveLighting ||
+            EffectType == ClassicFxEffectType.FlameStrike ||
             base.IsBlendMesh(mesh);
 
         public override void DrawModel(bool isAfterDraw)
@@ -2473,10 +2482,13 @@ namespace Client.Main.ClassicFX.Core
 
         internal ClassicFxEffectType EffectType { get; }
 
-        public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type)
+        public ClassicFxEffectModelObject(string bmdPath, ClassicFxEffectType type, int subType = 0)
         {
             _bmdPath = bmdPath;
             EffectType = type;
+            _nativeRageFighterWaveLighting =
+                (type == ClassicFxEffectType.Shockwave01 && subType is 1 or 4) ||
+                (type == ClassicFxEffectType.ShockWaveGround01 && subType is 1 or 2);
             _nativeRagefulBmdLighting =
                 type is ClassicFxEffectType.Wave or ClassicFxEffectType.Tail ||
                 (type >= ClassicFxEffectType.FuryQuake1 &&

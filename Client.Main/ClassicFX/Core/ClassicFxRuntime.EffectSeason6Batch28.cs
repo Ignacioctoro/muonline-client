@@ -114,7 +114,8 @@ namespace Client.Main.ClassicFX.Core
                 headAngle = Vector3.TransformNormal(
                     new Vector3(0f, speed, 0f),
                     Matrix.CreateRotationZ(angle.Z));
-                headAngle.Z += 25f * Clock.FrameFactor;
+                // Initial speed is per reference tick; movement applies the frame factor.
+                headAngle.Z += 25f;
                 direction = Vector3.Zero;
                 return true;
             }

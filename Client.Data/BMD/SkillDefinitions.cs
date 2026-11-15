@@ -238,8 +238,8 @@ namespace Client.Data.BMD
             Add(261, 248);  // Beast Uppercut → PlayerSkillStamp
             Add(262, 249);  // Chain Drive → PlayerSkillGiantswing
             Add(263, 250);  // Dark Side → PlayerSkillDarksideReady
-            Add(264, 252);  // Dragon Roar → PlayerSkillDragonkick
-            Add(265, 253);  // Dragon Slasher → PlayerSkillDragonlore
+            Add(264, 253);  // Dragon Roar → PlayerSkillDragonlore
+            Add(265, 252);  // Dragon Slasher → PlayerSkillDragonkick
             Add(270, 254);  // Phoenix Shot → PlayerSkillPhoenixShot
             Add(48, 255);   // Swell Life → PlayerSkillAttUpOurforces
 
@@ -352,8 +352,8 @@ namespace Client.Data.BMD
             map[260] = "Sound/Ragefighter/Rage_Thrust.wav";
             map[262] = "Sound/Ragefighter/Rage_Giantswing.wav";
             map[263] = "Sound/Ragefighter/Rage_Darkside.wav";    // Darkside (ID 263)
-            map[265] = "Sound/Ragefighter/Rage_Dragonlower.wav"; // Dragon Lore (ID 265)
-            map[264] = "Sound/Ragefighter/Rage_Dragonkick.wav";  // Dragon Slayer (ID 264)
+            map[264] = "Sound/Ragefighter/Rage_Dragonlower.wav";
+            map[265] = "Sound/Ragefighter/Rage_Dragonkick.wav";
             map[266] = "Sound/Ragefighter/Rage_Buff_1.wav";
             map[267] = "Sound/Ragefighter/Rage_Buff_2.wav";
             map[268] = "Sound/Ragefighter/Rage_Buff_2.wav";

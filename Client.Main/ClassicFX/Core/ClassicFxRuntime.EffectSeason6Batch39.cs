@@ -18,7 +18,7 @@ namespace Client.Main.ClassicFX.Core
                 ClassicFxEffectType.BossLaserShort => sub == 0,
                 ClassicFxEffectType.FireTrail02 => sub == 0,
                 ClassicFxEffectType.LightProjectile => sub == 0,
-                ClassicFxEffectType.MagicGroundBase => sub is 1 or 13,
+                ClassicFxEffectType.MagicGroundBase => sub is 1 or 13 or 14,
                 ClassicFxEffectType.ShotgunJointBurst => sub == 0,
                 ClassicFxEffectType.FlareForceJointBurst => sub is >= 0 and <= 7,
                 ClassicFxEffectType.LightRedGround => sub is >= 0 and <= 4,
@@ -93,8 +93,8 @@ namespace Client.Main.ClassicFX.Core
                     break;
                 }
                 case ClassicFxEffectType.MagicGroundBase:
-                    scale = sub == 13 ? 1f : 0.5f;
-                    life = sub == 13 ? 30f : 20f;
+                    scale = sub is 13 or 14 ? 1f : 0.5f;
+                    life = sub is 13 or 14 ? 30f : 20f;
                     break;
                 case ClassicFxEffectType.ShotgunJointBurst:
                     life = 10f;
@@ -205,7 +205,7 @@ namespace Client.Main.ClassicFX.Core
                             e.Position, e.Angle, e.Light, 1, e.Scale);
                     return e.Direction.Z >= -2f;
                 case ClassicFxEffectType.MagicGroundBase:
-                    if (e.SubType == 13)
+                    if (e.SubType is 13 or 14)
                     {
                         e.Scale *= MathF.Pow(1.1f, f);
                         e.Light *= MathF.Pow(e.Scale > 4f ? 0.475f : 0.95f, f);
@@ -261,7 +261,7 @@ namespace Client.Main.ClassicFX.Core
                 float scale = e.SubType == 13 ? e.Scale * RageFighterBuffVisualScale : e.Scale;
                 QueueTerrainEffect(ref e, resource,
                     scaleOverride: scale, angleZOverride: -e.Angle.Z);
-                if (e.SubType == 13)
+                if (e.SubType is 13 or 14)
                     QueueTerrainEffect(ref e, resource,
                         scaleOverride: scale, angleZOverride: -e.Angle.Z);
             }

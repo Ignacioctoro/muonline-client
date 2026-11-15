@@ -869,14 +869,14 @@ namespace Client.Main.Core.Utilities
                 "Dragon Roar",
                 SkillType.Area,
                 Season6SkillAnimationMode.Explicit,
-                PlayerAction.PlayerSkillDragonkick);
+                PlayerAction.PlayerSkillDragonlore);
 
             Add(
                 265,
                 "Dragon Slasher",
                 SkillType.Target,
                 Season6SkillAnimationMode.Explicit,
-                PlayerAction.PlayerSkillDragonlore);
+                PlayerAction.PlayerSkillDragonkick);
 
             Add(
                 266,
