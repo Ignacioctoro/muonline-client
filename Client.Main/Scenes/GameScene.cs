@@ -1160,6 +1160,9 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(DevilSquareEnterControl.Instance))
                     return true;
 
+                if (IsWindowCovering(EventsInfoControl.Instance))
+                    return true;
+
                 if (IsWindowCovering(BloodCastleEnterControl.Instance))
                     return true;
 
@@ -1318,6 +1321,7 @@ namespace Client.Main.Scenes
             Controls.Add(new MobileCommandsLauncher());
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
+            Controls.Add(EventsInfoControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);
             Controls.Add(BloodCastleResultControl.Instance);
 
@@ -3204,6 +3208,7 @@ namespace Client.Main.Scenes
             PetTrainerControl.Instance.HideWithoutServerRequest();
             LahapControl.Instance.HideWithoutServerRequest();
             PetInfoControl.Instance.HideWindow();
+            EventsInfoControl.Instance.CloseWindow();
 
             base.Dispose();
         }

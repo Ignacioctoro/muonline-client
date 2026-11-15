@@ -245,6 +245,19 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
             if (!over) return;
             _hoveredSlot = ItemAt(mouse);
+            if (rightPress && _hoveredSlot is byte ticketSlot &&
+                ExtendedInventoryLayout.Extension(ticketSlot) < _unlocked &&
+                _items.TryGetValue(ticketSlot, out var ticket) &&
+                ticket.Definition is { Group: 13, Id: 18 })
+            {
+                var service = MuGame.Network?.GetCharacterService();
+                if (service != null)
+                    _ = service.RequestBloodCastleOpeningAsync((byte)ticket.Details.Level);
+
+                Scene?.SetMouseInputConsumed();
+                return;
+            }
+
             if (rightPress && _hoveredSlot is byte consumableSlot && _items.TryGetValue(consumableSlot, out var consumable) &&
                 consumable.Definition.IsConsumable() && !consumable.Definition.IsUpgradeJewel() &&
                 ExtendedInventoryLayout.Extension(consumableSlot) < _unlocked)

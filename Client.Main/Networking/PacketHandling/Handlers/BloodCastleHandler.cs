@@ -29,6 +29,34 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             _networkManager = networkManager;
         }
 
+        [PacketHandler(0x91, PacketRouter.NoSubCode)]
+        public Task HandleMiniGameOpeningStateAsync(Memory<byte> packet)
+        {
+            const byte bloodCastle = 2;
+            var data = packet.Span;
+            if (data.Length < 7 || data[3] != bloodCastle)
+            {
+                return Task.CompletedTask;
+            }
+
+            byte minutes = data[4];
+            byte players = data[5];
+            string message = minutes switch
+            {
+                0 => $"Blood Castle entrance is open. Players inside: {players}.",
+                1 => "Blood Castle entrance opens in 1 minute.",
+                0xFF => "Blood Castle opening time is unavailable.",
+                _ => $"Blood Castle entrance opens in {minutes} minutes."
+            };
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                if (!EventsInfoControl.Instance.TrySetBloodCastleOpening(message))
+                    RequestDialog.ShowInfo(message);
+            });
+            return Task.CompletedTask;
+        }
+
         /// <summary>
         /// Handles Blood Castle game state updates (0x9B).
         /// Updates timer, monster count, and quest item carrier.
@@ -135,12 +163,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     string message = result switch
                     {
                         0 => "Successfully entered Blood Castle!",
-                        1 => "Failed to enter Blood Castle.",
-                        2 => "Blood Castle ticket not found or invalid level.",
-                        3 => "You cannot enter at this time.",
-                        4 => "Blood Castle is full.",
-                        5 => "Your level is too low.",
-                        6 => "Your level is too high.",
+                        1 => "Blood Castle entry was rejected. Check that your Invisibility Cloak matches this gate and has uses left.",
+                        2 => "Blood Castle entrance is closed.",
+                        3 => "Your level is too high for this Blood Castle gate.",
+                        4 => "Your level is too low for this Blood Castle gate.",
+                        5 => "Blood Castle is full.",
                         _ => $"Failed to enter Blood Castle (code: {result})."
                     };
 

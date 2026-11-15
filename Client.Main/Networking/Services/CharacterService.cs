@@ -1907,6 +1907,37 @@ namespace Client.Main.Networking.Services
         }
 
         /// <summary>
+        /// Requests Blood Castle's next opening using the level of the Invisibility Cloak.
+        /// </summary>
+        public async Task RequestBloodCastleOpeningAsync(byte ticketLevel)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                return;
+            }
+
+            try
+            {
+                var connection = _connectionManager.Connection;
+                await connection.SendAsync(() =>
+                {
+                    const int length = 5;
+                    Span<byte> packet = connection.Output.GetSpan(length).Slice(0, length);
+                    packet[0] = 0xC1;
+                    packet[1] = length;
+                    packet[2] = 0x91;
+                    packet[3] = 2; // Blood Castle
+                    packet[4] = ticketLevel;
+                    return length;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error requesting the Blood Castle opening time.");
+            }
+        }
+
+        /// <summary>
         /// Sends a request to enter Blood Castle.
         /// </summary>
         /// <param name="castleLevel">Blood Castle level (1-8).</param>

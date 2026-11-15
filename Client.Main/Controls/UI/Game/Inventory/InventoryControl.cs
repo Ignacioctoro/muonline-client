@@ -2570,6 +2570,18 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                 if (rightJustPressed && _hoveredItem != null && _pickedItemRenderer.Item == null)
                 {
+                    if (_hoveredItem.Definition is { Group: 13, Id: 18 })
+                    {
+                        if (_networkManager != null)
+                        {
+                            _ = _networkManager.GetCharacterService()
+                                .RequestBloodCastleOpeningAsync((byte)_hoveredItem.Details.Level);
+                        }
+
+                        Scene?.SetMouseInputConsumed();
+                        return;
+                    }
+
                     if (_hoveredItem.Definition?.IsConsumable() == true)
                     {
                         if (_hoveredItem.Definition.IsUpgradeJewel())
