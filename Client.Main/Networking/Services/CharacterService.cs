@@ -1909,7 +1909,10 @@ namespace Client.Main.Networking.Services
         /// <summary>
         /// Requests Blood Castle's next opening using the level of the Invisibility Cloak.
         /// </summary>
-        public async Task RequestBloodCastleOpeningAsync(byte ticketLevel)
+        public Task RequestBloodCastleOpeningAsync(byte ticketLevel) =>
+            RequestMiniGameOpeningAsync(MiniGameType.BloodCastle, ticketLevel);
+
+        public async Task RequestMiniGameOpeningAsync(MiniGameType type, byte gateLevel)
         {
             if (!_connectionManager.IsConnected)
             {
@@ -1926,14 +1929,114 @@ namespace Client.Main.Networking.Services
                     packet[0] = 0xC1;
                     packet[1] = length;
                     packet[2] = 0x91;
-                    packet[3] = 2; // Blood Castle
-                    packet[4] = ticketLevel;
+                    packet[3] = (byte)type;
+                    packet[4] = gateLevel;
                     return length;
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error requesting the Blood Castle opening time.");
+                _logger.LogError(ex, "Error requesting the opening time for {EventType}.", type);
+            }
+        }
+
+        public async Task RequestRaklionStateAsync()
+        {
+            if (!_connectionManager.IsConnected) return;
+
+            try
+            {
+                var connection = _connectionManager.Connection;
+                await connection.SendAsync(() =>
+                {
+                    const int length = 4;
+                    var packet = connection.Output.GetSpan(length).Slice(0, length);
+                    packet[0] = 0xC1;
+                    packet[1] = length;
+                    packet[2] = 0xD1;
+                    packet[3] = 0x10;
+                    return length;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error requesting Raklion event status.");
+            }
+        }
+
+        public async Task SendImperialGuardianEnterRequestAsync()
+        {
+            if (!_connectionManager.IsConnected) return;
+
+            try
+            {
+                var connection = _connectionManager.Connection;
+                await connection.SendAsync(() =>
+                {
+                    const int length = 5;
+                    var packet = connection.Output.GetSpan(length).Slice(0, length);
+                    packet[0] = 0xC1;
+                    packet[1] = length;
+                    packet[2] = 0xF7;
+                    packet[3] = 0x01;
+                    packet[4] = 0x01; // The original sends 1. OpenMU looks up the ticket for the event day.
+                    return length;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending Imperial Guardian enter request.");
+            }
+        }
+
+        public async Task SendDoppelgangerEnterRequestAsync()
+        {
+            if (!_connectionManager.IsConnected) return;
+
+            try
+            {
+                var connection = _connectionManager.Connection;
+                await connection.SendAsync(() =>
+                {
+                    const int length = 5;
+                    var packet = connection.Output.GetSpan(length).Slice(0, length);
+                    packet[0] = 0xC1;
+                    packet[1] = length;
+                    packet[2] = 0xBF;
+                    packet[3] = 0x0E;
+                    packet[4] = 0xFF; // OpenMU selects and validates the ticket.
+                    return length;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending Doppelganger enter request.");
+            }
+        }
+
+        public async Task SendChaosCastleEnterRequestAsync()
+        {
+            if (!_connectionManager.IsConnected) return;
+
+            try
+            {
+                var connection = _connectionManager.Connection;
+                await connection.SendAsync(() =>
+                {
+                    const int length = 6;
+                    var packet = connection.Output.GetSpan(length).Slice(0, length);
+                    packet[0] = 0xC1;
+                    packet[1] = length;
+                    packet[2] = 0xAF;
+                    packet[3] = 0x01;
+                    packet[4] = 0; // OpenMU selects the tier based on the character.
+                    packet[5] = 0xFF; // Search the inventory for Armor of Guardsman.
+                    return length;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending Chaos Castle enter request.");
             }
         }
 

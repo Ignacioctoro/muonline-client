@@ -25,6 +25,49 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         private readonly TargetProtocolVersion _targetVersion;
         private NpcWindowResponse.NpcWindow? _lastWindow;
 
+        [PacketHandler(0xF7, 0x02)]
+        public Task HandleImperialGuardianEnterResultAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 12 || packet.Span[4] == 0) return Task.CompletedTask;
+
+            string message = packet.Span[4] switch
+            {
+                1 => "Imperial Guardian is unavailable.",
+                2 => packet.Span[5] == 7 ? "Complete Secromicon required." : "Gaion's Order required.",
+                3 => "The Imperial Guardian zone is full.",
+                4 => "There is still time remaining in this zone.",
+                5 => "You must be in a party to enter Imperial Guardian.",
+                6 => "Your level is too low to enter Imperial Guardian.",
+                _ => "Imperial Guardian entry was rejected."
+            };
+            MuGame.ScheduleOnMainThread(() => RequestDialog.ShowInfo(message));
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xBF, 0x0E)]
+        public Task HandleDoppelgangerEnterResultAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 5) return Task.CompletedTask;
+
+            string message = packet.Span[4] switch
+            {
+                0 or 4 => null,
+                2 => "Doppelganger has already started or is occupied.",
+                3 => "Players with PK status cannot enter Doppelganger.",
+                _ => "Doppelganger entry was rejected. Check your ticket and try again."
+            };
+
+            if (message != null)
+            {
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    _ = _networkManager.GetCharacterService().SendCloseNpcRequestAsync();
+                    RequestDialog.ShowInfo(message);
+                });
+            }
+            return Task.CompletedTask;
+        }
+
         public ShopHandler(
             ILoggerFactory loggerFactory,
             CharacterState characterState,
@@ -440,6 +483,34 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     MuGame.ScheduleOnMainThread(() =>
                     {
                         DevilSquareEnterControl.Instance.ShowWindow();
+                    });
+                }
+                else if (resp.Window == NpcWindowResponse.NpcWindow.JerintGaionEvententry)
+                {
+                    MuGame.ScheduleOnMainThread(() =>
+                    {
+                        EventsInfoControl.Instance.CloseWindow();
+                        var service = _networkManager.GetCharacterService();
+                        RequestDialog.Show(
+                            "Enter Imperial Guardian?\nGaion's Order (Mon-Sat)\nComplete Secromicon (Sunday)",
+                            onAccept: () => _ = service.SendImperialGuardianEnterRequestAsync(),
+                            onReject: () => _ = service.SendCloseNpcRequestAsync(),
+                            acceptText: "Enter",
+                            rejectText: "Close");
+                    });
+                }
+                else if (resp.Window == NpcWindowResponse.NpcWindow.LugardDoppelgangerEntry)
+                {
+                    MuGame.ScheduleOnMainThread(() =>
+                    {
+                        EventsInfoControl.Instance.CloseWindow();
+                        var service = _networkManager.GetCharacterService();
+                        RequestDialog.Show(
+                            "Enter Doppelganger?\nRequires a Mirror of Dimensions or a Doppelganger Free Ticket.",
+                            onAccept: () => _ = service.SendDoppelgangerEnterRequestAsync(),
+                            onReject: () => _ = service.SendCloseNpcRequestAsync(),
+                            acceptText: "Enter",
+                            rejectText: "Close");
                     });
                 }
                 else if (resp.Window == NpcWindowResponse.NpcWindow.BloodCastle)

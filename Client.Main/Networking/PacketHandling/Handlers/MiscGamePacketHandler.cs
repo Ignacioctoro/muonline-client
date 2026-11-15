@@ -776,6 +776,28 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
+        [PacketHandler(0xD1, 0x10)]
+        public Task HandleRaklionStateInfoAsync(Memory<byte> packet)
+        {
+            var data = packet.Span;
+            if (data.Length < 12) return Task.CompletedTask;
+
+            string phase = data[4] switch
+            {
+                0 => "Spider Eggs are active.",
+                1 => "Only a few Spider Eggs remain.",
+                2 => "Selupan is about to appear.",
+                3 or 4 => "Selupan has appeared.",
+                5 or 6 => "The battle against Selupan is active.",
+                7 when data[5] != 9 => "Battle active. Entry closed.",
+                7 or 8 or 9 or 10 => "Waiting for the hatchery to reopen.",
+                _ => "Raklion status unavailable."
+            };
+            bool canEnter = data[6] != 0;
+            MuGame.ScheduleOnMainThread(() => EventsInfoControl.Instance.SetRaklionStatus(phase, canEnter));
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0x90, PacketRouter.NoSubCode)] // DevilSquareEnterResult (S2C)
         public Task HandleDevilSquareEnterResultAsync(Memory<byte> packet)
         {

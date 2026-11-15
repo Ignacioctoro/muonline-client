@@ -200,6 +200,13 @@ namespace Client.Main.Controls.UI.Game
             }
         }
 
+        internal byte GetEventGateLevel()
+        {
+            EnsureCharacterState();
+            RefreshEntryOptions();
+            return (byte)(_activeIndex + 1);
+        }
+
         public void ShowWindow()
         {
             EnsureCharacterState();

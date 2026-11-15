@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.Network.Packets.ServerToClient;
+using MUnique.OpenMU.Network.Packets;
 using Client.Main.Core.Client;
 using Client.Main.Networking;
 using Client.Main.Controls.UI;
@@ -32,28 +33,54 @@ namespace Client.Main.Networking.PacketHandling.Handlers
         [PacketHandler(0x91, PacketRouter.NoSubCode)]
         public Task HandleMiniGameOpeningStateAsync(Memory<byte> packet)
         {
-            const byte bloodCastle = 2;
             var data = packet.Span;
-            if (data.Length < 7 || data[3] != bloodCastle)
-            {
-                return Task.CompletedTask;
-            }
+            if (data.Length < 7) return Task.CompletedTask;
 
-            byte minutes = data[4];
+            var type = (MiniGameType)data[3];
+            string name = type switch
+            {
+                MiniGameType.BloodCastle => "Blood Castle",
+                MiniGameType.DevilSquare => "Devil Square",
+                MiniGameType.ChaosCastle => "Chaos Castle",
+                _ => null
+            };
+            if (name == null) return Task.CompletedTask;
+
+            bool isChaosCastle = type == MiniGameType.ChaosCastle;
+            int minutes = isChaosCastle ? (data[4] << 8) | data[6] : data[4];
+            int unavailable = isChaosCastle ? 0xFFFF : 0xFF;
             byte players = data[5];
             string message = minutes switch
             {
-                0 => $"Blood Castle entrance is open. Players inside: {players}.",
-                1 => "Blood Castle entrance opens in 1 minute.",
-                0xFF => "Blood Castle opening time is unavailable.",
-                _ => $"Blood Castle entrance opens in {minutes} minutes."
+                0 => $"Entrance open. Players inside: {players}.",
+                1 => "Entrance opens in 1 minute.",
+                _ when minutes == unavailable => "Opening time unavailable.",
+                _ => $"Entrance opens in {minutes} minutes."
             };
 
             MuGame.ScheduleOnMainThread(() =>
             {
-                if (!EventsInfoControl.Instance.TrySetBloodCastleOpening(message))
-                    RequestDialog.ShowInfo(message);
+                if (!EventsInfoControl.Instance.TrySetOpening(type, message) && type == MiniGameType.BloodCastle)
+                    RequestDialog.ShowInfo($"{name}\n{message}");
             });
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xAF, 0x01)]
+        public Task HandleChaosCastleEnterResultAsync(Memory<byte> packet)
+        {
+            var data = packet.Span;
+            if (data.Length < 5 || data[4] == 0) return Task.CompletedTask;
+
+            string message = data[4] switch
+            {
+                2 => "Chaos Castle entrance is closed.",
+                5 => "Chaos Castle is full.",
+                7 => "You do not have enough Zen to enter Chaos Castle.",
+                8 => "Players with PK status cannot enter Chaos Castle.",
+                _ => "Chaos Castle entry was rejected. Check your level and Armor of Guardsman."
+            };
+            MuGame.ScheduleOnMainThread(() => RequestDialog.ShowInfo(message));
             return Task.CompletedTask;
         }
 
