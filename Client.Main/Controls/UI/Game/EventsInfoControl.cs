@@ -35,11 +35,23 @@ namespace Client.Main.Controls.UI.Game
             new(null, "Imperial Guardian", "Interface/GFx/EventMapEntranceUI_I89.ozd",
                 "Clear the fortress and defeat its guardians\nbefore time runs out.", "Gaion's Order",
                 new("Jerint", "Devias (229, 221)", "Sunday: Complete Secromicon.")),
+            new(null, "Illusion of Kundun", "Interface/GFx/EventMapEntranceUI_I80.ozd",
+                "Open a portal to Kalima 7 and challenge\nIllusion of Kundun.", "Lost Map +7"),
             new(null, "Selupan", "Interface/GFx/EventMapEntranceUI_I77.ozd",
                 "Destroy the Spider Eggs in Raklion Hatchery\nto awaken Selupan.", "None"),
+            new(null, "Nightmare", "Interface/GFx/EventMapEntranceUI_I7A.ozd",
+                "Defeat Maya in Kanturu to face Nightmare\nand open the Tower of Refinement.", "Moonstone Pendant"),
+            new(null, "Crywolf", "Interface/GFx/EventMapEntranceUI_I5F.ozd",
+                "Defend the Wolf Statue and its altars\nfrom Balgass and his army.", "None"),
         };
-        private static readonly int SelupanIndex = Pages.Length - 1;
+        private static readonly int FirstBossIndex = Pages.Length - 4;
+        private static readonly int SelupanIndex = FirstBossIndex + 1;
+        private static readonly int NightmareIndex = Pages.Length - 2;
+        private static readonly int CrywolfIndex = Pages.Length - 1;
+        private const ushort CrywolfWarpIndex = 26;
+        private static readonly Rectangle CompetitionTab = new(241, 78, 103, 27);
         private const ushort RaklionWarpIndex = 34;
+        private const ushort KanturuRelicsWarpIndex = 30;
         private static readonly Rectangle EventMapTab = new(27, 78, 103, 27);
         private static readonly Rectangle BossBattleTab = new(134, 78, 103, 27);
         private static readonly Rectangle FrameSource = new(0, 0, Width, Height);
@@ -59,13 +71,22 @@ namespace Client.Main.Controls.UI.Game
         private readonly Dictionary<MiniGameType, DateTime> _openingRequests = new();
         private int _selectedIndex = 1;
         private int _eventMapIndex = 1;
-        private DateTime? _raklionReplyDeadline;
-        private string _hatcheryStatus = string.Empty;
+        private int _bossIndex = SelupanIndex;
+        private DateTime? _encounterReplyDeadline;
+        private string _bossEntranceStatus = string.Empty;
+        private string _crywolfSchedule = string.Empty;
+        private string _crywolfTiming = string.Empty;
         private byte _gateLevel;
         private string _openingStatus = string.Empty;
 
         private EventPage SelectedPage => Pages[_selectedIndex];
-        private bool IsBossBattle => _selectedIndex == SelupanIndex;
+        private bool IsBossBattle => _selectedIndex >= FirstBossIndex && _selectedIndex < CrywolfIndex;
+        private bool IsCompetition => _selectedIndex == CrywolfIndex;
+        private bool IsEncounter => IsBossBattle || IsCompetition;
+        private int FirstVisiblePage => IsCompetition ? CrywolfIndex : IsBossBattle ? FirstBossIndex : 0;
+        private int EndVisiblePage => IsCompetition ? Pages.Length : IsBossBattle ? CrywolfIndex : FirstBossIndex;
+        private bool IsKundun => _selectedIndex == FirstBossIndex;
+        private bool IsNightmare => _selectedIndex == NightmareIndex;
         private bool IsWaitingForOpening => SelectedPage.Type is { } type && _openingRequests.ContainsKey(type);
 
         private EventsInfoControl()
@@ -109,7 +130,7 @@ namespace Client.Main.Controls.UI.Game
         {
             Visible = false;
             _openingRequests.Clear();
-            _raklionReplyDeadline = null;
+            _encounterReplyDeadline = null;
             if (Scene?.FocusControl == this) Scene.FocusControl = null;
         }
 
@@ -122,10 +143,12 @@ namespace Client.Main.Controls.UI.Game
 
         private void SelectPage(int index)
         {
+            if (_selectedIndex != index) _encounterReplyDeadline = null;
             _selectedIndex = index;
-            if (IsBossBattle)
+            if (IsEncounter)
             {
-                RefreshRaklion();
+                if (IsBossBattle) _bossIndex = index;
+                RefreshEncounterStatus();
                 return;
             }
 
@@ -157,30 +180,49 @@ namespace Client.Main.Controls.UI.Game
             _ = service.RequestMiniGameOpeningAsync(type, _gateLevel);
         }
 
-        private void RefreshRaklion()
+        private void RefreshEncounterStatus()
         {
-            if (_raklionReplyDeadline.HasValue) return;
-            _hatcheryStatus = string.Empty;
+            if (_encounterReplyDeadline.HasValue) return;
+            _bossEntranceStatus = string.Empty;
+            _crywolfSchedule = string.Empty;
+            _crywolfTiming = string.Empty;
             var service = MuGame.Network?.GetCharacterService();
             if (service == null)
             {
-                _openingStatus = "Raklion status unavailable.";
+                _openingStatus = $"{SelectedPage.Name} status unavailable.";
                 return;
             }
 
-            _openingStatus = "Checking Raklion status...";
-            _raklionReplyDeadline = DateTime.UtcNow.AddSeconds(6);
-            _ = service.RequestRaklionStateAsync();
+            _openingStatus = $"Checking {SelectedPage.Name} status...";
+            _encounterReplyDeadline = DateTime.UtcNow.AddSeconds(6);
+            _ = IsCompetition ? service.RequestCrywolfMenuStateAsync() :
+                IsKundun ? service.RequestKundunMenuStateAsync() :
+                IsNightmare ? service.RequestKanturuMenuStateAsync() : service.RequestRaklionStateAsync();
         }
 
-        internal void SetRaklionStatus(string phase, bool canEnter)
-        {
-            if (!_raklionReplyDeadline.HasValue) return;
-            _raklionReplyDeadline = null;
-            if (!Visible || !IsBossBattle) return;
+        internal void SetRaklionStatus(string phase, bool canEnter) =>
+            SetBossStatus(SelupanIndex, phase, canEnter ? "Hatchery gate open." : "Hatchery gate closed.");
 
+        internal void SetKundunStatus(string phase) =>
+            SetBossStatus(FirstBossIndex, phase, "Portal opened with Lost Map +7.");
+
+        internal void SetKanturuStatus(string phase, bool canEnter) =>
+            SetBossStatus(NightmareIndex, phase, canEnter ? "Gateway open." : "Gateway closed.");
+
+        internal void SetCrywolfStatus(string phase, string details, string schedule, string timing)
+        {
+            if (!Visible || !IsCompetition || !_encounterReplyDeadline.HasValue) return;
+            SetBossStatus(CrywolfIndex, phase, details);
+            _crywolfSchedule = schedule;
+            _crywolfTiming = timing;
+        }
+
+        private void SetBossStatus(int index, string phase, string entranceStatus)
+        {
+            if (!Visible || _selectedIndex != index || !_encounterReplyDeadline.HasValue) return;
+            _encounterReplyDeadline = null;
             _openingStatus = phase;
-            _hatcheryStatus = canEnter ? "Hatchery gate open." : "Hatchery gate closed.";
+            _bossEntranceStatus = entranceStatus;
         }
 
         private void PositionWindow()
@@ -196,10 +238,10 @@ namespace Client.Main.Controls.UI.Game
             if (!Visible) return;
             PositionWindow();
             base.Update(gameTime);
-            if (_raklionReplyDeadline is { } deadlineRaklion && DateTime.UtcNow >= deadlineRaklion)
+            if (_encounterReplyDeadline is { } bossDeadline && DateTime.UtcNow >= bossDeadline)
             {
-                _raklionReplyDeadline = null;
-                if (IsBossBattle) _openingStatus = "Raklion status unavailable.";
+                _encounterReplyDeadline = null;
+                if (IsEncounter) _openingStatus = $"{SelectedPage.Name} status unavailable.";
             }
             foreach (var page in Pages)
             {
@@ -228,24 +270,28 @@ namespace Client.Main.Controls.UI.Game
             var point = ToLocal(mouse.Position);
             if (CloseButton.Contains(point))
                 CloseWindow();
-            else if (EventMapTab.Contains(point) && IsBossBattle)
+            else if (EventMapTab.Contains(point) && IsEncounter)
                 SelectPage(_eventMapIndex);
             else if (BossBattleTab.Contains(point) && !IsBossBattle)
-                SelectPage(SelupanIndex);
+                SelectPage(_bossIndex);
+            else if (CompetitionTab.Contains(point) && !IsCompetition)
+                SelectPage(CrywolfIndex);
             else if (TimeButton.Contains(point) && SelectedPage.Npc == null)
             {
-                if (IsBossBattle) RefreshRaklion();
+                if (IsEncounter) RefreshEncounterStatus();
                 else RefreshOpening();
             }
             else if (EntryButton.Contains(point))
             {
                 EnterSelectedEvent();
             }
-            else if (!IsBossBattle)
+            else
             {
-                for (int i = 0; i < SelupanIndex; i++)
+                int firstPage = FirstVisiblePage;
+                int lastPage = EndVisiblePage;
+                for (int i = firstPage; i < lastPage; i++)
                 {
-                    if (!EventRow(i).Contains(point) || i == _selectedIndex) continue;
+                    if (!EventRow(i - firstPage).Contains(point) || i == _selectedIndex) continue;
                     SelectPage(i);
                     break;
                 }
@@ -255,10 +301,20 @@ namespace Client.Main.Controls.UI.Game
         private void EnterSelectedEvent()
         {
             CloseWindow();
-            if (IsBossBattle)
+            if (IsKundun)
+            {
+                RequestDialog.ShowInfo("Drop a Lost Map +7 outside a safe zone to open a portal to Kalima 7.\nThen use the portal to enter.");
+                return;
+            }
+
+            if (IsEncounter)
             {
                 var characterService = MuGame.Network?.GetCharacterService();
-                if (characterService != null) _ = characterService.SendWarpCommandRequestAsync(RaklionWarpIndex);
+                if (characterService != null)
+                {
+                    ushort warpIndex = IsCompetition ? CrywolfWarpIndex : IsNightmare ? KanturuRelicsWarpIndex : RaklionWarpIndex;
+                    _ = characterService.SendWarpCommandRequestAsync(warpIndex);
+                }
                 return;
             }
 
@@ -308,14 +364,14 @@ namespace Client.Main.Controls.UI.Game
                 batch.Draw(selectedArt, new Rectangle(205, 111, 699, 576), ArtSource, Color.White);
 
             DrawPanel(batch, pixel, new Rectangle(18, 76, 888, 31), new Color(20, 16, 13));
-            DrawButton(batch, pixel, font, EventMapTab, "Event Map", !IsBossBattle, false);
+            DrawButton(batch, pixel, font, EventMapTab, "Event Map", !IsEncounter, false);
             DrawButton(batch, pixel, font, BossBattleTab, "Boss Battle", IsBossBattle, false);
-            DrawButton(batch, pixel, font, new Rectangle(241, 78, 103, 27), "Competition", false, true);
+            DrawButton(batch, pixel, font, CompetitionTab, "Competition", IsCompetition, false);
             DrawText(batch, font, "Events Info", new Rectangle(50, 29, 824, 23), Gold, 17f, true);
             DrawText(batch, font, "X", CloseButton, CloseButton.Contains(mouse) ? Gold : new Color(211, 117, 69), 15f, true);
 
-            int firstPage = IsBossBattle ? SelupanIndex : 0;
-            int lastPage = IsBossBattle ? SelupanIndex + 1 : SelupanIndex;
+            int firstPage = FirstVisiblePage;
+            int lastPage = EndVisiblePage;
             for (int i = firstPage; i < lastPage; i++)
             {
                 var row = EventRow(i - firstPage);
@@ -332,12 +388,12 @@ namespace Client.Main.Controls.UI.Game
             DrawText(batch, font, SelectedPage.Name, new Rectangle(222, 123, 470, 41), Gold, 34f);
             DrawText(batch, font, SelectedPage.Description, new Rectangle(222, 170, 470, 45), TextColor, 16f);
             if (SelectedPage.Npc == null)
-                DrawButton(batch, pixel, font, TimeButton, IsBossBattle ? "Refresh Status" : "Event Entry Time",
-                    TimeButton.Contains(mouse), IsBossBattle ? _raklionReplyDeadline.HasValue : IsWaitingForOpening);
+                DrawButton(batch, pixel, font, TimeButton, IsEncounter ? "Refresh Status" : "Event Entry Time",
+                    TimeButton.Contains(mouse), IsEncounter ? _encounterReplyDeadline.HasValue : IsWaitingForOpening);
 
             var info = new Rectangle(599, 320, 280, 139);
             DrawPanel(batch, pixel, info, new Color(12, 10, 9, 207));
-            DrawText(batch, font, IsBossBattle ? "Boss Battle Information" : "Entry Information",
+            DrawText(batch, font, IsCompetition ? "Fortress Information" : IsBossBattle ? "Boss Battle Information" : "Entry Information",
                 new Rectangle(615, 332, 248, 24), Gold, 17f);
             bool isChaosCastle = SelectedPage.Type == MiniGameType.ChaosCastle;
             var npc = SelectedPage.Npc;
@@ -346,8 +402,19 @@ namespace Client.Main.Controls.UI.Game
             string entryInfo = npc?.TicketNote ?? (isChaosCastle ? "Entry costs Zen." : "See the entry window for level ranges.");
             if (IsBossBattle)
             {
-                gateInfo = "Raklion Hatchery (171, 23-25)";
-                entryInfo = _hatcheryStatus;
+                gateInfo = IsKundun ? "Kalima 7" :
+                    IsNightmare ? "Gateway Machine (141, 191)" : "Raklion Hatchery (171, 23-25)";
+                entryInfo = _bossEntranceStatus;
+            }
+            if (IsCompetition)
+            {
+                gateInfo = "Crywolf Fortress";
+                entryInfo = _bossEntranceStatus;
+
+                DrawPanel(batch, pixel, new Rectangle(222, 462, 657, 100), new Color(12, 10, 9, 215));
+                DrawText(batch, font, "Weekly Schedule (Server Time)", new Rectangle(238, 468, 625, 21), Gold, 15f);
+                DrawText(batch, font, _crywolfSchedule, new Rectangle(238, 491, 625, 38), TextColor, 12f);
+                DrawText(batch, font, _crywolfTiming, new Rectangle(238, 535, 625, 20), Gold, 13f);
             }
             DrawText(batch, font, gateInfo, new Rectangle(615, 370, 248, 21), TextColor, 13f);
             DrawText(batch, font, entryInfo, new Rectangle(615, 399, 248, 21), TextColor, 13f);
@@ -356,7 +423,7 @@ namespace Client.Main.Controls.UI.Game
             DrawText(batch, font, "Required Item", new Rectangle(238, 585, 179, 24), Gold, 17f, true);
             DrawText(batch, font, SelectedPage.Ticket, new Rectangle(238, 617, 179, 24), TextColor, 15f, true);
             DrawText(batch, font, _openingStatus, new Rectangle(449, 577, 430, 29), Gold, 15f, true);
-            string action = IsBossBattle ? "Move" : npc != null ? $"Find {npc.Name}" : "Enter";
+            string action = IsKundun ? "How to Enter" : IsEncounter ? "Move" : npc != null ? $"Find {npc.Name}" : "Enter";
             DrawButton(batch, pixel, font, EntryButton, action, EntryButton.Contains(mouse), false);
         }
 

@@ -1940,7 +1940,19 @@ namespace Client.Main.Networking.Services
             }
         }
 
-        public async Task RequestRaklionStateAsync()
+        public Task RequestRaklionStateAsync() => SendKanturuGroupRequestAsync(0x10);
+
+        public Task RequestKanturuMenuStateAsync() => SendKanturuGroupRequestAsync(0x20);
+
+        public Task SendKanturuEnterRequestAsync() => SendKanturuGroupRequestAsync(0x01);
+
+        public Task RequestKundunMenuStateAsync() => SendKanturuGroupRequestAsync(0x21);
+
+        public Task RequestCrywolfMenuStateAsync() => SendEventStatusPacketAsync(0xBD, 0x20);
+
+        private Task SendKanturuGroupRequestAsync(byte subCode) => SendEventStatusPacketAsync(0xD1, subCode);
+
+        private async Task SendEventStatusPacketAsync(byte code, byte subCode)
         {
             if (!_connectionManager.IsConnected) return;
 
@@ -1953,14 +1965,14 @@ namespace Client.Main.Networking.Services
                     var packet = connection.Output.GetSpan(length).Slice(0, length);
                     packet[0] = 0xC1;
                     packet[1] = length;
-                    packet[2] = 0xD1;
-                    packet[3] = 0x10;
+                    packet[2] = code;
+                    packet[3] = subCode;
                     return length;
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error requesting Raklion event status.");
+                _logger.LogError(ex, "Error sending event request 0x{Code:X2}/0x{SubCode:X2}.", code, subCode);
             }
         }
 

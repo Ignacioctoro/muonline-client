@@ -18,10 +18,12 @@ namespace Client.Main.Controls.UI.Game.Hud
     {
         private readonly CharacterState _state;
         private readonly TextureControl _fill;
+        private readonly TextureControl _masterFill;
         private readonly TextureControl _cover;
         private readonly LabelControl _hoverTooltip;
         private ulong _shownExperience = ulong.MaxValue;
         private ulong _shownNextExperience = ulong.MaxValue;
+        private bool _shownMasterMode;
 
         /// <summary>Original HUD EXP digit, 0-9. Updated with the gauge.</summary>
         public int CurrentDecileDigit { get; private set; }
@@ -35,10 +37,7 @@ namespace Client.Main.Controls.UI.Game.Hud
             TextureRectangle = new Rectangle(218, 90, 741, 14);
             BlendState = BlendState.NonPremultiplied;
 
-            // The GFx normal-EXP resource is orange. Data also has a green
-            // guege_exp_1 variant; its original switching rule is unverified.
-            // Do not invent a color change per decile or activate Master here.
-            // The cover draws the original divisions on top.
+            // As in the original main frame, the same gauge switches to the Master EXP texture.
             _fill = new TextureControl
             {
                 Name = "ExperienceFill",
@@ -48,6 +47,18 @@ namespace Client.Main.Controls.UI.Game.Hud
                 TextureRectangle = new Rectangle(0, 0, 4, 8),
                 BlendState = BlendState.NonPremultiplied,
                 ViewSize = Point.Zero
+            };
+
+            _masterFill = new TextureControl
+            {
+                Name = "MasterExperienceFill",
+                AutoViewSize = false,
+                Interactive = false,
+                TexturePath = "Interface/Exbar_Master.OZJ",
+                TextureRectangle = new Rectangle(0, 0, 6, 4),
+                BlendState = BlendState.NonPremultiplied,
+                ViewSize = Point.Zero,
+                Visible = false
             };
 
             _cover = new TextureControl
@@ -62,6 +73,7 @@ namespace Client.Main.Controls.UI.Game.Hud
             };
 
             Controls.Add(_fill);
+            Controls.Add(_masterFill);
             Controls.Add(_cover);
 
             // As in the original main frame, show exact cumulative EXP on hover.
@@ -87,11 +99,13 @@ namespace Client.Main.Controls.UI.Game.Hud
             if (!IsMouseOver || !Visible || Status != Client.Main.Models.GameControlStatus.Ready)
                 return;
 
-            ulong current = _state.Experience;
-            ulong next = _state.ExperienceForNextLevel;
-            if (current != _shownExperience || next != _shownNextExperience)
+            bool master = _state.UsesMasterExperience;
+            ulong current = master ? _state.MasterExperience : _state.Experience;
+            ulong next = master ? _state.MasterExperienceForNextLevel : _state.ExperienceForNextLevel;
+            if (current != _shownExperience || next != _shownNextExperience || master != _shownMasterMode)
             {
-                _hoverTooltip.Text = $"EXP: {current:N0} / {next:N0}";
+                _hoverTooltip.Text = $"{(master ? "Master EXP" : "EXP")}: {current:N0} / {next:N0}";
+                _shownMasterMode = master;
                 _shownExperience = current;
                 _shownNextExperience = next;
             }
@@ -117,9 +131,7 @@ namespace Client.Main.Controls.UI.Game.Hud
             const int insetX = 4;
             int usableWidth = Math.Max(0, ViewSize.X - insetX * 2);
             int usableHeight = Math.Max(0, ViewSize.Y - 6);
-            ExperienceProgressCalculator.GetNormalLevelDecile(
-                _state.Level, _state.Experience, _state.ExperienceForNextLevel,
-                out int digit, out float fraction);
+            ExperienceProgressCalculator.GetCharacterDecile(_state, out int digit, out float fraction);
             CurrentDecileDigit = digit;
 
             _fill.X = insetX;
@@ -127,7 +139,12 @@ namespace Client.Main.Controls.UI.Game.Hud
             _fill.ViewSize = new Point(
                 (int)Math.Round(usableWidth * fraction),
                 usableHeight);
-            _fill.Visible = fraction > 0f && usableHeight > 0;
+            bool master = _state.UsesMasterExperience;
+            _fill.Visible = !master && fraction > 0f && usableHeight > 0;
+            _masterFill.X = _fill.X;
+            _masterFill.Y = _fill.Y;
+            _masterFill.ViewSize = _fill.ViewSize;
+            _masterFill.Visible = master && fraction > 0f && usableHeight > 0;
 
             // The overlay owns the ornamentation and all ten tick marks.
             _cover.ViewSize = ViewSize;

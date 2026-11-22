@@ -124,6 +124,32 @@ namespace Client.Main.Core.Client
         public ulong MasterExperience { get; set; } = 0;
         public ulong MasterExperienceForNextLevel { get; set; } = 1;
         public ushort MasterLevelUpPoints { get; set; } = 0;
+        public CharacterProgressionInfo Progression { get; private set; }
+        public int ProgressionRevision { get; private set; }
+        public bool HasMasterExperienceInfo { get; private set; }
+
+        public bool UsesMasterExperience => HasMasterExperienceInfo
+            && (Progression?.IsMasterClass ?? (Class is CharacterClassNumber.GrandMaster or CharacterClassNumber.BladeMaster
+                or CharacterClassNumber.HighElf or CharacterClassNumber.DuelMaster or CharacterClassNumber.LordEmperor
+                or CharacterClassNumber.DimensionMaster or CharacterClassNumber.FistMaster))
+            && Level >= (Progression?.MaximumLevel ?? 400);
+
+        public int GetBaseStatLimit(int index) => Progression is { BaseStatLimits.Length: 5 } info
+            && index >= 0 && index < 5 ? info.BaseStatLimits[index] : ushort.MaxValue;
+
+        public int GetBaseStatValue(int index) => index switch
+        {
+            0 => Strength, 1 => Agility, 2 => Vitality, 3 => Energy, 4 => Leadership, _ => 0,
+        };
+
+        public void ApplyProgressionInfo(CharacterProgressionInfo info)
+        {
+            if (info.CharacterName != Name || info.Class != (int)Class || info.BaseStatLimits?.Length != 5) return;
+            Progression = info;
+            ProgressionRevision++;
+            if (info.Level == Level) ExperienceForNextLevel = info.NormalNext;
+            if (info.MasterLevel == MasterLevel) MasterExperienceForNextLevel = info.MasterNext;
+        }
 
         // Position and Map Information
         public byte PositionX { get; set; } = 0;
@@ -1332,6 +1358,7 @@ namespace Client.Main.Core.Client
         /// </summary>
         public void UpdateMasterLevelAndExperience(ushort masterLevel, ulong currentMasterExperience, ulong nextMasterLevelExperience, ushort masterLevelUpPoints)
         {
+            HasMasterExperienceInfo = true;
             MasterLevel = masterLevel;
             MasterExperience = currentMasterExperience;
             MasterExperienceForNextLevel = Math.Max(1, nextMasterLevelExperience);
@@ -1742,6 +1769,13 @@ namespace Client.Main.Core.Client
         /// <summary>Starts a fresh skill session before selecting another character.</summary>
         public void ResetCharacterSkills()
         {
+            Progression = null;
+            ProgressionRevision++;
+            HasMasterExperienceInfo = false;
+            MasterLevel = 0;
+            MasterExperience = 0;
+            MasterExperienceForNextLevel = 1;
+            MasterLevelUpPoints = 0;
             System.Threading.Interlocked.Increment(ref _skillSessionRevision);
             ClearSkillList();
             LastAreaSkillId = 0;

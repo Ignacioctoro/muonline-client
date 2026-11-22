@@ -1,4 +1,5 @@
 using System;
+using Client.Main.Core.Client;
 
 namespace Client.Main.Core.Utilities
 {
@@ -8,6 +9,44 @@ namespace Client.Main.Core.Utilities
     /// </summary>
     public static class ExperienceProgressCalculator
     {
+        public static float GetCharacterFraction(CharacterState state, bool master)
+        {
+            var info = state.Progression;
+            int level = master ? state.MasterLevel : state.Level;
+            int maximum = master ? info?.MaximumMasterLevel ?? 200 : info?.MaximumLevel ?? 400;
+            if (level >= maximum) return 1f;
+
+            ulong current = master ? state.MasterExperience : state.Experience;
+            ulong next = master ? state.MasterExperienceForNextLevel : state.ExperienceForNextLevel;
+            ulong start;
+            if (master)
+            {
+                start = info?.MasterLevel == level ? info.MasterStart : DefaultMasterThreshold(level);
+            }
+            else
+            {
+                start = info?.Level == level ? info.NormalStart :
+                    level > 1 ? NextLevelThreshold((ushort)(level - 1)) : 0;
+            }
+
+            if (next <= start) return 0f;
+            ulong gained = current > start ? current - start : 0;
+            return (float)Math.Clamp(gained / (double)(next - start), 0d, 1d);
+        }
+
+        public static void GetCharacterDecile(CharacterState state, out int digit, out float fraction)
+        {
+            double progress = GetCharacterFraction(state, state.UsesMasterExperience) * 10d;
+            digit = Math.Clamp((int)progress, 0, 9);
+            fraction = progress >= 10d ? 1f : (float)(progress - digit);
+        }
+
+        private static ulong DefaultMasterThreshold(int level)
+        {
+            ulong n = (ulong)Math.Max(0, level);
+            return 505UL * n * n * n + 228045UL * n * n + 35278500UL * n;
+        }
+
         public static ulong NextLevelThreshold(ushort level)
         {
             ulong n = level;

@@ -776,6 +776,158 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
+        [PacketHandler(0xBD, 0x20)]
+        public Task HandleCrywolfMenuStateAsync(Memory<byte> packet)
+        {
+            const int baseLength = 22;
+            var data = packet.Span;
+            if (data.Length < baseLength || data.Length != baseLength + data[12] * 2)
+                return Task.CompletedTask;
+
+            if (data[4] == 0)
+            {
+                MuGame.ScheduleOnMainThread(() => EventsInfoControl.Instance.SetCrywolfStatus(
+                    "Crywolf status unavailable.", string.Empty, string.Empty, string.Empty));
+                return Task.CompletedTask;
+            }
+
+            bool isHost = data[4] == 1;
+            byte state = data[6];
+            string phase = !isHost && data[7] == 2 ? "Battle active on another server." : state switch
+            {
+                1 => "Balgass attack announced.",
+                2 => "The fortress is preparing.",
+                3 => "The altars are open for contracts.",
+                4 => "Battle against Balgass in progress.",
+                5 or 6 => "The battle has ended.",
+                _ when data[7] == 1 => "Balgass occupies the fortress.",
+                _ => "Fortress at peace."
+            };
+            string details = isHost && data[8] != byte.MaxValue
+                ? $"Shield {data[8]}% | Altars {data[9]}/{data[10]}"
+                : $"Event server ID {data[5]}";
+
+            var weekdays = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+            var scheduledDays = new System.Collections.Generic.List<string>();
+            for (int day = 0; day < weekdays.Length; day++)
+                if ((data[11] & (1 << day)) != 0) scheduledDays.Add(weekdays[day]);
+
+            int shownTimes = Math.Min(data[12], (byte)8);
+            var scheduleTimes = new string[shownTimes];
+            for (int i = 0; i < shownTimes; i++)
+            {
+                int minutes = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(data[(baseLength + i * 2)..]);
+                scheduleTimes[i] = $"{minutes / 60:00}:{minutes % 60:00}";
+            }
+
+            string schedule = scheduledDays.Count == 0 || shownTimes == 0 ? "No weekly schedule." :
+                $"{string.Join(", ", scheduledDays)}\n{string.Join(", ", scheduleTimes)}{(shownTimes < data[12] || data[13] != 0 ? ", ..." : "")}";
+            uint phaseSeconds = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data[14..]);
+            uint nextSeconds = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data[18..]);
+            string timing = isHost && state is >= 1 and <= 6 && phaseSeconds > 0
+                ? $"Phase ends in {FormatCrywolfRemaining(phaseSeconds)}."
+                : nextSeconds == uint.MaxValue ? string.Empty : $"Next defense in {FormatCrywolfRemaining(nextSeconds)}.";
+
+            MuGame.ScheduleOnMainThread(() => EventsInfoControl.Instance.SetCrywolfStatus(phase, details, schedule, timing));
+            return Task.CompletedTask;
+        }
+
+        private static string FormatCrywolfRemaining(uint seconds)
+        {
+            var remaining = TimeSpan.FromMinutes(Math.Ceiling(seconds / 60d));
+            return remaining.Days > 0 ? $"{remaining.Days}d {remaining.Hours}h {remaining.Minutes}m" :
+                remaining.Hours > 0 ? $"{remaining.Hours}h {remaining.Minutes}m" : $"{remaining.Minutes}m";
+        }
+
+        [PacketHandler(0xD1, 0x21)]
+        public Task HandleKundunMenuStateAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 5) return Task.CompletedTask;
+
+            string phase = packet.Span[4] switch
+            {
+                0 => "Kalima 7 is not loaded on this channel.",
+                1 => "Illusion of Kundun is alive.",
+                2 => "Illusion of Kundun is not present.",
+                3 => "Kundun spawn is not configured in Kalima 7.",
+                _ => "Kundun status unavailable."
+            };
+            MuGame.ScheduleOnMainThread(() => EventsInfoControl.Instance.SetKundunStatus(phase));
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xD1, 0x20)]
+        public Task HandleKanturuMenuStateAsync(Memory<byte> packet)
+        {
+            if (TryReadKanturuState(packet, out var phase, out var canEnter, out _))
+                MuGame.ScheduleOnMainThread(() => EventsInfoControl.Instance.SetKanturuStatus(phase, canEnter));
+
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xD1, 0x00)]
+        public Task HandleKanturuGatewayStateAsync(Memory<byte> packet)
+        {
+            if (!TryReadKanturuState(packet, out var phase, out var canEnter, out var playerCount))
+                return Task.CompletedTask;
+
+            MuGame.ScheduleOnMainThread(() =>
+            {
+                EventsInfoControl.Instance.CloseWindow();
+                var service = MuGame.Network?.GetCharacterService();
+                if (service == null) return;
+
+                string label = $"Kanturu Gateway\n{phase}\nPlayers inside: {playerCount}.";
+                if (canEnter)
+                {
+                    RequestDialog.Show(label,
+                        onAccept: () => _ = service.SendKanturuEnterRequestAsync(),
+                        onReject: () => _ = service.SendCloseNpcRequestAsync(),
+                        acceptText: "Enter", rejectText: "Close");
+                }
+                else
+                {
+                    _ = service.SendCloseNpcRequestAsync();
+                    RequestDialog.ShowInfo(label);
+                }
+            });
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xD1, 0x01)]
+        public Task HandleKanturuEnterResultAsync(Memory<byte> packet)
+        {
+            if (packet.Length >= 5 && packet.Span[4] == 0)
+                MuGame.ScheduleOnMainThread(() => RequestDialog.ShowInfo("Kanturu entry was rejected. Check your requirements and try again."));
+
+            return Task.CompletedTask;
+        }
+
+        private static bool TryReadKanturuState(Memory<byte> packet, out string phase, out bool canEnter, out byte playerCount)
+        {
+            phase = string.Empty;
+            canEnter = false;
+            playerCount = 0;
+            var data = packet.Span;
+            if (data.Length < 12) return false;
+
+            uint seconds = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data[8..]);
+            canEnter = data[6] != 0;
+            playerCount = data[7];
+            phase = data[4] switch
+            {
+                1 when seconds > 0 => $"Kanturu opens in {(seconds + 59UL) / 60} min.",
+                1 => "Waiting for the next Kanturu opening.",
+                2 when canEnter => "Kanturu entry is open.",
+                2 => "Maya battle in progress.",
+                3 => "Nightmare battle in progress.",
+                4 => "Tower of Refinement is open.",
+                5 => "The Kanturu event has ended.",
+                _ => "Kanturu status unavailable."
+            };
+            return true;
+        }
+
         [PacketHandler(0xD1, 0x10)]
         public Task HandleRaklionStateInfoAsync(Memory<byte> packet)
         {

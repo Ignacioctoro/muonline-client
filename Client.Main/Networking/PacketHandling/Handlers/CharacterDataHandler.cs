@@ -5,6 +5,9 @@ using Client.Main.Objects.Player;
 using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
+using System.Text.Json;
+using System.Linq;
+using Client.Main.Controls.UI.Game;
 using Client.Main.ClassicFX.Core;
 using Client.Data.ATT;
 using Client.Main.Core.Utilities;
@@ -372,6 +375,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                 // Notify NetworkManager that character info is ready
                 _networkManager.ProcessCharacterInformation();
+                _ = _networkManager.GetCharacterService().RequestCharacterProgressionAsync();
             }
             catch (Exception ex)
             {
@@ -567,6 +571,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 // threshold, including the post-255 term, with 64-bit math.
                 ulong nextExp = ExperienceProgressCalculator.NextLevelThreshold(newLevel);
                 _characterState.UpdateLevelAndExperience(newLevel, _characterState.Experience, nextExp, newPoints);
+                _ = _networkManager.GetCharacterService().RequestCharacterProgressionAsync();
                 _characterState.UpdateMaximumHealthShield(maxHp, maxSd);
                 _characterState.UpdateMaximumManaAbility(maxMana, maxAbility);
 
@@ -1209,6 +1214,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 }
 
                 _characterState.UpdateMasterLevelAndExperience(mlvl, mexp, nextMexp, mpts);
+                _ = _networkManager.GetCharacterService().RequestCharacterProgressionAsync();
                 _characterState.UpdateMaximumHealthShield(maxHp, maxSd);
                 _characterState.UpdateMaximumManaAbility(maxMana, maxAbility);
 
@@ -1239,6 +1245,54 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             return Task.CompletedTask;
         }
 
+        [PacketHandler(0xF3, 0xE1)]
+        public Task HandleCharacterProgressionInfoAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 5 || packet.Span[0] != 0xC2) return Task.CompletedTask;
+            try
+            {
+                var info = JsonSerializer.Deserialize<CharacterProgressionInfo>(packet.Span[5..]);
+                if (info?.BaseStatLimits?.Length == 5 && info.MaximumLevel > 0 && info.MaximumMasterLevel >= 0
+                    && Array.TrueForAll(info.BaseStatLimits, limit => limit >= 0 && limit <= ushort.MaxValue))
+                    MuGame.ScheduleOnMainThread(() => _characterState.ApplyProgressionInfo(info));
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Invalid character progression response.");
+            }
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xF3, 0xE0)]
+        public Task HandleMasterTreeInfoAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 5 || packet.Span[0] != 0xC2) return Task.CompletedTask;
+            try
+            {
+                var snapshot = JsonSerializer.Deserialize<MasterTreeSnapshot>(packet.Span[5..]);
+                if (snapshot?.Nodes != null && snapshot.Nodes.Length <= 108
+                    && Array.TrueForAll(snapshot.Nodes, node => node != null && node.Index is >= 1 and <= 108
+                        && node.Rank is >= 1 and <= 9 && node.Requirements != null))
+                    MuGame.ScheduleOnMainThread(() => MasterSkillTreeControl.Instance.SetSnapshot(snapshot));
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Invalid master tree response.");
+            }
+            return Task.CompletedTask;
+        }
+
+        [PacketHandler(0xF3, 0x53)]
+        public Task HandleMasterSkillListAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 12) return Task.CompletedTask;
+            uint count = BinaryPrimitives.ReadUInt32LittleEndian(packet.Span[8..]);
+            if (count > 108 || packet.Length < 12 + count * 12) return Task.CompletedTask;
+            // Pull the authoritative catalog to map the S6 slot indices to skill IDs and prerequisites.
+            MuGame.ScheduleOnMainThread(() => MasterSkillTreeControl.Instance.LearnedSkillsChanged());
+            return Task.CompletedTask;
+        }
+
         [PacketHandler(0xF3, 0x52)] // MasterSkillLevelUpdate
         public Task HandleMasterSkillLevelUpdateAsync(Memory<byte> packet)
         {
@@ -1261,13 +1315,18 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 if (upd.Success)
                 {
                     _characterState.MasterLevelUpPoints = upd.MasterLevelUpPoints;
-                    _characterState.AddOrUpdateSkill(new SkillEntryState
+                    // Passive master skills belong to the tree. The normal skill-list packets
+                    // determine which active skills are available on the action bar.
+                    if (_characterState.GetSkills().Any(skill => skill.SkillId == upd.MasterSkillNumber))
                     {
-                        SkillId = upd.MasterSkillNumber,
-                        SkillLevel = upd.Level,
-                        DisplayValue = upd.DisplayValue,
-                        NextDisplayValue = upd.DisplayValueOfNextLevel
-                    });
+                        _characterState.AddOrUpdateSkill(new SkillEntryState
+                        {
+                            SkillId = upd.MasterSkillNumber,
+                            SkillLevel = upd.Level,
+                            DisplayValue = upd.DisplayValue,
+                            NextDisplayValue = upd.DisplayValueOfNextLevel
+                        });
+                    }
                 }
             }
             catch (Exception ex)

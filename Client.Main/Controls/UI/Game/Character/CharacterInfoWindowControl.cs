@@ -316,7 +316,12 @@ namespace Client.Main.Controls.UI.Game.Character
                 }, "QUEST");
             _masterButton = CreateButton(new Rectangle(231, 588, 94, 30), _characterAtlas,
                 buttonNormal, buttonNormal, buttonNormal,
-                () => SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav"), "MASTER");
+                () =>
+                {
+                    Scene?.SetMouseInputConsumed();
+                    Client.Main.Controls.UI.Game.MasterSkillTreeControl.Instance.Toggle();
+                    SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+                }, "MASTER");
 
             // Keep the native GFx X compact and slightly inset/lower inside the title plaque.
             _exitButton = CreateButton(new Rectangle(303, 44, 20, 20), _characterAtlas,
@@ -884,7 +889,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 if (_statButtons[i] == null) continue;
                 bool available = snapshot.LevelUpPoints > 0 && (i != 4 || isDarkLordFamily);
                 _statButtons[i].Visible = available;
-                _statButtons[i].Enabled = available;
+                _statButtons[i].Enabled = available && snapshot.GetBaseStat(i) < (_networkManager?.GetCharacterState()?.GetBaseStatLimit(i) ?? ushort.MaxValue);
             }
 
             // All three are future Season 6 navigation shortcuts, not active windows.
@@ -902,7 +907,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 return;
 
             var state = _networkManager.GetCharacterState();
-            if (state == null || state.LevelUpPoints == 0)
+            if (state == null || state.LevelUpPoints == 0 || state.GetBaseStatValue(statIndex) >= state.GetBaseStatLimit(statIndex))
                 return;
 
             if (statIndex == 4 && state.Class != CharacterClassNumber.DarkLord &&
@@ -928,6 +933,8 @@ namespace Client.Main.Controls.UI.Game.Character
 
         public void ShowWindow()
         {
+            var service = _networkManager?.GetCharacterService();
+            if (service != null) _ = service.RequestCharacterProgressionAsync();
             Visible = true;
             _isDragging = false;
             _pressedButtonIndex = -1;
@@ -987,6 +994,7 @@ namespace Client.Main.Controls.UI.Game.Character
                 Class = state.Class;
                 Level = state.Level;
                 MasterLevel = state.MasterLevel;
+                ProgressionRevision = state.ProgressionRevision;
                 Experience = state.Experience;
                 ExperienceForNextLevel = state.ExperienceForNextLevel;
                 LevelUpPoints = state.LevelUpPoints;
@@ -1040,6 +1048,7 @@ namespace Client.Main.Controls.UI.Game.Character
             public readonly CharacterClassNumber Class;
             public readonly ushort Level;
             public readonly ushort MasterLevel;
+            public readonly int ProgressionRevision;
             public readonly ulong Experience;
             public readonly ulong ExperienceForNextLevel;
             public readonly ushort LevelUpPoints;
@@ -1105,6 +1114,7 @@ namespace Client.Main.Controls.UI.Game.Character
                        Class == other.Class &&
                        Level == other.Level &&
                        MasterLevel == other.MasterLevel &&
+                       ProgressionRevision == other.ProgressionRevision &&
                        Experience == other.Experience &&
                        ExperienceForNextLevel == other.ExperienceForNextLevel &&
                        LevelUpPoints == other.LevelUpPoints &&

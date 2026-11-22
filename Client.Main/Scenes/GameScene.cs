@@ -1138,6 +1138,7 @@ namespace Client.Main.Scenes
                     return true;
 
                 if (IsWindowCovering(PetInfoControl.Instance)) return true;
+                if (IsWindowCovering(MasterSkillTreeControl.Instance)) return true;
 
                 if (IsWindowCovering(LahapControl.Instance))
                     return true;
@@ -1307,6 +1308,7 @@ namespace Client.Main.Scenes
             Controls.Add(PetTrainerControl.Instance);
             Controls.Add(LahapControl.Instance);
             Controls.Add(PetInfoControl.Instance);
+            Controls.Add(MasterSkillTreeControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
@@ -3208,6 +3210,7 @@ namespace Client.Main.Scenes
             PetTrainerControl.Instance.HideWithoutServerRequest();
             LahapControl.Instance.HideWithoutServerRequest();
             PetInfoControl.Instance.HideWindow();
+            MasterSkillTreeControl.Instance.CloseWindow();
             EventsInfoControl.Instance.CloseWindow();
 
             base.Dispose();
