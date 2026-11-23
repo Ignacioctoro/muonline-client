@@ -386,6 +386,19 @@ namespace Client.Main.Controls.UI.Game
             // SETTINGS BUTTON
             // =========================================================
 
+            if (Controls.FirstOrDefault(c => c.Name == "Button_1") is TextureControl cashShopButton)
+            {
+                cashShopButton.Interactive = true;
+                cashShopButton.BringToFront();
+                cashShopButton.Click += (_, _) =>
+                {
+                    if (Scene?.IsPointerInputBlockedFor(cashShopButton) == true) return;
+                    Scene?.SetMouseInputConsumed();
+                    CashShopControl.Instance.Toggle();
+                    SoundController.Instance?.PlayBuffer("Sound/iButtonClick.wav");
+                };
+            }
+
             if (Controls.FirstOrDefault(c => c.Name == "button2") is TextureControl characterButton)
             {
                 characterButton.BringToFront();
@@ -1078,7 +1091,7 @@ namespace Client.Main.Controls.UI.Game
                     "button4" => (3, "T", "Misiones"),
                     "InventoryButton" => (4, "I", "Inventario"),
                     "button2" => (5, "C", "Personaje"),
-                    "Button_1" => (6, "", "Tienda"),
+                    "Button_1" => (6, "X", "XShop"),
                     _ => (0, "", "Cambiar barra de habilidades")
                 };
                 if (settings.Item1 != 0)

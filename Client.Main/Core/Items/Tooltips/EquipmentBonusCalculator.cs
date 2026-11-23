@@ -59,7 +59,7 @@ namespace Client.Main.Core.Items.Tooltips
             foreach (var pair in equipment)
             {
                 var item = pair.Value;
-                if (pair.Key >= 12 || item == null || item.Durability <= 0 || FindAncientSet(item)?.Id != set.Id)
+                if (pair.Key >= 12 || item == null || item.IsExpired || item.Durability <= 0 || FindAncientSet(item)?.Id != set.Id)
                     continue;
                 distinct.Add((item.Definition.Group, item.Definition.Id));
             }
@@ -82,7 +82,7 @@ namespace Client.Main.Core.Items.Tooltips
             foreach (var pair in equipment)
             {
                 var item = pair.Value;
-                if (pair.Key >= 12 || item == null || item.Durability <= 0 || !item.Details.HasSockets)
+                if (pair.Key >= 12 || item == null || item.IsExpired || item.Durability <= 0 || !item.Details.HasSockets)
                     continue;
                 var sockets = item.Details.SocketOptions;
                 if (sockets == null)

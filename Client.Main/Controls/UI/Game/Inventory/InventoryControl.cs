@@ -2374,7 +2374,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             for (byte slot = 0; slot < 12; slot++)
             {
                 _equippedItems.TryGetValue(slot, out var item);
-                int durability = item?.Durability ?? 0;
+                int durability = item?.IsExpired == true ? -1 : item?.Durability ?? 0;
                 changed |= !ReferenceEquals(_summaryEquipment[slot], item) || _summaryDurability[slot] != durability;
                 _summaryEquipment[slot] = item;
                 _summaryDurability[slot] = durability;
@@ -2902,6 +2902,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return false;
             }
 
+            if (itemToPlace.IsExpired)
+            {
+                MessageWindow.Show("This item's period of use has expired.");
+                RestorePickedItemToOriginalLocation();
+                return true;
+            }
+
             if (TryUsePickedJewelOnEquipment(equipSlot))
             {
                 return true;
@@ -3316,7 +3323,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     item.Definition.Height * INVENTORY_SQUARE_HEIGHT);
 
                 // Item glow effect
-                Color glowColor = ItemUiHelper.GetItemGlowColor(item, GlowPalette);
+                Color glowColor = item.IsExpired ? Color.Transparent : ItemUiHelper.GetItemGlowColor(item, GlowPalette);
                 if (glowColor.A > 0)
                 {
                     ItemUiHelper.DrawItemGlow(spriteBatch, pixel, itemRect, glowColor, glowSize: 1);
@@ -3327,7 +3334,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                 if (itemTexture != null)
                 {
-                    spriteBatch.Draw(itemTexture, itemRect, Color.White);
+                    spriteBatch.Draw(itemTexture, itemRect, item.IsExpired ? new Color(120, 100, 100) : Color.White);
 
                     if (JewelShineOverlay.ShouldShine(item))
                     {
@@ -3380,7 +3387,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                 if (itemTexture != null)
                 {
-                    spriteBatch.Draw(itemTexture, itemRect, Color.White);
+                    spriteBatch.Draw(itemTexture, itemRect, item.IsExpired ? new Color(120, 100, 100) : Color.White);
                 }
                 else if (GraphicsManager.Instance?.Pixel != null)
                 {

@@ -20,6 +20,7 @@ namespace Client.Main.Scenes
 
         public void OnHeroMoved(object sender, EventArgs e)
         {
+            if (CashShopControl.IsOpen) CashShopControl.Instance.CloseWindow();
             if (LahapControl.IsOpen) LahapControl.Instance.CloseWindow();
 
             if (NpcShopControl.Instance.Visible)
@@ -68,6 +69,7 @@ namespace Client.Main.Scenes
 
         public void OnHeroTookDamage(object sender, EventArgs e)
         {
+            if (CashShopControl.IsOpen) CashShopControl.Instance.CloseWindow();
             if (LahapControl.IsOpen) LahapControl.Instance.CloseWindow();
 
             if (PetTrainerControl.IsOpen)

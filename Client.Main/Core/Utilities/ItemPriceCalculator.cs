@@ -41,7 +41,8 @@ namespace Client.Main.Core.Utilities
         /// </summary>
         public static bool IsRepairable(InventoryItem item)
         {
-            if (item == null) return false;
+            // Rental items cannot be repaired, independently of their remaining durability.
+            if (item == null || item.IsTimeLimited) return false;
 
             var def = item.Definition;
             if (def == null) return false;

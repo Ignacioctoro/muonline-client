@@ -29,6 +29,17 @@ public class CursorControl : SpriteControl
     private Vector2[] currentAnimationState;
     private readonly Dictionary<string, Texture2D> _cursorTextures = new();
 
+    public override void Draw(GameTime gameTime)
+    {
+        // The shop is rendered in GameScene.DrawAfter, after the normal UI pass.
+        // Defer the cursor too, so it is drawn once, above the shop and its dialogs.
+        if (Scene is Client.Main.Scenes.GameScene && CashShopControl.IsOpen) return;
+        base.Draw(gameTime);
+    }
+
+    /// <summary>Draws the cursor in the final UI batch supplied by the scene.</summary>
+    public void DrawAboveWindows(GameTime gameTime) => base.Draw(gameTime);
+
     public override async Task Load()
     {
         foreach (string name in new[] { "Cursor", "CursorPush", "CursorAttack", "CursorGet", "CursorTalk", "CursorRepair", "CursorLeanAgainst", "CursorSitDown" })

@@ -18,7 +18,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
     /// <summary>
     /// Handles packets related to inventory, items, and money updates.
     /// </summary>
-    public class InventoryHandler : IGamePacketHandler
+    public partial class InventoryHandler : IGamePacketHandler
     {
         // ──────────────────────────── Fields ────────────────────────────
         private readonly ILogger<InventoryHandler> _logger;

@@ -726,7 +726,7 @@ namespace Client.Main.Objects.Player
             if (_networkManager == null) return;
 
             var charState = _networkManager.GetCharacterState();
-            var inventory = charState.GetInventoryItems();
+            var inventory = charState.GetEffectiveEquipmentItems();
 
             // Ensure base body model is correct for the character's class
             var newClass = (CharacterClassNumber)charState.Class;
@@ -1625,6 +1625,7 @@ namespace Client.Main.Objects.Player
                 var state = _networkManager?.GetCharacterState();
                 if (state != null && state.TryGetInventoryItem(InventoryConstants.PetSlot, out var item)
                     && ItemDatabase.GetItemDurability(item) > 0
+                    && !ItemDatabase.ParseItemDetails(item).IsExpired
                     && ItemDatabase.TryGetItemGroupAndNumber(item, out byte group, out short itemNumber)
                     && group == 13)
                     number = itemNumber;
@@ -2185,7 +2186,7 @@ namespace Client.Main.Objects.Player
             }
 
             var charState = _networkManager.GetCharacterState();
-            var inventory = charState.GetInventoryItems();
+            var inventory = charState.GetEffectiveEquipmentItems();
 
             ItemDefinition left = null;
             ItemDefinition right = null;
@@ -2706,7 +2707,7 @@ namespace Client.Main.Objects.Player
                     return false;
 
                 var charState = _networkManager.GetCharacterState();
-                var inventory = charState.GetInventoryItems();
+                var inventory = charState.GetEffectiveEquipmentItems();
 
                 // Pet slot = 8
                 if (!inventory.TryGetValue(InventoryConstants.PetSlot, out var petData))
@@ -3906,7 +3907,7 @@ namespace Client.Main.Objects.Player
                 return "Sound/eCrossbow.wav";
 
             var charState = _networkManager.GetCharacterState();
-            var inventory = charState.GetInventoryItems();
+            var inventory = charState.GetEffectiveEquipmentItems();
 
             if (inventory.TryGetValue(InventoryConstants.RightHandSlot, out var rightData))
             {

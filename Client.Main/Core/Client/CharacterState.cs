@@ -73,7 +73,7 @@ namespace Client.Main.Core.Client
     /// Holds the state of the currently logged-in character, including basic info, stats, inventory, and skills.
     /// This class is responsible for tracking and updating the character's attributes as received from the server.
     /// </summary>
-    public class CharacterState
+    public partial class CharacterState
     {
         private readonly ILogger<CharacterState> _logger;
 
@@ -1628,6 +1628,7 @@ namespace Client.Main.Core.Client
         public void ClearInventory()
         {
             _inventoryItems.Clear();
+            _itemExpirations.Clear();
             _petInfoBySlot.Clear();
             _ravenCommandMode = -1;
             InventoryChanged?.Invoke();
@@ -1641,6 +1642,9 @@ namespace Client.Main.Core.Client
         {
             if (slot == 1) _ravenCommandMode = -1;
             _petInfoBySlot.TryRemove(slot, out _);
+            // A new server item record must not inherit a date from a previous occupant.
+            if (_inventoryItems.TryGetValue(slot, out var previous) && !ReferenceEquals(previous, itemData))
+                _itemExpirations.TryRemove(previous, out _);
             _inventoryItems[slot] = itemData;
             InventoryChanged?.Invoke();
             if (slot < 12) // equipment slots 0..11
@@ -1664,7 +1668,8 @@ namespace Client.Main.Core.Client
         public void RemoveInventoryItem(byte slot)
         {
             if (slot == 1) _ravenCommandMode = -1;
-            bool removed = _inventoryItems.TryRemove(slot, out _);
+            bool removed = _inventoryItems.TryRemove(slot, out var removedItem);
+            if (removedItem != null) _itemExpirations.TryRemove(removedItem, out _);
             _petInfoBySlot.TryRemove(slot, out _);
             if (removed)
             {

@@ -29,6 +29,8 @@ namespace Client.Main.Core.Utilities
             public readonly byte Group;
             public readonly short Number;
             public readonly byte Level;
+            public readonly bool IsTimeLimited;
+            public readonly bool IsExpired;
             public readonly byte Durability;
             public readonly byte OptionLevel;
             public readonly byte OptionType;
@@ -67,11 +69,14 @@ namespace Client.Main.Core.Utilities
                 byte socketCount,
                 byte[] socketOptions,
                 ItemOptionFlags flags,
-                int length)
+                int length,
+                byte periodFlags = 0)
             {
                 Group = group;
                 Number = number;
                 Level = level;
+                IsTimeLimited = (periodFlags & 0x40) != 0;
+                IsExpired = (periodFlags & 0x80) != 0;
                 Durability = durability;
                 OptionLevel = optionLevel;
                 OptionType = optionType;
@@ -215,8 +220,10 @@ namespace Client.Main.Core.Utilities
                     ((data[0] & 0x0F) << 8) |
                     data[1]);
 
+            // OpenMU's extended format reserves the high two level bits for period state.
+            // Dark Raven/Horse levels still fit in the six remaining bits.
             byte level =
-                data[2];
+                (byte)(data[2] & 0x3F);
 
             byte durability =
                 data[3];
@@ -387,7 +394,8 @@ namespace Client.Main.Core.Utilities
                     socketCount,
                     socketOptions,
                     flags,
-                    offset);
+                    offset,
+                    data[2]);
 
             return true;
         }

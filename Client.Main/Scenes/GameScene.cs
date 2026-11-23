@@ -1139,6 +1139,7 @@ namespace Client.Main.Scenes
 
                 if (IsWindowCovering(PetInfoControl.Instance)) return true;
                 if (IsWindowCovering(MasterSkillTreeControl.Instance)) return true;
+                if (IsWindowCovering(CashShopControl.Instance)) return true;
 
                 if (IsWindowCovering(LahapControl.Instance))
                     return true;
@@ -1309,6 +1310,7 @@ namespace Client.Main.Scenes
             Controls.Add(LahapControl.Instance);
             Controls.Add(PetInfoControl.Instance);
             Controls.Add(MasterSkillTreeControl.Instance);
+            Controls.Add(CashShopControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
@@ -3119,6 +3121,16 @@ namespace Client.Main.Scenes
                 PersonalStoreBuyerControl.Instance.DrawTooltipOverlay(sprite);
                 ExtendedInventoryControl.Instance.DrawOverlay(sprite);
             }
+            // XShop is an opaque modal surface. World notices and sibling helpers stay behind it.
+            CashShopControl.Instance.DrawOverlay(gameTime);
+            if (CashShopControl.IsOpen)
+            {
+                using var cursorScope = new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
+                    BlendState.AlphaBlend, SamplerState.PointClamp,
+                    DepthStencilState.None, RasterizerState.CullNone,
+                    transform: UiScaler.SpriteTransform);
+                Cursor.DrawAboveWindows(gameTime);
+            }
         }
 
         private new void DrawBackground()
@@ -3211,6 +3223,7 @@ namespace Client.Main.Scenes
             LahapControl.Instance.HideWithoutServerRequest();
             PetInfoControl.Instance.HideWindow();
             MasterSkillTreeControl.Instance.CloseWindow();
+            CashShopControl.Instance.ResetSession();
             EventsInfoControl.Instance.CloseWindow();
 
             base.Dispose();

@@ -363,6 +363,8 @@ namespace Client.Main.Core.Utilities
         public struct ItemDetails
         {
             public int Level;
+            public bool IsTimeLimited;
+            public bool IsExpired;
 
             public bool HasSkill;
             public bool HasLuck;
@@ -492,6 +494,8 @@ namespace Client.Main.Core.Utilities
             {
                 d.Level =
                     ext.Level;
+                d.IsTimeLimited = ext.IsTimeLimited;
+                d.IsExpired = ext.IsExpired;
 
                 d.HasSkill =
                     ext.HasSkill;
@@ -584,6 +588,11 @@ namespace Client.Main.Core.Utilities
 
             d.Level =
                 (optByte & 0x78) >> 3;
+            if (itemData.Length > 5)
+            {
+                d.IsTimeLimited = (itemData[5] & 0x02) != 0;
+                d.IsExpired = (itemData[5] & 0x04) != 0;
+            }
 
             d.HasSkill =
                 (optByte & 0x80) != 0;

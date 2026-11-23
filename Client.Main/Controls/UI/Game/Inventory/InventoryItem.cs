@@ -52,6 +52,14 @@ public class InventoryItem
         }
     }
 
+    public DateTimeOffset? ExpiresAt =>
+        Client.Main.MuGame.Network?.GetCharacterState()?.GetItemExpiration(RawData);
+
+    public bool IsTimeLimited => Details.IsTimeLimited || Details.IsExpired || ExpiresAt.HasValue;
+
+    // This only changes presentation and equip eligibility. Server packets own effects and removal.
+    public bool IsExpired => Details.IsExpired || (ExpiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow);
+
     public bool IsAmmunition => Definition.Group == 4 && (Definition.Id == 7 || Definition.Id == 15);
 
     public bool ShowLevelBadge => !Definition.IsPackedJewel() && Details.Level > 0;

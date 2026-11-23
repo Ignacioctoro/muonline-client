@@ -152,6 +152,35 @@ namespace Client.Main.Core.Items.Tooltips
         public static List<(string text, Color color)> Build(
             InventoryItem item, PetInfoSnapshot? petInfo = null)
         {
+            var lines = BuildCore(item, petInfo);
+            if (item?.IsTimeLimited != true) return lines;
+            lines.Add((string.Empty, Color.White));
+            if (item.IsExpired)
+            {
+                lines.Add(("Period of use has expired.", Color.Red));
+                lines.Add(("This item no longer provides its effects.", Color.Red));
+            }
+            else if (item.ExpiresAt is { } expiresAt)
+            {
+                var left = expiresAt - DateTimeOffset.UtcNow;
+                long seconds = Math.Max(0, (long)Math.Ceiling(left.TotalSeconds));
+                string remaining = seconds >= 86400
+                    ? $"{seconds / 86400}d {seconds / 3600 % 24}h {seconds / 60 % 60}m"
+                    : seconds >= 3600 ? $"{seconds / 3600}h {seconds / 60 % 60}m {seconds % 60}s"
+                    : $"{seconds / 60}m {seconds % 60}s";
+                lines.Add(($"Remaining time: {remaining}", new Color(255, 190, 80)));
+                lines.Add(($"Expires: {expiresAt.ToLocalTime():yyyy-MM-dd HH:mm:ss}", Color.White));
+            }
+            else
+            {
+                lines.Add(("Remaining time: --", new Color(255, 190, 80)));
+            }
+            return lines;
+        }
+
+        private static List<(string text, Color color)> BuildCore(
+            InventoryItem item, PetInfoSnapshot? petInfo)
+        {
             if (item?.Definition == null)
             {
                 return new List<(string, Color)>();
@@ -2240,7 +2269,7 @@ namespace Client.Main.Core.Items.Tooltips
                     !equippedItem.Details.IsAncient ||
                     equippedItem.Details
                         .AncientDiscriminator == 0 ||
-                    equippedItem.Durability <= 0)
+                    equippedItem.Durability <= 0 || equippedItem.IsExpired)
                 {
                     continue;
                 }
