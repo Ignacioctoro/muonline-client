@@ -232,9 +232,11 @@ namespace Client.Main.Scenes
 
             return true;
         }
-        public bool UseSelectedSkillOnMonster(MonsterObject target)
+        public bool UseSelectedSkillOnMonster(MonsterObject target) => UseSkillOnMonster(_skillQuickSlot.SelectedSkill, target);
+
+        // Shared by manual attacks and the helper, without changing the player's selected quick slot.
+        public bool UseSkillOnMonster(Core.Client.SkillEntryState skill, MonsterObject target)
         {
-            var skill = _skillQuickSlot.SelectedSkill;
 
             if (skill == null || !CastleSiegeSkillRules.CanUse(skill.SkillId))
             {
@@ -1260,6 +1262,26 @@ namespace Client.Main.Scenes
                 targetLocation,
                 sendToServer: true,
                 usePathfinding: usePathfinding);
+        }
+
+        // Support casts use known friendly/self skills only. They cannot turn a helper action into PvP.
+        public bool UseHelperSupportSkill(Core.Client.SkillEntryState skill, PlayerObject target)
+        {
+            var hero = _scene.Hero;
+            var state = MuGame.Network?.GetCharacterState();
+            if (skill == null || target == null || hero == null || hero.IsDead || target.IsDead
+                || hero.IsMoving || target.World != _scene.World || state == null || !state.IsSkillSelectable(skill.SkillId)
+                || !CastleSiegeSkillRules.CanUse(skill.SkillId)) return false;
+            if (!SkillDatabase.IsFriendlySkill(skill.SkillId) && !SkillDatabase.IsSelfSkill(skill.SkillId)
+                && SkillDatabase.GetSkillDefinition(skill.SkillId)?.Type != Client.Data.BMD.TypeSkill.Buff) return false;
+            if (target == hero) { hero.StopAfterCurrentTile(); return UseSelfSkill(skill); }
+            bool partyMember = false;
+            foreach (var member in MuGame.Network.GetPartyManager().GetPartyMembers())
+                if (member.Name == target.Name && member.MapId == state.MapId) { partyMember = true; break; }
+            if (!partyMember || !SkillDatabase.IsFriendlySkill(skill.SkillId)
+                || !IsInSkillRange(target.Location, SkillDatabase.GetSkillRange(skill.SkillId))) return false;
+            hero.StopAfterCurrentTile();
+            return UseSkillOnPlayerTarget(skill, target, allowNonDuelTarget: true);
         }
 
         private bool UseSelfSkill(

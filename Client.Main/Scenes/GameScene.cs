@@ -87,6 +87,18 @@ namespace Client.Main.Scenes
         private Texture2D _backgroundTexture;
         private ProgressBarControl _progressBar;
         private GameSceneSkillController _skillController;
+        private GameSceneMuHelperController _muHelper;
+        public bool IsMuHelperActive => _muHelper?.Active == true;
+        public bool IsMuHelperBusy => _muHelper?.Busy == true;
+        internal bool MuHelperWorldReady => _mapController?.IsChangingWorld != true && World?.Status == GameControlStatus.Ready;
+        internal bool MuHelperBlockingWindow => MuHelperControl.IsOpen || CashShopControl.IsOpen
+            || _inventoryControl?.Visible == true || _pauseMenu?.Visible == true;
+        public void ToggleMuHelper() => _muHelper?.Toggle();
+        public void StopMuHelper() => _muHelper?.Stop();
+        public void ShowMuHelperLog() => _muHelper?.ShowLog();
+        public bool TryAcceptMuHelperPartyInvite(ushort requester, string name) => _muHelper?.TryAcceptPartyInvite(requester, name) == true;
+        public void ReceiveMuHelperStatus(string owner, int characterClass, bool consumeMoney, bool paused, uint money)
+            => _muHelper?.Status(owner, characterClass, consumeMoney, paused, money);
         private readonly GroundImpactPresentation _groundImpacts = new();
         internal GroundImpactPresentation GroundImpacts => _groundImpacts;
         private GameSceneNotificationController _notificationController;
@@ -560,7 +572,7 @@ namespace Client.Main.Scenes
             /// This is the real pickup path used by both
             /// Space and the mobile pickup panel.
             /// </summary>
-            private void TryPickupGroundItem(
+            internal void TryPickupGroundItem(
                 ushort rawId)
             {
                 var network =
@@ -1140,6 +1152,7 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(PetInfoControl.Instance)) return true;
                 if (IsWindowCovering(MasterSkillTreeControl.Instance)) return true;
                 if (IsWindowCovering(CashShopControl.Instance)) return true;
+                if (IsWindowCovering(MuHelperControl.Instance)) return true;
 
                 if (IsWindowCovering(LahapControl.Instance))
                     return true;
@@ -1311,6 +1324,7 @@ namespace Client.Main.Scenes
             Controls.Add(PetInfoControl.Instance);
             Controls.Add(MasterSkillTreeControl.Instance);
             Controls.Add(CashShopControl.Instance);
+            Controls.Add(MuHelperControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
@@ -1438,6 +1452,7 @@ namespace Client.Main.Scenes
                 };
             _skillQuickSlot.BringToFront();
             _skillController = new GameSceneSkillController(this, _skillQuickSlot, _logger, _duelController.IsDuelAttackTarget);
+            _muHelper = new GameSceneMuHelperController(this, _skillController);
 
             // Panel de objetivo móvil
             _mobileTargetPanel = new MobileTargetPanel();
@@ -2519,6 +2534,7 @@ namespace Client.Main.Scenes
         // ─────────────────────────── Update Loop ───────────────────────────
         public override void Update(GameTime gameTime)
         {
+            _muHelper?.BeforeWorldUpdate();
             bool pauseOpen =
                 _pauseMenu?.Visible == true;
 
@@ -2749,6 +2765,7 @@ namespace Client.Main.Scenes
                 MuGame.Instance.UiMouseState;
             var prevUiMouse = MuGame.Instance.PrevUiMouseState;
             _playerMenuController?.Update(gameTime, currentKeyboardState, uiMouse, prevUiMouse);
+            _muHelper?.Update();
             _skillController?.Update();
             _groundImpacts.Update(World as WorldControl);
 
@@ -3224,6 +3241,8 @@ namespace Client.Main.Scenes
             PetInfoControl.Instance.HideWindow();
             MasterSkillTreeControl.Instance.CloseWindow();
             CashShopControl.Instance.ResetSession();
+            _muHelper?.Dispose();
+            MuHelperControl.Instance.ResetSession();
             EventsInfoControl.Instance.CloseWindow();
 
             base.Dispose();

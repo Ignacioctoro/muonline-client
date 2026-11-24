@@ -62,8 +62,7 @@ namespace Client.Main.Controls.UI.Game.Hud
             HELPER_FRAME_WIDTH -
             FRAME_OVERLAP;
 
-        private const int TOTAL_HEIGHT =
-            MAP_FRAME_HEIGHT;
+        private const int TOTAL_HEIGHT = 40;
 
         // =============================================================
         // TEXT
@@ -83,6 +82,13 @@ namespace Client.Main.Controls.UI.Game.Hud
         // =============================================================
 
         private Texture2D _hudTexture;
+        private bool _helperHovered;
+        private bool _helperRunHovered;
+        private bool _helperLogHovered;
+        // TopMenu_I3 stores the native circular faces in 30px cells with a 1px gutter.
+        private Rectangle HelperLogArea => new(DisplayRectangle.X + 178, DisplayRectangle.Y + 10, 30, 30);
+        private Rectangle HelperSetupArea => new(DisplayRectangle.X + 209, DisplayRectangle.Y + 10, 30, 30);
+        private Rectangle HelperRunArea => new(DisplayRectangle.X + 240, DisplayRectangle.Y + 10, 30, 30);
 
         private string _mapName = string.Empty;
 
@@ -127,6 +133,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                 await TextureLoader.Instance
                     .PrepareAndGetTexture(
                         HUD_TEXTURE_PATH);
+
 
             await base.Load();
         }
@@ -183,6 +190,10 @@ namespace Client.Main.Controls.UI.Game.Hud
         private void UpdateInteraction()
         {
             _mapHovered = false;
+            _helperHovered = false;
+            _helperRunHovered = false;
+            _helperLogHovered = false;
+            if (Scene?.IsPointerInputBlockedFor(this) == true) return;
 
             if (!Visible ||
                 Scene == null)
@@ -194,6 +205,34 @@ namespace Client.Main.Controls.UI.Game.Hud
                 MuGame.Instance
                     .UiMouseState
                     .Position;
+
+            _helperLogHovered = HelperLogArea.Contains(mouse);
+            if (_helperLogHovered)
+            {
+                Scene.SetMouseInputConsumed();
+                if (MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed
+                    && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released
+                    && Scene is GameScene logScene) logScene.ShowMuHelperLog();
+                return;
+            }
+            _helperRunHovered = HelperRunArea.Contains(mouse);
+            if (_helperRunHovered)
+            {
+                Scene.SetMouseInputConsumed();
+                if (MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed
+                    && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released
+                    && Scene is GameScene gameScene) gameScene.ToggleMuHelper();
+                return;
+            }
+            _helperHovered = HelperSetupArea.Contains(mouse);
+            if (_helperHovered)
+            {
+                Scene.SetMouseInputConsumed();
+                if (MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed
+                    && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released)
+                    MuHelperControl.Instance.Toggle();
+                return;
+            }
 
             // Solo el marco izquierdo abre
             // el menú de movimiento/mapas.
@@ -249,6 +288,26 @@ namespace Client.Main.Controls.UI.Game.Hud
 
             DrawFrames();
             DrawMapText();
+            if (_hudTexture != null)
+            {
+                var sprite = GraphicsManager.Instance.Sprite;
+                using var scope = new SpriteBatchScope(sprite, SpriteSortMode.Deferred,
+                    BlendState.NonPremultiplied, SamplerState.LinearClamp,
+                    DepthStencilState.None, RasterizerState.CullNone, transform: UiScaler.SpriteTransform);
+                bool busy = Scene is GameScene helperScene && helperScene.IsMuHelperBusy;
+                sprite.Draw(_hudTexture, HelperLogArea, new Rectangle(_helperLogHovered ? 654 : 592, 0, 30, 30), Color.White);
+                sprite.Draw(_hudTexture, HelperSetupArea, new Rectangle(_helperHovered ? 561 : 375, 0, 30, 30), Color.White);
+                int runSource = busy ? _helperRunHovered ? 778 : 747 : _helperRunHovered ? 437 : 406;
+                sprite.Draw(_hudTexture, HelperRunArea, new Rectangle(runSource, 0, 30, 30), Color.White);
+                if (_helperHovered || _helperRunHovered || _helperLogHovered)
+                {
+                    var rect = new Rectangle(HelperLogArea.Left, HelperLogArea.Bottom + 4, 164, 20);
+                    sprite.Draw(GraphicsManager.Instance.Pixel, rect, new Color(12, 10, 8, 235));
+                    var font = GraphicsManager.Instance.Font;
+                    if (font != null) sprite.DrawString(font, _helperLogHovered ? "Hunting Log" : _helperRunHovered ? busy ? "Stop MU Helper (Home)" : "Start MU Helper (Home)" : "Settings (Z)", new Vector2(rect.X + 5, rect.Y + 3),
+                        new Color(221, 184, 83), 0, Vector2.Zero, 9f / Constants.BASE_FONT_SIZE, SpriteEffects.None, 0);
+                }
+            }
         }
 
         // =============================================================

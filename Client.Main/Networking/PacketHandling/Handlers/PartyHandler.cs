@@ -43,6 +43,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
             MuGame.ScheduleOnMainThread(() =>
             {
+                if (MuGame.Instance.ActiveScene is Client.Main.Scenes.GameScene scene
+                    && scene.TryAcceptMuHelperPartyInvite(requesterId, requesterName)) return;
                 RequestDialog.Show(
                     $"{requesterName} has invited you to a party.",
                     onAccept: () =>

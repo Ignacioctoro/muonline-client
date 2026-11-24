@@ -35,6 +35,7 @@ namespace Client.Main.Objects
         /// Last target id received from server animation packets (used for attack effects).
         /// </summary>
         public ushort LastAttackTargetId { get; internal set; }
+        public long LastAttackAtMs { get; internal set; }
 
         /// <summary>
         /// Owner name supplied by OpenMU C2 1F for summoned monsters.

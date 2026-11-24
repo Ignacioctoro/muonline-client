@@ -2104,6 +2104,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     if (monsterAction == MonsterActionType.Attack1 || monsterAction == MonsterActionType.Attack2)
                     {
                         monsterToAnimate.LastAttackTargetId = targetId;
+                        monsterToAnimate.LastAttackAtMs = Environment.TickCount64;
                     }
                 }
                 else
