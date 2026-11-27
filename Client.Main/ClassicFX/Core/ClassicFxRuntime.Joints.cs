@@ -179,9 +179,13 @@ namespace Client.Main.ClassicFX.Core
             // Native CreateJoint() applies this after every Type branch.
             // Avoid division by zero before the first MonoGame Update().
             float frameFactor = Clock.FrameFactor > 0f ? Clock.FrameFactor : 1f;
-            joint.MaxTails = Math.Clamp(
-                (int)(joint.MaxTails / frameFactor),
-                0, ClassicJoint.MaxTailSegments);
+            // Ancient-set HEALING/9 samples its trail at the native 25 Hz.
+            // Keep the original 20 samples regardless of the creation frame.
+            // Other joints retain their existing per-render-frame history.
+            if (joint.Type != ClassicTextureIds.BitmapJointHealing || joint.SubType != 9)
+                joint.MaxTails = Math.Clamp(
+                    (int)(joint.MaxTails / frameFactor),
+                    0, ClassicJoint.MaxTailSegments);
             return handle;
         }
 

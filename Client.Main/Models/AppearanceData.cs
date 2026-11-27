@@ -860,7 +860,14 @@ namespace Client.Main.Models
             }
         }
 
-        public bool FullAncientSet => !IsExtendedFormat && RawData.Length > 11 && (RawData[11] & 0x1) == 1;
+        // OpenMU Extended27 has class/pose before its equipment bytes.
+        // Extended25 has no header and cannot advertise the full-set flag.
+        public bool FullAncientSet => Format switch
+        {
+            AppearanceFormat.Extended27Byte => (RawData[1] & 0x10) != 0,
+            AppearanceFormat.Standard18Byte => (RawData[11] & 0x01) != 0,
+            _ => false,
+        };
 
         // ------------------------------------------------------------------
         // Wings, pets, and mounts

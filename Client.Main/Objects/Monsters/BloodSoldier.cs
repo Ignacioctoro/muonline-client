@@ -12,6 +12,7 @@ namespace Client.Main.Objects.Monsters
     {
         public BloodSoldier()
         {
+            Scale = 0.8f;
         }
 
         public override async Task Load()

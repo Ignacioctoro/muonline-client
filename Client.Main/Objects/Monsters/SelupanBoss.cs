@@ -8,22 +8,21 @@ using System.Threading.Tasks;
 
 namespace Client.Main.Objects.Monsters
 {
+    [NpcInfo(459, "Selupan")]
     public class SelupanBoss : MonsterObject
     {
         public SelupanBoss()
         {
+            Scale = 2.0f;
+            BlendMesh = 5; // Original Selupan's additive blast layer.
         }
 
         public override async Task Load()
         {
-            Model = await BMDLoader.Instance.Prepare($"Monster/Monster415.bmd");
+            Model = await BMDLoader.Instance.Prepare($"Monster/Monster151.bmd");
             await base.Load();
         }
 
-        public override void Update(GameTime gameTime)
-        {
-            base.Update(gameTime);
-            BlendMesh = 4;
-        }
+        // S6 uses Monster151; the Monster415 mesh-4 override belongs to another model.
     }
 }

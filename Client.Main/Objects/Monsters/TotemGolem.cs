@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 
 namespace Client.Main.Objects.Monsters
 {
+    [NpcInfo(423, "Totem Golem")]
     public class TotemGolem : MonsterObject
     {
         public TotemGolem()
         {
+            Scale = 0.1615f;
         }
 
         public override async Task Load()

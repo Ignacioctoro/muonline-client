@@ -27,7 +27,7 @@ using MUnique.OpenMU.Network.Packets.ServerToClient;
 
 namespace Client.Main.Controls.UI.Game
 {
-    public class ChaosMixControl : UIControl, IUiTexturePreloadable
+    public partial class ChaosMixControl : UIControl, IUiTexturePreloadable
     {
         // ═══════════════════════════════════════════════════════════════
         // WINDOW DIMENSIONS
@@ -53,7 +53,7 @@ namespace Client.Main.Controls.UI.Game
         private const int TrainerWindowWidth = GameWindowMetrics.SecondaryWidth;
         private const int TrainerWindowHeight = GameWindowMetrics.SecondaryHeight;
 
-        private int SLOT_WIDTH => IsTrainerMix ? GameWindowMetrics.SecondaryCell : GameWindowMetrics.InventoryCell;
+        private int SLOT_WIDTH => UsesCompactLayout ? GameWindowMetrics.SecondaryCell : GameWindowMetrics.InventoryCell;
         private int SLOT_HEIGHT => SLOT_WIDTH;
 
         private const int HEADER_HEIGHT = 52;
@@ -125,8 +125,15 @@ namespace Client.Main.Controls.UI.Game
         private MixInventoryType _mixInventoryType = MixInventoryType.GoblinNormal;
         private bool IsTrainerMix => _mixInventoryType == MixInventoryType.Trainer;
         public bool IsTrainerMode => IsTrainerMix;
-        private ItemStorageKind ActiveCraftingStorage =>
-            IsTrainerMix ? ItemStorageKind.PetTrainer : ItemStorageKind.ChaosMachine;
+        public ItemStorageKind ActiveCraftingStorage => _mixInventoryType switch
+        {
+            MixInventoryType.Trainer => ItemStorageKind.PetTrainer,
+            MixInventoryType.ExtractSeed => ItemStorageKind.SeedCrafting,
+            MixInventoryType.SeedSphere => ItemStorageKind.SeedSphereCrafting,
+            MixInventoryType.AttachSocket => ItemStorageKind.SeedMountCrafting,
+            MixInventoryType.DetachSocket => ItemStorageKind.SeedUnmountCrafting,
+            _ => ItemStorageKind.ChaosMachine,
+        };
         private Texture2D _trainerFrame;
         private Texture2D _trainerSlots;
         private Texture2D _trainerButtonNormal;
@@ -219,6 +226,7 @@ namespace Client.Main.Controls.UI.Game
 
         public IEnumerable<string> GetPreloadTexturePaths()
         {
+            yield return SocketAtlasPath;
             yield return TrainerFramePath;
             yield return TrainerSlotsPath;
             yield return TrainerButtonNormalPath;
@@ -245,6 +253,7 @@ namespace Client.Main.Controls.UI.Game
                 loader.PrepareAndGetTexture(TrainerCloseHoverPath),
                 loader.PrepareAndGetTexture(TrainerClosePressedPath));
 
+            _socketAtlas = await loader.PrepareAndGetTexture(SocketAtlasPath);
             _trainerFrame = textures[0];
             _trainerSlots = textures[1];
             _trainerButtonNormal = textures[2];
@@ -277,8 +286,10 @@ namespace Client.Main.Controls.UI.Game
         private void ShowFor(MixInventoryType mode)
         {
             _mixInventoryType = mode;
+            _selectedSocket = -1;
+            ResetSocketPreview();
             BuildLayoutMetrics();
-            ControlSize = IsTrainerMix ? new Point(TrainerWindowWidth, TrainerWindowHeight)
+            ControlSize = UsesCompactLayout ? new Point(TrainerWindowWidth, TrainerWindowHeight)
                 : new Point(WINDOW_WIDTH, GameWindowMetrics.FullHeightWindowHeight);
             ViewSize = ControlSize;
             Align = ControlAlign.VerticalCenter | ControlAlign.Left;
@@ -437,7 +448,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void BuildLayoutMetrics()
         {
-            if (IsTrainerMix)
+            if (UsesCompactLayout)
             {
                 // Share the secondary window footprint with Character, Shop and Vault.
                 // Keep the original atlas borders; only the central surfaces stretch.
@@ -638,7 +649,7 @@ namespace Client.Main.Controls.UI.Game
             {
                 if (_font != null)
                 {
-                    string title = IsTrainerMix ? "Resurrect Spirit" : _mixInventoryType == MixInventoryType.GoblinAdd380 ? "Item 380 Option" : "Regular Combination";
+                    string title = IsSocketMix ? SocketOperationTitle : IsTrainerMix ? "Resurrect Spirit" : _mixInventoryType == MixInventoryType.GoblinAdd380 ? "Item 380 Option" : "Regular Combination";
                     float scale = 0.53f;
                     Vector2 size = _font.MeasureString(title) * scale;
                     Vector2 pos = new((ControlSize.X - size.X) / 2, 52 - size.Y / 2);
@@ -679,7 +690,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void DrawInfoPanel(SpriteBatch sb)
         {
-            if (!IsTrainerMix) return;
+            if (!UsesCompactLayout) return;
             if (_trainerFrame != null)
             {
                 NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _infoRect);
@@ -698,7 +709,7 @@ namespace Client.Main.Controls.UI.Game
             if (_trainerFrame != null)
             {
                 NewUiFrameRenderer.DrawPersonalShopInset(sb, _trainerFrame, _gridFrameRect);
-                if (IsTrainerMix) DrawSectionHeader(sb, "SPIRIT COMBINATION", _gridFrameRect.X,
+                if (UsesCompactLayout) DrawSectionHeader(sb, IsSocketMix ? "SOCKET SYSTEM" : "SPIRIT COMBINATION", _gridFrameRect.X,
                     _gridFrameRect.Y + 12, _gridFrameRect.Width);
 
                 if (_trainerSlots != null && !_trainerSlots.IsDisposed)
@@ -837,6 +848,7 @@ namespace Client.Main.Controls.UI.Game
         {
             if (_font == null) return;
 
+            if (IsSocketMix) { DrawSocketInfoText(sb); return; }
             if (!IsTrainerMix) { DrawChaosRecipeText(sb); return; }
             float scale = 0.42f;
             int x = DisplayRectangle.X + _infoRect.X + 14;
@@ -900,7 +912,7 @@ namespace Client.Main.Controls.UI.Game
 
             if (_font == null) return;
 
-            string text = _mixInProgress ? "MIXING..." : IsTrainerMix ? "RESURRECT" : "COMBINE";
+            string text = _mixInProgress ? "MIXING..." : IsSocketMix ? SocketActionText : IsTrainerMix ? "RESURRECT" : "COMBINE";
             float scale = IsTrainerMix ? 0.54f : 0.45f;
             Vector2 size = _font.MeasureString(text) * scale;
             Vector2 pos = new(rect.X + (rect.Width - size.X) / 2, rect.Y + (rect.Height - size.Y) / 2);
@@ -1029,6 +1041,7 @@ namespace Client.Main.Controls.UI.Game
 
         private bool HandleChromeClick()
         {
+            if (HandleSocketClick(MuGame.Instance.UiMouseState.Position)) return true;
             if (_closeHovered)
             {
                 CloseWindow();
@@ -1087,6 +1100,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void HandleMouseInput(Point mousePos, bool leftJustPressed)
         {
+            if (IsSocketMix && _mixInProgress) return;
             if (!leftJustPressed)
             {
                 return;
@@ -1112,6 +1126,8 @@ namespace Client.Main.Controls.UI.Game
             {
                 return;
             }
+
+            if (IsSocketMix) { TrySocketMix(); return; }
 
             if (_evaluation?.CurrentRecipe == null)
             {
@@ -1153,6 +1169,7 @@ namespace Client.Main.Controls.UI.Game
                 return;
             }
 
+            byte socketSlot = IsSocketSelection ? (byte)Math.Max(0, _selectedSocket) : (byte)0;
             _mixInProgress = true;
             SoundController.Instance.PlayBuffer("Sound/iButton.wav");
 
@@ -1160,7 +1177,7 @@ namespace Client.Main.Controls.UI.Game
             {
                 try
                 {
-                    await svc.SendChaosMachineMixRequestAsync(mixId, socketSlot: 0);
+                    await svc.SendChaosMachineMixRequestAsync(mixId, socketSlot);
                 }
                 catch (Exception ex)
                 {
@@ -1252,6 +1269,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void UpdateRecipeInfo()
         {
+            if (IsSocketMix) { UpdateSocketSelection(); return; }
             _evaluation = IsTrainerMix
                 ? MixRecipeDatabase.EvaluateTrainer(_items)
                 : _mixInventoryType == MixInventoryType.GoblinAdd380
@@ -1598,7 +1616,7 @@ namespace Client.Main.Controls.UI.Game
         public Point GetSlotAtScreenPosition(Point screenPos)
             => ItemGridRenderHelper.GetSlotAtScreenPosition(DisplayRectangle, _gridRect, Columns, Rows, SLOT_WIDTH, SLOT_HEIGHT, screenPos);
 
-        public bool CanPlaceAt(Point gridSlot, InventoryItem item) => CanPlaceItem(item, gridSlot);
+        public bool CanPlaceAt(Point gridSlot, InventoryItem item) => !(IsSocketMix && _mixInProgress) && CanPlaceItem(item, gridSlot);
 
         private bool CanPlaceItem(InventoryItem item, Point slot)
         {
@@ -1891,7 +1909,7 @@ namespace Client.Main.Controls.UI.Game
 
             if (_items.Count > 0)
             {
-                blockReason = IsTrainerMix
+                blockReason = IsSocketMix ? "Remove all items from the socket mix box before closing." : IsTrainerMix
                     ? "Remove all items from the Pet Trainer mix box before closing."
                     : "Remove all items from the Chaos Mix box before closing.";
                 return false;

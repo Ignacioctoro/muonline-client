@@ -630,7 +630,10 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
                 var modelDefinition = def.PackedJewelPreviewSource ?? def;
                 var bones = BuildBoneMatrices(bmd, modelDefinition);
-                var originalBounds = ComputeBounds(bmd, bones);
+                var meshOrder = GetMeshRenderOrder(bmd, def);
+                if (meshOrder.Count == 0) return target;
+                // Fit the item shell, excluding character face/hair geometry.
+                var originalBounds = ComputeBounds(bmd, bones, meshOrder);
 
                 if (rt == null || rt.IsDisposed || rt.Width != width || rt.Height != height)
                 {
@@ -730,8 +733,6 @@ namespace Client.Main.Controls.UI.Game.Inventory
                                        !UsesClassicPreviewStyle(def) && props.ShouldUseItemMaterial &&
                                        Constants.ENABLE_ITEM_MATERIAL_SHADER &&
                                        GraphicsManager.Instance.ItemMaterialEffect != null;
-
-                var meshOrder = GetMeshRenderOrder(bmd);
 
                 if (!useItemMaterial)
                 {
@@ -840,7 +841,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
         }
 
-        private static List<int> GetMeshRenderOrder(Client.Data.BMD.BMD bmd)
+        private static List<int> GetMeshRenderOrder(Client.Data.BMD.BMD bmd, ItemDefinition definition)
         {
             var opaqueOrder = new List<int>();
             var transparentOrder = new List<int>();
@@ -848,6 +849,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             for (int i = 0; i < bmd.Meshes.Length; i++)
             {
                 var mesh = bmd.Meshes[i];
+                if (!ShouldDrawInventoryMesh(definition, mesh.TexturePath)) continue;
                 bool isTransparent = !string.IsNullOrEmpty(mesh.BlendingMode) &&
                                    mesh.BlendingMode != "Opaque";
 
@@ -1423,12 +1425,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
             return local;
         }
 
-        private static BoundingBox ComputeBounds(Client.Data.BMD.BMD bmd, Matrix[] bones)
+        private static BoundingBox ComputeBounds(Client.Data.BMD.BMD bmd, Matrix[] bones, IReadOnlyList<int> meshOrder)
         {
             Vector3 min = new(float.MaxValue);
             Vector3 max = new(float.MinValue);
-            foreach (var mesh in bmd.Meshes)
+            foreach (int meshIndex in meshOrder)
             {
+                var mesh = bmd.Meshes[meshIndex];
                 foreach (var vert in mesh.Vertices)
                 {
                     Matrix m = vert.Node < bones.Length ? bones[vert.Node] : Matrix.Identity;

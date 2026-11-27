@@ -607,7 +607,12 @@ namespace Client.Main.ClassicFX.Core
             // The native post-switch CreateTail uses Matrix from entry,
             // unless subtype branch updates it via AngleMatrix.
             if (j.CreateTails)
-                AppendJointTailMoveA(ref j, matrix);
+            {
+                if (j.IsEquipmentSetTrail)
+                    AppendAncientSetOrbitTail(ref j, matrix, f);
+                else
+                    AppendJointTailMoveA(ref j, matrix);
+            }
             j.LifeTime -= f;
             return j.LifeTime >= 0f;
         }
@@ -839,7 +844,7 @@ namespace Client.Main.ClassicFX.Core
                 j.Light *= MathF.Pow(1f / 1.3f, f);
             if ((j.SubType == 0 || j.SubType == 10 || j.SubType == 18) &&
                 j.Scale < 40f &&
-                JointFlareOwnerMovingOrAttackingResolver?.Invoke(j.Target) == true)
+                (JointFlareOwnerMovingOrAttackingResolver?.Invoke(j.Target) == true || EquipmentSetTrailOwnerIsMoving(ref j)))
             {
                 j.SubType = 1;
                 j.CreateTails = false;

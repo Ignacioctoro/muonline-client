@@ -41,7 +41,7 @@ using Client.Data.ATT;
 
 namespace Client.Main.Scenes
 {
-    public class GameScene : BaseScene
+    public partial class GameScene : BaseScene
     {
         // ──────────────────────────── Fields ────────────────────────────
         private readonly HeroObject _hero;
@@ -91,7 +91,7 @@ namespace Client.Main.Scenes
         public bool IsMuHelperActive => _muHelper?.Active == true;
         public bool IsMuHelperBusy => _muHelper?.Busy == true;
         internal bool MuHelperWorldReady => _mapController?.IsChangingWorld != true && World?.Status == GameControlStatus.Ready;
-        internal bool MuHelperBlockingWindow => MuHelperControl.IsOpen || CashShopControl.IsOpen
+        internal bool MuHelperBlockingWindow => MuHelperControl.IsOpen || CashShopControl.IsOpen || GensControl.IsOpen
             || _inventoryControl?.Visible == true || _pauseMenu?.Visible == true;
         public void ToggleMuHelper() => _muHelper?.Toggle();
         public void StopMuHelper() => _muHelper?.Stop();
@@ -266,6 +266,8 @@ namespace Client.Main.Scenes
                     {
                         continue;
                     }
+
+                    if (GensCombatRules.IsBattleZone && !GensCombatRules.IsEnemy(player)) continue;
 
                     if (excludeCurrentTarget &&
                         _mobilePvpTargetId.HasValue &&
@@ -1153,6 +1155,7 @@ namespace Client.Main.Scenes
                 if (IsWindowCovering(MasterSkillTreeControl.Instance)) return true;
                 if (IsWindowCovering(CashShopControl.Instance)) return true;
                 if (IsWindowCovering(MuHelperControl.Instance)) return true;
+                if (IsWindowCovering(GensControl.Instance)) return true;
 
                 if (IsWindowCovering(LahapControl.Instance))
                     return true;
@@ -1325,6 +1328,7 @@ namespace Client.Main.Scenes
             Controls.Add(MasterSkillTreeControl.Instance);
             Controls.Add(CashShopControl.Instance);
             Controls.Add(MuHelperControl.Instance);
+            Controls.Add(GensControl.Instance);
             Controls.Add(TradeControl.Instance);
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(MyQuestsControl.Instance);
@@ -1369,6 +1373,7 @@ namespace Client.Main.Scenes
 
             _inventoryControl = new InventoryControl(MuGame.Network, MuGame.AppLoggerFactory);
             Controls.Add(_inventoryControl);
+            _inventoryControl.ItemHotkeysChanged += MarkHudConfigurationChanged;
             _inventoryControl.HookEvents();
             _windowCloseController = new GameSceneWindowCloseController(_inventoryControl, _logger);
 
@@ -1417,6 +1422,7 @@ namespace Client.Main.Scenes
             _skillSelectionPanel.QuickSlotAssigned +=
             (slotIndex, skill) =>
             {
+                MarkHudConfigurationChanged();
                 // HUD clásico inferior.
                 _main.SkillHotkeys.SetSkill(
                     slotIndex,
@@ -2765,6 +2771,7 @@ namespace Client.Main.Scenes
                 MuGame.Instance.UiMouseState;
             var prevUiMouse = MuGame.Instance.PrevUiMouseState;
             _playerMenuController?.Update(gameTime, currentKeyboardState, uiMouse, prevUiMouse);
+            UpdateHudConfiguration();
             _muHelper?.Update();
             _skillController?.Update();
             _groundImpacts.Update(World as WorldControl);
@@ -2803,7 +2810,8 @@ namespace Client.Main.Scenes
                 bool isDuelTarget =
                     _duelController?.IsDuelAttackTarget(targetPlayer) == true;
 
-                if ((ctrlPressed || isDuelTarget) &&
+                if ((ctrlPressed || isDuelTarget || GensCombatRules.IsEnemy(targetPlayer)) &&
+                    !GensCombatRules.IsProtectedTarget(targetPlayer) &&
                     Hero != null &&
                     !Hero.IsDead &&
                     !targetPlayer.IsDead &&
@@ -3243,6 +3251,7 @@ namespace Client.Main.Scenes
             CashShopControl.Instance.ResetSession();
             _muHelper?.Dispose();
             MuHelperControl.Instance.ResetSession();
+            GensControl.Instance.HideWithoutServerRequest();
             EventsInfoControl.Instance.CloseWindow();
 
             base.Dispose();

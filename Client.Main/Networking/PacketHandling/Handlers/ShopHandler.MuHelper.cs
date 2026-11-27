@@ -33,7 +33,13 @@ public partial class ShopHandler
         string owner = _characterState.Name;
         int characterClass = (int)_characterState.Class;
         byte[] configuration = packet.Span.Slice(4, MuHelperConfigurationData.Length).ToArray();
-        MuGame.ScheduleOnMainThread(() => MuHelperControl.Instance.Receive(owner, characterClass, configuration));
+        int session = _characterState.SkillSessionRevision;
+        _characterState.ReceiveHelperConfiguration(configuration);
+        MuGame.ScheduleOnMainThread(() =>
+        {
+            if (_characterState.SkillSessionRevision == session)
+                MuHelperControl.Instance.Receive(owner, characterClass, configuration);
+        });
         return Task.CompletedTask;
     }
 }

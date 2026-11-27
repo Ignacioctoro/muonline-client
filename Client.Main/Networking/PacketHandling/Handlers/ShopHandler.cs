@@ -418,6 +418,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 var resp = new NpcWindowResponse(packet);
                 _lastWindow = resp.Window;
+                MuGame.ScheduleOnMainThread(() => GensControl.Instance.HideWithoutServerRequest());
                 if (resp.Window != NpcWindowResponse.NpcWindow.Lahap)
                     MuGame.ScheduleOnMainThread(() => LahapControl.Instance.HideWithoutServerRequest());
 
@@ -468,6 +469,13 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                     // The server explicitly identifies the trainer window (7).
                     // Do not open this dialog just by matching an NPC display name.
                     MuGame.ScheduleOnMainThread(() => PetTrainerControl.Instance.ShowWindow());
+                }
+                else if (resp.Window == NpcWindowResponse.NpcWindow.SeedMaster ||
+                         resp.Window == NpcWindowResponse.NpcWindow.SeedResearcher)
+                {
+                    _characterState.ClearChaosMachineItems();
+                    bool researcher = resp.Window == NpcWindowResponse.NpcWindow.SeedResearcher;
+                    MuGame.ScheduleOnMainThread(() => ChaosMixControl.Instance.ShowSocketSelection(researcher));
                 }
                 else if (resp.Window == NpcWindowResponse.NpcWindow.ChaosMachine)
                 {
@@ -563,6 +571,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 // On failure OpenMU sends StoreItemList type 5, not type 3.
                 bool toChaosMachine =
                     _lastWindow == NpcWindowResponse.NpcWindow.ChaosMachine ||
+                    _lastWindow == NpcWindowResponse.NpcWindow.SeedMaster ||
+                    _lastWindow == NpcWindowResponse.NpcWindow.SeedResearcher ||
                     list.Type == StoreItemList.ItemWindow.ChaosMachine ||
                     (_lastWindow == NpcWindowResponse.NpcWindow.PetTrainer &&
                      list.Type == StoreItemList.ItemWindow.ResurrectionFailed);
@@ -670,6 +680,19 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             {
                 _logger.LogError(ex, "Error parsing StoreItemList packet.");
             }
+            return Task.CompletedTask;
+        }
+
+        // OpenMU's official crafting preview: C1 88, 12 bytes. Read the wire
+        // layout directly so older packet-library versions remain compatible.
+        [PacketHandler(0x88, PacketRouter.NoSubCode)]
+        public Task HandleItemCraftingPreviewAsync(Memory<byte> packet)
+        {
+            if (packet.Length < 12) return Task.CompletedTask;
+            byte mix = packet.Span[3];
+            byte rate = packet.Span[4];
+            uint price = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(packet.Span.Slice(8, 4));
+            MuGame.ScheduleOnMainThread(() => ChaosMixControl.Instance.UpdateSocketPreview(mix, rate, price));
             return Task.CompletedTask;
         }
 

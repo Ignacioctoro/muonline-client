@@ -1,433 +1,238 @@
-using Client.Main.Controllers;
+using System;
+using System.Threading.Tasks;
+using Client.Main.Content;
 using Client.Main.Controls.UI.Common;
-using Client.Main.Core.Utilities;
+using Client.Main.Controllers;
 using Client.Main.Graphics;
 using Client.Main.Helpers;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using MUnique.OpenMU.Network.Packets;
-using System;
-using System.Collections.Generic;
 
 namespace Client.Main.Controls.UI.SelectCharacter
 {
-    /// <summary>
-    /// Dialog for creating a new character with class selection.
-    /// </summary>
     public class CharacterCreationDialog : GameControl
     {
-        // ═══════════════════════════════════════════════════════════════
-        // MODERN DARK THEME - Matching SelectCharacterScene
-        // ═══════════════════════════════════════════════════════════════
-        private static class Theme
-        {
-            // Background layers
-            public static readonly Color BgDarkest = new(8, 10, 14, 252);
-            public static readonly Color BgDark = new(16, 20, 26, 250);
-            public static readonly Color BgMid = new(24, 30, 38, 248);
-            public static readonly Color BgLight = new(35, 42, 52, 245);
-            public static readonly Color BgLighter = new(48, 56, 68, 240);
-
-            // Accent - Warm Gold
-            public static readonly Color Accent = new(212, 175, 85);
-            public static readonly Color AccentBright = new(255, 215, 120);
-            public static readonly Color AccentDim = new(140, 115, 55);
-            public static readonly Color AccentGlow = new(255, 200, 80, 40);
-
-            // Secondary accent - Cool Blue
-            public static readonly Color Secondary = new(90, 140, 200);
-            public static readonly Color SecondaryBright = new(130, 180, 240);
-            public static readonly Color SecondaryDim = new(50, 80, 120);
-
-            // Borders
-            public static readonly Color BorderOuter = new(5, 6, 8, 255);
-            public static readonly Color BorderInner = new(60, 70, 85, 200);
-            public static readonly Color BorderHighlight = new(100, 110, 130, 120);
-
-            // Text
-            public static readonly Color TextWhite = new(240, 240, 245);
-            public static readonly Color TextGold = new(255, 220, 130);
-            public static readonly Color TextGray = new(160, 165, 175);
-            public static readonly Color TextDark = new(100, 105, 115);
-
-            // Status colors
-            public static readonly Color Success = new(80, 200, 120);
-            public static readonly Color Warning = new(240, 180, 60);
-            public static readonly Color Danger = new(220, 80, 80);
-        }
-
-        private readonly List<CharacterClassInfo> _availableClasses;
-        private int _selectedClassIndex = 0;
-        
-        private LabelControl _titleLabel;
-        private TextBoxControl _nameInput;
-        private LabelControl _classLabel;
-        private LabelControl _classDescriptionLabel;
-        private ButtonControl _previousClassButton;
-        private ButtonControl _nextClassButton;
-        private ButtonControl _createButton;
-        private ButtonControl _cancelButton;
-        
-        // Static surface cache for background (following muonline-ui-design pattern)
-        private RenderTarget2D _backgroundSurface;
-        private bool _surfaceNeedsRedraw = true;
-        private double _bringToFrontTimer = 0;
-        private const double BRING_TO_FRONT_INTERVAL = 0.1; // Throttle to every 100ms
-        
+        public override bool BlocksPointerInput => true;
         public event EventHandler<(string Name, CharacterClassNumber Class)> CharacterCreateRequested;
         public event EventHandler CancelRequested;
-
-        private struct CharacterClassInfo
+        private sealed record ClassInfo(CharacterClassNumber Class, string Name, int Face,
+            int Strength, int Agility, int Stamina, int Energy, int Command, string Description)
         {
-            public CharacterClassNumber Class;
-            public string Name;
-            public string Description;
+            public string[] Lines { get; } = Description.Split('\n');
         }
+        // OpenMU's Season Six base attributes; server configuration remains authoritative.
+        private static readonly ClassInfo[] Classes =
+        {
+            new(CharacterClassNumber.DarkWizard, "Dark Wizard", 0, 18,18,15,30,0, "A master of destructive magic.\nUses powerful spells to attack\nenemies from a distance."),
+            new(CharacterClassNumber.DarkKnight, "Dark Knight", 1, 28,20,25,10,0, "A knight of Lorencia, trained\nin strength and swordsmanship.\nExcels in close-range combat."),
+            new(CharacterClassNumber.FairyElf, "Fairy Elf", 2, 22,25,20,15,0, "An agile archer from Noria.\nCombines bow attacks with\nhealing and support magic."),
+            new(CharacterClassNumber.Summoner, "Summoner", 5, 21,21,18,23,0, "A mystic from Elbeland.\nUses curses and summoned\npowers to weaken enemies."),
+            new(CharacterClassNumber.RageFighter, "Rage Fighter", 6, 32,27,25,20,0, "A powerful hand-to-hand fighter.\nUses martial arts and devastating\nphysical attacks."),
+            new(CharacterClassNumber.MagicGladiator, "Magic Gladiator", 3, 26,26,26,26,0, "A warrior who combines\nswordsmanship and magic.\nSkilled in both forms of combat."),
+            new(CharacterClassNumber.DarkLord, "Dark Lord", 4, 26,20,20,15,25, "A commander of dark powers.\nCommands the Dark Raven\nand rides the Dark Horse."),
+        };
+        private int _selected = 1;
+        private double _portraitTime;
+        private bool _submitted;
+        private readonly CharacterCreationPortraitRenderer _portrait = new();
+        private readonly NameInput _nameInput;
+        private readonly Rectangle[] _classRects = new Rectangle[7];
+        private Rectangle _portraitRect, _statsRect, _nameRect, _descriptionRect, _okRect, _cancelRect, _headerRect;
+        private Texture2D _atlas, _sidebar, _buttons;
+        private RenderTarget2D _staticSurface;
+        private Texture2D _preparedPortrait;
+        private bool _dirty = true;
+        private readonly BlendState _surfaceBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.InverseSourceAlpha,
+        };
+        private static readonly Color Gold = new(234, 206, 132);
 
         public CharacterCreationDialog()
         {
-            _availableClasses = new List<CharacterClassInfo>
-            {
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.DarkWizard, 
-                    Name = "Dark Wizard",
-                    Description = "Masters of magical destruction.\nHigh magic damage, low defense."
-                },
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.DarkKnight, 
-                    Name = "Dark Knight",
-                    Description = "Warriors of strength and honor.\nHigh health and physical damage."
-                },
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.FairyElf, 
-                    Name = "Fairy Elf",
-                    Description = "Agile archers and healers.\nHigh agility, support abilities."
-                },
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.MagicGladiator, 
-                    Name = "Magic Gladiator",
-                    Description = "Hybrid warriors with magic.\nBalanced melee and magic skills."
-                },
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.DarkLord, 
-                    Name = "Dark Lord",
-                    Description = "Commanders with dark powers.\nSummons pets and commands armies."
-                },
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.Summoner, 
-                    Name = "Summoner",
-                    Description = "Mystics with curse powers.\nCurses enemies and summons."
-                },
-                new CharacterClassInfo 
-                { 
-                    Class = CharacterClassNumber.RageFighter, 
-                    Name = "Rage Fighter",
-                    Description = "Hand-to-hand combat masters.\nHighest HP, powerful combos."
-                }
-            };
-
-            AutoViewSize = false;
-            ViewSize = new Point(650, 550);
-            Align = ControlAlign.HorizontalCenter | ControlAlign.VerticalCenter;
-            Interactive = true;
-            
-            InitializeControls();
-            UpdateClassDisplay();
-            
-            BringToFront();
-        }
-
-        private void InitializeControls()
-        {
-            // Title
-            _titleLabel = new LabelControl
-            {
-                Text = "CREATE CHARACTER",
-                FontSize = 20f,
-                TextColor = Theme.TextGold,
-                Align = ControlAlign.Top | ControlAlign.HorizontalCenter,
-                Margin = new Margin { Top = 10 }
-            };
-            Controls.Add(_titleLabel);
-
-            // Character name input label
-            var nameLabel = new LabelControl
-            {
-                Text = "Character Name:",
-                FontSize = 13f,
-                TextColor = Theme.TextWhite,
-                X = 50,
-                Y = 75
-            };
-            Controls.Add(nameLabel);
-
-            // Character name input
-            _nameInput = new TextBoxControl
-            {
-                X = 50,
-                Y = 100,
-                ViewSize = new Point(550, 36),
-                MaxLength = 10,
-                PlaceholderText = "Enter name (3-10 chars)...",
-                FontSize = 8f,
-                BackgroundColor = Theme.BgDark,
-                TextColor = Theme.TextWhite,
-                BorderColor = Theme.BorderInner,
-                BorderThickness = 1
-            };
+            AutoViewSize = false; Interactive = true; Align = ControlAlign.None;
+            _nameInput = new NameInput { MaxLength = 10, PlaceholderText = "Enter name", TextColor = Color.White };
             Controls.Add(_nameInput);
-
-            // Class selection section
-            var classSectionLabel = new LabelControl
-            {
-                Text = "Select Class:",
-                FontSize = 13f,
-                TextColor = Theme.TextWhite,
-                X = 50,
-                Y = 165
-            };
-            Controls.Add(classSectionLabel);
-
-            // Class navigation buttons
-            _previousClassButton = CreateModernNavigationButton("<");
-            _previousClassButton.X = 50;
-            _previousClassButton.Y = 200;
-            _previousClassButton.Click += (s, e) => ChangeClass(-1);
-            Controls.Add(_previousClassButton);
-
-            _nextClassButton = CreateModernNavigationButton(">");
-            _nextClassButton.X = ViewSize.X - 50 - _nextClassButton.ViewSize.X;
-            _nextClassButton.Y = 200;
-            _nextClassButton.Click += (s, e) => ChangeClass(1);
-            Controls.Add(_nextClassButton);
-
-            // Class name label
-            _classLabel = new LabelControl
-            {
-                Text = "Dark Wizard",
-                FontSize = 18f,
-                TextColor = Theme.TextGold,
-                Align = ControlAlign.HorizontalCenter,
-                Y = 200
-            };
-            Controls.Add(_classLabel);
-
-            // Class description
-            _classDescriptionLabel = new LabelControl
-            {
-                Text = "",
-                FontSize = 12f,
-                TextColor = Theme.TextGray,
-                Align = ControlAlign.HorizontalCenter,
-                Y = 240,
-                ViewSize = new Point(550, 100),
-                X = 50
-            };
-            Controls.Add(_classDescriptionLabel);
-
-            // Create button
-            _createButton = CreateModernButton("CREATE CHARACTER", Theme.Success);
-            _createButton.X = 50;
-            _createButton.Y = 380;
-            _createButton.ViewSize = new Point(260, 40);
-            _createButton.Click += OnCreateButtonClick;
-            Controls.Add(_createButton);
-
-            // Cancel button
-            _cancelButton = CreateModernButton("CANCEL", Theme.BgLight);
-            _cancelButton.X = 340;
-            _cancelButton.Y = 380;
-            _cancelButton.ViewSize = new Point(260, 40);
-            _cancelButton.Click += (s, e) => CancelRequested?.Invoke(this, EventArgs.Empty);
-            Controls.Add(_cancelButton);
+            Layout(UiScaler.VirtualSize);
         }
 
-        private ButtonControl CreateModernNavigationButton(string arrow)
+        public override async Task Load()
         {
-            return new ButtonControl
-            {
-                Text = arrow,
-                FontSize = 32f,
-                AutoViewSize = false,
-                ViewSize = new Point(60, 60),
-                BackgroundColor = Theme.BgMid,
-                HoverBackgroundColor = Theme.BgLight,
-                PressedBackgroundColor = Theme.BgDark,
-                TextColor = Theme.Accent,
-                HoverTextColor = Theme.AccentBright,
-                DisabledTextColor = Theme.TextDark,
-                Interactive = true,
-                BorderThickness = 2,
-                BorderColor = Theme.BorderInner
-            };
+            var textures = await Task.WhenAll(
+                TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/CharacterSelect_I1.ozd"),
+                TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/CharacterSelect_IA1.ozd"),
+                TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/winLoginSceneBottomUI_I1.ozd"));
+            _atlas = textures[0]; _sidebar = textures[1]; _buttons = textures[2];
+            await _portrait.LoadAsync();
+            _nameInput.Focus(); _dirty = true;
         }
 
-        private ButtonControl CreateModernButton(string text, Color baseColor)
+        private void Layout(Point size)
         {
-            return new ButtonControl
-            {
-                Text = text,
-                FontSize = 13f,
-                AutoViewSize = false,
-                BackgroundColor = baseColor,
-                HoverBackgroundColor = Color.Lerp(baseColor, Color.White, 0.2f),
-                PressedBackgroundColor = Color.Lerp(baseColor, Color.Black, 0.2f),
-                TextColor = Theme.TextWhite,
-                HoverTextColor = Theme.TextWhite,
-                DisabledTextColor = Theme.TextDark,
-                Interactive = true,
-                BorderThickness = 1,
-                BorderColor = Theme.BorderInner
-            };
-        }
-
-        private void ChangeClass(int direction)
-        {
-            _selectedClassIndex = (_selectedClassIndex + direction + _availableClasses.Count) % _availableClasses.Count;
-            UpdateClassDisplay();
-        }
-
-        private void UpdateClassDisplay()
-        {
-            var selectedClass = _availableClasses[_selectedClassIndex];
-            _classLabel.Text = selectedClass.Name;
-            _classDescriptionLabel.Text = selectedClass.Description;
-        }
-
-        private void OnCreateButtonClick(object sender, EventArgs e)
-        {
-            string characterName = _nameInput?.Text?.Trim() ?? "";
-            
-            if (string.IsNullOrWhiteSpace(characterName))
-            {
-                MessageWindow.Show("Please enter a character name.");
-                return;
-            }
-
-            if (characterName.Length < 3)
-            {
-                MessageWindow.Show("Character name must be at least 3 characters long.");
-                return;
-            }
-
-            if (characterName.Length > 10)
-            {
-                MessageWindow.Show("Character name must be 10 characters or less.");
-                return;
-            }
-
-            var selectedClass = _availableClasses[_selectedClassIndex];
-            CharacterCreateRequested?.Invoke(this, (characterName, selectedClass.Class));
+            if (_nameInput == null) return;
+            ViewSize = size; X = Y = 0;
+            float s = Math.Min(size.X / 1024f, size.Y / 768f);
+            int ox = (int)((size.X - 1024 * s) / 2), oy = (int)((size.Y - 768 * s) / 2);
+            Rectangle R(int x, int y, int w, int h) => new(ox + (int)(x * s), oy + (int)(y * s), Math.Max(1, (int)(w * s)), Math.Max(1, (int)(h * s)));
+            _portraitRect = R(155, 160, 440, 385);
+            _statsRect = R(590, 93, 134, 380);
+            _headerRect = R(567, 65, 334, 29);
+            for (int i = 0; i < Classes.Length; i++) _classRects[i] = R(725, 99 + i * 31, 153, 29);
+            _nameRect = R(237, 503, 331, 33);
+            _descriptionRect = R(272, 540, 330, 111);
+            _okRect = R(641, 503, 79, 31); _cancelRect = R(641, 539, 79, 31);
+            _nameInput.X = _nameRect.X; _nameInput.Y = _nameRect.Y;
+            _nameInput.ViewSize = _nameRect.Size;
+            _dirty = true;
         }
 
         public override void Update(GameTime gameTime)
         {
+            if (Parent != null && ViewSize != Parent.ViewSize) Layout(Parent.ViewSize);
             base.Update(gameTime);
-            
-            _bringToFrontTimer += gameTime.ElapsedGameTime.TotalSeconds;
-            if (_bringToFrontTimer >= BRING_TO_FRONT_INTERVAL && Parent != null)
+            if (!Visible || Status != GameControlStatus.Ready) return;
+            _portraitTime += Math.Min(0.1, gameTime.ElapsedGameTime.TotalSeconds);
+            bool click = MuGame.Instance.UiMouseState.LeftButton == ButtonState.Pressed && MuGame.Instance.PrevUiMouseState.LeftButton == ButtonState.Released;
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            if (click)
             {
-                _bringToFrontTimer = 0;
-                BringToFront();
+                for (int i = 0; i < _classRects.Length; i++)
+                    if (_classRects[i].Contains(mouse)) { _selected = i; _portraitTime = 0; Scene?.SetMouseInputConsumed(); break; }
+                if (_okRect.Contains(mouse)) Submit();
+                else if (_cancelRect.Contains(mouse)) CancelRequested?.Invoke(this, EventArgs.Empty);
             }
+            if (MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) && MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape))
+                CancelRequested?.Invoke(this, EventArgs.Empty);
+            else if (MuGame.Instance.Keyboard.IsKeyDown(Keys.Enter) && MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Enter)) Submit();
+        }
+
+        private void Submit()
+        {
+            if (_submitted) return;
+            string name = _nameInput.Text.Trim();
+            if (name.Length < 3 || name.Length > 10) { MessageWindow.Show("Character name must contain 3 to 10 characters."); return; }
+            _submitted = true;
+            CharacterCreateRequested?.Invoke(this, (name, Classes[_selected].Class));
+        }
+
+        private void EnsureSurface()
+        {
+            if (!_dirty && _staticSurface is { IsDisposed: false }) return;
+            if (_atlas == null || _sidebar == null) return;
+            _staticSurface?.Dispose();
+            var gd = GraphicsDevice; var targets = gd.GetRenderTargets();
+            _staticSurface = new RenderTarget2D(gd, ViewSize.X, ViewSize.Y, false, SurfaceFormat.Color, DepthFormat.None);
+            try
+            {
+                gd.SetRenderTarget(_staticSurface); gd.Clear(Color.Transparent);
+                using var scope = new SpriteBatchScope(GraphicsManager.Instance.Sprite, SpriteSortMode.Deferred, _surfaceBlend, SamplerState.LinearClamp);
+                var sb = GraphicsManager.Instance.Sprite; var pixel = GraphicsManager.Instance.Pixel;
+                sb.Draw(_sidebar, _headerRect, new Rectangle(0, 0, 338, 30), Color.White);
+                sb.Draw(_sidebar, _statsRect, new Rectangle(29, 31, 130, 440), Color.White);
+                foreach (var rect in _classRects) sb.Draw(_atlas, rect, new Rectangle(146, 964, 145, 27), Color.White);
+                sb.Draw(pixel, _descriptionRect, new Color(0, 0, 0, 185));
+                sb.Draw(pixel, new Rectangle(_descriptionRect.X, _descriptionRect.Y, 1, _descriptionRect.Height), new Color(91, 75, 52));
+                // Native nameplate/sword ornament and hooded figure.
+                var namePlate = new Rectangle(_nameRect.X - _nameRect.Height * 2, _nameRect.Y - 4, _nameRect.Width + _nameRect.Height * 2, _nameRect.Height + 8);
+                sb.Draw(_atlas, namePlate, new Rectangle(0, 621, 374, 67), Color.White);
+                var hood = new Rectangle(_okRect.X - _okRect.Width, _okRect.Y - _okRect.Height * 2, _okRect.Width * 2, _okRect.Height * 6);
+                sb.Draw(_atlas, hood, new Rectangle(315, 585, 265, 250), Color.White);
+            }
+            finally { gd.SetRenderTargets(targets); }
+            _dirty = false;
+        }
+
+        // Called by the scene before drawing the world and before opening any UI batch.
+        // Rebinding the main DiscardContents target after offscreen rendering invalidates
+        // its previous pixels, so render-target switches must happen before world drawing.
+        internal void PrepareDraw()
+        {
+            if (!Visible || Status != GameControlStatus.Ready) return;
+            _preparedPortrait = _portrait.Render(Classes[_selected].Face, _portraitRect.Width, _portraitRect.Height, _portraitTime);
+            EnsureSurface();
         }
 
         public override void Draw(GameTime gameTime)
         {
-            DrawCachedBackground();
-            
-            base.Draw(gameTime);
+            if (!Visible || Status != GameControlStatus.Ready) return;
+            using var scope = new SpriteBatchScope(GraphicsManager.Instance.Sprite, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.None, RasterizerState.CullNone, transform: UiScaler.SpriteTransform);
+            var sb = GraphicsManager.Instance.Sprite;
+            if (_preparedPortrait != null) sb.Draw(_preparedPortrait, _portraitRect, Color.White);
+            if (_staticSurface != null) sb.Draw(_staticSurface, DisplayRectangle, Color.White);
+            var mouse = MuGame.Instance.UiMouseState.Position;
+            for (int i = 0; i < Classes.Length; i++)
+            {
+                var rect = _classRects[i];
+                if (i == _selected || rect.Contains(mouse)) sb.Draw(_atlas, rect, new Rectangle(0, 964, 145, 27), Color.White);
+                Text(sb, Classes[i].Name, rect, i == _selected ? Color.White : new Color(191, 178, 159), 0.40f, true);
+            }
+            Text(sb, "Create Character", _headerRect, Color.White, 0.42f, true);
+            var selected = Classes[_selected];
+            float scale = ViewSize.Y / 768f;
+            int row = Math.Max(28, (int)(52 * scale));
+            Text(sb, selected.Name, new Rectangle(_statsRect.X + 7, _statsRect.Y + 7, _statsRect.Width - 14, row / 2), Color.White, 0.38f, true);
+            Stat(sb, "STR", selected.Strength, 0, row); Stat(sb, "AGI", selected.Agility, 1, row);
+            Stat(sb, "STA", selected.Stamina, 2, row); Stat(sb, "ENG", selected.Energy, 3, row);
+            if (selected.Command > 0) Stat(sb, "CMD", selected.Command, 4, row);
+            Text(sb, "Name", new Rectangle(_nameRect.X - 63, _nameRect.Y, 58, _nameRect.Height), Color.White, 0.42f, true);
+            var lines = selected.Lines;
+            for (int i = 0; i < lines.Length; i++) Text(sb, lines[i], new Rectangle(_descriptionRect.X + 12, _descriptionRect.Y + 10 + i * 22, _descriptionRect.Width - 24, 22), new Color(190, 183, 176), 0.40f);
+            DrawButton(sb, _okRect, "OK", mouse); DrawButton(sb, _cancelRect, "Cancel", mouse);
+            _nameInput.Draw(gameTime);
         }
 
-        private void DrawCachedBackground()
+        private void Stat(SpriteBatch sb, string label, int value, int index, int row)
         {
-            var device = MuGame.Instance.GraphicsDevice;
-            
-            if (_backgroundSurface == null || _surfaceNeedsRedraw || 
-                _backgroundSurface.Width != ViewSize.X || _backgroundSurface.Height != ViewSize.Y)
+            var rect = new Rectangle(_statsRect.X + 12, _statsRect.Y + row / 2 + index * row + 10, _statsRect.Width - 24, row - 4);
+            sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle(rect.X, rect.Bottom, rect.Width, 1), new Color(78, 69, 53, 150));
+            Text(sb, label, new Rectangle(rect.X, rect.Y, rect.Width, 20), new Color(178, 173, 165), 0.36f);
+            Text(sb, value.ToString(), new Rectangle(rect.X, rect.Y + 19, rect.Width, 20), Color.White, 0.42f, right: true);
+        }
+
+        private void DrawButton(SpriteBatch sb, Rectangle rect, string caption, Point mouse)
+        {
+            var src = rect.Contains(mouse) ? new Rectangle(258, 2, 117, 28) : new Rectangle(131, 2, 117, 28);
+            if (_buttons != null) sb.Draw(_buttons, rect, src, Color.White);
+            Text(sb, caption, rect, Gold, 0.43f, true);
+        }
+
+        private static void Text(SpriteBatch sb, string value, Rectangle rect, Color color, float scale, bool centered = false, bool right = false)
+        {
+            var font = GraphicsManager.Instance.Font; var measured = font.MeasureString(value);
+            if (measured.X > 0) scale = Math.Min(scale, rect.Width / measured.X);
+            var size = measured * scale;
+            var pos = new Vector2(centered ? rect.X + (rect.Width - size.X) / 2 : right ? rect.Right - size.X : rect.X, rect.Y + (rect.Height - size.Y) / 2);
+            sb.DrawString(font, value, pos + Vector2.One, Color.Black, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            sb.DrawString(font, value, pos, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+        }
+
+        private sealed class NameInput : TextBoxControl
+        {
+            public override void Draw(GameTime gameTime)
             {
-                _backgroundSurface?.Dispose();
-                _backgroundSurface = new RenderTarget2D(
-                    device,
-                    ViewSize.X,
-                    ViewSize.Y,
-                    false,
-                    SurfaceFormat.Color,
-                    DepthFormat.None
-                );
-                
-                // Render background to surface
-                var oldTargets = device.GetRenderTargets();
-                device.SetRenderTarget(_backgroundSurface);
-                device.Clear(Color.Transparent);
-                
-                using var batch = new SpriteBatch(device);
-                batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-                
-                var pixel = UiDrawHelper.GetPixelTexture(device);
-                var dialogRect = new Rectangle(0, 0, ViewSize.X, ViewSize.Y);
-                
-                // Main panel background with gradient
-                UiDrawHelper.DrawVerticalGradient(batch, dialogRect, Theme.BgMid, Theme.BgDark);
-                
-                // Outer border
-                batch.Draw(pixel, new Rectangle(0, 0, dialogRect.Width, 1), Theme.BorderOuter);
-                batch.Draw(pixel, new Rectangle(0, dialogRect.Height - 1, dialogRect.Width, 1), Theme.BorderOuter);
-                batch.Draw(pixel, new Rectangle(0, 0, 1, dialogRect.Height), Theme.BorderOuter);
-                batch.Draw(pixel, new Rectangle(dialogRect.Width - 1, 0, 1, dialogRect.Height), Theme.BorderOuter);
-                
-                // Header section
-                var headerRect = new Rectangle(0, 0, dialogRect.Width, 50);
-                UiDrawHelper.DrawHorizontalGradient(batch, headerRect, Theme.BgLighter, Theme.BgMid);
-                UiDrawHelper.DrawCornerAccents(batch, headerRect, Theme.Accent, 12, 2);
-                
-                // Header separator
-                batch.Draw(pixel, new Rectangle(0, headerRect.Bottom - 1, headerRect.Width, 1), Theme.BorderInner);
-                batch.Draw(pixel, new Rectangle(0, headerRect.Bottom - 2, headerRect.Width, 1), Theme.Accent * 0.3f);
-                
-                batch.End();
-                
-                device.SetRenderTargets(oldTargets);
-                _surfaceNeedsRedraw = false;
+                var sb = GraphicsManager.Instance.Sprite; var rect = DisplayRectangle;
+                sb.Draw(GraphicsManager.Instance.Pixel, rect, new Color(0, 0, 0, 175));
+                string value = string.IsNullOrEmpty(Text) ? PlaceholderText : Text;
+                TextValue(sb, value, rect, string.IsNullOrEmpty(Text) ? Color.Gray : Color.White);
+                if ((gameTime.TotalGameTime.TotalSeconds % 1) < 0.5)
+                {
+                    float x = rect.X + 8 + GraphicsManager.Instance.Font.MeasureString(Text).X * 0.48f;
+                    sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle((int)x, rect.Y + 6, 1, Math.Max(1, rect.Height - 12)), Color.White);
+                }
             }
-            
-            // Draw cached surface
-            using var scope = new SpriteBatchScope(
-                GraphicsManager.Instance.Sprite,
-                SpriteSortMode.Deferred,
-                BlendState.AlphaBlend,
-                SamplerState.LinearClamp,
-                DepthStencilState.None,
-                RasterizerState.CullNone,
-                null,
-                UiScaler.SpriteTransform
-            );
-            
-            GraphicsManager.Instance.Sprite.Draw(
-                _backgroundSurface,
-                new Rectangle(DisplayPosition.X, DisplayPosition.Y, ViewSize.X, ViewSize.Y),
-                Color.White
-            );
+            private static void TextValue(SpriteBatch sb, string value, Rectangle rect, Color color) =>
+                CharacterCreationDialog.Text(sb, value, new Rectangle(rect.X + 8, rect.Y, rect.Width - 16, rect.Height), color, 0.48f);
         }
 
         public override void Dispose()
         {
-            _backgroundSurface?.Dispose();
-            _backgroundSurface = null;
+            _portrait.Dispose(); _staticSurface?.Dispose(); _surfaceBlend.Dispose();
             base.Dispose();
-        }
-
-        protected override void OnScreenSizeChanged()
-        {
-            base.OnScreenSizeChanged();
-            _surfaceNeedsRedraw = true;
         }
     }
 }

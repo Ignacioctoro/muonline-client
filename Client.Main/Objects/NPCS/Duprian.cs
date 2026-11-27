@@ -29,6 +29,8 @@ namespace Client.Main.Objects.NPCS
 
         protected override void HandleClick()
         {
+            var service = MuGame.Network?.GetCharacterService();
+            if (service != null) _ = service.SendTalkToNpcRequestAsync(NetworkId);
         }
 
         public override void Update(GameTime gameTime)

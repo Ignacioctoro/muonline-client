@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using Client.Main.Core.Utilities;
 using Client.Data.BMD.Tooltip;
 using Client.Main.Controls.UI.Game.Inventory;
 
@@ -64,6 +65,40 @@ namespace Client.Main.Core.Items.Tooltips
                 distinct.Add((item.Definition.Group, item.Definition.Id));
             }
             return distinct.Count;
+        }
+
+        /// <summary>
+        /// Mirrors OpenMU CharacterExtensions.HasFullAncientSetEquipped for the
+        /// local player, who does not receive their own AppearanceChanged packet.
+        /// Evaluate on equipment changes, never in the per-frame renderer.
+        /// </summary>
+        public static bool HasFullAncientSetEquipped(IReadOnlyDictionary<byte, byte[]> equipment)
+        {
+            var equipped = new HashSet<(int group, int number, int discriminator)>();
+            var candidates = new HashSet<AncientSet>();
+            foreach (var pair in equipment)
+            {
+                if (pair.Key >= 12 || pair.Value == null) continue;
+                var definition = ItemDatabase.GetItemDefinition(pair.Value);
+                var details = ItemDatabase.ParseItemDetails(pair.Value);
+                if (definition == null || !details.IsAncient) continue;
+                var key = ((int)definition.Group, (int)definition.Id, (int)details.AncientDiscriminator);
+                if (!SetsByItem.TryGetValue(key, out var set)) continue;
+                equipped.Add(key);
+                candidates.Add(set);
+            }
+            foreach (var set in candidates)
+            {
+                bool complete = set.Items.Length > 0;
+                foreach (var member in set.Items)
+                    if (!equipped.Contains((member.Group, member.Number, member.Discriminator)))
+                    {
+                        complete = false;
+                        break;
+                    }
+                if (complete) return true;
+            }
+            return false;
         }
 
         public static int ActiveAncientOptionCount(AncientSet set, int distinctPieces)

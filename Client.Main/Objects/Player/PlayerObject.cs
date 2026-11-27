@@ -36,7 +36,7 @@ namespace Client.Main.Objects.Player
         Swim
     }
 
-    public class PlayerObject : WalkerObject
+    public partial class PlayerObject : WalkerObject
     {
         protected override bool RequiresPerFrameAnimation => IsMainWalker;
         private CharacterClassNumber _characterClass;
@@ -250,6 +250,7 @@ namespace Client.Main.Objects.Player
             _characterService = _networkManager?.GetCharacterService();
 
             Appearance = appearance;
+            _fullAncientSetEquipped = appearance.FullAncientSet;
         }
 
         /// <summary>
@@ -727,6 +728,7 @@ namespace Client.Main.Objects.Player
 
             var charState = _networkManager.GetCharacterState();
             var inventory = charState.GetEffectiveEquipmentItems();
+            SetAncientSetComplete(global::Client.Main.Core.Items.Tooltips.EquipmentBonusCalculator.HasFullAncientSetEquipped(inventory));
 
             // Ensure base body model is correct for the character's class
             var newClass = (CharacterClassNumber)charState.Class;
@@ -1672,6 +1674,8 @@ namespace Client.Main.Objects.Player
             // Native horse muzzle particles must use the fully advanced rider
             // transform, not the previous child-update transform.
             Vehicle?.EmitDarkHorseBreathAfterRiderMovement(gameTime);
+            UpdateAncientSetAura(gameTime);
+            UpdateEquipmentSetTrails(gameTime);
         }
 
         public override void Draw(GameTime gameTime)
@@ -3639,7 +3643,8 @@ namespace Client.Main.Objects.Player
 
         public void Attack(PlayerObject target)
         {
-            if (target == null || World == null) return;
+            if (target == null || World == null || target.World != World) return;
+            if (this == (MuGame.Instance.ActiveScene as GameScene)?.Hero && GensCombatRules.IsProtectedTarget(target)) return;
 
             if (IsDead) return;
             if (target.IsDead) return;
@@ -4109,6 +4114,7 @@ namespace Client.Main.Objects.Player
 
         public override void DrawHoverName()
         {
+            if (GensNameplateRenderer.TryDraw(this)) return;
             // Mantener el comportamiento normal:
             // solamente mostrar nombre cuando corresponde.
             if (!Constants.SHOW_NAMES_ON_HOVER ||
@@ -4955,6 +4961,7 @@ namespace Client.Main.Objects.Player
         /// </summary>
         public async Task UpdateEquipmentSlotAsync(byte itemSlot, EquipmentSlotData equipmentData)
         {
+            if (equipmentData != null) SetAncientSetComplete(equipmentData.IsAncientSetComplete);
             if (equipmentData == null)
             {
                 // Item is being unequipped

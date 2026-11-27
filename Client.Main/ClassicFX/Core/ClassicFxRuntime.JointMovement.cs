@@ -833,9 +833,16 @@ namespace Client.Main.ClassicFX.Core
                 : MoveJointSpiritC(ref j, factor, slotIndex, handle,
                     entryPosition, entryTargetPosition);
 
-            // Original post-switch: unchanged for HEALING/SPIRIT/SPIRIT2.
+            // Preserve the native time span of the Ancient set's circular
+            // trail. A sample per display frame makes it collapse at high FPS,
+            // especially if it was created during a slow map-loading frame.
             if (j.CreateTails)
-                AppendJointTailMoveA(ref j, matrix);
+            {
+                if (j.Type == ClassicTextureIds.BitmapJointHealing && j.SubType == 9)
+                    AppendAncientSetOrbitTail(ref j, matrix, factor);
+                else
+                    AppendJointTailMoveA(ref j, matrix);
+            }
             j.LifeTime -= factor;
             return alive && j.LifeTime >= 0f;
         }

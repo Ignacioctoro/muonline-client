@@ -41,7 +41,9 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
     public static MuHelperControl Instance { get; } = new();
     private readonly Texture2D[] _listSkin = new Texture2D[ListFiles.Length];
     private readonly Dictionary<string, Texture2D> _icons = new();
-    private Texture2D _atlas;
+    private Texture2D _atlas, _subAtlas;
+    private MuHelperConfigurationData _optionSnapshot;
+    private bool _optionWasDirty;
     private MuHelperConfigurationData _saved = MuHelperConfigurationData.Defaults(), _draft = MuHelperConfigurationData.Defaults();
     private byte[] _pending;
     private string _owner, _status = string.Empty;
@@ -74,6 +76,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
     public IEnumerable<string> GetPreloadTexturePaths()
     {
         yield return AtlasPath;
+        yield return "Interface/GFx/MacroSub_I1.ozd";
         foreach (var file in ListFiles) yield return "Interface/" + file;
         yield return SkillIconDatabase.NewUiAtlas;
         yield return "Interface/newui_command.OZJ";
@@ -83,6 +86,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
     {
         await base.Load();
         _atlas = await TextureLoader.Instance.PrepareAndGetTexture(AtlasPath);
+        _subAtlas = await TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/MacroSub_I1.ozd");
         _icons[SkillIconDatabase.NewUiAtlas] = await TextureLoader.Instance.PrepareAndGetTexture(SkillIconDatabase.NewUiAtlas);
         _icons["Interface/newui_command.OZJ"] = await TextureLoader.Instance.PrepareAndGetTexture("Interface/newui_command.OZJ");
         for (int i = 0; i < ListFiles.Length; i++)
@@ -95,11 +99,19 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         return state != null && state.Name == _owner && (int)state.Class == _ownerClass;
     }
 
+    private void RestoreSavedConfiguration(CharacterState state)
+    {
+        if (OwnsCurrentCharacter()) return;
+        var saved = state.GetHelperConfiguration();
+        if (saved != null) Receive(state.Name, (int)state.Class, saved);
+    }
+
     public void Toggle()
     {
         if (Visible) { CloseWindow(); return; }
         var state = MuGame.Network?.GetCharacterState();
         if (state == null || !state.IsInGame) return;
+        RestoreSavedConfiguration(state);
         if (!OwnsCurrentCharacter())
         {
             ResetSession(); _owner = state.Name; _ownerClass = (int)state.Class;
@@ -114,7 +126,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
 
     public void CloseWindow()
     {
-        Visible = false; _picker = -1; _modal = 0;
+        Visible = false; _picker = -1; _modal = 0; _optionSnapshot = null;
         _filterInput.Blur(); _filterInput.Visible = false;
         if (Scene?.FocusControl == this) Scene.FocusControl = null;
     }
@@ -149,6 +161,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
     {
         var state = MuGame.Network?.GetCharacterState();
         if (state == null || !state.IsInGame) return null;
+        RestoreSavedConfiguration(state);
         if (!OwnsCurrentCharacter()) { ResetSession(); _owner = state.Name; _ownerClass = (int)state.Class; }
         if (_pending != null || Visible && _dirty) return null;
         return new MuHelperConfigurationData(_saved.ToArray());
@@ -183,7 +196,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         });
     }
 
-    private int WindowHeight => _modal != 0 ? 430 : _picker >= 0 ? 446 : Height;
+    private int WindowHeight => _modal is 1 or 2 ? 495 : _modal != 0 ? 380 : _picker >= 0 ? 222 + Math.Max(1, (Math.Min(20, Math.Max(0, PickerSkills().Length - _page * 20)) + 4) / 5) * 54 : Height;
 
     private void PositionWindow()
     {
@@ -218,7 +231,9 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         if (game.Keyboard.IsKeyDown(Keys.Escape) && game.PrevKeyboard.IsKeyUp(Keys.Escape))
         {
             Scene?.ConsumeKeyboardEscape();
-            if (_picker >= 0 || _modal != 0) { _picker = -1; _modal = 0; } else CloseWindow();
+            if (_modal != 0) CancelOptions();
+            else if (_picker >= 0) _picker = -1;
+            else CloseWindow();
             return;
         }
         _mouse = new((int)((game.UiMouseState.X - DisplayPosition.X) / Scale), (int)((game.UiMouseState.Y - DisplayPosition.Y) / Scale));
@@ -265,10 +280,10 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
 
     private void Build(SpriteBatch batch)
     {
+        if (_modal != 0) { BuildOptions(batch); return; }
+        if (_picker >= 0) { BuildPicker(batch); return; }
         Label(batch, "MU Helper", new(35, 37, 254, 22), Gold, 11, true);
         CloseIcon(batch);
-        if (_picker >= 0) { BuildPicker(batch); return; }
-        if (_modal != 0) { BuildOptions(batch); return; }
         Button(batch, new(24, 80, 91, 28), "Hunting", () => _tab = 0, selected: _tab == 0);
         Button(batch, new(119, 80, 91, 28), "Obtaining", () => _tab = 1, selected: _tab == 1);
         Button(batch, new(214, 80, 91, 28), "Others", () => _tab = 2, selected: _tab == 2);
@@ -293,12 +308,12 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         Section(batch, new(23, 151, 286, 141));
         CheckAt(batch, 31, 160, "Regular attack", 29, 3, width: 123);
         CheckAt(batch, 178, 160, "Potion", 25, 0, width: 76);
-        Gear(batch, new(282, 160, 20, 20), () => _modal = 4);
+        Gear(batch, new(282, 160, 20, 20), () => OpenOptions(4));
         int root = _ownerClass >> 4;
         if (root is 2 or 5)
         {
             CheckAt(batch, 31, 185, root == 2 ? "Auto Heal" : "Drain Life", 25, root == 2 ? 1 : 2);
-            Gear(batch, new(282, 185, 20, 20), () => _modal = 5);
+            Gear(batch, new(282, 185, 20, 20), () => OpenOptions(5));
         }
         CheckAt(batch, 31, 213, "Long-distance counterattack", 25, 3, width: 250);
         CheckAt(batch, 31, 239, "Original position", 25, 4, width: 250);
@@ -311,9 +326,9 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         }
         for (int i = 0; i < 3; i++) SkillSlot(batch, i);
         Label(batch, "Con", new(131, 379, 41, 20), Ink, 9);
-        Gear(batch, new(181, 379, 20, 20), () => _modal = 1);
+        Gear(batch, new(181, 379, 20, 20), () => OpenOptions(1));
         Label(batch, "Con", new(230, 379, 41, 20), Ink, 9);
-        Gear(batch, new(280, 379, 20, 20), () => _modal = 2);
+        Gear(batch, new(280, 379, 20, 20), () => OpenOptions(2));
         Section(batch, new(23, 409, 286, 66));
         CheckAt(batch, 31, 419, "Combo", 25, 5, () =>
         {
@@ -331,7 +346,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
     {
         Section(batch, new(23, 113, 286, 458));
         CheckAt(batch, 31, 130, "Party support", 25, 6);
-        Gear(batch, new(282, 130, 20, 20), () => _modal = 3);
+        Gear(batch, new(282, 130, 20, 20), () => OpenOptions(3));
         Number(batch, 175, "Buff interval", _draft.Word(15), d => _draft.SetWord(15, Math.Clamp(_draft.Word(15) + d * 5, 0, 3600)), "s");
         CheckAt(batch, 31, 217, "Buff duration for party", 26, 0, width: 250);
         CheckAt(batch, 31, 260, "Accept friends automatically", 29, 1, width: 250);
@@ -444,59 +459,229 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         }
     }
 
-    private void BuildOptions(SpriteBatch batch)
+    private void OpenOptions(int modal)
     {
-        Label(batch, _modal >= 4 ? "Recovery settings" : _modal == 3 ? "Party settings" : $"Activation skill {_modal}", new(20, 85, 280, 28), Gold, 12, true);
-        if (_modal is 4 or 5)
+        _optionSnapshot = new(_draft.ToArray()); _optionWasDirty = _dirty; _modal = modal;
+    }
+
+    private void CancelOptions()
+    {
+        if (_optionSnapshot != null) { _draft = _optionSnapshot; _dirty = _optionWasDirty; }
+        _optionSnapshot = null; _modal = 0;
+    }
+
+    private void ResetOptions()
+    {
+        var defaults = MuHelperConfigurationData.Defaults();
+        if (_modal is 1 or 2)
         {
-            Label(batch, _modal == 4 ? "Healing potion" : "Healing skill", new(20, 116, 292, 28), Gold, 11, true);
+            int flags = _modal == 1 ? 26 : 27, shift = _modal == 1 ? 3 : 0;
+            _draft.SetBits(flags, shift, 31, defaults.Bits(flags, shift, 31));
+            _draft.SetWord(_modal == 1 ? 9 : 13, 0);
+        }
+        else if (_modal is 4 or 5)
+        {
             int offset = _modal == 4 || (_ownerClass >> 4) == 2 ? 23 : 24;
             int shift = _modal == 4 ? 0 : 4;
-            Number(batch, 175, "HP threshold", _draft.Bits(offset, shift, 15) * 10,
-                d => _draft.SetBits(offset, shift, 15, Math.Clamp(_draft.Bits(offset, shift, 15) + d, 1, 10)), "%");
+            _draft.SetBits(offset, shift, 15, defaults.Bits(offset, shift, 15));
+        }
+        else
+        {
+            _draft.SetFlag(25, 7, defaults.Flag(25, 7));
+            _draft.SetBits(24, 0, 15, defaults.Bits(24, 0, 15));
+            _draft.SetFlag(26, 0, defaults.Flag(26, 0));
+            _draft.SetFlag(29, 1, defaults.Flag(29, 1));
+            _draft.SetFlag(29, 2, defaults.Flag(29, 2));
+        }
+        _dirty = true;
+    }
+
+    private void BuildOptions(SpriteBatch batch)
+    {
+        string title = _modal is 4 or 5 ? "Auto Recovery" : _modal == 3 ? "Party Settings" : "Activation Skill " + _modal;
+        Label(batch, title, new(24, 17, 284, 24), Gold, 11, true);
+        if (_modal is 4 or 5)
+        {
+            string caption = _modal == 4 ? "Auto Potion" : (_ownerClass >> 4) == 2 ? "Auto Heal" : "Drain Life";
+            Label(batch, caption, new(30, 64, 270, 22), Ink, 11);
+            OptionGroup(batch, new(28, 99, 276, 86));
+            int offset = _modal == 4 || (_ownerClass >> 4) == 2 ? 23 : 24;
+            int shift = _modal == 4 ? 0 : 4;
+            HpSegments(batch, 120, offset, shift);
         }
         else if (_modal is 1 or 2)
         {
             int flags = _modal == 1 ? 26 : 27, shift = _modal == 1 ? 3 : 0, delay = _modal == 1 ? 9 : 13;
-            Check(batch, 130, "Use timer", flags, shift, () => { if (_draft.Flag(flags, shift)) { _draft.SetFlag(flags, shift + 1, false); _draft.SetFlag(25, 5, false); } });
-            Number(batch, 160, "Interval", _draft.Word(delay), d => _draft.SetWord(delay, Math.Clamp(_draft.Word(delay) + d, 1, 3600)), "s");
-            Check(batch, 200, "Use monster condition", flags, shift + 1, () => { if (_draft.Flag(flags, shift + 1)) { _draft.SetFlag(flags, shift, false); _draft.SetFlag(25, 5, false); } });
-            Check(batch, 232, "Monsters attacking me", flags, shift + 2);
-            Number(batch, 270, "Minimum monsters", _draft.Bits(flags, shift + 3, 3) + 2,
-                d => _draft.SetBits(flags, shift + 3, 3, Math.Clamp(_draft.Bits(flags, shift + 3, 3) + d, 0, 3)));
-            Label(batch, "Unchecked: count nearby monsters.", new(18, 310, 284, 22), Muted, 9, true);
+            CheckAt(batch, 27, 61, "Delay condition setting", flags, shift, () =>
+            { if (_draft.Flag(flags, shift)) { _draft.SetFlag(flags, shift + 1, false); _draft.SetFlag(25, 5, false); } }, width: 276);
+            OptionGroup(batch, new(27, 91, 278, 56));
+            Number(batch, 108, "Interval", _draft.Word(delay), d => _draft.SetWord(delay, Math.Clamp(_draft.Word(delay) + d, 0, 3600)), "s");
+            CheckAt(batch, 27, 165, "Monster condition setting", flags, shift + 1, () =>
+            { if (_draft.Flag(flags, shift + 1)) { _draft.SetFlag(flags, shift, false); _draft.SetFlag(25, 5, false); } }, width: 276);
+            Label(batch, "Basic condition", new(31, 200, 260, 22), Ink, 10);
+            OptionGroup(batch, new(27, 228, 278, 66));
+            bool conditional = _draft.Flag(flags, shift + 1);
+            Radio(batch, new(40, 237, 254, 21), "Monster within hunting range", !_draft.Flag(flags, shift + 2),
+                () => _draft.SetFlag(flags, shift + 2, false), conditional);
+            Radio(batch, new(40, 266, 254, 21), "Monster attacking me", _draft.Flag(flags, shift + 2),
+                () => _draft.SetFlag(flags, shift + 2, true), conditional);
+            Label(batch, "Minimum monsters", new(31, 309, 260, 22), Ink, 10);
+            OptionGroup(batch, new(27, 339, 278, 73));
+            for (int i = 0; i < 4; i++)
+            {
+                int count = i;
+                Radio(batch, new(40 + i % 2 * 130, 348 + i / 2 * 29, 123, 22), (i + 2) + " monsters",
+                    _draft.Bits(flags, shift + 3, 3) == i, () => _draft.SetBits(flags, shift + 3, 3, count), conditional);
+            }
         }
         else
         {
-            Check(batch, 130, "Heal party members", 25, 7);
-            Number(batch, 162, "Party HP threshold", _draft.Bits(24, 0, 15) * 10,
-                d => _draft.SetBits(24, 0, 15, Math.Clamp(_draft.Bits(24, 0, 15) + d, 1, 10)), "%");
-            Check(batch, 202, "Buff duration for party", 26, 0);
-            Check(batch, 242, "Accept friends automatically", 29, 1);
-            Check(batch, 274, "Accept guild automatically", 29, 2);
+            OptionGroup(batch, new(27, 59, 278, 118));
+            CheckAt(batch, 39, 70, "Heal party members", 25, 7, width: 251);
+            HpSegments(batch, 111, 24, 0);
+            OptionGroup(batch, new(27, 194, 278, 119));
+            CheckAt(batch, 39, 207, "Buff duration for party", 26, 0, width: 251);
+            CheckAt(batch, 39, 244, "Accept friends automatically", 29, 1, width: 251);
+            CheckAt(batch, 39, 279, "Accept guild automatically", 29, 2, width: 251);
         }
-        Button(batch, new(216, 365, 86, 25), "Back", () => _modal = 0, true);
+        int footer = WindowHeight - 48;
+        PopupButton(batch, new(29, footer, 86, 29), "Initialize", ResetOptions);
+        PopupButton(batch, new(123, footer, 86, 29), "Save", () =>
+        { _optionSnapshot = null; _modal = 0; _ = SaveAsync(); });
+        PopupButton(batch, new(217, footer, 86, 29), "Cancel", CancelOptions);
     }
+
+    private void HpSegments(SpriteBatch batch, int y, int offset, int shift)
+    {
+        int value = Math.Clamp(_draft.Bits(offset, shift, 15), 1, 10);
+        for (int i = 0; i < 10; i++)
+        {
+            var rect = new Rectangle(103 + i * 13, y, 11, 16);
+            if (batch != null)
+                batch.Draw(GraphicsManager.Instance.Pixel, rect, i < value ? new Color(255, 139, 0) : new Color(49, 49, 49));
+            if (_pending == null && _click is { } p && rect.Contains(p) && !_rightClick)
+            { _click = null; _draft.SetBits(offset, shift, 15, i + 1); _dirty = true; }
+        }
+        Label(batch, "HP Status: " + value * 10 + "%", new(47, y + 24, 238, 21), Gold, 10, true);
+    }
+
+    private void Radio(SpriteBatch batch, Rectangle rect, string label, bool selected, Action action, bool available)
+    {
+        bool enabled = available && _pending == null;
+        if (batch != null)
+        {
+            DrawRadio(batch, new Point(rect.X + 8, rect.Center.Y), selected, enabled);
+            Label(batch, label, new(rect.X + 22, rect.Y, rect.Width - 22, rect.Height), enabled ? Ink : Muted, 10);
+        }
+        if (enabled && _click is { } p && rect.Contains(p) && !_rightClick)
+        { _click = null; action(); _dirty = true; }
+    }
+
+    // Rasterize indicators because the UI font does not contain Unicode radio glyphs.
+    private static void DrawRadio(SpriteBatch batch, Point center, bool selected, bool enabled)
+    {
+        var pixel = GraphicsManager.Instance.Pixel;
+        for (int y = -5; y <= 5; y++)
+        {
+            int halfWidth = (int)Math.Sqrt(25 - y * y);
+            batch.Draw(pixel, new Rectangle(center.X - halfWidth, center.Y + y, halfWidth * 2 + 1, 1), enabled ? Ink : Muted);
+        }
+        for (int y = -3; y <= 3; y++)
+        {
+            int halfWidth = (int)Math.Sqrt(9 - y * y);
+            batch.Draw(pixel, new Rectangle(center.X - halfWidth, center.Y + y, halfWidth * 2 + 1, 1),
+                selected ? enabled ? Gold : Muted : new Color(20, 20, 20));
+        }
+    }
+
+
+    private static void OptionGroup(SpriteBatch batch, Rectangle rect)
+    {
+        if (batch == null) return;
+        batch.Draw(GraphicsManager.Instance.Pixel, rect, new Color(0, 0, 0, 48));
+        Section(batch, rect);
+    }
+
+    private void PopupButton(SpriteBatch batch, Rectangle rect, string label, Action action)
+    {
+        if (batch != null)
+        {
+            bool hover = rect.Contains(_mouse) && _pending == null;
+            if (_subAtlas != null)
+                batch.Draw(_subAtlas, rect, new Rectangle(hover ? 112 : 37, 0, 70, 32), _pending == null ? Color.White : Color.Gray);
+            else OptionGroup(batch, rect);
+            Label(batch, label, rect, _pending == null ? Ink : Muted, 10, true);
+        }
+        if (_pending == null && _click is { } p && rect.Contains(p) && !_rightClick)
+        { _click = null; action(); }
+    }
+
+    private void DrawOptionsFrame(SpriteBatch batch)
+    {
+        var pixel = GraphicsManager.Instance.Pixel;
+        batch.Draw(pixel, new Rectangle(8, 7, Width - 16, WindowHeight - 14), new Color(0, 0, 0, 180));
+        Section(batch, new(8, 7, Width - 16, WindowHeight - 14));
+        Section(batch, new(12, 11, Width - 24, WindowHeight - 22));
+        Line(batch, new(20, 48, Width - 40, 1));
+        Line(batch, new(20, WindowHeight - 60, Width - 40, 1));
+    }
+
 
     private void BuildPicker(SpriteBatch batch)
     {
         var choices = PickerSkills();
-        int pages = Math.Max(1, (choices.Length + 19) / 20); _page = Math.Clamp(_page, 0, pages - 1);
-        Label(batch, "Select " + SlotNames[_picker], new(16, 77, 288, 24), Gold, 11, true);
-        Button(batch, new(16, 104, 94, 22), _picker == 0 ? "Normal attack" : "Clear slot", () => { _draft.SetWord(MuHelperConfigurationData.SkillOffsets[_picker], 0); _dirty = true; _picker = -1; });
-        for (int i = 0; i < 20 && _page * 20 + i < choices.Length; i++)
+        int pages = Math.Max(1, (choices.Length + 19) / 20);
+        _page = Math.Clamp(_page, 0, pages - 1);
+        int count = Math.Min(20, choices.Length - _page * 20);
+        ushort current = (ushort)_draft.Word(MuHelperConfigurationData.SkillOffsets[_picker]);
+        string hoveredName = null;
+        Label(batch, "Select " + SlotNames[_picker], new(24, 17, 284, 24), Gold, 11, true);
+        PopupButton(batch, new(103, 62, 126, 29), _picker == 0 ? "Normal attack" : "Clear slot", () =>
+        { _draft.SetWord(MuHelperConfigurationData.SkillOffsets[_picker], 0); _dirty = true; _picker = -1; });
+        if (_picker < 0) return;
+        for (int i = 0; i < count; i++)
         {
             ushort id = choices[_page * 20 + i].SkillId;
-            var rect = new Rectangle(20 + i % 5 * 58, 140 + i / 5 * 51, 43, 43);
-            Button(batch, rect, "", () => { _draft.SetWord(MuHelperConfigurationData.SkillOffsets[_picker], id); _dirty = true; _picker = -1; });
-            if (batch != null) DrawIcon(batch, id, rect);
-            if (rect.Contains(_mouse)) Label(batch, SkillDatabase.GetSkillName(id), new(16, 349, 288, 22), Gold, 9, true);
+            int rowCount = Math.Min(5, count - i / 5 * 5);
+            int rowWidth = (rowCount - 1) * 52 + 36;
+            var rect = new Rectangle((Width - rowWidth) / 2 + i % 5 * 52, 112 + i / 5 * 54, 36, 44);
+            bool hover = rect.Contains(_mouse);
+            if (hover) hoveredName = SkillDatabase.GetSkillName(id);
+            if (batch != null)
+            {
+                if (_atlas != null) batch.Draw(_atlas, rect, new Rectangle(651, 75, 32, 42), Color.White);
+                else OptionGroup(batch, rect);
+                if (hover || id == current)
+                {
+                    var edge = new Rectangle(rect.X - 2, rect.Y - 2, rect.Width + 4, rect.Height + 4);
+                    var color = hover ? new Color(241, 205, 106) : Gold;
+                    batch.Draw(GraphicsManager.Instance.Pixel, new Rectangle(edge.X, edge.Y, edge.Width, 1), color);
+                    batch.Draw(GraphicsManager.Instance.Pixel, new Rectangle(edge.X, edge.Bottom - 1, edge.Width, 1), color);
+                    batch.Draw(GraphicsManager.Instance.Pixel, new Rectangle(edge.X, edge.Y, 1, edge.Height), color);
+                    batch.Draw(GraphicsManager.Instance.Pixel, new Rectangle(edge.Right - 1, edge.Y, 1, edge.Height), color);
+                }
+                DrawIcon(batch, id, rect);
+            }
+            if (_pending == null && _click is { } p && rect.Contains(p) && !_rightClick)
+            {
+                _click = null; _draft.SetWord(MuHelperConfigurationData.SkillOffsets[_picker], id);
+                _dirty = true; _picker = -1; return;
+            }
         }
-        Button(batch, new(16, 380, 32, 24), "<", () => _page--, available: _page > 0);
-        Button(batch, new(108, 380, 32, 24), ">", () => _page++, available: _page < pages - 1);
-        Label(batch, $"{_page + 1}/{pages}", new(49, 380, 58, 24), Ink, 9, true);
-        Button(batch, new(216, 380, 86, 24), "Back", () => _picker = -1, true);
+        string name = hoveredName ?? (current == 0 ? _picker == 0 ? "Normal attack" : "No skill selected" : SkillDatabase.GetSkillName(current));
+        if (count == 0) Label(batch, "No available skills", new(30, 117, 272, 24), Muted, 10, true);
+        OptionGroup(batch, new(27, WindowHeight - 104, 278, 32));
+        Label(batch, name, new(34, WindowHeight - 101, 264, 26), Gold, 10, true);
+        int footer = WindowHeight - 48;
+        if (pages > 1)
+        {
+            Button(batch, new(29, footer, 28, 29), "<", () => _page--, available: _page > 0);
+            Label(batch, $"{_page + 1} / {pages}", new(60, footer, 69, 29), Ink, 10, true);
+            Button(batch, new(132, footer, 28, 29), ">", () => _page++, available: _page < pages - 1);
+        }
+        PopupButton(batch, new(217, footer, 86, 29), "Back", () => _picker = -1);
     }
+
 
     private void SkillSlot(SpriteBatch batch, int index)
     {
@@ -544,7 +729,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
 
     private void Number(SpriteBatch batch, int y, string label, int value, Action<int> change, string suffix = "")
     {
-        Label(batch, label, new(16, y, 180, 20), Ink, 9);
+        Label(batch, label, new(40, y, 156, 20), Ink, 10);
         Button(batch, new(210, y, 20, 20), "-", () => { change(-1); _dirty = true; });
         Label(batch, $"{value}{suffix}", new(231, y, 49, 20), Gold, 9, true);
         Button(batch, new(282, y, 20, 20), "+", () => { change(1); _dirty = true; });
@@ -567,7 +752,7 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
     {
         bool enabled = _pending == null;
         if (batch != null && _atlas != null)
-            batch.Draw(_atlas, rect, new Rectangle(!enabled ? 361 : rect.Contains(_mouse) ? 392 : 420, 290, 28, 28), Color.White);
+            batch.Draw(_atlas, rect, new Rectangle(!enabled ? 361 : rect.Contains(_mouse) ? 392 : 330, 290, 28, 28), Color.White);
         if (enabled && _click is { } p && rect.Contains(p) && !_rightClick) { _click = null; action(); }
     }
 
@@ -639,18 +824,22 @@ public sealed class MuHelperControl : UIControl, IUiTexturePreloadable
         using (new SpriteBatchScope(batch, SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp,
             DepthStencilState.None, RasterizerState.CullNone, transform: transform))
         {
-            // Back only the usable interior. The textured frame, ornament and rounded
-            // corners retain their original alpha instead of exposing a rectangular backing.
-            var backing = _atlas == null
-                ? new Rectangle(0, 0, Width, WindowHeight)
-                : new Rectangle(20, 73, Width - 40, WindowHeight - 91);
-            batch.Draw(GraphicsManager.Instance.Pixel, backing, new Color(13, 11, 9));
-            if (_atlas != null)
+            if (_modal != 0 || _picker >= 0) DrawOptionsFrame(batch);
+            else
             {
-                Slice(batch, new Rectangle(6, 23, 320, WindowHeight - 23), new Rectangle(0, 0, 320, 380), 14, Color.White);
-                // Keep the native ornament, header and corners at their original pixel size.
-                // The next atlas sprite starts below the 74px header; never include its top rows.
-                batch.Draw(_atlas, new Rectangle(0, 0, 332, 74), new Rectangle(648, 0, 332, 74), Color.White);
+                // Back only the usable interior. The textured frame, ornament and rounded
+                // corners retain their original alpha instead of exposing a rectangular backing.
+                var backing = _atlas == null
+                    ? new Rectangle(0, 0, Width, WindowHeight)
+                    : new Rectangle(20, 73, Width - 40, WindowHeight - 91);
+                batch.Draw(GraphicsManager.Instance.Pixel, backing, new Color(13, 11, 9));
+                if (_atlas != null)
+                {
+                    Slice(batch, new Rectangle(6, 23, 320, WindowHeight - 23), new Rectangle(0, 0, 320, 380), 14, Color.White);
+                    // Keep the native ornament, header and corners at their original pixel size.
+                    // The next atlas sprite starts below the 74px header; never include its top rows.
+                    batch.Draw(_atlas, new Rectangle(0, 0, 332, 74), new Rectangle(648, 0, 332, 74), Color.White);
+                }
             }
             Build(batch);
         }

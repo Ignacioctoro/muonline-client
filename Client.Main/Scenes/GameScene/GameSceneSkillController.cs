@@ -27,7 +27,7 @@ namespace Client.Main.Scenes
         private readonly GameScene _scene;
         private readonly SkillQuickSlot _skillQuickSlot;
         private readonly ILogger _logger;
-        private readonly Func<PlayerObject, bool> _isDuelAttackTarget;
+        private readonly Func<PlayerObject, bool> _isAutomaticPlayerTarget;
 
         private Core.Client.SkillEntryState _pendingSkill;
         private ushort _pendingSkillTargetId;
@@ -36,6 +36,7 @@ namespace Client.Main.Scenes
         private uint _pendingSkillRange;
         private bool _pendingSkillIsArea;
         private bool _pendingSkillTargetIsPlayer;
+        private bool _pendingGensTarget;
 
         // Permite que una skill iniciada desde el botón PvP móvil
         // pueda apuntar a jugadores aunque no estén en duelo.
@@ -54,7 +55,7 @@ namespace Client.Main.Scenes
             _scene = scene ?? throw new ArgumentNullException(nameof(scene));
             _skillQuickSlot = skillQuickSlot ?? throw new ArgumentNullException(nameof(skillQuickSlot));
             _logger = logger;
-            _isDuelAttackTarget = isDuelAttackTarget ?? (_ => false);
+            _isAutomaticPlayerTarget = player => isDuelAttackTarget?.Invoke(player) == true || GensCombatRules.IsEnemy(player);
         }
 
         public void Update()
@@ -163,6 +164,8 @@ namespace Client.Main.Scenes
 
                 return true;
             }
+
+            if (GensCombatRules.IsProtectedTarget(target)) return false;
 
             // No permitir skills desde SafeZone.
             var terrainFlags = walkableWorld.Terrain.RequestTerrainFlag(
@@ -870,7 +873,7 @@ namespace Client.Main.Scenes
                 return monster.NetworkId;
             }
 
-            if (hoveredTarget is PlayerObject player && !player.IsDead && _isDuelAttackTarget(player))
+            if (hoveredTarget is PlayerObject player && !player.IsDead && _isAutomaticPlayerTarget(player))
             {
                 hero.FaceTowards(player.Location, immediate: true);
                 return player.NetworkId;
@@ -956,7 +959,7 @@ namespace Client.Main.Scenes
                 // Jugador válido si:
                 // 1. Es nuestro oponente de duelo.
                 // 2. Estamos manteniendo CTRL para PvP clásico.
-                if (_isDuelAttackTarget(player) || ctrlPressed)
+                if (!GensCombatRules.IsProtectedTarget(player) && (_isAutomaticPlayerTarget(player) || ctrlPressed))
                 {
                     return player;
                 }
@@ -1013,6 +1016,8 @@ namespace Client.Main.Scenes
             _pendingSkillRange = allowedRange;
             _pendingSkillIsArea = isAreaSkill;
             _pendingSkillTargetIsPlayer = target is PlayerObject;
+            _pendingGensTarget = target is PlayerObject gensTarget && !SkillDatabase.IsFriendlySkill(skill.SkillId)
+                && GensCombatRules.IsEnemy(gensTarget);
 
             _pendingSkillAllowNonDuelPlayer =
                 allowNonDuelPlayer &&
@@ -1151,8 +1156,15 @@ namespace Client.Main.Scenes
                 //
                 // PvP móvil:
                 // puede permitir jugadores normales.
+                if ((_pendingGensTarget && !GensCombatRules.IsEnemy(targetPlayer))
+                    || (!pendingFriendly && GensCombatRules.IsProtectedTarget(targetPlayer)))
+                {
+                    ClearPendingSkill();
+                    return;
+                }
+
                 if (!_pendingSkillAllowNonDuelPlayer &&
-                    !_isDuelAttackTarget(targetPlayer))
+                    !_isAutomaticPlayerTarget(targetPlayer))
                 {
                     ClearPendingSkill();
                     return;
@@ -1237,6 +1249,7 @@ namespace Client.Main.Scenes
             _pendingSkillRange = 0;
             _pendingSkillIsArea = false;
             _pendingSkillTargetIsPlayer = false;
+            _pendingGensTarget = false;
             _pendingSkillAllowNonDuelPlayer = false;
         }
 
@@ -1421,8 +1434,9 @@ namespace Client.Main.Scenes
             //
             // PvP móvil:
             // puede saltar esta restricción explícitamente.
+            if (!SkillDatabase.IsFriendlySkill(skill.SkillId) && GensCombatRules.IsProtectedTarget(target)) return false;
             if (!allowNonDuelTarget &&
-                !_isDuelAttackTarget(target))
+                !_isAutomaticPlayerTarget(target))
             {
                 return false;
             }
@@ -1468,6 +1482,10 @@ namespace Client.Main.Scenes
 
             if (hero.IsDead)
                 return false;
+
+            if (extraTargetId != 0 && _scene.World is WalkableWorldControl gensWorld
+                && gensWorld.TryGetWalkerById(extraTargetId, out var gensWalker) && gensWalker is PlayerObject gensTarget
+                && GensCombatRules.IsProtectedTarget(gensTarget)) return false;
 
             Vector2 targetTile = hero.Location;
 
@@ -1699,6 +1717,7 @@ namespace Client.Main.Scenes
             _pendingSkillRange = allowedRange;
             _pendingSkillIsArea = true;
             _pendingSkillTargetIsPlayer = false;
+            _pendingGensTarget = false;
             _pendingSkillAllowNonDuelPlayer = false;
 
             MoveHeroTowardsTarget(

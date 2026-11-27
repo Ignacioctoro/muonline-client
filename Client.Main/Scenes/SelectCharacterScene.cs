@@ -22,7 +22,7 @@ using System.Threading.Tasks;
 
 namespace Client.Main.Scenes
 {
-    public class SelectCharacterScene : BaseScene
+    public partial class SelectCharacterScene : BaseScene
     {
         private static class Theme
         {
@@ -61,13 +61,13 @@ namespace Client.Main.Scenes
             public static readonly Color Danger = new(220, 80, 80);
         }
 
-        private const int PANEL_WIDTH = 340;
+        private const int PANEL_WIDTH = 280;
         private const int PANEL_MARGIN = 30;
         private const int HEADER_HEIGHT = 45;
         private const int BUTTON_HEIGHT = 36;
         private const int BUTTON_SPACING = 8;
         private const int INNER_PADDING = 12;
-        private const int CHAR_CARD_HEIGHT = 65;
+        private const int CHAR_CARD_HEIGHT = 66;
         private const int CHAR_CARD_SPACING = 6;
 
         // Fields
@@ -93,6 +93,7 @@ namespace Client.Main.Scenes
         private ButtonControl _enterGameButton;
         private ButtonControl _exitButton;
         private CharacterCreationDialog _characterCreationDialog;
+        private CharacterDeletionDialog _characterDeletionDialog;
         private string _currentlySelectedCharacterName = null;
         private bool _isIntentionalLogout = false;
 
@@ -223,144 +224,56 @@ namespace Client.Main.Scenes
 
         private ButtonControl CreateModernButton(string text, Color baseColor)
         {
-            return new ButtonControl
+            // Keep the existing click/state logic. The native atlas is drawn
+            // in the scene overlay, after the 3D world and before the cursor.
+            return new NativeSelectionButton
             {
-                Text = text,
-                FontSize = 13f,
-                AutoViewSize = false,
-                ViewSize = new Point(PANEL_WIDTH - INNER_PADDING * 2, BUTTON_HEIGHT),
-                BackgroundColor = baseColor,
-                HoverBackgroundColor = Color.Lerp(baseColor, Color.White, 0.2f),
-                PressedBackgroundColor = Color.Lerp(baseColor, Color.Black, 0.2f),
-                TextColor = Theme.TextWhite,
-                HoverTextColor = Theme.TextWhite,
-                DisabledTextColor = Theme.TextDark,
-                Interactive = true,
-                Visible = false,
-                Enabled = false,
-                BorderThickness = 1,
-                BorderColor = Theme.BorderInner
+                Text = text, AutoViewSize = false, ViewSize = new Point(100, 34),
+                Interactive = true, Visible = false, Enabled = false,
             };
         }
 
         private void CalculatePanelLayout()
         {
-            int screenWidth = ViewSize.X;
-            int screenHeight = ViewSize.Y;
-
-            // Calculate panel height based on content
-            int buttonSectionHeight = (BUTTON_HEIGHT + BUTTON_SPACING) * 4 + INNER_PADDING * 2; // Buttons only, no header
-            int maxCharCards = Math.Min(_characters.Count, 5);
-            int characterListHeight = maxCharCards * (CHAR_CARD_HEIGHT + CHAR_CARD_SPACING) + INNER_PADDING * 2;
-            int totalPanelHeight = HEADER_HEIGHT + characterListHeight + buttonSectionHeight;
-
-            // Character panel (right side)
-            int panelX = screenWidth - PANEL_WIDTH - PANEL_MARGIN;
-            int panelY = (screenHeight - totalPanelHeight) / 2;
-            _characterPanelRect = new Rectangle(panelX, panelY, PANEL_WIDTH, totalPanelHeight);
-
-            // Character list section (top, below header)
-            int listY = panelY + HEADER_HEIGHT;
-            _characterListRect = new Rectangle(panelX, listY, PANEL_WIDTH, characterListHeight);
-
-            // Button section (bottom of panel, below character list)
-            int buttonY = listY + characterListHeight;
-            _buttonSectionRect = new Rectangle(panelX, buttonY, PANEL_WIDTH, buttonSectionHeight);
-
-            // Calculate character card rectangles
+            int cardHeight = Math.Min(CHAR_CARD_HEIGHT, Math.Max(40, (ViewSize.Y - 180) / 5 - CHAR_CARD_SPACING));
+            int width = Math.Min(PANEL_WIDTH, Math.Max(210, ViewSize.X / 4));
+            int listHeight = cardHeight * 5 + CHAR_CARD_SPACING * 4;
+            int panelX = Math.Max(12, ViewSize.X - width - PANEL_MARGIN);
+            int panelY = Math.Max(70, (ViewSize.Y - listHeight) / 2 - 14);
+            var nextRect = new Rectangle(panelX, panelY, width, listHeight);
+            if (_characterListRect != nextRect) _nativeSelectionSurfaceDirty = true;
+            _characterPanelRect = nextRect;
+            _characterListRect = nextRect;
+            _buttonSectionRect = new Rectangle(0, ViewSize.Y - 40, ViewSize.X, 30);
             _characterCardRects.Clear();
-            int cardY = listY + INNER_PADDING;
-            for (int i = 0; i < _characters.Count && i < 5; i++)
-            {
-                _characterCardRects.Add(new Rectangle(
-                    panelX + INNER_PADDING,
-                    cardY,
-                    PANEL_WIDTH - INNER_PADDING * 2,
-                    CHAR_CARD_HEIGHT
-                ));
-                cardY += CHAR_CARD_HEIGHT + CHAR_CARD_SPACING;
-            }
+            for (int i = 0; i < 5; i++)
+                _characterCardRects.Add(new Rectangle(panelX, panelY + i * (cardHeight + CHAR_CARD_SPACING), width, cardHeight));
         }
 
         private void PositionNavigationButtons()
         {
-            // Early exit if buttons not created yet (called during construction)
-            if (_previousCharacterButton == null && _nextCharacterButton == null && 
-                _enterGameButton == null && _createCharacterButton == null && 
-                _deleteCharacterButton == null && _exitButton == null)
-            {
-                return;
-            }
-
+            // BaseScene sets ViewSize from its constructor, invoking our
+            // resize override before this constructor assigns _characters.
+            // InitializeModernUI/AfterLoad will lay out the completed scene.
+            if (_characters == null || _characterCardRects == null) return;
             CalculatePanelLayout();
-            
             bool ready = _initialLoadComplete && (_loadingScreen == null || !_loadingScreen.Visible) && !_isSelectionInProgress;
-            bool hasCharacters = _characters.Count > 0;
             bool hasSelection = !string.IsNullOrEmpty(_currentlySelectedCharacterName);
-            bool canCreate = _characters.Count < 5;
-
-            // Position navigation arrows
-            if (_previousCharacterButton != null)
+            int y = _buttonSectionRect.Y;
+            void Place(ButtonControl button, int x, int width, bool enabled)
             {
-                _previousCharacterButton.X = (ViewSize.X / 2) - 250;
-                _previousCharacterButton.Y = (ViewSize.Y - _previousCharacterButton.ViewSize.Y) / 2;
+                if (button == null) return;
+                button.X = x; button.Y = y;
+                button.ViewSize = new Point(width, 30);
+                button.Visible = ready;
+                button.Enabled = ready && enabled && _characterDeletionDialog == null && _characterCreationDialog == null;
             }
-
-            if (_nextCharacterButton != null)
-            {
-                _nextCharacterButton.X = (ViewSize.X / 2) + 180;
-                _nextCharacterButton.Y = (ViewSize.Y - _nextCharacterButton.ViewSize.Y) / 2;
-            }
-
-            // Position action buttons in button section (bottom of panel)
-            int panelX = _characterPanelRect.X;
-            int buttonY = _buttonSectionRect.Y + INNER_PADDING;
-
-            // ENTER GAME button (top of button section)
-            if (_enterGameButton != null)
-            {
-                _enterGameButton.X = panelX + INNER_PADDING;
-                _enterGameButton.Y = buttonY;
-                _enterGameButton.Enabled = ready && hasCharacters && hasSelection;
-                _enterGameButton.Visible = ready && hasCharacters && hasSelection;
-            }
-
-            buttonY += (BUTTON_HEIGHT + BUTTON_SPACING);
-
-            // DELETE CHARACTER button (shows when character selected)
-            if (_deleteCharacterButton != null)
-            {
-                _deleteCharacterButton.X = panelX + INNER_PADDING;
-                _deleteCharacterButton.Y = buttonY;
-                _deleteCharacterButton.Enabled = ready && hasSelection;
-                _deleteCharacterButton.Visible = ready && hasSelection;
-                
-                _logger?.LogDebug("Delete button - Ready: {Ready}, HasSelection: {HasSel}, CharName: '{Name}', Visible: {Vis}", 
-                    ready, hasSelection, _currentlySelectedCharacterName, _deleteCharacterButton.Visible);
-            }
-
-            buttonY += (BUTTON_HEIGHT + BUTTON_SPACING);
-
-            // CREATE CHARACTER button
-            if (_createCharacterButton != null)
-            {
-                _createCharacterButton.X = panelX + INNER_PADDING;
-                _createCharacterButton.Y = buttonY;
-                _createCharacterButton.Enabled = ready && canCreate;
-                _createCharacterButton.Visible = ready;
-            }
-
-            buttonY += (BUTTON_HEIGHT + BUTTON_SPACING);
-
-            // EXIT button (very bottom)
-            if (_exitButton != null)
-            {
-                _exitButton.X = panelX + INNER_PADDING;
-                _exitButton.Y = buttonY;
-                _exitButton.Enabled = ready && !_isSelectionInProgress;
-                _exitButton.Visible = ready;
-            }
-
+            Place(_createCharacterButton, 20, 54, _characters.Count < 5);
+            Place(_exitButton, 75, 54, true);
+            Place(_enterGameButton, Math.Max(135, ViewSize.X - 132), 54, hasSelection && _characters.Count > 0);
+            Place(_deleteCharacterButton, Math.Max(190, ViewSize.X - 77), 54, hasSelection);
+            if (_previousCharacterButton != null) { _previousCharacterButton.Visible = false; _previousCharacterButton.Enabled = false; }
+            if (_nextCharacterButton != null) { _nextCharacterButton.Visible = false; _nextCharacterButton.Enabled = false; }
         }
 
         private void UpdateNavigationButtonState()
@@ -438,6 +351,7 @@ namespace Client.Main.Scenes
 
             try
             {
+                await LoadNativeSelectionTexturesAsync();
                 UpdateLoadProgress("Creating Select World...", 0.05f);
                 _selectWorld = new SelectWorld();
                 Controls.Add(_selectWorld);
@@ -645,12 +559,14 @@ namespace Client.Main.Scenes
             }
 
             CloseCharacterCreationDialog();
+            CloseCharacterDeletionDialog();
             if (_loadingScreen != null)
             {
                 Controls.Remove(_loadingScreen);
                 _loadingScreen.Dispose();
                 _loadingScreen = null;
             }
+            DisposeNativeSelectionSurface();
             RestoreDayNightCycle();
             base.Dispose();
         }
@@ -882,6 +798,18 @@ namespace Client.Main.Scenes
 
             _logger.LogInformation("Opening character creation dialog...");
 
+            // Creation uses the original animated NewFace portrait instead of
+            // showing the selected equipped character behind the dialog.
+            if (_characterController != null)
+                foreach (var player in _characterController.Characters)
+                {
+                    player.Hidden = true;
+                    player.Interactive = false;
+                    if (_characterController.Labels.TryGetValue(player, out var label)) label.Visible = false;
+                }
+            foreach (var button in new[] { _enterGameButton, _deleteCharacterButton, _createCharacterButton, _exitButton })
+                if (button != null) button.Enabled = false;
+
             // Create and show dialog
             _characterCreationDialog = new CharacterCreationDialog();
             _characterCreationDialog.CharacterCreateRequested += OnCharacterCreateRequested;
@@ -948,6 +876,7 @@ namespace Client.Main.Scenes
         
         private void OnControllerCharacterClicked(object sender, string characterName)
         {
+            if (_characterDeletionDialog != null || _characterCreationDialog != null) return;
             _logger.LogInformation("Controller: Character '{Name}' clicked.", characterName);
             _currentlySelectedCharacterName = characterName;
 
@@ -967,78 +896,42 @@ namespace Client.Main.Scenes
 
         private void OnControllerCharacterDoubleClicked(object sender, string characterName)
         {
+            if (_characterDeletionDialog != null || _characterCreationDialog != null) return;
             _logger.LogInformation("Controller: Character '{Name}' double-clicked.", characterName);
             CharacterSelected(characterName);
         }
         
         private void OnDeleteCharacterButtonClick(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(_currentlySelectedCharacterName))
-            {
-                _logger.LogWarning("Delete button clicked but no character selected.");
-                return;
-            }
-            
+            if (_characterDeletionDialog != null || _characterCreationDialog != null || string.IsNullOrEmpty(_currentlySelectedCharacterName)) return;
             string characterToDelete = _currentlySelectedCharacterName;
-            _logger.LogInformation("Delete button clicked for character '{Name}'.", characterToDelete);
-            
-            // Create security code input dialog
-            var securityCodeDialog = new CharacterDeletionDialog(characterToDelete);
-            securityCodeDialog.DeleteConfirmed += (s, securityCode) =>
+            var dialog = new CharacterDeletionDialog(characterToDelete);
+            _characterDeletionDialog = dialog;
+            dialog.DeleteConfirmed += (s, secret) =>
             {
-                _logger.LogInformation("User confirmed deletion of '{Name}' with security code.", characterToDelete);
-                var characterService = _networkManager?.GetCharacterService();
-                if (characterService != null)
-                {
-                    _ = characterService.SendDeleteCharacterRequestAsync(characterToDelete, securityCode);
-                    MessageWindow.Show($"Deleting character '{characterToDelete}'...\nPlease wait for server response.");
-                    
-                    // Clear selection
-                    _currentlySelectedCharacterName = null;
-                    UpdateNavigationButtonState();
-                        }
-                else
-                {
-                    _logger.LogError("CharacterService not available - cannot delete character.");
-                    MessageWindow.Show("Error: Cannot delete character at this time.");
-                }
-                
-                // Clean up dialog
-                Controls.Remove(securityCodeDialog);
-                securityCodeDialog.Dispose();
-                
-                // Re-enable world interaction
-                if (_selectWorld != null)
-                {
-                    _selectWorld.Interactive = true;
-                }
+                CloseCharacterDeletionDialog();
+                var service = _networkManager?.GetCharacterService();
+                if (service == null) { MessageWindow.Show("Cannot delete character at this time."); return; }
+                // This is the only request, after all three confirmations. Never log the secret.
+                _ = service.SendDeleteCharacterRequestAsync(characterToDelete, secret);
             };
-            
-            securityCodeDialog.CancelRequested += (s, args) =>
-            {
-                _logger.LogInformation("User cancelled deletion of '{Name}'.", characterToDelete);
-                
-                // Clean up dialog
-                Controls.Remove(securityCodeDialog);
-                securityCodeDialog.Dispose();
-                
-                // Re-enable world interaction
-                if (_selectWorld != null)
-                {
-                    _selectWorld.Interactive = true;
-                }
-            };
-            
-            // Show dialog
-            Controls.Add(securityCodeDialog);
-            securityCodeDialog.BringToFront();
+            dialog.CancelRequested += (s, args) => CloseCharacterDeletionDialog();
+            Controls.Add(dialog);
+            dialog.BringToFront();
             Cursor?.BringToFront();
-            
-            // Disable world interaction while dialog is open
-            if (_selectWorld != null)
-            {
-                _selectWorld.Interactive = false;
-            }
+            if (_selectWorld != null) _selectWorld.Interactive = false;
+            PositionNavigationButtons();
+        }
+
+        private void CloseCharacterDeletionDialog()
+        {
+            if (_characterDeletionDialog == null) return;
+            var dialog = _characterDeletionDialog;
+            _characterDeletionDialog = null;
+            Controls.Remove(dialog);
+            dialog.Dispose();
+            if (_selectWorld != null) _selectWorld.Interactive = true;
+            PositionNavigationButtons();
         }
 
         private void CloseCharacterCreationDialog()
@@ -1057,6 +950,16 @@ namespace Client.Main.Scenes
             {
                 _selectWorld.Interactive = true;
             }
+            if (_characterController != null)
+                for (int i = 0; i < _characterController.Characters.Count; i++)
+                {
+                    var player = _characterController.Characters[i];
+                    bool selected = i == _currentCharacterIndex;
+                    player.Hidden = !selected;
+                    player.Interactive = selected;
+                    if (_characterController.Labels.TryGetValue(player, out var label)) label.Visible = selected;
+                }
+            PositionNavigationButtons();
             UpdateNavigationButtonState();
         }
 
@@ -1084,7 +987,7 @@ namespace Client.Main.Scenes
 
         private void UpdateCharacterCardInteraction()
         {
-            if (_characterCardRects.Count == 0 || !_initialLoadComplete || Cursor == null)
+            if (_characterCardRects.Count == 0 || !_initialLoadComplete || Cursor == null || _isSelectionInProgress || _characterCreationDialog != null || _characterDeletionDialog != null)
                 return;
 
             Point mousePos = new Point((int)Cursor.X, (int)Cursor.Y);
@@ -1114,8 +1017,8 @@ namespace Client.Main.Scenes
                     // Handle click (on mouse release)
                     if (mouseClicked)
                     {
-                        SelectCharacterByIndex(i);
-                        _logger.LogInformation("Character card {Index} clicked: {Name}", i, _characters[i].Name);
+                        if (i < _characters.Count) SelectCharacterByIndex(i);
+                        else if (_createCharacterButton.Enabled) OnCreateCharacterButtonClick(this, EventArgs.Empty);
                     }
                     break;
                 }
@@ -1154,6 +1057,12 @@ namespace Client.Main.Scenes
                 return;
             }
 
+            // Finish all offscreen work before drawing into the main DiscardContents
+            // target. The UI pass below only composites textures and never rebinds it.
+            EnsureNativeSelectionSurface();
+            _characterCreationDialog?.PrepareDraw();
+            _characterDeletionDialog?.PrepareDraw();
+
             // Draw 3D world first
             base.Draw(gameTime);
 
@@ -1186,94 +1095,9 @@ namespace Client.Main.Scenes
             }
         }
 
-        private void DrawCharacterPanel(SpriteBatch sb)
-        {
-            var pixel = GraphicsManager.Instance.Pixel;
-            var font = GraphicsManager.Instance.Font;
-            if (pixel == null || font == null) return;
+        private void DrawCharacterPanel(SpriteBatch sb) => DrawNativeCharacterSelection(sb);
 
-            // Panel background excluding button section (so buttons are visible on top)
-            var panelWithoutButtons = new Rectangle(
-                _characterPanelRect.X,
-                _characterPanelRect.Y,
-                _characterPanelRect.Width,
-                _characterPanelRect.Height - _buttonSectionRect.Height
-            );
-            UiDrawHelper.DrawVerticalGradient(sb, panelWithoutButtons, Theme.BgMid, Theme.BgDark);
-            
-            // Outer border (excluding button section - no bottom border, side borders stop at character list)
-            int borderEndY = _characterListRect.Bottom;
-            sb.Draw(pixel, new Rectangle(_characterPanelRect.X - 1, _characterPanelRect.Y - 1, _characterPanelRect.Width + 2, 1), Theme.BorderOuter); // Top border
-            sb.Draw(pixel, new Rectangle(_characterPanelRect.X - 1, _characterPanelRect.Y, 1, borderEndY - _characterPanelRect.Y), Theme.BorderOuter); // Left border (stops at character list)
-            sb.Draw(pixel, new Rectangle(_characterPanelRect.Right, _characterPanelRect.Y, 1, borderEndY - _characterPanelRect.Y), Theme.BorderOuter); // Right border (stops at character list)
 
-            // Header section
-            var headerRect = new Rectangle(_characterPanelRect.X, _characterPanelRect.Y, _characterPanelRect.Width, HEADER_HEIGHT);
-            UiDrawHelper.DrawHorizontalGradient(sb, headerRect, Theme.BgLighter, Theme.BgMid);
-            UiDrawHelper.DrawCornerAccents(sb, headerRect, Theme.Accent, 12, 2);
-            
-            // Header separator
-            sb.Draw(pixel, new Rectangle(headerRect.X, headerRect.Bottom - 1, headerRect.Width, 1), Theme.BorderInner);
-            sb.Draw(pixel, new Rectangle(headerRect.X, headerRect.Bottom - 2, headerRect.Width, 1), Theme.Accent * 0.3f);
-
-            // Header text
-            string headerText = "CHARACTERS";
-            Vector2 headerTextSize = font.MeasureString(headerText) * 0.75f;
-            Vector2 headerTextPos = new Vector2(
-                headerRect.X + (headerRect.Width - headerTextSize.X) / 2,
-                headerRect.Y + (headerRect.Height - headerTextSize.Y) / 2
-            );
-            sb.DrawString(font, headerText, headerTextPos + new Vector2(1, 1), Color.Black * 0.7f, 0f, Vector2.Zero, 0.75f, SpriteEffects.None, 0f);
-            sb.DrawString(font, headerText, headerTextPos, Theme.TextGold, 0f, Vector2.Zero, 0.75f, SpriteEffects.None, 0f);
-
-            // Draw character list separator (top)
-            sb.Draw(pixel, new Rectangle(_characterListRect.X, _characterListRect.Y, _characterListRect.Width, 1), Theme.BorderInner);
-            
-            // Draw separator between character list and buttons (bottom)
-            sb.Draw(pixel, new Rectangle(_characterListRect.X, _characterListRect.Bottom, _characterListRect.Width, 1), Theme.BorderInner);
-
-            // Draw character cards
-            for (int i = 0; i < _characters.Count && i < _characterCardRects.Count; i++)
-            {
-                DrawCharacterCard(sb, pixel, font, i, _characterCardRects[i], _characters[i]);
-            }
-        }
-
-        private void DrawCharacterCard(SpriteBatch sb, Texture2D pixel, SpriteFont font, int index, Rectangle cardRect, (string Name, CharacterClassNumber Class, ushort Level, byte[] Appearance) character)
-        {
-            bool isSelected = _currentCharacterIndex == index;
-            bool isHovered = _hoveredCardIndex == index;
-
-            // Card background
-            Color bgColor = isSelected ? Theme.BgLighter : (isHovered ? Theme.BgMid : Theme.BgDark);
-            sb.Draw(pixel, cardRect, bgColor);
-
-            // Card border
-            Color borderColor = isSelected ? Theme.Accent : Theme.BorderInner;
-            int borderWidth = isSelected ? 2 : 1;
-            sb.Draw(pixel, new Rectangle(cardRect.X, cardRect.Y, cardRect.Width, borderWidth), borderColor);
-            sb.Draw(pixel, new Rectangle(cardRect.X, cardRect.Bottom - borderWidth, cardRect.Width, borderWidth), borderColor);
-            sb.Draw(pixel, new Rectangle(cardRect.X, cardRect.Y, borderWidth, cardRect.Height), borderColor);
-            sb.Draw(pixel, new Rectangle(cardRect.Right - borderWidth, cardRect.Y, borderWidth, cardRect.Height), borderColor);
-
-            // Character info
-            int textX = cardRect.X + 10;
-            int textY = cardRect.Y + 10;
-            float nameScale = 0.7f;
-            float infoScale = 0.6f;
-
-            // Name
-            Color nameColor = isSelected ? Theme.TextGold : Theme.TextWhite;
-            sb.DrawString(font, character.Name, new Vector2(textX, textY) + new Vector2(1, 1), Color.Black * 0.7f, 0f, Vector2.Zero, nameScale, SpriteEffects.None, 0f);
-            sb.DrawString(font, character.Name, new Vector2(textX, textY), nameColor, 0f, Vector2.Zero, nameScale, SpriteEffects.None, 0f);
-            textY += 22;
-
-            // Class and Level
-            string classLevelText = $"{character.Class}  •  Lv.{character.Level}";
-            Color infoColor = isSelected ? Theme.AccentBright : Theme.TextGray;
-            sb.DrawString(font, classLevelText, new Vector2(textX, textY) + new Vector2(1, 1), Color.Black * 0.7f, 0f, Vector2.Zero, infoScale, SpriteEffects.None, 0f);
-            sb.DrawString(font, classLevelText, new Vector2(textX, textY), infoColor, 0f, Vector2.Zero, infoScale, SpriteEffects.None, 0f);
-        }
 
         private new void DrawBackground()
         {

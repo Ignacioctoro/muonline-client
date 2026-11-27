@@ -371,6 +371,11 @@ namespace Client.Main.Content
                 foreach (var mesh in asset.Meshes)
                 {
                     var fullPath = Path.Combine(dir, mesh.TexturePath);
+                    // This shared Skill texture is referenced by Selupan's native model.
+                    // The newer Data keeps it outside Monster; do not duplicate the asset.
+                    if (Path.GetFileName(path).Equals("Monster151.bmd", StringComparison.OrdinalIgnoreCase) &&
+                        mesh.TexturePath.Equals("blast2_r.jpg", StringComparison.OrdinalIgnoreCase))
+                        fullPath = Path.Combine("Skill", mesh.TexturePath);
                     if (
                         mesh.TexturePath == "unicon.jpg"
                         || mesh.TexturePath == "unicon01.tga"

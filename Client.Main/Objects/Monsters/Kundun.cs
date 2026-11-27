@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 
 namespace Client.Main.Objects.Monsters
 {
+    [NpcInfo(275, "Kundun")]
     public class Kundun : MonsterObject
     {
         public Kundun()
         {
+            Scale = 2.0f;
         }
 
         public override async Task Load()

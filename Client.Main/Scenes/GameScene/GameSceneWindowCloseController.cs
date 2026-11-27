@@ -22,6 +22,7 @@ namespace Client.Main.Scenes
         {
             if (CashShopControl.IsOpen) CashShopControl.Instance.CloseWindow();
             if (LahapControl.IsOpen) LahapControl.Instance.CloseWindow();
+            if (GensControl.IsOpen && GensControl.Instance.IsNpcDialog) GensControl.Instance.CloseWindow();
 
             if (NpcShopControl.Instance.Visible)
             {
@@ -71,6 +72,7 @@ namespace Client.Main.Scenes
         {
             if (CashShopControl.IsOpen) CashShopControl.Instance.CloseWindow();
             if (LahapControl.IsOpen) LahapControl.Instance.CloseWindow();
+            if (GensControl.IsOpen && GensControl.Instance.IsNpcDialog) GensControl.Instance.CloseWindow();
 
             if (PetTrainerControl.IsOpen)
             {

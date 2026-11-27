@@ -1,5 +1,6 @@
 using System;
 using Client.Main.Core.Input;
+using Client.Main.Core.Utilities;
 using Microsoft.Xna.Framework.Input.Touch;
 using Client.Main.Controllers;
 using Client.Main.Controls;
@@ -234,7 +235,7 @@ namespace Client.Main.Scenes
                 return true;
             }
             bool consumed = _touchHold.Update(pointer, pressed, down,
-                target, pvpModifier || duelClick || _scene.IsMobileJoystickCapturingMouse ||
+                target, pvpModifier || duelClick || (desktopMouse && GensCombatRules.IsEnemy(player)) || _scene.IsMobileJoystickCapturingMouse ||
                     _scene.IsMouseInputConsumedThisFrame || _scene.IsInteractiveUIUnderMouse(),
                 position.X, position.Y, gameTime.ElapsedGameTime.TotalSeconds, out bool openMenu);
             if (consumed) _scene.SetMouseInputConsumed();
@@ -445,7 +446,7 @@ namespace Client.Main.Scenes
             bool ctrlDown = keyboardState.IsKeyDown(Keys.LeftControl) || keyboardState.IsKeyDown(Keys.RightControl);
             bool menuOpen = _playerContextMenu?.Visible == true;
             bool playerValid = hoveredPlayer != null && hoveredPlayer != _scene.Hero && hoveredPlayer.World == _scene.World;
-            bool shouldShow = !_scene.IsInteractiveUIUnderMouse() && playerValid && !ctrlDown && !menuOpen && _playerMenuHintCooldown <= 0;
+            bool shouldShow = !_scene.IsInteractiveUIUnderMouse() && playerValid && !GensCombatRules.IsEnemy(hoveredPlayer) && !ctrlDown && !menuOpen && _playerMenuHintCooldown <= 0;
 
             if (!playerValid)
             {

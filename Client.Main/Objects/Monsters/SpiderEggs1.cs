@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 
 namespace Client.Main.Objects.Monsters
 {
+    [NpcInfo(460, "Spider Eggs 1")]
     public class SpiderEggs1 : MonsterObject
     {
         public SpiderEggs1()
         {
+            Scale = 0.3f;
         }
 
         public override async Task Load()

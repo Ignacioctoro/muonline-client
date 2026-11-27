@@ -1,3 +1,6 @@
+using System;
+using System.Threading.Tasks;
+using Client.Main.Content;
 using Client.Main.Controls.UI.Common;
 using Client.Main.Controllers;
 using Client.Main.Graphics;
@@ -5,307 +8,213 @@ using Client.Main.Helpers;
 using Client.Main.Models;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using System;
+using Microsoft.Xna.Framework.Input;
 
 namespace Client.Main.Controls.UI.SelectCharacter
 {
-    /// <summary>
-    /// Dialog for confirming character deletion with security code input.
-    /// </summary>
     public class CharacterDeletionDialog : GameControl
     {
-        // ═══════════════════════════════════════════════════════════════
-        // MODERN DARK THEME - Matching SelectCharacterScene
-        // ═══════════════════════════════════════════════════════════════
         private static class Theme
         {
-            // Background layers
-            public static readonly Color BgDarkest = new(8, 10, 14, 252);
-            public static readonly Color BgDark = new(16, 20, 26, 250);
-            public static readonly Color BgMid = new(24, 30, 38, 248);
-            public static readonly Color BgLight = new(35, 42, 52, 245);
-            public static readonly Color BgLighter = new(48, 56, 68, 240);
-
-            // Accent - Warm Gold
-            public static readonly Color Accent = new(212, 175, 85);
-            public static readonly Color AccentBright = new(255, 215, 120);
-            public static readonly Color AccentDim = new(140, 115, 55);
-            public static readonly Color AccentGlow = new(255, 200, 80, 40);
-
-            // Secondary accent - Cool Blue
-            public static readonly Color Secondary = new(90, 140, 200);
-            public static readonly Color SecondaryBright = new(130, 180, 240);
-            public static readonly Color SecondaryDim = new(50, 80, 120);
-
-            // Borders
-            public static readonly Color BorderOuter = new(5, 6, 8, 255);
-            public static readonly Color BorderInner = new(60, 70, 85, 200);
-            public static readonly Color BorderHighlight = new(100, 110, 130, 120);
-
-            // Text
-            public static readonly Color TextWhite = new(240, 240, 245);
-            public static readonly Color TextGold = new(255, 220, 130);
-            public static readonly Color TextGray = new(160, 165, 175);
-            public static readonly Color TextDark = new(100, 105, 115);
-
-            // Status colors
-            public static readonly Color Success = new(80, 200, 120);
-            public static readonly Color Warning = new(240, 180, 60);
-            public static readonly Color Danger = new(220, 80, 80);
+            public static readonly Color BgDarkest = new(0, 0, 0, 185);
+            public static readonly Color BgDark = new(0, 0, 0, 210);
+            public static readonly Color BgMid = new(35, 30, 22);
+            public static readonly Color BgLight = new(74, 61, 42);
+            public static readonly Color BgLighter = new(130, 108, 66);
+            public static readonly Color Accent = new(234, 206, 132);
         }
 
-        private RenderTarget2D _backgroundSurface;
-        private bool _surfaceNeedsRedraw = true;
-        private double _bringToFrontTimer = 0;
-        private const double BRING_TO_FRONT_INTERVAL = 0.1; // Throttle to every 100ms
+        private enum Step { ConfirmCharacter, Credentials, FinalWarning }
+        private Step _step;
         private readonly string _characterName;
-        private LabelControl _titleLabel;
-        private LabelControl _messageLabel;
-        private LabelControl _securityCodeLabel;
-        private TextBoxControl _securityCodeInput;
-        private ButtonControl _confirmButton;
-        private ButtonControl _cancelButton;
-
+        private readonly SecretInput _input;
+        private readonly Texture2D[] _frame = new Texture2D[9];
+        private Texture2D _buttons;
+        private RenderTarget2D _surface;
+        private bool _finished;
+        private int _pressed = -1;
+        private readonly BlendState _surfaceBlend = new()
+        {
+            ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.InverseSourceAlpha,
+            AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.InverseSourceAlpha,
+        };
+        public override bool BlocksPointerInput => true;
         public event EventHandler<string> DeleteConfirmed;
         public event EventHandler CancelRequested;
 
         public CharacterDeletionDialog(string characterName)
         {
             _characterName = characterName;
-            
             AutoViewSize = false;
-            ViewSize = new Point(550, 400);
+            ViewSize = new Point(304, 186);
             Align = ControlAlign.HorizontalCenter | ControlAlign.VerticalCenter;
             Interactive = true;
-
-            InitializeControls();
-            
-            // Ensure dialog appears on top of character cards
-            BringToFront();
-        }
-
-        private void InitializeControls()
-        {
-            // Title
-            _titleLabel = new LabelControl
+            _input = new SecretInput
             {
-                Text = "DELETE CHARACTER",
-                FontSize = 20f,
-                TextColor = Theme.Danger,
-                Align = ControlAlign.Top | ControlAlign.HorizontalCenter,
-                Margin = new Margin { Top = 10 }
+                X = 70, Y = 67, ViewSize = new Point(164, 24), MaxLength = 20,
+                Visible = false, Interactive = false,
             };
-            Controls.Add(_titleLabel);
-
-            // Warning message
-            _messageLabel = new LabelControl
-            {
-                Text = $"Are you sure you want to delete '{_characterName}'?\n\nThis action cannot be undone!\n\nEnter your security code to confirm:",
-                FontSize = 13f,
-                TextColor = Theme.TextWhite,
-                Align = ControlAlign.Top | ControlAlign.HorizontalCenter,
-                Margin = new Margin { Top = 70 },
-                ViewSize = new Point(450, 120),
-                X = 50
-            };
-            Controls.Add(_messageLabel);
-
-            // Security code label
-            _securityCodeLabel = new LabelControl
-            {
-                Text = "Security Code:",
-                FontSize = 13f,
-                TextColor = Theme.TextWhite,
-                X = 50,
-                Y = 200
-            };
-            Controls.Add(_securityCodeLabel);
-
-            // Security code input
-            _securityCodeInput = new TextBoxControl
-            {
-                X = 50,
-                Y = 230,
-                ViewSize = new Point(450, 36),
-                MaxLength = 20,
-                PlaceholderText = "Enter security code...",
-                FontSize = 8f,
-                BackgroundColor = Theme.BgDark,
-                TextColor = Theme.TextWhite,
-                BorderColor = Theme.BorderInner,
-                BorderThickness = 1
-            };
-            Controls.Add(_securityCodeInput);
-            _securityCodeInput.Focus();
-
-            // Delete button
-            _confirmButton = CreateModernButton("DELETE CHARACTER", Theme.Danger);
-            _confirmButton.X = 50;
-            _confirmButton.Y = 300;
-            _confirmButton.ViewSize = new Point(220, 40);
-            _confirmButton.Click += OnConfirmClick;
-            Controls.Add(_confirmButton);
-
-            // Cancel button
-            _cancelButton = CreateModernButton("CANCEL", Theme.BgLight);
-            _cancelButton.X = 280;
-            _cancelButton.Y = 300;
-            _cancelButton.ViewSize = new Point(220, 40);
-            _cancelButton.Click += OnCancelClick;
-            Controls.Add(_cancelButton);
+            Controls.Add(_input);
         }
 
-        private ButtonControl CreateModernButton(string text, Color baseColor)
+        public override async Task Load()
         {
-            return new ButtonControl
+            var tasks = new Task<Texture2D>[10];
+            for (int i = 0; i < 9; i++) tasks[i] = TextureLoader.Instance.PrepareAndGetTexture($"Interface/GFx/popupbg{i + 1:00}.ozd");
+            tasks[9] = TextureLoader.Instance.PrepareAndGetTexture("Interface/GFx/winLoginSceneBottomUI_I1.ozd");
+            var textures = await Task.WhenAll(tasks);
+            Array.Copy(textures, _frame, 9);
+            _buttons = textures[9];
+        }
+
+        // Pre-rendered before the world: never switch the main target in the UI pass.
+        internal void PrepareDraw()
+        {
+            if (!Visible || Status != GameControlStatus.Ready || _surface != null) return;
+            var gd = GraphicsDevice;
+            var targets = gd.GetRenderTargets();
+            _surface = new RenderTarget2D(gd, 304, 186, false, SurfaceFormat.Color, DepthFormat.None);
+            try
             {
-                Text = text,
-                FontSize = 13f,
-                AutoViewSize = false,
-                BackgroundColor = baseColor,
-                HoverBackgroundColor = Color.Lerp(baseColor, Color.White, 0.2f),
-                PressedBackgroundColor = Color.Lerp(baseColor, Color.Black, 0.2f),
-                TextColor = Theme.TextWhite,
-                HoverTextColor = Theme.TextWhite,
-                DisabledTextColor = Theme.TextDark,
-                Interactive = true,
-                BorderThickness = 1,
-                BorderColor = Theme.BorderInner
-            };
+                gd.SetRenderTarget(_surface);
+                gd.Clear(Color.Transparent);
+                using var scope = new SpriteBatchScope(GraphicsManager.Instance.Sprite, SpriteSortMode.Deferred, _surfaceBlend, SamplerState.LinearClamp);
+                var sb = GraphicsManager.Instance.Sprite;
+                for (int y = 0; y < 3; y++)
+                for (int x = 0; x < 3; x++)
+                {
+                    int left = x == 0 ? 0 : x == 1 ? 16 : 288;
+                    int top = y == 0 ? 0 : y == 1 ? 16 : 170;
+                    var rect = new Rectangle(left, top, x == 1 ? 272 : 16, y == 1 ? 154 : 16);
+                    if (x == 1 && y == 1) sb.Draw(GraphicsManager.Instance.Pixel, rect, Theme.BgDarkest);
+                    else if (_frame[y * 3 + x] != null) sb.Draw(_frame[y * 3 + x], rect, Color.White);
+                }
+                sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle(13, 34, 278, 1), Theme.BgLight);
+            }
+            finally { gd.SetRenderTargets(targets); }
         }
 
-        private void OnConfirmClick(object sender, EventArgs e)
-        {
-            string securityCode = _securityCodeInput.Text.Trim();
-            DeleteConfirmed?.Invoke(this, securityCode);
-        }
-
-        private void OnCancelClick(object sender, EventArgs e)
-        {
-            CancelRequested?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void RegenerateBackgroundSurface()
-        {
-            _backgroundSurface?.Dispose();
-
-            int width = ViewSize.X;
-            int height = ViewSize.Y;
-
-            _backgroundSurface = new RenderTarget2D(
-                GraphicsDevice,
-                width,
-                height,
-                false,
-                SurfaceFormat.Color,
-                DepthFormat.None);
-
-            // Render background to surface
-            var oldTargets = GraphicsDevice.GetRenderTargets();
-            GraphicsDevice.SetRenderTarget(_backgroundSurface);
-            GraphicsDevice.Clear(Color.Transparent);
-
-            // Create a new SpriteBatch instance to avoid conflicts with shared instance
-            using var batch = new SpriteBatch(GraphicsDevice);
-            batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-
-            var pixel = UiDrawHelper.GetPixelTexture(GraphicsDevice);
-            var dialogRect = new Rectangle(0, 0, width, height);
-
-            // Main panel background with gradient
-            UiDrawHelper.DrawVerticalGradient(batch, dialogRect, Theme.BgMid, Theme.BgDark);
-
-            // Outer border
-            batch.Draw(pixel, new Rectangle(0, 0, dialogRect.Width, 1), Theme.BorderOuter);
-            batch.Draw(pixel, new Rectangle(0, dialogRect.Height - 1, dialogRect.Width, 1), Theme.BorderOuter);
-            batch.Draw(pixel, new Rectangle(0, 0, 1, dialogRect.Height), Theme.BorderOuter);
-            batch.Draw(pixel, new Rectangle(dialogRect.Width - 1, 0, 1, dialogRect.Height), Theme.BorderOuter);
-
-            // Header section with danger accent - aligned with dialog (no offset)
-            var headerRect = new Rectangle(0, 0, dialogRect.Width, 50);
-            UiDrawHelper.DrawHorizontalGradient(batch, headerRect, Theme.BgLighter, Theme.BgMid);
-            
-            // Danger accent on header (top stripe)
-            batch.Draw(pixel, new Rectangle(0, 0, dialogRect.Width, 3), Theme.Danger * 0.6f);
-            
-            // Corner accents aligned with header
-            UiDrawHelper.DrawCornerAccents(batch, headerRect, Theme.Danger, 12, 2);
-
-            // Header separator (aligned with header width)
-            batch.Draw(pixel, new Rectangle(0, headerRect.Bottom - 1, headerRect.Width, 1), Theme.BorderInner);
-            batch.Draw(pixel, new Rectangle(0, headerRect.Bottom - 2, headerRect.Width, 1), Theme.Danger * 0.3f);
-
-            batch.End();
-
-            GraphicsDevice.SetRenderTargets(oldTargets);
-        }
+        private Rectangle ButtonRect(int index) => new(DisplayRectangle.X + 77 + index * 80, DisplayRectangle.Y + 140, 72, 30);
 
         public override void Update(GameTime gameTime)
         {
             base.Update(gameTime);
-            
-            // Ensure dialog stays on top of character cards (throttled)
-            _bringToFrontTimer += gameTime.ElapsedGameTime.TotalSeconds;
-            if (_bringToFrontTimer >= BRING_TO_FRONT_INTERVAL && Parent != null)
+            if (!Visible || Status != GameControlStatus.Ready || _finished) return;
+            var mouse = MuGame.Instance.UiMouseState;
+            var previous = MuGame.Instance.PrevUiMouseState;
+            if (mouse.LeftButton == ButtonState.Pressed && previous.LeftButton == ButtonState.Released)
             {
-                _bringToFrontTimer = 0;
-                BringToFront();
+                _pressed = ButtonRect(0).Contains(mouse.Position) ? 0 : ButtonRect(1).Contains(mouse.Position) ? 1 : -1;
+                Scene?.SetMouseInputConsumed();
             }
+            if (mouse.LeftButton == ButtonState.Released && previous.LeftButton == ButtonState.Pressed)
+            {
+                int pressed = _pressed;
+                _pressed = -1;
+                if (pressed >= 0 && ButtonRect(pressed).Contains(mouse.Position))
+                {
+                    if (pressed == 0) Advance(); else Cancel();
+                }
+            }
+            if (_finished) return;
+            if (MuGame.Instance.Keyboard.IsKeyDown(Keys.Escape) && MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Escape)) Cancel();
+            else if (MuGame.Instance.Keyboard.IsKeyDown(Keys.Enter) && MuGame.Instance.PrevKeyboard.IsKeyUp(Keys.Enter)) Advance();
+        }
+
+        private void Advance()
+        {
+            if (_finished) return;
+            Scene?.SetMouseInputConsumed();
+            if (_step == Step.ConfirmCharacter)
+            {
+                _step = Step.Credentials;
+                _input.Visible = _input.Interactive = true;
+                _input.Focus();
+            }
+            else if (_step == Step.Credentials)
+            {
+                if (string.IsNullOrEmpty(_input.Text)) { _input.Focus(); return; }
+                _step = Step.FinalWarning;
+                _input.Visible = _input.Interactive = false;
+                _input.Unfocus();
+            }
+            else
+            {
+                _finished = true;
+                string secret = _input.Text;
+                _input.Text = string.Empty;
+                DeleteConfirmed?.Invoke(this, secret);
+            }
+        }
+
+        private void Cancel()
+        {
+            _finished = true;
+            _input.Text = string.Empty;
+            CancelRequested?.Invoke(this, EventArgs.Empty);
         }
 
         public override void Draw(GameTime gameTime)
         {
-            if (Status == GameControlStatus.Ready)
+            if (!Visible || Status != GameControlStatus.Ready) return;
+            using var scope = new SpriteBatchScope(GraphicsManager.Instance.Sprite, SpriteSortMode.Deferred,
+                BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.None, RasterizerState.CullNone, transform: UiScaler.SpriteTransform);
+            var sb = GraphicsManager.Instance.Sprite;
+            var rect = DisplayRectangle;
+            if (_surface != null) sb.Draw(_surface, rect, Color.White);
+            string text = _step switch
             {
-                if (_backgroundSurface == null || _surfaceNeedsRedraw ||
-                    _backgroundSurface.Width != ViewSize.X || _backgroundSurface.Height != ViewSize.Y)
-                {
-                    RegenerateBackgroundSurface();
-                    _surfaceNeedsRedraw = false;
-                }
+                Step.ConfirmCharacter => $"Would you like to delete\n{_characterName}?",
+                Step.Credentials => "Enter your security code\nor account password.",
+                _ => "You cannot restore a deleted character!\nIts equipment and items\ncannot be recovered.",
+            };
+            DrawText(sb, text, new Rectangle(rect.X + 14, rect.Y + 38, rect.Width - 28, _step == Step.Credentials ? 28 : 66), Color.White);
+            if (_input.Visible) _input.Draw(gameTime);
+            for (int i = 0; i < 2; i++)
+            {
+                var button = ButtonRect(i);
+                bool hover = button.Contains(MuGame.Instance.UiMouseState.Position);
+                var source = hover && _pressed == i ? new Rectangle(385, 2, 117, 28)
+                    : hover ? new Rectangle(258, 2, 117, 28) : new Rectangle(131, 2, 117, 28);
+                if (_buttons != null) sb.Draw(_buttons, button, source, Color.White);
+                DrawText(sb, i == 0 ? "OK" : "Cancel", button, Theme.Accent);
+            }
+        }
 
-                if (_backgroundSurface != null)
-                {
-                    var sb = GraphicsManager.Instance.Sprite;
-                    using (new SpriteBatchScope(sb, SpriteSortMode.Deferred, BlendState.AlphaBlend,
-                        SamplerState.LinearClamp, DepthStencilState.None, RasterizerState.CullNone, null, UiScaler.SpriteTransform))
-                    {
-                        var destRect = new Rectangle(
-                            DisplayPosition.X,
-                            DisplayPosition.Y,
-                            ViewSize.X,
-                            ViewSize.Y);
+        private static void DrawText(SpriteBatch sb, string text, Rectangle rect, Color color)
+        {
+            var font = GraphicsManager.Instance.Font;
+            var size = font.MeasureString(text);
+            float scale = Math.Min(0.39f, rect.Width / Math.Max(1, size.X));
+            var position = new Vector2(rect.X + (rect.Width - size.X * scale) / 2, rect.Y + (rect.Height - size.Y * scale) / 2);
+            sb.DrawString(font, text, position + Vector2.One, Color.Black, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+            sb.DrawString(font, text, position, color, 0, Vector2.Zero, scale, SpriteEffects.None, 0);
+        }
 
-                        sb.Draw(_backgroundSurface, destRect, Color.White);
-                    }
+        private sealed class SecretInput : TextBoxControl
+        {
+            public override void Draw(GameTime gameTime)
+            {
+                var sb = GraphicsManager.Instance.Sprite;
+                var rect = DisplayRectangle;
+                sb.Draw(GraphicsManager.Instance.Pixel, rect, Theme.BgDark);
+                sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), Theme.BgLight);
+                string masked = new('*', Text.Length);
+                DrawText(sb, masked, rect, Color.White);
+                if (gameTime.TotalGameTime.TotalSeconds % 1 < 0.5)
+                {
+                    int x = rect.Center.X + (int)(GraphicsManager.Instance.Font.MeasureString(masked).X * 0.39f / 2);
+                    sb.Draw(GraphicsManager.Instance.Pixel, new Rectangle(x, rect.Y + 5, 1, rect.Height - 10), Theme.Accent);
                 }
             }
-
-            base.Draw(gameTime);
         }
 
         public override void Dispose()
         {
-            _backgroundSurface?.Dispose();
-            _backgroundSurface = null;
-
-            if (_confirmButton != null)
-            {
-                _confirmButton.Click -= OnConfirmClick;
-            }
-
-            if (_cancelButton != null)
-            {
-                _cancelButton.Click -= OnCancelClick;
-            }
-
+            _input.Text = string.Empty;
+            _surface?.Dispose();
+            _surfaceBlend.Dispose();
             base.Dispose();
-        }
-
-        protected override void OnScreenSizeChanged()
-        {
-            base.OnScreenSizeChanged();
-            _surfaceNeedsRedraw = true;
         }
     }
 }

@@ -296,7 +296,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                     DepthStencilState.None, RasterizerState.CullNone, transform: UiScaler.SpriteTransform);
                 bool busy = Scene is GameScene helperScene && helperScene.IsMuHelperBusy;
                 sprite.Draw(_hudTexture, HelperLogArea, new Rectangle(_helperLogHovered ? 654 : 592, 0, 30, 30), Color.White);
-                sprite.Draw(_hudTexture, HelperSetupArea, new Rectangle(_helperHovered ? 561 : 375, 0, 30, 30), Color.White);
+                sprite.Draw(_hudTexture, HelperSetupArea, new Rectangle(_helperHovered ? 561 : 530, 0, 30, 30), Color.White);
                 int runSource = busy ? _helperRunHovered ? 778 : 747 : _helperRunHovered ? 437 : 406;
                 sprite.Draw(_hudTexture, HelperRunArea, new Rectangle(runSource, 0, 30, 30), Color.White);
                 if (_helperHovered || _helperRunHovered || _helperLogHovered)

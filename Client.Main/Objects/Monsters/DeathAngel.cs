@@ -12,6 +12,7 @@ namespace Client.Main.Objects.Monsters
     {
         public DeathAngel()
         {
+            Scale = 1.2f;
         }
 
         public override async Task Load()

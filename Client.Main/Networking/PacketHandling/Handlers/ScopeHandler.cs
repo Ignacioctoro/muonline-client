@@ -966,7 +966,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                     if (extItemGroup == UNEQUIP_MARKER)
                     {
-                        await HandleUnequipAsync(extMaskedId, extItemSlot);
+                        await HandleUnequipAsync(extMaskedId, extItemSlot, span[EXT_SET_COMPLETE_OFFSET] != 0);
                         return;
                     }
 
@@ -1018,7 +1018,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                 if (itemData[0] == UNEQUIP_MARKER)
                 {
-                    await HandleUnequipAsync(stdMaskedId, itemSlot);
+                    await HandleUnequipAsync(stdMaskedId, itemSlot, itemData.Length > 6 && itemData[6] != 0);
                     return;
                 }
 
@@ -1071,7 +1071,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             }
         }
 
-        private Task HandleUnequipAsync(ushort maskedId, byte itemSlot)
+        private Task HandleUnequipAsync(ushort maskedId, byte itemSlot, bool isAncientSetComplete)
         {
             MuGame.ScheduleOnMainThread(async () =>
             {
@@ -1085,6 +1085,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 {
                     try
                     {
+                        player.SetAncientSetComplete(isAncientSetComplete);
                         await player.UpdateEquipmentSlotAsync(itemSlot, null);
                     }
                     catch (Exception ex)

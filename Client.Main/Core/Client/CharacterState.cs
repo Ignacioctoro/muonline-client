@@ -1774,6 +1774,8 @@ namespace Client.Main.Core.Client
         /// <summary>Starts a fresh skill session before selecting another character.</summary>
         public void ResetCharacterSkills()
         {
+            ResetCharacterConfiguration();
+            ResetGens();
             Progression = null;
             ProgressionRevision++;
             HasMasterExperienceInfo = false;

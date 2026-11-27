@@ -12,6 +12,7 @@ namespace Client.Main.Objects.Monsters
     {
         public Aegis()
         {
+            Scale = 1.4f;
         }
 
         public override async Task Load()

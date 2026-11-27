@@ -15,6 +15,7 @@ using Client.Main.Content;
 using Microsoft.Xna.Framework.Graphics;
 using System.Linq;
 using Client.Main.Objects;
+using Client.Main.Core.Utilities;
 
 public class CursorControl : SpriteControl
 {
@@ -151,7 +152,8 @@ public class CursorControl : SpriteControl
                 player.NetworkId == enemyId;
         }
 
-        return ctrlPressed || isDuelTarget;
+        return !GensCombatRules.IsProtectedTarget(player)
+            && (ctrlPressed || isDuelTarget || GensCombatRules.IsEnemy(player));
     }
 
     public void UpdateAfterWorld(GameTime gameTime)

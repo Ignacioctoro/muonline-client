@@ -382,6 +382,19 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             InitializeTextEntries();
         }
+        public event Action ItemHotkeysChanged;
+
+        public void RestoreItemHotkey(Keys key, int group, int id, int level)
+        {
+            if (key != Keys.Q && key != Keys.W && key != Keys.E && key != Keys.R) return;
+            if (group < 0 || group > 15 || id < 0 || id > 511 || level < 0 || level > 15)
+            { _itemHotkeys.Remove(key); return; }
+            var definition = ItemDatabase.GetItemDefinition((byte)group, (short)id);
+            if (definition == null || !definition.IsConsumable() || definition.IsJewel())
+            { _itemHotkeys.Remove(key); return; }
+            _itemHotkeys[key] = new ItemHotkeyEntry(group, id, level, definition.Name);
+        }
+
         public bool TryAssignItemHotkey(Keys key, out string message)
         {
             message = string.Empty;
@@ -422,6 +435,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 _hoveredItem.Level,
                 definition.Name);
 
+            ItemHotkeysChanged?.Invoke();
             message = $"{key} asignada a {definition.Name}.";
 
             return true;
@@ -643,6 +657,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     option.Level,
                     option.Name);
 
+            ItemHotkeysChanged?.Invoke();
             message =
                 $"{key} asignada a {option.Name}.";
 
@@ -658,7 +673,9 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return false;
             }
 
-            return _itemHotkeys.Remove(key);
+            bool removed = _itemHotkeys.Remove(key);
+            if (removed) ItemHotkeysChanged?.Invoke();
+            return removed;
         }
 
         public static InventoryControl Instance
@@ -2761,7 +2778,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     _ = Task.Run(async () =>
                     {
                         await svc.SendStorageItemMoveAsync(ItemStorageKind.Inventory, slotIndex,
-                            chaos.IsTrainerMode ? ItemStorageKind.PetTrainer : ItemStorageKind.ChaosMachine,
+                            chaos.ActiveCraftingStorage,
                             toSlot, _networkManager.TargetVersion, raw);
                         await Task.Delay(1200);
                         if (_networkManager != null && state.IsInventoryMovePending(slotIndex, slotIndex))

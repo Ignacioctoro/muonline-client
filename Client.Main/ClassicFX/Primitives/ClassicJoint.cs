@@ -44,6 +44,8 @@ namespace Client.Main.ClassicFX.Primitives
         public bool CreateTails;
         public int NumTails;
         public int MaxTails;
+        public float NativeTailFramePhase;
+        public bool IsEquipmentSetTrail;
 
         // Flattened vec3_t Tails[MAX_TAILS][4]; one reusable array per
         // activated slot, avoiding per-frame arrays and 200 small objects.

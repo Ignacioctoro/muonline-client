@@ -544,7 +544,11 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         _logger.LogInformation("Vault item moved to slot {To}.", toSlot);
                     }
                     else if (targetStore == ItemStorageKind.ChaosMachine ||
-                             targetStore == ItemStorageKind.PetTrainer)
+                             targetStore == ItemStorageKind.PetTrainer ||
+                             targetStore == ItemStorageKind.SeedCrafting ||
+                             targetStore == ItemStorageKind.SeedSphereCrafting ||
+                             targetStore == ItemStorageKind.SeedMountCrafting ||
+                             targetStore == ItemStorageKind.SeedUnmountCrafting)
                     {
                         // Clear any pending chaos machine move information (for chaos->chaos moves)
                         if (_characterState.TryConsumePendingChaosMachineMove(out var from, out var to))

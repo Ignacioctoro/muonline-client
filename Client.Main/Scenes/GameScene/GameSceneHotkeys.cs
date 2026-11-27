@@ -146,7 +146,7 @@ namespace Client.Main.Scenes
         }
 
         private static bool WhenEscapeNotConsumed(HotkeyContext context)
-            => !context.Scene.IsKeyboardEscapeConsumedThisFrame && !PetTrainerControl.IsOpen && !PetInfoControl.IsOpen && !MasterSkillTreeControl.IsOpen && !CashShopControl.IsOpen && !MuHelperControl.IsOpen;
+            => !context.Scene.IsKeyboardEscapeConsumedThisFrame && !PetTrainerControl.IsOpen && !PetInfoControl.IsOpen && !MasterSkillTreeControl.IsOpen && !CashShopControl.IsOpen && !MuHelperControl.IsOpen && !GensControl.IsOpen;
 
         private static bool WhenMoveCommandFocused(HotkeyContext context)
         {
@@ -189,6 +189,8 @@ namespace Client.Main.Scenes
             hotkeys.OnKeyPressed(Keys.Z, HotkeyModifiers.None, _ => MuHelperControl.Instance.Toggle(),
                 when: WhenNotUiInput, exactModifiers: true);
             hotkeys.OnKeyPressed(Keys.Y, _ => PetInfoControl.Instance.Toggle(), when: WhenNotUiInput);
+            hotkeys.OnKeyPressed(Keys.B, HotkeyModifiers.None, _ => GensControl.Instance.Toggle(),
+                when: WhenNotUiInput, exactModifiers: true);
             hotkeys.OnKeyPressed(Keys.A, HotkeyModifiers.None, _ => MasterSkillTreeControl.Instance.Toggle(),
                 when: WhenNotUiInput, exactModifiers: true);
             hotkeys.OnKeyPressed(Keys.I, ToggleInventory, when: WhenNotUiInput);

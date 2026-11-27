@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Client.Main.Objects;
+using Client.Main.Objects.Monsters;
 
 namespace Client.Main.Core.Utilities
 {
@@ -30,6 +31,26 @@ namespace Client.Main.Core.Utilities
                     NpcNames[attr.TypeId] = attr.DisplayName;
                     NpcTypes[attr.TypeId] = type;
                 }
+            }
+
+            // GMHellas::CreateHellasMonster: each Kalima tier has its own server ID,
+            // while all tiers reuse the same family model. Keep protocol IDs intact.
+            RegisterKalimaFamily(typeof(DeathAngel), "Death Angel", 144, 174, 182, 190, 260, 268, 334);
+            RegisterKalimaFamily(typeof(DeathCenturion), "Death Centurion", 145, 175, 183, 191, 261, 269, 336);
+            RegisterKalimaFamily(typeof(BloodSoldier), "Blood Soldier", 146, 176, 184, 192, 262, 270, 333);
+            RegisterKalimaFamily(typeof(Aegis), "Aegis", 147, 177, 185, 193, 263, 271, 331);
+            RegisterKalimaFamily(typeof(LordCenturion), "Rogue Centurion", 148, 178, 186, 194, 264, 272, 332);
+            RegisterKalimaFamily(typeof(Necron), "Necron", 149, 179, 187, 195, 265, 273, 335);
+            RegisterKalimaFamily(typeof(Schriker), "Schriker", 160, 180, 188, 196, 266, 274, 337);
+            RegisterKalimaFamily(typeof(IllusionOfKundun), "Illusion of Kundun", 161, 181, 189, 197, 267, 338);
+        }
+
+        private static void RegisterKalimaFamily(Type type, string name, params ushort[] ids)
+        {
+            for (int i = 0; i < ids.Length; i++)
+            {
+                NpcTypes[ids[i]] = type;
+                NpcNames[ids[i]] = $"{name} {i + 1}";
             }
         }
 

@@ -21,6 +21,15 @@ namespace Client.Main.Core.Client
         private readonly ConcurrentDictionary<ushort, ScopeObject> _objectsInScope = new(); // Thread-safe dictionary to store objects in scope, using masked IDs as keys
         // Server-confirmed shop advertisements (C2 3F 00). Keys are masked network IDs.
         private readonly ConcurrentDictionary<ushort, string> _playerShopNames = new();
+        // F8 05 may precede the visible model; keep server relations by masked id.
+        private readonly ConcurrentDictionary<ushort, GensStatus> _gensRelations = new();
+        public void SetGensRelation(ushort id, GensStatus relation)
+        {
+            id = (ushort)(id & 0x7FFF);
+            if (relation.Family == 0) _gensRelations.TryRemove(id, out _);
+            else _gensRelations[id] = relation;
+        }
+        public bool TryGetGensRelation(ushort id, out GensStatus relation) => _gensRelations.TryGetValue((ushort)(id & 0x7FFF), out relation);
 
         public void SetPlayerShop(ushort networkId, string storeName)
         {
@@ -181,6 +190,7 @@ namespace Client.Main.Core.Client
         public bool RemoveObjectFromScope(ushort maskedId)
         {
             RemovePlayerShop(maskedId);
+            _gensRelations.TryRemove((ushort)(maskedId & 0x7FFF), out _);
             if (_objectsInScope.TryRemove(maskedId, out var removedObject))
             {
                 ReturnScopeObject(removedObject);
@@ -356,6 +366,7 @@ namespace Client.Main.Core.Client
         {
             // Do not retain advertisements across map/connection transitions.
             _playerShopNames.Clear();
+            _gensRelations.Clear();
             if (clearSelf || _characterState.Id == 0xFFFF)
             {
                 _objectsInScope.Clear();

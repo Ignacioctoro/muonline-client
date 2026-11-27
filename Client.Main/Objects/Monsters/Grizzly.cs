@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 
 namespace Client.Main.Objects.Monsters
 {
+    [NpcInfo(424, "Grizzly")]
     public class Grizzly : MonsterObject
     {
         public Grizzly()
         {
+            Scale = 1.14f;
         }
 
         public override async Task Load()
